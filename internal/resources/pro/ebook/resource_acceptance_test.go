@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
@@ -440,8 +441,9 @@ resource "jamfplatform_pro_ebook" "test" {
 // tab, and a category shared by general.category_id and the Self Service
 // category set. Every ID-keyed category the test covers therefore carries a
 // real, distinct member. The Platform device groups bridge to the classic
-// scope through jamf_pro_id. class_ids is not covered: there is no
-// jamfplatform_pro_class resource to mint a class id.
+// scope through jamf_pro_id. class_ids is covered separately, by
+// TestAccResource_ProEbook_ScopeClassesSurviveUpdate — it needs its own steps
+// because Jamf Pro will not overwrite a stored class list in a single write.
 func ebookOmitRetainsFixtures(suffix string) string {
 	return fmt.Sprintf(`
 		resource "jamfplatform_pro_category" "omit" {
@@ -817,6 +819,160 @@ func TestAccResource_ProEbook_OmittedBlocksRetained(t *testing.T) {
 					resource.TestCheckNoResourceAttr(ebookResourceAddr, "scope.targets.department_ids.#"),
 					resource.TestCheckNoResourceAttr(ebookResourceAddr, "self_service.install_button_text"),
 					ebookRetainedOnServer(t),
+				),
+			},
+		},
+	})
+}
+
+// ebookClassScopeFixtures declares the objects the class_ids coverage needs: a
+// class to scope to, and two departments so a step can change a target category
+// OTHER than classes — the transition that destroyed the stored class before
+// the two-request delivery landed (issue #428).
+func ebookClassScopeFixtures(suffix string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_class" "scope" {
+			name        = "tf-acc-ebook-class-%[1]s"
+			description = "tf-acc ebook class scope fixture"
+		}
+
+		resource "jamfplatform_pro_department" "class_a" {
+			name = "tf-acc-ebook-class-dept-a-%[1]s"
+		}
+
+		resource "jamfplatform_pro_department" "class_b" {
+			name = "tf-acc-ebook-class-dept-b-%[1]s"
+		}
+	`, suffix)
+}
+
+// ebookClassScopeConfig declares an ebook scoped to the class fixture plus the
+// departments named in depts. classIDs is the literal `class_ids` line, so a
+// step can declare the category, clear it with `[]`, or omit it entirely. A
+// step that does not reference the class gets an explicit depends_on: nothing
+// else then orders the destroy, and the ebook must go before the class it may
+// still name on the wire.
+func ebookClassScopeConfig(name, suffix, depts, classIDs string) string {
+	dependsOn := ""
+	if !strings.Contains(classIDs, "jamfplatform_pro_class.scope") {
+		dependsOn = "depends_on = [jamfplatform_pro_class.scope]"
+	}
+	return ebookClassScopeFixtures(suffix) + fmt.Sprintf(`
+		resource "jamfplatform_pro_ebook" "test" {
+			%s
+			general = {
+				name            = %q
+				url             = "https://www.rd.usda.gov/sites/default/files/pdf-sample_0.pdf"
+				file_type       = "PDF"
+				version         = "1.0"
+				deployment_type = "Make Available in Self Service"
+			}
+			scope = {
+				targets = {
+					department_ids = [%s]
+					%s
+				}
+			}
+		}
+	`, dependsOn, name, depts, classIDs)
+}
+
+// ebookClassesOnServer asserts the ebook's stored scope classes against the
+// class fixture's allocated id. wantClass false demands the category be empty.
+// This is the check the state cannot make: a class the server dropped is a
+// server-side loss, and the pre-fix failure mode cleared it while reporting the
+// department change as applied.
+func ebookClassesOnServer(t *testing.T, wantClass bool) resource.TestCheckFunc {
+	c := proclassic.New(testhelpers.NewAcceptanceClient(t))
+	return func(s *terraform.State) error {
+		classID, err := ebookStateAttr(s, "jamfplatform_pro_class.scope", "id")
+		if err != nil {
+			return err
+		}
+		return testhelpers.CheckLiveObject(ebookResourceAddr,
+			func(ctx context.Context, id string) (*proclassic.Ebook, error) {
+				return c.GetEbookByID(ctx, id)
+			},
+			func(e *proclassic.Ebook) error {
+				if e.Scope == nil {
+					return fmt.Errorf("scope: absent")
+				}
+				if !wantClass {
+					if e.Scope.Classes != nil && e.Scope.Classes.Class != nil && len(*e.Scope.Classes.Class) != 0 {
+						return fmt.Errorf("scope.targets.classes: want empty, got %+v", *e.Scope.Classes.Class)
+					}
+					return nil
+				}
+				if e.Scope.Classes == nil {
+					return fmt.Errorf("scope.targets.classes: absent — the server dropped the class")
+				}
+				return ebookRequireSingleIDName("scope.targets.classes", classID, e.Scope.Classes.Class)
+			})(s)
+	}
+}
+
+// TestAccResource_ProEbook_ScopeClassesSurviveUpdate is the regression test for
+// issue #428: an ebook whose scope holds a class could not survive a scope
+// update. Jamf Pro stores <classes> only while the stored list is empty, so
+// every later scope write cleared it — the apply failed the post-apply
+// consistency check AND destroyed the class server-side, and the next apply
+// restored it, so an unchanged config alternated pass/fail forever. The
+// provider now delivers such a scope in two requests (see
+// ebookScopeClassesCleared).
+//
+// Step 2 is the one that used to fail: it changes department_ids and leaves
+// class_ids alone. Step 3 drops class_ids so the category goes unmanaged and
+// the granular merge has to carry it through the same two requests. Step 4
+// clears it with `[]`, which needs one request because the server accepts an
+// empty list. Every step's implicit post-apply plan must be empty, which is the
+// half the alternating failure broke. CheckDestroy is the file's documented
+// no-op: the /ebooks delete is asynchronous and GET-sensitive.
+func TestAccResource_ProEbook_ScopeClassesSurviveUpdate(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-ebook-class-" + suffix
+
+	const (
+		deptA     = "jamfplatform_pro_department.class_a.id"
+		deptAB    = "jamfplatform_pro_department.class_a.id, jamfplatform_pro_department.class_b.id"
+		declared  = "class_ids = [jamfplatform_pro_class.scope.id]"
+		cleared   = "class_ids = []"
+		unmanaged = ""
+	)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckEbookDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: ebookClassScopeConfig(name, suffix, deptA, declared),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(ebookResourceAddr, "scope.targets.class_ids.#", "1"),
+					resource.TestCheckResourceAttr(ebookResourceAddr, "scope.targets.department_ids.#", "1"),
+					ebookClassesOnServer(t, true),
+				),
+			},
+			{
+				Config: ebookClassScopeConfig(name, suffix, deptAB, declared),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(ebookResourceAddr, "scope.targets.class_ids.#", "1"),
+					resource.TestCheckResourceAttr(ebookResourceAddr, "scope.targets.department_ids.#", "2"),
+					ebookClassesOnServer(t, true),
+				),
+			},
+			{
+				Config: ebookClassScopeConfig(name, suffix, deptA, unmanaged),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr(ebookResourceAddr, "scope.targets.class_ids.#"),
+					resource.TestCheckResourceAttr(ebookResourceAddr, "scope.targets.department_ids.#", "1"),
+					ebookClassesOnServer(t, true),
+				),
+			},
+			{
+				Config: ebookClassScopeConfig(name, suffix, deptA, cleared),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(ebookResourceAddr, "scope.targets.class_ids.#", "0"),
+					ebookClassesOnServer(t, false),
 				),
 			},
 		},

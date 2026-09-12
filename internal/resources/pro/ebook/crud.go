@@ -31,6 +31,17 @@
 // categories stay owned by the admin UI; declared `[]` clears. See
 // STYLE_GUIDE.md §Scope helper omission semantics.
 //
+// Scope classes are a second exception, on top of that one. Jamf Pro stores
+// <classes> only while the STORED category is empty, so a scope write that
+// changes anything else destroys an existing class list whatever the body
+// carries (wire-probed 2026-09-12 on 11.31.1; see ebookScopeClassesCleared in
+// input_builders.go for the probe and the rule). Update therefore delivers a
+// scope carrying class members in two requests: the first applies the change
+// with <classes> emptied, the second sets the classes against the now-empty
+// category. Create needs neither — a new ebook's category starts empty, so the
+// POST stores them first time. No other scope category on any classic resource
+// behaves this way.
+//
 // Delete semantics: FIRE-AND-TRUST. The classic /ebooks DELETE is asynchronous
 // behind a MISLEADING response — the server returns HTTP 400 with body
 // <ebook><id>N</id></ebook> (no error envelope) even though it has ACCEPTED the
@@ -58,6 +69,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -211,7 +223,10 @@ func (r *EbookResource) Read(ctx context.Context, req resource.ReadRequest, resp
 }
 
 // Update updates a Jamf Pro ebook. Classic UpdateEbookByID returns 201 with an
-// empty body — we must GET to refresh state.
+// empty body — we must GET to refresh state. A plan whose merged scope carries
+// class members goes out as two requests, the first with the classes emptied;
+// ebookScopeClassesCleared holds the wire rule and why that ordering is the
+// safe one.
 func (r *EbookResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan EbookResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -254,9 +269,30 @@ func (r *EbookResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	if err := helpers.RetryOnDirectoryGroupMatchConflict(updateCtx, func() error {
-		return r.client.UpdateEbookByID(updateCtx, plan.ID.ValueString(), payload)
-	}); err != nil {
+	put := func(body *proclassic.EbookPost) error {
+		return helpers.RetryOnDirectoryGroupMatchConflict(updateCtx, func() error {
+			return r.client.UpdateEbookByID(updateCtx, plan.ID.ValueString(), body)
+		})
+	}
+
+	cleared := ebookScopeClassesCleared(payload)
+	if cleared != nil {
+		if err := put(cleared); err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating Jamf Pro ebook, and its scope classes may now be empty",
+				fmt.Sprintf("Jamf Pro stores an ebook's scope classes only while the stored list is empty, so the provider empties the list in one request and restores it in a second. The first request failed for ebook %s. An error return is not proof that nothing was applied, because a deadline that expires in flight leaves the write committed, so scope.targets.class_ids may now be empty in Jamf Pro. If your configuration declares class_ids, apply again to restore them. If it leaves the category unmanaged, check the ebook's scope in Jamf Pro before the next apply. (response: %s)", plan.ID.ValueString(), helpers.APIErrorDetail(err)),
+			)
+			return
+		}
+	}
+	if err := put(payload); err != nil {
+		if cleared != nil {
+			resp.Diagnostics.AddError(
+				"Ebook updated, but its scope classes are now empty in Jamf Pro",
+				fmt.Sprintf("Jamf Pro stores an ebook's scope classes only while the stored list is empty, so the provider empties the list in one request and restores it in a second. The first request applied every other change to ebook %s. The second failed, so scope.targets.class_ids is now empty in Jamf Pro. Terraform state is unchanged: if your configuration declares class_ids, apply again to restore the classes; if it leaves the category unmanaged, Jamf Pro no longer holds the list it had and the provider cannot recover it. (restore response: %s)", plan.ID.ValueString(), helpers.APIErrorDetail(err)),
+			)
+			return
+		}
 		resp.Diagnostics.AddError("Error updating Jamf Pro ebook", helpers.APIErrorDetail(err))
 		return
 	}

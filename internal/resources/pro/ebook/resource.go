@@ -60,7 +60,16 @@ var _ resource.ResourceWithModifyPlan = &EbookResource{}
 const (
 	defaultCreateTimeout = 60 * time.Second
 	defaultReadTimeout   = 90 * time.Second
-	defaultUpdateTimeout = 60 * time.Second
+	// defaultUpdateTimeout bounds up to four classic round trips, not the usual
+	// two: the read-merge-write GET, then — when the merged scope carries class
+	// members — a clearing PUT and a restoring PUT, then the refresh GET. The
+	// restoring PUT is the only request whose failure leaves class_ids empty in
+	// Jamf Pro, and it is last in the queue, so the budget has to cover the three
+	// ahead of it with room to spare. 3 minutes also leaves the directory-group
+	// match-conflict retry (helpers.RetryOnDirectoryGroupMatchConflict, 90s of
+	// its own) able to spend its full deadline on one PUT without starving the
+	// restore. See ebookScopeClassesCleared in input_builders.go.
+	defaultUpdateTimeout = 3 * time.Minute
 	// defaultDeleteTimeout bounds the whole Delete call: a single DELETE plus the
 	// GET-by-id poll that confirms the async /ebooks removal landed. A single
 	// delete clears in ~16s; 2 minutes is comfortable headroom before Delete
