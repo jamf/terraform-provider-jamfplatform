@@ -5,8 +5,11 @@ package ebook
 
 import (
 	"context"
+	"encoding/xml"
+	"strings"
 	"testing"
 
+	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -212,5 +215,100 @@ func TestBuildEbookSelfService_CategoryIDOnlySendsDisplayIn(t *testing.T) {
 	cats := *ss.SelfServiceCategories.Category
 	if len(cats) != 1 || cats[0].DisplayIn == nil || !*cats[0].DisplayIn {
 		t.Fatalf("display_in must be sent as true for an id-only category, got %+v", cats)
+	}
+}
+
+// TestEbookScopeClassesCleared_SingleRequestPaths pins every shape that must
+// NOT cost a second write: no payload, no scope, an unmanaged class category,
+// and a declared-empty one (the clear gesture, which a single request applies).
+func TestEbookScopeClassesCleared_SingleRequestPaths(t *testing.T) {
+	empty := []proclassic.IDName{}
+	for _, tc := range []struct {
+		name    string
+		payload *proclassic.EbookPost
+	}{
+		{"nil payload", nil},
+		{"no scope", &proclassic.EbookPost{General: &proclassic.EbookPostGeneral{}}},
+		{"scope without classes", &proclassic.EbookPost{Scope: &proclassic.EbookPostScope{
+			Departments: &proclassic.EbookScopeDepartments{Department: &[]proclassic.IDName{{ID: new(9)}}},
+		}}},
+		{"classes declared empty", &proclassic.EbookPost{Scope: &proclassic.EbookPostScope{
+			Classes: &proclassic.EbookScopeClasses{Class: &empty},
+		}}},
+		{"classes wrapper without members", &proclassic.EbookPost{Scope: &proclassic.EbookPostScope{
+			Classes: &proclassic.EbookScopeClasses{},
+		}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ebookScopeClassesCleared(tc.payload); got != nil {
+				t.Errorf("expected a single-request path, got a first-pass payload: %+v", got.Scope)
+			}
+		})
+	}
+}
+
+// TestEbookScopeClassesCleared_FirstPassCarriesTheChange proves the first of the
+// two requests is the caller's own body with only <classes> emptied: every
+// other category is carried unchanged, and the caller's payload — the one that
+// goes out second — is not mutated.
+func TestEbookScopeClassesCleared_FirstPassCarriesTheChange(t *testing.T) {
+	depts := []proclassic.IDName{{ID: new(9)}, {ID: new(10)}}
+	classes := []proclassic.IDName{{ID: new(41)}, {ID: new(42)}}
+	payload := &proclassic.EbookPost{
+		General: &proclassic.EbookPostGeneral{Name: new("Field Guide")},
+		Scope: &proclassic.EbookPostScope{
+			AllComputers: new(false),
+			Departments:  &proclassic.EbookScopeDepartments{Department: &depts},
+			Classes:      &proclassic.EbookScopeClasses{Class: &classes},
+			Limitations:  &proclassic.EbookScopeLimitations{},
+		},
+	}
+
+	first := ebookScopeClassesCleared(payload)
+	if first == nil {
+		t.Fatalf("expected a first-pass payload for a scope carrying classes")
+	}
+	if first.Scope.Classes == nil || first.Scope.Classes.Class == nil || len(*first.Scope.Classes.Class) != 0 {
+		t.Errorf("first pass must carry an explicitly empty classes category, got %+v", first.Scope.Classes)
+	}
+	if first.Scope.Departments != payload.Scope.Departments || first.Scope.Limitations != payload.Scope.Limitations {
+		t.Errorf("first pass must carry every other scope category unchanged")
+	}
+	if first.General != payload.General || first.Scope.AllComputers != payload.Scope.AllComputers {
+		t.Errorf("first pass must carry the rest of the body unchanged")
+	}
+	if payload.Scope.Classes == nil || payload.Scope.Classes.Class == nil || len(*payload.Scope.Classes.Class) != 2 {
+		t.Errorf("the caller's payload was mutated: %+v", payload.Scope.Classes)
+	}
+	if len(classes) != 2 || classes[0].ID == nil || *classes[0].ID != 41 {
+		t.Errorf("the caller's class slice was mutated: %+v", classes)
+	}
+}
+
+// TestEbookScopeClassesCleared_EmitsAnExplicitEmptyElement checks the gesture
+// that reaches the wire. The scope subtree replaces wholesale, so the first
+// request has to land <classes></classes> — an omitted element would leave the
+// body's meaning to the endpoint's merge rules rather than stating the clear.
+func TestEbookScopeClassesCleared_EmitsAnExplicitEmptyElement(t *testing.T) {
+	classes := []proclassic.IDName{{ID: new(41)}}
+	payload := &proclassic.EbookPost{Scope: &proclassic.EbookPostScope{
+		Departments: &proclassic.EbookScopeDepartments{Department: &[]proclassic.IDName{{ID: new(9)}}},
+		Classes:     &proclassic.EbookScopeClasses{Class: &classes},
+	}}
+
+	first, err := xml.Marshal(ebookScopeClassesCleared(payload).Scope)
+	if err != nil {
+		t.Fatalf("marshal first pass: %v", err)
+	}
+	if got := string(first); !strings.Contains(got, "<classes></classes>") || strings.Contains(got, "<class>") {
+		t.Errorf("first pass body must carry an empty classes element and no members: %s", got)
+	}
+
+	second, err := xml.Marshal(payload.Scope)
+	if err != nil {
+		t.Fatalf("marshal second pass: %v", err)
+	}
+	if got := string(second); !strings.Contains(got, "<class><id>41</id></class>") {
+		t.Errorf("second pass body must carry the class members: %s", got)
 	}
 }

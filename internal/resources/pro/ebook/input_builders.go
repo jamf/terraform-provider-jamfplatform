@@ -56,6 +56,39 @@ func buildEbookInput(ctx context.Context, plan EbookResourceModel) (*proclassic.
 	return out, diags
 }
 
+// ebookScopeClassesCleared returns the first of the two requests an ebook
+// whose scope carries class members needs, or nil when one request will do.
+//
+// Jamf Pro stores <classes> only while the stored category is empty. A
+// populated-to-populated transition is refused and the category is cleared
+// instead, whatever the body carries — re-sending the identical <classes>
+// cleared it 5/5, as did omitting it (wire-probed 2026-09-12 on 11.31.1,
+// /proclassic/ebooks). No other scope category behaves this way, and because a
+// scope PUT replaces the whole subtree there is no single body that preserves a
+// stored class across another scope change. Two bodies do: the first empties
+// the category while applying every other change, the second sets the classes
+// against the now-empty category (verified 5/5 on the same build).
+//
+// The returned payload is the caller's own body with an explicitly empty
+// <classes>, so the first request already carries the real change and an apply
+// interrupted between the two leaves exactly what a single request leaves — the
+// change applied, the classes empty, restored by the next apply.
+//
+// The gate is the category rather than the resource: a scope with no class
+// members takes the single-request path, so the extra write happens only where
+// it is the difference between keeping and losing the stored classes, and a
+// resource that gains the category later needs no further change here.
+func ebookScopeClassesCleared(p *proclassic.EbookPost) *proclassic.EbookPost {
+	if p == nil || p.Scope == nil || p.Scope.Classes == nil || p.Scope.Classes.Class == nil || len(*p.Scope.Classes.Class) == 0 {
+		return nil
+	}
+	cleared := *p
+	clearedScope := *p.Scope
+	clearedScope.Classes = &proclassic.EbookScopeClasses{Class: &[]proclassic.IDName{}}
+	cleared.Scope = &clearedScope
+	return &cleared
+}
+
 func buildEbookGeneral(m *EbookGeneralModel) *proclassic.EbookPostGeneral {
 	g := &proclassic.EbookPostGeneral{
 		Name:            helpers.OptionalStringPointer(m.Name),
