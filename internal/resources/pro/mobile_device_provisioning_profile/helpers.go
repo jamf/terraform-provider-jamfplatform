@@ -6,8 +6,8 @@ package mobile_device_provisioning_profile
 import (
 	"strconv"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // bigIntStringOrNull converts a nil-safe *proclassic.BigInt to a TF String,

@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // A policy dependency is an object a policy uses to do its work rather than to

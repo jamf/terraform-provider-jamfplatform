@@ -18,7 +18,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // Searcher is the subset of *pro.Client this package needs. Declaring it as an

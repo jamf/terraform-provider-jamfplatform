@@ -4,7 +4,7 @@
 package department
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // buildDepartmentInput converts the Terraform plan model into an SDK Department payload.

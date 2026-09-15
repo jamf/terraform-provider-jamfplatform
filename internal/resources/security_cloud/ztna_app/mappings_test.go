@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // TestLabelCoverage is the drift guard the label tables rest on: every value the SDK

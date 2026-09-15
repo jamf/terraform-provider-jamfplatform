@@ -4,7 +4,7 @@
 package local_admin_password_settings
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // buildLocalAdminPasswordSettingsInput converts the Terraform plan model into a

@@ -4,8 +4,8 @@
 package computer_check_in_settings
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // buildComputerCheckInSettingsInput converts the Terraform plan model into an SDK

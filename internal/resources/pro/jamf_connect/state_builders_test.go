@@ -6,8 +6,8 @@ package jamf_connect
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 func TestAssignJamfConnectResourceModel_EmptyVersionToNull(t *testing.T) {

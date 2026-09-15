@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // Three enumerated attributes on this resource are fixed dropdowns in the admin UI

@@ -6,8 +6,8 @@ package sso_connection
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/account"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 )
 
 // oidcConnectionRead is a generic OpenID Connect connection as Jamf returns it.

@@ -2,12 +2,16 @@
 // SPDX-License-Identifier: MPL-2.0
 
 // SDK endpoints used:
-//   proclassic.GetActivationCode
-//   proclassic.UpdateActivationCode    (PUT, XML — known server bug: commits the write
-//                                        but returns HTTP 500; tolerated via read-back
-//                                        verification in applyActivationCode. PI-1401.)
+//   proclassic.GetActivationCode       (deprecated 2026-07-14; no successor read is published)
+//   proclassic.UpdateActivationCode    (deprecated 2026-07-14; successor pro.UpdateActivationCodeV1
+//                                        deliberately not adopted. PUT, XML — known server bug:
+//                                        commits the write but returns HTTP 500; tolerated via
+//                                        read-back verification in applyActivationCode. PI-1401.)
 //
-// Status: current. Last reviewed 2026-06-19.
+// Status: deprecated by Jamf 2026-07-14; no migration is possible and none is planned — the read has
+// no successor, so the resource and the data source both carry a whole-schema DeprecationMessage and
+// are removed with the endpoint. See deprecation.go for the reasoning behind the six SA1019
+// suppressions. Last reviewed 2026-09-15.
 
 package activation_code
 
@@ -89,6 +93,7 @@ func (r *ActivationCodeResource) Read(ctx context.Context, req resource.ReadRequ
 	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
 	defer cancel()
 
+	//nolint:staticcheck // SA1019: the Classic /activationcode endpoint is deprecated with no replacement read — see deprecation.go.
 	got, err := r.client.GetActivationCode(readCtx)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading Jamf Pro activation code", helpers.APIErrorDetail(err))

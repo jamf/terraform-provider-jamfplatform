@@ -3,7 +3,7 @@
 
 package volume_purchasing_notification
 
-import "github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+import "github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 // Wire enum values, wire-probed against the live endpoint (a junk value returns
 // 400 INVALID_FIELD listing the accepted set). These back static OneOf validators.

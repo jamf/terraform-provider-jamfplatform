@@ -17,8 +17,8 @@ package invitationcommon
 import (
 	"time"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // Unlimited is the sentinel accepted by Jamf Pro for an invitation that never

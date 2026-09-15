@@ -3,7 +3,7 @@
 
 package blueprint
 
-import "github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/blueprints"
+import "github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 
 // Constants for blueprint deployment states. The SDK also generates
 // OUT_OF_DATE, which nothing here compares against.

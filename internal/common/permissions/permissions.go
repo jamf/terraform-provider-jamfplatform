@@ -50,7 +50,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 )
 
 // platformAPIGettingStartedURL is Jamf's "Getting started with the Platform

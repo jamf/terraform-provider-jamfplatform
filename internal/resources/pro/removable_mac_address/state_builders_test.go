@@ -6,8 +6,8 @@ package removable_mac_address
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 func TestAssignRemovableMacAddressResourceModel_PreservesIDWhenAPINil(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/blueprints"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 )
 
 // The custom_declarations schema validates `channel` and `kind` against an

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 )
 
 // apiError builds the error shape the SDK produces for a failed call, so the tests below exercise

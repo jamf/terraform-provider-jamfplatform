@@ -9,9 +9,9 @@ import (
 	"sort"
 	"testing"
 
-	devSDK "github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/devices"
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
+	devSDK "github.com/jamf/jamfplatform-go-sdk/jamfplatform/devices"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )

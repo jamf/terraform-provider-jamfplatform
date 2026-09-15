@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // TestPlatformLabels_CoverEverySDKValue fails when the SDK gains a platform this

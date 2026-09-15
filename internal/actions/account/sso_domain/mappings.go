@@ -6,7 +6,7 @@ package ssodomainaction
 import (
 	"slices"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/account"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 )
 
 // Machine-readable error codes this action translates. Wire-probed against the

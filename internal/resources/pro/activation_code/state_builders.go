@@ -4,8 +4,8 @@
 package activation_code
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // assignActivationCodeResourceModel populates a resource model from a ProClassic GET

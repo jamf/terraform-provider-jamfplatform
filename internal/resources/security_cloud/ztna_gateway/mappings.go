@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // Every enumerated attribute on this resource is a fixed dropdown in the admin UI

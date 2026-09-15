@@ -4,7 +4,7 @@
 package jamf_connect
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // buildJamfConnectInput converts the planned deployment settings into the SDK

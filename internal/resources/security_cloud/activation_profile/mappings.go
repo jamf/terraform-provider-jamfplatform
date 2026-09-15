@@ -6,7 +6,7 @@ package activation_profile
 import (
 	"slices"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // platformLabelByWire maps each platform value the Jamf API accepts to the

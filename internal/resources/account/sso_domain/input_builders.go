@@ -4,7 +4,7 @@
 package sso_domain
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/account"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 )
 
 // buildDomainRequest converts the Terraform plan model into the claim payload.

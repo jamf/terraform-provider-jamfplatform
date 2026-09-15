@@ -4,7 +4,7 @@
 package macos_onboarding
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // buildOnboardingInput converts the planned enabled flag and decoded onboarding

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // fakeToggleClient is a hand-rolled toggleClient that scripts the async settle: each GET

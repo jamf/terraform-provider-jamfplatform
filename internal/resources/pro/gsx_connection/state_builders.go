@@ -4,8 +4,8 @@
 package gsx_connection
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // assignGsxConnectionSettingsResourceModel populates a resource model from an SDK GET

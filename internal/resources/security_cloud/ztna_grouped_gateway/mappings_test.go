@@ -6,7 +6,7 @@ package ztna_grouped_gateway
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // TestRoutingStrategyLabelCoverage is the drift guard on the strategy table. A

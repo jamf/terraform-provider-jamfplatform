@@ -4,10 +4,10 @@
 package sso_domain
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/account"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 )
 
 // assignDomainResourceModel populates a resource model from a claim response.
@@ -100,7 +100,7 @@ func assignedConnectionListValue(connections []account.DomainAllocationConnectio
 		obj, objDiags := types.ObjectValue(assignedConnectionAttributeTypes, map[string]attr.Value{
 			"connection_id":              types.StringValue(c.AssignedConnection),
 			"connection_organization_id": types.StringValue(c.AssignedConnectionOrgID),
-			"region":                     types.StringValue(c.AuthZeroRegion),
+			"region":                     types.StringValue(c.Region),
 		})
 		diags.Append(objDiags...)
 		values = append(values, obj)

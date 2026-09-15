@@ -6,12 +6,12 @@ package activation_code
 import (
 	"context"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -38,7 +38,9 @@ func (d *ActivationCodeDataSource) Metadata(ctx context.Context, req datasource.
 // Schema returns the data source schema.
 func (d *ActivationCodeDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Read the current Jamf Pro activation code and organization name. One record per tenant." + dataSourcePrivileges,
+		DeprecationMessage: dataSourceDeprecation,
+		MarkdownDescription: dataSourceDeprecationCallout +
+			"Read the current Jamf Pro activation code and organization name. One record per tenant." + dataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Fixed singleton identifier. Always `singleton`.",
@@ -92,6 +94,7 @@ func (d *ActivationCodeDataSource) Read(ctx context.Context, req datasource.Read
 	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
 	defer cancel()
 
+	//nolint:staticcheck // SA1019: the Classic /activationcode endpoint is deprecated with no replacement read — see deprecation.go.
 	got, err := d.client.GetActivationCode(readCtx)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read Jamf Pro activation code", helpers.APIErrorDetail(err))

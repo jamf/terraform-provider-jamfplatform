@@ -6,8 +6,8 @@ package ztna_grouped_gateway
 import (
 	"context"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // buildGroupedGatewayCreateInput converts the Terraform plan into the create

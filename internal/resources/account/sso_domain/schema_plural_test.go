@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/account"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	dsschema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 )
 
 func TestDomainsDataSource_Metadata(t *testing.T) {

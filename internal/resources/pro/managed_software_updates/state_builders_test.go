@@ -6,8 +6,8 @@ package managed_software_updates
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // TestAssignManagedSoftwareUpdateResourceModel_AllFields uses distinct values per field so a

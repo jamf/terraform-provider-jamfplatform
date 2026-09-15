@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/egressip"
 	"golang.org/x/oauth2"
 )

@@ -6,8 +6,8 @@ package supervision_identity
 import (
 	"strconv"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // assignSupervisionIdentityResourceModel populates a resource model from a

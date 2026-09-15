@@ -4,8 +4,8 @@
 package managed_software_updates
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // assignManagedSoftwareUpdateResourceModel populates a resource model from an SDK response.

@@ -6,7 +6,7 @@ package restricted_software
 import (
 	"strconv"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // extractRestrictedSoftwareID returns the assigned ID as a string from a

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 )
 
 func notFoundErr() error { return &jamfplatform.APIResponseError{StatusCode: http.StatusNotFound} }

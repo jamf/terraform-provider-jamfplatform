@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 )
 
 // isNotFound reports whether an error is the platform saying the policy is gone. A malformed
