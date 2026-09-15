@@ -3,7 +3,7 @@
 
 package disk_encryption_configuration
 
-import "github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
+import "github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 // Wire enum values for the top-level `<key_type>` element.
 //

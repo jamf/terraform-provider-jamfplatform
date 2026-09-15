@@ -6,9 +6,9 @@ package benchmark
 import (
 	"time"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/compliancebenchmarks"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/compliancebenchmarks"
 )
 
 // assignBenchmarkModelFromResponse maps the API response into the Terraform benchmark resource model.

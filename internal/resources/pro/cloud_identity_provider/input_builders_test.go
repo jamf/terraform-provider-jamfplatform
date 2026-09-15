@@ -7,8 +7,8 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // sampleKeystoreBytes is a short byte sequence used as a stand-in for a real

@@ -6,8 +6,8 @@ package activation_profile
 import (
 	"context"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // buildCreateRequest turns the resource model into an activation profile create

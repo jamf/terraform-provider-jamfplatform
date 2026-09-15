@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/account"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers"
 )

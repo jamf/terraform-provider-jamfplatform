@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // administratorPrivilegeSet is the privilege_set label whose grid enumerates

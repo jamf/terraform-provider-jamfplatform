@@ -9,13 +9,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -71,7 +71,9 @@ func (r *ActivationCodeResource) IdentitySchema(ctx context.Context, req resourc
 // Schema returns the Terraform schema for the activation code resource.
 func (r *ActivationCodeResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages the Jamf Pro activation code and organization name (Settings → System → Activation Code). " +
+		DeprecationMessage: resourceDeprecation,
+		MarkdownDescription: resourceDeprecationCallout +
+			"Manages the Jamf Pro activation code and organization name (Settings → System → Activation Code). " +
 			"One record per tenant. The activation code is a license secret, and an invalid code can disable the tenant. " +
 			"Import with `terraform import jamfplatform_pro_activation_code.<name> singleton`." + resourcePrivileges,
 		Attributes: map[string]schema.Attribute{

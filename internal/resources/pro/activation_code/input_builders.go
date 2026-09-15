@@ -6,7 +6,7 @@ package activation_code
 import (
 	"strings"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // buildActivationCodeInput converts the Terraform plan into a ProClassic payload. BOTH

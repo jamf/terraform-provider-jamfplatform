@@ -4,8 +4,8 @@
 package self_service_branding_ios
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // intPtrValueOrNull converts an SDK *int into a types.Int64, mapping nil to

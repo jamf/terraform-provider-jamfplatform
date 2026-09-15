@@ -6,7 +6,7 @@ package pki_json_web_token_configuration
 import (
 	"strconv"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // extractJSONWebTokenConfigurationID returns the assigned ID as a string from a

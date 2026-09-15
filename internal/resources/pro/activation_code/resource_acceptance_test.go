@@ -22,8 +22,8 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers"
 )
@@ -49,6 +49,7 @@ const skipReason = "jamfplatform_pro_activation_code is scheduled for deprecatio
 func currentActivationCode(t *testing.T) (org, code string) {
 	t.Helper()
 	c := proclassic.New(testhelpers.NewAcceptanceClient(t))
+	//nolint:staticcheck // SA1019: the Classic /activationcode endpoint is deprecated with no replacement read — see deprecation.go.
 	got, err := c.GetActivationCode(context.Background())
 	if err != nil {
 		t.Fatalf("failed to read current activation code: %v", err)
@@ -63,6 +64,7 @@ func currentActivationCode(t *testing.T) (org, code string) {
 // tenant after Terraform destroys the resource from state (the remote Delete is a no-op).
 func checkSingletonRecordStillExists(t *testing.T) resource.TestCheckFunc {
 	return testhelpers.RequireSingletonStillExists(t, "activation code", func(ctx context.Context) (any, error) {
+		//nolint:staticcheck // SA1019: the Classic /activationcode endpoint is deprecated with no replacement read — see deprecation.go.
 		return proclassic.New(testhelpers.NewAcceptanceClient(t)).GetActivationCode(ctx)
 	})
 }

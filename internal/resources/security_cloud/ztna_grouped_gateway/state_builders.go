@@ -7,9 +7,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // assignGroupedGatewayResourceModel populates a resource model from a

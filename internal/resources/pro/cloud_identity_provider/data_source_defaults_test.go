@@ -8,11 +8,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	dsschema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // defaultsSchema compiles the defaults data source schema, failing the test on

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 )
 
 // stickySessionStub serves a token endpoint and two API reads, sets Jamf Cloud's

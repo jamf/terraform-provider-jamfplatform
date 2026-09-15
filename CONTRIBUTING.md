@@ -136,7 +136,7 @@ Terraform prints a yellow **"Provider development overrides are in effect"** war
 ## Adding a New Resource
 
 1. Obtain the OpenAPI specification or request/response examples for the Jamf Platform endpoint.
-2. Confirm the required client methods exist in [`jamfplatform-go-sdk`](https://github.com/Jamf-Concepts/jamfplatform-go-sdk). If not, add them upstream (versioned naming, e.g. `CreateMyResourceV1`) and bump the dep in `go.mod`.
+2. Confirm the required client methods exist in [`jamfplatform-go-sdk`](https://github.com/jamf/jamfplatform-go-sdk). If not, add them upstream (versioned naming, e.g. `CreateMyResourceV1`) and bump the dep in `go.mod`.
 3. Create the resource package under `internal/resources/<domain>/<resource>/` following the [file conventions](STYLE_GUIDE.md#resource-package-file-conventions).
 4. Register the resource in `internal/provider/provider.go` (`Resources()`, `DataSources()`, `ListResources()`, or `Actions()` as applicable).
 5. Add unit tests in the same package: `schema_test.go`, `input_builders_test.go`, `state_builders_test.go`, plus helpers/upgrader tests where relevant.
@@ -261,7 +261,7 @@ See `CLAUDE.md` for the full project structure and conventions. Key directories:
 | `docs/` | Auto-generated provider documentation |
 | `tools/` | `go:generate` entrypoint for `copywrite`, `terraform fmt`, and `tfplugindocs` |
 
-The Jamf Platform API client lives in the external SDK `github.com/Jamf-Concepts/jamfplatform-go-sdk` — not in this repo.
+The Jamf Platform API client lives in the external SDK `github.com/jamf/jamfplatform-go-sdk` — not in this repo.
 
 ## Dependencies
 

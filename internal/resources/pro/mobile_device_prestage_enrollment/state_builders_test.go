@@ -8,9 +8,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 func newStringList(t *testing.T, in []string) types.List {

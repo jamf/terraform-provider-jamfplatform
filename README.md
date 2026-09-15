@@ -123,7 +123,7 @@ The Jamf Terraform community has discussions in #terraform-provider-jamfpro on [
 
 The following third party acknowledgements and licenses are incorporated by reference:
 
-* [Jamf Platform Go SDK](https://github.com/Jamf-Concepts/jamfplatform-go-sdk) ([MIT](https://github.com/Jamf-Concepts/jamfplatform-go-sdk?tab=MIT-1-ov-file))
+* [Jamf Platform Go SDK](https://github.com/jamf/jamfplatform-go-sdk) ([MIT](https://github.com/jamf/jamfplatform-go-sdk?tab=MIT-1-ov-file))
 * [Terraform Plugin Framework](https://github.com/hashicorp/terraform-plugin-framework) ([MPL](https://github.com/hashicorp/terraform-plugin-framework?tab=MPL-2.0-1-ov-file))
 * [Terraform Plugin Log](https://github.com/hashicorp/terraform-plugin-log) ([MPL](https://github.com/hashicorp/terraform-plugin-log?tab=MPL-2.0-1-ov-file))
 

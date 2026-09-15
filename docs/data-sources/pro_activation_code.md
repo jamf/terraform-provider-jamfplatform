@@ -3,6 +3,7 @@
 page_title: "jamfplatform_pro_activation_code Data Source - terraform-provider-jamfplatform"
 subcategory: ""
 description: |-
+  ~> Deprecated. The Classic /activationcode endpoint is deprecated as of 2026-07-14. The Jamf Pro API publishes no replacement read, so this data source will be removed with it. Read the activation code in Jamf Pro instead.
   Read the current Jamf Pro activation code and organization name. One record per tenant.
   Required Jamf permissions
   Jamf lists this under Platform environment scope (preferred for new integrations) or Tenant scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
@@ -12,6 +13,8 @@ description: |-
 ---
 
 # jamfplatform_pro_activation_code (Data Source)
+
+~> **Deprecated.** The Classic /activationcode endpoint is deprecated as of 2026-07-14. The Jamf Pro API publishes no replacement read, so this data source will be removed with it. Read the activation code in Jamf Pro instead.
 
 Read the current Jamf Pro activation code and organization name. One record per tenant.
 

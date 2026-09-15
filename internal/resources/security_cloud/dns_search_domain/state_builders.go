@@ -4,8 +4,8 @@
 package dns_search_domain
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // assignSearchDomainResourceModel copies the stored search domain into the resource

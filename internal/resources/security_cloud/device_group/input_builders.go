@@ -4,7 +4,7 @@
 package device_group
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // buildGroupCreateInput converts the Terraform plan model into the create payload.

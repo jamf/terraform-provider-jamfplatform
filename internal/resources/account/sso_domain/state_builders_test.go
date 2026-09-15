@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/account"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 )
 
 // numberPtr builds a *json.Number the way the SDK decodes one, from either a
@@ -151,8 +151,8 @@ func TestAssignDomainDataSourceModel_PopulatesAssignments(t *testing.T) {
 	diags := assignDomainDataSourceModel(&state, verifiedDomain(t), &account.DomainAllocation{
 		Domain: "corp.example",
 		Connections: []account.DomainAllocationConnection{
-			{AssignedConnection: "con_abc", AssignedConnectionOrgID: "org_abc", AuthZeroRegion: account.RegionUs},
-			{AssignedConnection: "con_def", AssignedConnectionOrgID: "org_def", AuthZeroRegion: account.RegionEu},
+			{AssignedConnection: "con_abc", AssignedConnectionOrgID: "org_abc", Region: account.RegionUs},
+			{AssignedConnection: "con_def", AssignedConnectionOrgID: "org_def", Region: account.RegionEu},
 		},
 		JamfIDEnabled: true,
 	})

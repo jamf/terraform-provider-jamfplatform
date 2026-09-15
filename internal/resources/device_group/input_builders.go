@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/devicegroups"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/devicegroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 

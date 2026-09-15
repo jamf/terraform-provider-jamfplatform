@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 const wantPluralTypeName = "jamfplatform_pro_app_installer_titles"

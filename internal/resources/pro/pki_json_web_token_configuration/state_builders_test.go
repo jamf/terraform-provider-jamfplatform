@@ -6,8 +6,8 @@ package pki_json_web_token_configuration
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // TestAssignJSONWebTokenConfigurationResourceModel_Mapping verifies the server

@@ -4,8 +4,8 @@
 package blueprints
 
 import (
-	bp "github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/blueprints"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	bp "github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 )
 
 // BlueprintsDataSource implements the Terraform data source for listing blueprints.

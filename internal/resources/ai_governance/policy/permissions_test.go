@@ -9,7 +9,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/aigovernance"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/aigovernance"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )

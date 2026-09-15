@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 )
 
 // ConfirmAsyncDelete handles a classic Jamf Pro endpoint that ACCEPTS a DELETE

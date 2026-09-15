@@ -8,7 +8,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // TestAutoDeleteBehaviourMappingIsBijective pins that the forward and reverse

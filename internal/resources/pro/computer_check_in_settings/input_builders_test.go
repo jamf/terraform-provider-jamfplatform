@@ -6,8 +6,8 @@ package computer_check_in_settings
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // TestBuildComputerCheckInSettingsInput verifies every plan field maps to the correct SDK

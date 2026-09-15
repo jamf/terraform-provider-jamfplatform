@@ -4,8 +4,8 @@
 package components
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/blueprints"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 )
 
 // ComponentsDataSource defines the data source for blueprint components.

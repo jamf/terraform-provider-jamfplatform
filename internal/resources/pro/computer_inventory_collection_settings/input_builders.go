@@ -4,8 +4,8 @@
 package computer_inventory_collection_settings
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // optBool returns a *bool only when the planned value is known and non-null. The V2

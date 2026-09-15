@@ -63,7 +63,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/blueprints"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 )
 
 //go:embed declarations.json

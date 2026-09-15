@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // Machine-readable error codes the UEM Connect actions translate. Wire-probed

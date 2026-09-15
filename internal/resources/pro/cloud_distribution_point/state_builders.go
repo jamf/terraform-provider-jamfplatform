@@ -4,8 +4,8 @@
 package cloud_distribution_point
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // assignCloudDistributionPointResourceModel populates the resource model from an

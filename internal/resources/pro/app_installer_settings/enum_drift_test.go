@@ -6,7 +6,7 @@ package app_installer_settings
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // days_of_week validates against explicit SDK constants rather than

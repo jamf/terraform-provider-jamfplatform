@@ -6,9 +6,9 @@ package app_installer_settings
 import (
 	"context"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // buildMergedInput merges the plan over the current server state. This preserves the

@@ -4,8 +4,8 @@
 package return_to_service
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // assignReturnToServiceResourceModel populates a resource model from a Return to

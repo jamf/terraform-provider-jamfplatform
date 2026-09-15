@@ -3,7 +3,7 @@
 
 package macos_configuration_profile
 
-import "github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
+import "github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 // Level field wire/UI mappings. The Jamf Pro admin UI dropdown for the
 // "Level" field offers `Computer Level` and `User Level`. The classic API

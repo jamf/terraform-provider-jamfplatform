@@ -3,7 +3,7 @@
 
 package device_group
 
-import "github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
+import "github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
 // Machine-readable error codes the Jamf Security Cloud device group endpoints
 // return. Wire-probed against the EU sandbox on 2026-08-29 (raw bodies in

@@ -9,8 +9,8 @@ package disk_encryption_configuration
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // TestAssign_Individual_EmptyIRKCollapsesToNil pins the load-bearing

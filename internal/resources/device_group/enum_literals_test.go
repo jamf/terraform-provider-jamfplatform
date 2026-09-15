@@ -6,7 +6,7 @@ package device_group
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/devicegroups"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/devicegroups"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/enumguard"
 )

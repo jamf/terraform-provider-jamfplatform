@@ -6,8 +6,8 @@ package user_initiated_enrollment_settings
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // TestMerge_PreservesReenrollmentFields proves the /v4 read-merge-write

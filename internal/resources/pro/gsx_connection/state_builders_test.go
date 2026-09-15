@@ -6,7 +6,7 @@ package gsx_connection
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // TestAssignGsxConnectionSettingsResourceModel_Full verifies the assigner copies the

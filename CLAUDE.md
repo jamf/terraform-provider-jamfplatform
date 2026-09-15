@@ -6,7 +6,7 @@ Terraform provider for Jamf Platform APIs, built on the [Terraform Plugin Framew
 
 Five construct types: **resources** (CRUD), **data sources** (read-only lookups), **list resources** (RSQL-filtered streaming), **actions** (fire-and-forget device commands), and **functions** (offline provider-defined functions under the `jamfplatform::` namespace — no API client, no provider config).
 
-The Jamf Platform API client is the external Go SDK `github.com/Jamf-Concepts/jamfplatform-go-sdk` (package `jamfplatform`). Not vendored.
+The Jamf Platform API client is the external Go SDK `github.com/jamf/jamfplatform-go-sdk` (package `jamfplatform`). Not vendored.
 
 ## Companion Docs (authoritative on conflict)
 

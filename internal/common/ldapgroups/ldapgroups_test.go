@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // fakeSearcher returns a canned result (or error) for SearchLdapGroupsV1.

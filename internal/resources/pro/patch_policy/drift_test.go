@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // TestAssignPatchPolicy_ReportsDrift pins the wire-authoritative read: an

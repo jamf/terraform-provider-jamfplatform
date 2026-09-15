@@ -4,7 +4,7 @@
 package managed_software_updates
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // buildManagedSoftwareUpdateInput converts the Terraform plan model into an SDK PUT payload.

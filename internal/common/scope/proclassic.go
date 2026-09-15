@@ -7,8 +7,8 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
 
 // FlattenIDNameSet projects a ProClassic []IDName pointer-slice into a Terraform

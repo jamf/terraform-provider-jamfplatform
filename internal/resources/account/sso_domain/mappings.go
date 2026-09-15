@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/account"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 )
 
 // Machine-readable error codes Jamf Account returns on the SSO domain

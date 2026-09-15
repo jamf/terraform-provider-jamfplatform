@@ -4,9 +4,9 @@
 package devices
 
 import (
-	devSDK "github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/devices"
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	devSDK "github.com/jamf/jamfplatform-go-sdk/jamfplatform/devices"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 )
 

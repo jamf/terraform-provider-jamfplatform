@@ -4,7 +4,7 @@
 package enrollment_customization
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // buildParentInput converts the Terraform model into the SDK

@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/aigovernance"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/aigovernance"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/provider"
 )
 

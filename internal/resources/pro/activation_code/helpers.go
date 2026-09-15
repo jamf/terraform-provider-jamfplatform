@@ -7,9 +7,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/proclassic"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
@@ -36,8 +36,10 @@ func (r *ActivationCodeResource) applyActivationCode(ctx context.Context, plan A
 	intendedCode := strings.TrimSpace(plan.Code.ValueString())
 	intendedOrg := plan.OrganizationName.ValueString()
 
+	//nolint:staticcheck // SA1019: the Classic /activationcode write is deprecated; its successor is not adopted — see deprecation.go.
 	writeErr := r.client.UpdateActivationCode(ctx, buildActivationCodeInput(plan))
 
+	//nolint:staticcheck // SA1019: the Classic /activationcode endpoint is deprecated with no replacement read — see deprecation.go.
 	got, getErr := r.client.GetActivationCode(ctx)
 	if getErr != nil {
 		if writeErr != nil {

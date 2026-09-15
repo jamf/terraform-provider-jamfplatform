@@ -3,7 +3,7 @@
 
 package mobile_device_prestage_enrollment
 
-import "github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+import "github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 // skipSetupItems wire-key ⇔ snake_case mapping is hand-encoded inside
 // buildSkipSetupItemsMap (input_builders.go), flattenSkipSetupItems

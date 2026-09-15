@@ -6,8 +6,8 @@ package supervision_identity
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 func TestAssignSupervisionIdentityResourceModel(t *testing.T) {

@@ -4,8 +4,8 @@
 package device_group
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // assignDeviceGroupResourceModel populates a resource model from a Group response.

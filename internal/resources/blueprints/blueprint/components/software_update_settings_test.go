@@ -5,6 +5,7 @@ package components
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -460,5 +461,86 @@ func TestSoftwareUpdateSettings_ToClientComponent(t *testing.T) {
 	}
 	if comp.Configuration == nil {
 		t.Fatal("expected non-nil configuration")
+	}
+}
+
+// TestSoftwareUpdateSettings_FromRawConfiguration_UIWrittenQuotedScalars is the
+// regression test for issue #431.
+//
+// The blueprints service validates a component configuration on write and then serves
+// it back byte-for-byte: it coerces "5" to 5 for validation but never re-serialises
+// from its own models, so whatever JSON encoding the writer used is what every later
+// read returns. The Jamf Pro web UI writes these scalars as JSON strings, so a
+// blueprint built there answers {"Value": "5"} where the spec declares an integer.
+//
+// Before jamfplatform-go-sdk v1.1.0 that stopped Go's decoder at the first quoted
+// number and the whole component was dropped from state, so
+// `terraform plan -generate-config-out` emitted a resource missing a component the
+// blueprint has. The SDK now carries tolerant UnmarshalJSON methods on these types.
+// This test pins the behaviour from the provider's side of the boundary, because the
+// consumer is what decodes a configuration — Component.Configuration is a
+// json.RawMessage and no SDK method decodes it.
+//
+// The payload is a raw literal rather than a marshalled map on purpose: marshalling a
+// Go map emits bare numbers and booleans, which is the encoding that always worked.
+func TestSoftwareUpdateSettings_FromRawConfiguration_UIWrittenQuotedScalars(t *testing.T) {
+	raw := []byte(`{
+		"Deferrals": {
+			"CombinedPeriodInDays": {"Value": "30", "Included": "true"},
+			"MajorPeriodInDays":    {"Value": "5",  "Included": true},
+			"MinorPeriodInDays":    {"Value": 14,   "Included": true},
+			"SystemPeriodInDays":   {"Value": "7",  "Included": "true"}
+		},
+		"Notifications": {"Enabled": "true", "Included": "true"},
+		"RecommendedCadence": {"Value": "Newest", "Included": true}
+	}`)
+
+	c := &SoftwareUpdateSettingsComponent{}
+	if err := c.FromRawConfiguration(raw); err != nil {
+		t.Fatalf("a UI-written configuration must decode, got: %v", err)
+	}
+
+	for _, tc := range []struct {
+		field string
+		got   types.Int64
+		want  int64
+	}{
+		{"DeferralCombinedPeriod", c.DeferralCombinedPeriod, 30},
+		{"DeferralMajorPeriod", c.DeferralMajorPeriod, 5},
+		{"DeferralMinorPeriod", c.DeferralMinorPeriod, 14},
+		{"DeferralSystemPeriod", c.DeferralSystemPeriod, 7},
+	} {
+		if tc.got.IsNull() {
+			t.Errorf("%s is null, so the component would be missing a value the blueprint holds", tc.field)
+			continue
+		}
+		if tc.got.ValueInt64() != tc.want {
+			t.Errorf("%s = %d, want %d", tc.field, tc.got.ValueInt64(), tc.want)
+		}
+	}
+
+	if c.NotificationsEnabled.IsNull() || !c.NotificationsEnabled.ValueBool() {
+		t.Errorf("NotificationsEnabled = %v, want true — a quoted boolean must decode too", c.NotificationsEnabled)
+	}
+	if c.RecommendedCadence.ValueString() != "Newest" {
+		t.Errorf("RecommendedCadence = %q, want %q", c.RecommendedCadence.ValueString(), "Newest")
+	}
+}
+
+// TestSoftwareUpdateSettings_FromRawConfiguration_UncoercibleScalarStillFails guards the
+// other side of the tolerance added for issue #431: only a JSON string holding a valid
+// scalar of the declared kind is rewritten. Text that is not a number must still fail,
+// rather than decode as zero and silently report a deferral period the tenant does not
+// have.
+func TestSoftwareUpdateSettings_FromRawConfiguration_UncoercibleScalarStillFails(t *testing.T) {
+	raw := []byte(`{"Deferrals": {"MajorPeriodInDays": {"Value": "none", "Included": true}}}`)
+
+	c := &SoftwareUpdateSettingsComponent{}
+	err := c.FromRawConfiguration(raw)
+	if err == nil {
+		t.Fatalf("a non-numeric deferral period must fail to decode, got MajorPeriodInDays=%v", c.DeferralMajorPeriod)
+	}
+	if !strings.Contains(err.Error(), "MajorPeriodInDays") {
+		t.Errorf("the error must name the field a caller can look up, got: %v", err)
 	}
 }

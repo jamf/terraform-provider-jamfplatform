@@ -6,7 +6,7 @@ package ztna_gateway
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/securitycloud"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 )
 
 // labelTable pairs a label map with the SDK value set it must cover, so one table

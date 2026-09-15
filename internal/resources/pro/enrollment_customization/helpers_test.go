@@ -6,7 +6,7 @@ package enrollment_customization
 import (
 	"testing"
 
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 func TestBuildPanelIndex_GroupsByType(t *testing.T) {

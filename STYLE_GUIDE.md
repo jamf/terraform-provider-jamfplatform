@@ -17,7 +17,7 @@ Allowed:
 - Go standard library.
 - `golang.org/x` packages.
 - HashiCorp Terraform Plugin packages: `terraform-plugin-framework`, `terraform-plugin-framework-timeouts`, `terraform-plugin-framework-validators`, `terraform-plugin-go`, `terraform-plugin-log`, `terraform-plugin-testing`.
-- `github.com/Jamf-Concepts/jamfplatform-go-sdk` — required for all Jamf Platform API access (auth, HTTP transport, request/response types).
+- `github.com/jamf/jamfplatform-go-sdk` — required for all Jamf Platform API access (auth, HTTP transport, request/response types).
 - `howett.net/plist` (BSD-2-Clause) — Apple plist parser/serialiser. Required by `internal/resources/pro/macos_configuration_profile/` to compare user-supplied `.mobileconfig` payloads against the server-canonical form for diff suppression. Use is contained to the configuration-profile resource family; no other code path should import it.
 
 Do not introduce other third-party dependencies without prior discussion.
@@ -132,7 +132,7 @@ Cover both sides of the framework seam:
 
 ## Client Conventions
 
-The Jamf Platform API client lives in the external SDK `github.com/Jamf-Concepts/jamfplatform-go-sdk` (package `jamfplatform`). This repository imports it; it is not vendored. To consume new endpoints, bump the SDK dep in `go.mod` (or coordinate changes upstream first).
+The Jamf Platform API client lives in the external SDK `github.com/jamf/jamfplatform-go-sdk` (package `jamfplatform`). This repository imports it; it is not vendored. To consume new endpoints, bump the SDK dep in `go.mod` (or coordinate changes upstream first).
 
 The SDK follows the conventions below — match them when contributing upstream.
 
@@ -1150,7 +1150,7 @@ This applies only to Platform Services resources. Jamf Pro schema deprecations f
 
 The buffered migration timeline below assumes the SDK exposes both the deprecated version (N) and the new version (N+1) simultaneously during the deprecation window. **This applies to every version transition** — V1→V2, V2→V3, V3→V4, etc. — not just V1→V2.
 
-The SDK does not currently retain side-by-side versioned functions on regeneration (the upstream generator change requested in [jamfplatform-go-sdk#19](https://github.com/Jamf-Concepts/jamfplatform-go-sdk/issues/19) closed without merging). Practical consequences:
+The SDK does not currently retain side-by-side versioned functions on regeneration (the upstream generator change requested in [jamfplatform-go-sdk#19](https://github.com/jamf/jamfplatform-go-sdk/issues/19) closed without merging). Practical consequences:
 
 - When the SDK exposes both versions of an endpoint: follow the buffer policy below.
 - When the SDK only exposes the new version on regeneration: migration is **SDK-bump-driven** — migrate at the SDK bump or pin the SDK to the prior release (only as a temporary workaround). Document the constraint in the resource's annotation block.

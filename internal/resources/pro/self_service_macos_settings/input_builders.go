@@ -4,8 +4,8 @@
 package self_service_macos_settings
 
 import (
-	"github.com/Jamf-Concepts/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 // buildSelfServiceMacosSettingsInput converts the Terraform plan model into a Self Service
