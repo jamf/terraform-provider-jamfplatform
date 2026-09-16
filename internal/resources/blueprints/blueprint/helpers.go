@@ -11,14 +11,65 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/go-uuid"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
-// generatePayloadIdentifier produces a deterministic UUID-formatted identifier from a payload type string.
-func generatePayloadIdentifier(payloadType string) string {
-	hash := sha256.Sum256([]byte(payloadType))
+const payloadIdentifierNamespaceKey = "legacy_payload_identifier_namespace"
+
+type privateStateReader interface {
+	GetKey(context.Context, string) ([]byte, diag.Diagnostics)
+}
+
+type privateStateWriter interface {
+	SetKey(context.Context, string, []byte) diag.Diagnostics
+}
+
+// ensurePayloadIdentifierNamespace returns the resource's stable private namespace, creating it
+// when a resource predates namespaced legacy payload identifiers or has just been imported.
+func ensurePayloadIdentifierNamespace(ctx context.Context, reader privateStateReader, writer privateStateWriter) (string, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if reader != nil {
+		raw, readDiags := reader.GetKey(ctx, payloadIdentifierNamespaceKey)
+		diags.Append(readDiags...)
+		if diags.HasError() {
+			return "", diags
+		}
+		if len(raw) > 0 {
+			var namespace string
+			if err := json.Unmarshal(raw, &namespace); err != nil || namespace == "" {
+				diags.AddError("Invalid legacy payload identifier namespace", "The Blueprint's private state contains an invalid legacy payload identifier namespace.")
+				return "", diags
+			}
+			return namespace, diags
+		}
+	}
+
+	namespace, err := uuid.GenerateUUID()
+	if err != nil {
+		diags.AddError("Could not generate legacy payload identifier namespace", helpers.APIErrorDetail(err))
+		return "", diags
+	}
+	if writer == nil {
+		diags.AddError("Missing private state", "The provider could not persist the legacy payload identifier namespace.")
+		return "", diags
+	}
+	raw, err := json.Marshal(namespace)
+	if err != nil {
+		diags.AddError("Could not encode legacy payload identifier namespace", helpers.APIErrorDetail(err))
+		return "", diags
+	}
+	diags.Append(writer.SetKey(ctx, payloadIdentifierNamespaceKey, raw)...)
+	return namespace, diags
+}
+
+// generatePayloadIdentifier produces a deterministic UUID-formatted identifier scoped to one
+// payload position in a Blueprint resource.
+func generatePayloadIdentifier(namespace string, stepIndex int, payloadType string) string {
+	hash := sha256.Sum256([]byte(namespace + "\x00" + strconv.Itoa(stepIndex) + "\x00" + payloadType))
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
 		hash[0:4], hash[4:6], hash[6:8], hash[8:10], hash[10:16])
 }

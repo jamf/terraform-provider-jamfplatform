@@ -349,8 +349,8 @@ func legacyPayloadItems(apiComponentsByID map[string]blueprints.Component, prior
 // serverStampedPayloadKeys are the per-payload metadata keys the blueprints service writes onto
 // every legacy payload it stores, whether or not the author supplied them. `payloadType` and
 // `payloadIdentifier` are not listed: legacyPayloadItems already lifts those out of settings, the
-// first into `payload_type` and the second because the provider derives it from the payload type
-// (see generatePayloadIdentifier).
+// first into `payload_type` and the second because the provider derives it from the resource
+// namespace, step position, and payload type (see generatePayloadIdentifier).
 var serverStampedPayloadKeys = [...]string{
 	"payloadDisplayName",
 	"payloadOrganization",

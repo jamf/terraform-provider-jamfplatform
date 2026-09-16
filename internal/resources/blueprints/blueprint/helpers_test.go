@@ -4,17 +4,86 @@
 package blueprint
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/gatewaystub"
 )
+
+const testPayloadIdentifierNamespace = "41d36a3f-3e44-4a07-9db4-0efdb086743f"
+
+type privateStateStub map[string][]byte
+
+func (s privateStateStub) GetKey(_ context.Context, key string) ([]byte, diag.Diagnostics) {
+	return s[key], nil
+}
+
+func (s privateStateStub) SetKey(_ context.Context, key string, value []byte) diag.Diagnostics {
+	s[key] = value
+	return nil
+}
+
+func TestEnsurePayloadIdentifierNamespace(t *testing.T) {
+	t.Parallel()
+
+	state := privateStateStub{}
+	first, diags := ensurePayloadIdentifierNamespace(context.Background(), nil, state)
+	if diags.HasError() {
+		t.Fatalf("generate namespace: %v", diags)
+	}
+	second, diags := ensurePayloadIdentifierNamespace(context.Background(), state, state)
+	if diags.HasError() {
+		t.Fatalf("read namespace: %v", diags)
+	}
+	if first != second {
+		t.Fatalf("namespace changed from %q to %q", first, second)
+	}
+}
+
+func TestEnsurePayloadIdentifierNamespaceRequiresPrivateState(t *testing.T) {
+	t.Parallel()
+
+	_, diags := ensurePayloadIdentifierNamespace(context.Background(), nil, nil)
+	if !diags.HasError() {
+		t.Fatal("expected an error when private state is unavailable")
+	}
+}
+
+func TestGeneratePayloadIdentifier(t *testing.T) {
+	t.Parallel()
+
+	first := generatePayloadIdentifier(testPayloadIdentifierNamespace, 0, "com.apple.ManagedClient.preferences")
+	if want := "1e484f1d-0a38-2d4e-4205-9fffb02d53a8"; first != want {
+		t.Fatalf("identifier = %q, want %q", first, want)
+	}
+	cases := map[string]string{
+		"same input":          generatePayloadIdentifier(testPayloadIdentifierNamespace, 0, "com.apple.ManagedClient.preferences"),
+		"different namespace": generatePayloadIdentifier("92e88a09-5c2c-4124-a288-22f27ff45952", 0, "com.apple.ManagedClient.preferences"),
+		"different step":      generatePayloadIdentifier(testPayloadIdentifierNamespace, 1, "com.apple.ManagedClient.preferences"),
+		"different type":      generatePayloadIdentifier(testPayloadIdentifierNamespace, 0, "com.apple.applicationaccess"),
+	}
+
+	if cases["same input"] != first {
+		t.Fatal("same input produced a different identifier")
+	}
+	for name, got := range cases {
+		if name != "same input" && got == first {
+			t.Errorf("%s produced the same identifier", name)
+		}
+	}
+	if !regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`).MatchString(first) {
+		t.Errorf("identifier %q is not UUID-formatted", first)
+	}
+}
 
 func TestDescribeBlueprintBlocks(t *testing.T) {
 	named := "Passcode"

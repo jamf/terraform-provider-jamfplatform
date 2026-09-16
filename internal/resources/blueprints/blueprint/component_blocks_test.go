@@ -129,7 +129,7 @@ func TestBuildSteps_BlockMode(t *testing.T) {
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, testPayloadIdentifierNamespace)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -159,6 +159,58 @@ func TestBuildSteps_BlockMode(t *testing.T) {
 	}
 }
 
+func TestBuildSteps_LegacyPayloadIdentifiersAreScoped(t *testing.T) {
+	t.Parallel()
+
+	buildIdentifiers := func(namespace string) []string {
+		t.Helper()
+		data := &BlueprintResourceModel{
+			Name: types.StringValue("Duplicate Name"),
+			ComponentBlocks: []ComponentBlockModel{
+				{LegacyPayloads: []BlockLegacyPayloadModel{{PayloadType: types.StringValue("com.apple.ManagedClient.preferences"), Settings: types.StringValue(`{}`)}}},
+				{LegacyPayloads: []BlockLegacyPayloadModel{{PayloadType: types.StringValue("com.apple.ManagedClient.preferences"), Settings: types.StringValue(`{}`)}}},
+			},
+		}
+
+		steps, diags := (&BlueprintResource{}).buildSteps(context.Background(), data, namespace)
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics: %v", diags)
+		}
+		if len(steps) != 2 {
+			t.Fatalf("got %d steps, want 2", len(steps))
+		}
+
+		identifiers := make([]string, len(steps))
+		for i, step := range steps {
+			if len(step.Components) != 1 {
+				t.Fatalf("step %d has %d components, want 1", i, len(step.Components))
+			}
+			var config struct {
+				PayloadContent []struct {
+					PayloadIdentifier string `json:"payloadIdentifier"`
+				} `json:"payloadContent"`
+			}
+			if err := json.Unmarshal(step.Components[0].Configuration, &config); err != nil {
+				t.Fatalf("unmarshal step %d configuration: %v", i, err)
+			}
+			if len(config.PayloadContent) != 1 {
+				t.Fatalf("step %d has %d payloads, want 1", i, len(config.PayloadContent))
+			}
+			identifiers[i] = config.PayloadContent[0].PayloadIdentifier
+		}
+		return identifiers
+	}
+
+	first := buildIdentifiers(testPayloadIdentifierNamespace)
+	second := buildIdentifiers("92e88a09-5c2c-4124-a288-22f27ff45952")
+	if first[0] == first[1] {
+		t.Error("the same payload type in different steps produced the same identifier")
+	}
+	if first[0] == second[0] {
+		t.Error("the same payload type in different blueprints produced the same identifier")
+	}
+}
+
 func TestBuildSteps_FlatMode(t *testing.T) {
 	r := &BlueprintResource{}
 	data := &BlueprintResourceModel{
@@ -169,7 +221,7 @@ func TestBuildSteps_FlatMode(t *testing.T) {
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, testPayloadIdentifierNamespace)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -496,7 +548,7 @@ func TestTypedComponents_RoundTripWithoutLandingInRawComponent(t *testing.T) {
 			steps, buildDiags := r.buildSteps(ctx, &BlueprintResourceModel{
 				Name:            types.StringValue("BP"),
 				ComponentBlocks: model.ComponentBlocks,
-			})
+			}, testPayloadIdentifierNamespace)
 			if buildDiags.HasError() {
 				t.Fatalf("unexpected write diagnostics: %v", buildDiags)
 			}
@@ -595,7 +647,7 @@ func TestBuildSteps_AppleDeclarationsAndRawComponentConflictEmitsNoStep(t *testi
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, testPayloadIdentifierNamespace)
 	if !diags.HasError() {
 		t.Fatal("expected an error from the conflicting block")
 	}
@@ -740,7 +792,7 @@ func TestBuildSteps_ConflictingBlockReportsOnlyTheOverlap(t *testing.T) {
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, testPayloadIdentifierNamespace)
 	if len(steps) != 0 {
 		t.Fatalf("expected no steps, got %+v", steps)
 	}
@@ -791,7 +843,7 @@ func TestBuildSteps_TypedAndRawComponentConflictEmitsNoStep(t *testing.T) {
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, testPayloadIdentifierNamespace)
 	if !diags.HasError() {
 		t.Fatal("expected an error from the conflicting block")
 	}
@@ -813,7 +865,7 @@ func TestBuildSteps_FlatLegacyPayloadsAndRawComponentConflictEmitsNoStep(t *test
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, testPayloadIdentifierNamespace)
 	if !diags.HasError() {
 		t.Fatal("expected an error for legacy_payloads set alongside a raw_component for the same component")
 	}

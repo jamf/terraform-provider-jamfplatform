@@ -36,7 +36,13 @@ func (r *BlueprintResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	steps, diags := r.buildSteps(ctx, &data)
+	payloadIdentifierNamespace, namespaceDiags := ensurePayloadIdentifierNamespace(ctx, nil, resp.Private)
+	resp.Diagnostics.Append(namespaceDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	steps, diags := r.buildSteps(ctx, &data, payloadIdentifierNamespace)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return
@@ -157,6 +163,12 @@ func (r *BlueprintResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
+	_, namespaceDiags := ensurePayloadIdentifierNamespace(ctx, req.Private, resp.Private)
+	resp.Diagnostics.Append(namespaceDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	resp.Diagnostics.Append(updateModelFromAPIResponse(ctx, &data, blueprint)...)
 
 	resp.Diagnostics.Append(helpers.SetIdentity(ctx, resp.Identity, blueprintIdentityModel{ID: data.ID})...)
@@ -191,7 +203,13 @@ func (r *BlueprintResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	steps, diags := r.buildSteps(ctx, &data)
+	payloadIdentifierNamespace, namespaceDiags := ensurePayloadIdentifierNamespace(ctx, req.Private, resp.Private)
+	resp.Diagnostics.Append(namespaceDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	steps, diags := r.buildSteps(ctx, &data, payloadIdentifierNamespace)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return

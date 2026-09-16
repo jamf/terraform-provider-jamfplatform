@@ -195,7 +195,7 @@ component_blocks = [
 Three things to carry across:
 
 - **Each payload's settings sit alongside `payloadType`**, not nested under a `settings` key. The typed attribute merges them in.
-- **`payloadIdentifier` is per payload and required.** The typed attribute derives one from the payload type; `raw_component` does not, so state one and keep it stable between applies. Jamf Pro keys the stored payload on it.
+- **`payloadIdentifier` is per payload and required.** The typed attribute derives one from a private Blueprint resource namespace, the step position, and the payload type; `raw_component` does not, so state one and keep it stable between applies. Jamf Pro keys the stored payload on it. The first update after upgrading from a provider version that derived identifiers from the payload type alone replaces those identifiers. Inserting or reordering a step also replaces identifiers in the affected positions.
 - **`payloadDisplayName` is per component.** The typed attribute uses the blueprint's own name.
 
 Moving a block to `raw_component` shows up in the plan as one component destroyed and another created. Read it before you apply.
