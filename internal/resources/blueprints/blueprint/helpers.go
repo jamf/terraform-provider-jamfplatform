@@ -41,6 +41,13 @@ import (
 // write rotating all four replaced the payload in place with no orphan and no duplicate. Parity with
 // the web app and a stable stored blueprint are the reasons here, not device churn.
 //
+// Nor does a duplicated identifier collide. Two blueprints delivering the same payload type under
+// one identifier install as two profiles, each keeping its own settings, wire-verified the same day:
+// the device keys a payload on its **profile's** top-level identifier, which Jamf assigns per
+// blueprint, rather than on the nested one. That is why the derivation every released version used,
+// sha256 of the payload type and so identical across every blueprint sharing a type, needs no
+// migration: there is nothing for a re-mint to repair.
+//
 // A payload is located by step and by `payloadType`, the same pairing checkLegacyPayloadDiscards
 // uses, because a type is unique within a block (appendLegacyConfigProfile rejects a duplicate).
 // Steps are matched by name ahead of position so that inserting or reordering a block keeps every
