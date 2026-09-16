@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -62,6 +63,21 @@ import (
 type storedLegacyPayloadIdentifiers struct {
 	stepIndexByName map[string]int
 	byStepIndex     []map[string]string
+	// ambiguous holds identifiers dropped because more than one payload type in a single step
+	// carried them, so the service reissues a distinct one for each. macOS refuses a whole profile
+	// whose payload identifiers are not unique — "the PayloadIdentifier is used more than once in
+	// the profile", ConfigProfilePluginDomain:-107, wire-verified on macOS 26.6 on 2026-09-16,
+	// where neither payload installed and the device retried indefinitely while the blueprint
+	// reported DEPLOYED and SUCCEEDED. Writing a stored duplicate back would reproduce that profile
+	// on every update, so a duplicate names nothing, the same way a name two steps share does.
+	//
+	// The scope is one step, and that is measured rather than assumed. A step's legacy payloads fold
+	// into one component and install as one profile, so a duplicate inside a step is what the device
+	// rejects. The same identifier on payloads in two different steps of one blueprint installed
+	// cleanly, as did the same identifier in two separate blueprints, because each is a profile of
+	// its own and the device scopes the uniqueness rule to a profile. Widening this to the whole
+	// blueprint would re-identify payloads a device is content with.
+	ambiguous []string
 }
 
 // newStoredLegacyPayloadIdentifiers reads the stored identifiers out of a blueprint as fetched from
@@ -82,7 +98,9 @@ func newStoredLegacyPayloadIdentifiers(blueprint *blueprints.BlueprintDetail) *s
 	duplicateNames := make(map[string]bool, len(blueprint.Steps))
 
 	for i, step := range blueprint.Steps {
-		stored.byStepIndex = append(stored.byStepIndex, legacyPayloadIdentifiersInStep(step))
+		identifiers, ambiguous := legacyPayloadIdentifiersInStep(step)
+		stored.byStepIndex = append(stored.byStepIndex, identifiers)
+		stored.ambiguous = append(stored.ambiguous, ambiguous...)
 
 		if step.Name == nil || *step.Name == "" {
 			continue
@@ -104,7 +122,7 @@ func newStoredLegacyPayloadIdentifiers(blueprint *blueprints.BlueprintDetail) *s
 // legacyPayloadIdentifiersInStep maps payload type to stored identifier for a step's legacy
 // configuration profile component. A payload the service has not stamped is omitted rather than
 // mapped to the empty string, so a caller cannot mistake it for a stored value.
-func legacyPayloadIdentifiersInStep(step blueprints.BlueprintStep) map[string]string {
+func legacyPayloadIdentifiersInStep(step blueprints.BlueprintStep) (map[string]string, []string) {
 	identifiers := make(map[string]string)
 	for _, component := range step.Components {
 		if component.Identifier != legacyConfigProfileIdentifier {
@@ -127,7 +145,33 @@ func legacyPayloadIdentifiersInStep(step blueprints.BlueprintStep) map[string]st
 			identifiers[payload.PayloadType] = payload.PayloadIdentifier
 		}
 	}
-	return identifiers
+
+	return identifiers, dropDuplicateIdentifiers(identifiers)
+}
+
+// dropDuplicateIdentifiers removes from one step's map every identifier more than one payload type
+// carries, and returns those identifiers sorted. Dropping rather than keeping one of them is what
+// makes the outcome safe: the service then mints a distinct value for each, and a rotated identifier
+// costs nothing (see storedLegacyPayloadIdentifiers), where writing the duplicate back costs the
+// whole profile.
+func dropDuplicateIdentifiers(identifiers map[string]string) []string {
+	typesByIdentifier := make(map[string][]string, len(identifiers))
+	for payloadType, identifier := range identifiers {
+		typesByIdentifier[identifier] = append(typesByIdentifier[identifier], payloadType)
+	}
+
+	var duplicates []string
+	for identifier, payloadTypes := range typesByIdentifier {
+		if len(payloadTypes) < 2 {
+			continue
+		}
+		duplicates = append(duplicates, identifier)
+		for _, payloadType := range payloadTypes {
+			delete(identifiers, payloadType)
+		}
+	}
+	slices.Sort(duplicates)
+	return duplicates
 }
 
 // resolve pairs each component block with the stored identifiers of the step it continues, one entry
@@ -381,5 +425,17 @@ func (r *BlueprintResource) readStoredLegacyPayloadIdentifiers(ctx context.Conte
 		return nil, diags
 	}
 
-	return newStoredLegacyPayloadIdentifiers(blueprint), diags
+	stored := newStoredLegacyPayloadIdentifiers(blueprint)
+	if len(stored.ambiguous) > 0 {
+		diags.AddWarning(
+			"Legacy payload identifiers were reissued",
+			"Jamf Pro held one identifier on more than one legacy payload of this blueprint: "+
+				strings.Join(stored.ambiguous, ", ")+". A device refuses a configuration profile whose payload "+
+				"identifiers are not unique, and refuses all of its payloads rather than the duplicated ones, so "+
+				"the provider left those out of this update for Jamf Pro to assign fresh ones. Your settings are "+
+				"unaffected. A blueprint reaches this state by being edited outside Terraform.",
+		)
+	}
+
+	return stored, diags
 }

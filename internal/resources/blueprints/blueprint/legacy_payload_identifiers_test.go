@@ -519,3 +519,76 @@ func TestStoredLegacyPayloadIdentifiers_DuplicateBlockNamesFallBackToPosition(t 
 func emptyStoredStep(name string) blueprints.BlueprintStep {
 	return blueprints.BlueprintStep{Name: &name}
 }
+
+// storedStepSharingOneIdentifier is a stored step whose payloads all carry the same identifier, the
+// shape an out-of-band edit can leave behind and the one macOS refuses outright.
+func storedStepSharingOneIdentifier(name, identifier string, payloadTypes ...string) blueprints.BlueprintStep {
+	payloads := make([]map[string]any, 0, len(payloadTypes))
+	for _, payloadType := range payloadTypes {
+		payloads = append(payloads, map[string]any{
+			"payloadType":       payloadType,
+			"payloadIdentifier": identifier,
+			"payloadUUID":       identifier,
+		})
+	}
+	configuration, err := json.Marshal(map[string]any{"payloadContent": payloads})
+	if err != nil {
+		panic(err)
+	}
+	return blueprints.BlueprintStep{
+		Name:       &name,
+		Components: []blueprints.Component{{Identifier: legacyConfigProfileIdentifier, Configuration: configuration}},
+	}
+}
+
+// TestStoredLegacyPayloadIdentifiers_DuplicateIdentifierIsDropped covers a stored step holding one
+// identifier on two payload types. macOS rejects such a profile whole — "the PayloadIdentifier is
+// used more than once in the profile", ConfigProfilePluginDomain:-107, wire-verified on macOS 26.6
+// on 2026-09-16, where neither payload installed and the device retried while the blueprint
+// reported DEPLOYED and SUCCEEDED.
+//
+// The provider reads stored identifiers by payload type, so without this guard both types would map
+// to the duplicate and the next update would write that unusable profile straight back, on every
+// apply, for as long as the blueprint existed. Dropping both lets the service mint a distinct value
+// for each, which costs nothing: a rotated identifier has no device effect.
+func TestStoredLegacyPayloadIdentifiers_DuplicateIdentifierIsDropped(t *testing.T) {
+	t.Parallel()
+
+	const shared = "AAAA1111-2222-4333-8444-555566667777"
+	stored := newStoredLegacyPayloadIdentifiers(storedBlueprint(
+		storedStepSharingOneIdentifier("Shared", shared, "com.apple.domains", "com.apple.universalaccess"),
+	))
+
+	resolved := stored.resolve([]types.String{types.StringValue("Shared")})
+	for _, payloadType := range []string{"com.apple.domains", "com.apple.universalaccess"} {
+		if got, present := resolved[0][payloadType]; present {
+			t.Errorf("%s resolved to %q, want the duplicate dropped so the service reissues it", payloadType, got)
+		}
+	}
+	if len(stored.ambiguous) != 1 || stored.ambiguous[0] != shared {
+		t.Errorf("ambiguous = %v, want exactly [%s] so the operator is told", stored.ambiguous, shared)
+	}
+}
+
+// TestStoredLegacyPayloadIdentifiers_DistinctIdentifiersAreKept is the other half: the guard must
+// not fire on the ordinary case. Two payload types with two identifiers is what every healthy
+// blueprint holds, and dropping those would re-identify a whole blueprint on every update.
+func TestStoredLegacyPayloadIdentifiers_DistinctIdentifiersAreKept(t *testing.T) {
+	t.Parallel()
+
+	stored := newStoredLegacyPayloadIdentifiers(storedBlueprint(storedStep("Shared", map[string]string{
+		"com.apple.domains":         "IDENT-DOMAINS",
+		"com.apple.universalaccess": "IDENT-ACCESS",
+	})))
+
+	resolved := stored.resolve([]types.String{types.StringValue("Shared")})
+	if got := resolved[0]["com.apple.domains"]; got != "IDENT-DOMAINS" {
+		t.Errorf("com.apple.domains resolved to %q, want IDENT-DOMAINS", got)
+	}
+	if got := resolved[0]["com.apple.universalaccess"]; got != "IDENT-ACCESS" {
+		t.Errorf("com.apple.universalaccess resolved to %q, want IDENT-ACCESS", got)
+	}
+	if len(stored.ambiguous) != 0 {
+		t.Errorf("ambiguous = %v, want empty: two distinct identifiers are the healthy case", stored.ambiguous)
+	}
+}

@@ -233,7 +233,14 @@ managed preferences composite on the **preference domain**: two blueprints setti
 one payload type land every key in the single `/Library/Managed Preferences/<domain>.plist`, whether
 they share an identifier or not. The derivation every released version used was sha256 of the payload
 type, so identical across every blueprint sharing a type, and it therefore needs no migration and no
-taint. So a blueprint update is
+taint. One duplicate **is** fatal, and only one: two payloads in a **single step** sharing an
+identifier make macOS refuse the whole profile and every payload in it (`the PayloadIdentifier is
+used more than once in the profile`, `ConfigProfilePluginDomain:-107`), retrying forever while the
+blueprint reports `DEPLOYED`/`SUCCEEDED`. A step is one component and so one profile, which is why
+the rule scopes there and why the same identifier across two steps, or across two blueprints,
+installs cleanly. The provider does not originate that shape but would propagate one, since stored
+identifiers are read by payload type, so `dropDuplicateIdentifiers` drops any identifier two types in
+a step share and warns, letting the service reissue distinct ones. So a blueprint update is
 **read-merge-write**, the same shape the configuration profile resources get from
 `payloadhelpers.InjectTopLevelIdentifierValues`: `readStoredLegacyPayloadIdentifiers` fetches the
 blueprint first and writes each stored identifier back, located by step and then by `payloadType`

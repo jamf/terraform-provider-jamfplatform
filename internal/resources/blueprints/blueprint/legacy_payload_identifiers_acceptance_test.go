@@ -953,3 +953,136 @@ func TestAccResource_Blueprint_LegacyPayloads_ServiceMintsOnCreate(t *testing.T)
 		},
 	})
 }
+
+// TestAccResource_Blueprint_LegacyPayloads_DuplicateIdentifierIsReissued covers the one duplicate a
+// device refuses: two payloads in a single step sharing an identifier. macOS rejects the whole
+// profile and every payload in it — "the PayloadIdentifier is used more than once in the profile",
+// ConfigProfilePluginDomain:-107, wire-verified on macOS 26.6 on 2026-09-16, retrying indefinitely
+// while the blueprint reported DEPLOYED and SUCCEEDED.
+//
+// The provider never writes that shape itself, but it would propagate one, because stored
+// identifiers are read by payload type: a blueprint edited outside Terraform into holding one
+// identifier on two types would have both types map to it and be written back unusable on every
+// apply. So the duplicate is planted out of band here, exactly as an admin or a raw_component author
+// could, and the update that follows must reissue rather than preserve.
+//
+// The step changes the description as well, because an identifier is masked from state: with the
+// configuration untouched the plan is empty, nothing is written, and the guard is never reached.
+func TestAccResource_Blueprint_LegacyPayloads_DuplicateIdentifierIsReissued(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-lpid-dupident-" + suffix
+	addr := "jamfplatform_blueprints_blueprint.lpid_dupident"
+
+	var blueprintID string
+	const planted = "AAAA1111-2222-4333-8444-555566667777"
+
+	block := legacyPayloadBlock{
+		name: "Shared",
+		payloads: []legacyPayloadSpec{
+			{payloadType: accessibilityPayloadType, settings: accessibilitySettings},
+			{payloadType: domainsPayloadType, settings: domainsSettings},
+		},
+	}
+	config := func(description string) string {
+		return legacyIdentifierConfig("lpiddupident", "lpid_dupident", name, description, block)
+	}
+
+	// plantDuplicateOutOfBand rewrites both payloads of the stored step to one identifier, the shape
+	// an edit outside Terraform can leave and the provider must not carry forward.
+	plantDuplicateOutOfBand := func() {
+		client := bpSDK.New(testhelpers.NewAcceptanceClient(t))
+		ctx := context.Background()
+
+		blueprint, err := client.GetBlueprint(ctx, blueprintID)
+		if err != nil {
+			t.Fatalf("out-of-band GET: %v", err)
+		}
+
+		steps := blueprint.Steps
+		stamped := 0
+		for stepIndex, step := range steps {
+			for componentIndex, component := range step.Components {
+				if component.Identifier != legacyConfigProfileComponent {
+					continue
+				}
+
+				var configuration map[string]any
+				if err := json.Unmarshal(component.Configuration, &configuration); err != nil {
+					t.Fatalf("out-of-band decode: %v", err)
+				}
+				payloads, ok := configuration["payloadContent"].([]any)
+				if !ok || len(payloads) < 2 {
+					t.Fatalf("out-of-band: expected at least two stored payloads, got %v", configuration["payloadContent"])
+				}
+				for _, item := range payloads {
+					payload, ok := item.(map[string]any)
+					if !ok {
+						t.Fatal("out-of-band: a payloadContent entry is not an object")
+					}
+					payload["payloadIdentifier"] = planted
+					payload["payloadUUID"] = planted
+					stamped++
+				}
+
+				encoded, err := json.Marshal(configuration)
+				if err != nil {
+					t.Fatalf("out-of-band encode: %v", err)
+				}
+				steps[stepIndex].Components[componentIndex].Configuration = encoded
+			}
+		}
+		if stamped < 2 {
+			t.Fatalf("out-of-band: stamped the shared identifier on %d payloads, so no duplicate exists to reissue", stamped)
+		}
+
+		if err := client.UpdateBlueprint(ctx, blueprintID, &bpSDK.UpdateBlueprintRequest{Steps: &steps}); err != nil {
+			t.Fatalf("out-of-band duplicate plant: %v", err)
+		}
+
+		current, err := readLegacyPayloadIdentifiers(t, blueprintID)
+		if err != nil {
+			t.Fatalf("reading back the planted blueprint: %v", err)
+		}
+		for _, payloadType := range []string{accessibilityPayloadType, domainsPayloadType} {
+			if got := current[payloadType]; !strings.EqualFold(got, planted) {
+				t.Fatalf("payload %s stores %s after the plant, want the shared %s; the service refused the duplicate and this test can prove nothing", payloadType, got, planted)
+			}
+		}
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBlueprintResourcesDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: config("Acceptance test — safe to delete"),
+				Check:  captureBlueprintID(addr, &blueprintID),
+			},
+			{
+				PreConfig: plantDuplicateOutOfBand,
+				Config:    config("Acceptance test — safe to delete, edited"),
+				Check: func(s *terraform.State) error {
+					current, err := readLegacyPayloadIdentifiers(t, blueprintID)
+					if err != nil {
+						return err
+					}
+					accessibility, domains := current[accessibilityPayloadType], current[domainsPayloadType]
+					if strings.EqualFold(accessibility, planted) || strings.EqualFold(domains, planted) {
+						return fmt.Errorf(
+							"the planted identifier %s survived on at least one payload (%s=%s, %s=%s); the provider wrote back a profile a device refuses whole",
+							planted, accessibilityPayloadType, accessibility, domainsPayloadType, domains,
+						)
+					}
+					if accessibility == domains {
+						return fmt.Errorf(
+							"both payloads were reissued %s, so the profile is still one a device refuses; the service must assign a distinct identifier per payload",
+							accessibility,
+						)
+					}
+					return nil
+				},
+			},
+		},
+	})
+}
