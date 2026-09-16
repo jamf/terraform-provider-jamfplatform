@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 
@@ -203,9 +204,7 @@ func captureStoredIdentifiers(t *testing.T, addr string, into map[string]string)
 		if err != nil {
 			return err
 		}
-		for payloadType, identifier := range current {
-			into[payloadType] = identifier
-		}
+		maps.Copy(into, current)
 		return nil
 	}
 }
