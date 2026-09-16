@@ -44,9 +44,15 @@ import (
 // Nor does a duplicated identifier collide. Two blueprints delivering the same payload type under
 // one identifier install as two profiles, each keeping its own settings, wire-verified the same day:
 // the device keys a payload on its **profile's** top-level identifier, which Jamf assigns per
-// blueprint, rather than on the nested one. That is why the derivation every released version used,
-// sha256 of the payload type and so identical across every blueprint sharing a type, needs no
-// migration: there is nothing for a re-mint to repair.
+// blueprint, rather than on the nested one. Managed preferences composite the same way: two
+// blueprints setting disjoint keys of one payload type land every key in the single
+// /Library/Managed Preferences/<domain>.plist, and they do so whether the two share an identifier or
+// carry different ones, so the merge is keyed on the preference domain and the identifier plays no
+// part either way. The plist's own PayloadUUID records whichever payload wrote last.
+//
+// So the derivation every released version used, sha256 of the payload type and therefore identical
+// across every blueprint sharing a type, needs no migration: there is nothing for a re-mint to
+// repair.
 //
 // A payload is located by step and by `payloadType`, the same pairing checkLegacyPayloadDiscards
 // uses, because a type is unique within a block (appendLegacyConfigProfile rejects a duplicate).

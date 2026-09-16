@@ -228,10 +228,12 @@ one — on macOS 26.6, 2026-09-16, a write plus a deploy reinstalled the profile
 identifiers moved or not, and a write rotating all four replaced the payload in place with no orphan
 and no duplicate. A **duplicated** identifier is equally inert: two blueprints delivering one payload
 type under the same identifier installed as two profiles, each keeping its own settings, because the
-device keys a payload on its *profile's* top-level identifier rather than the nested one. The
-derivation every released version used was sha256 of the payload type, so identical across every
-blueprint sharing a type, and it therefore needs no migration and no taint. So a blueprint update
-is
+device keys a payload on its *profile's* top-level identifier rather than the nested one, and
+managed preferences composite on the **preference domain**: two blueprints setting disjoint keys of
+one payload type land every key in the single `/Library/Managed Preferences/<domain>.plist`, whether
+they share an identifier or not. The derivation every released version used was sha256 of the payload
+type, so identical across every blueprint sharing a type, and it therefore needs no migration and no
+taint. So a blueprint update is
 **read-merge-write**, the same shape the configuration profile resources get from
 `payloadhelpers.InjectTopLevelIdentifierValues`: `readStoredLegacyPayloadIdentifiers` fetches the
 blueprint first and writes each stored identifier back, located by step and then by `payloadType`
