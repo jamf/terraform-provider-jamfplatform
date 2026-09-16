@@ -44,6 +44,9 @@ type storedLegacyPayloadIdentifiers struct {
 // newStoredLegacyPayloadIdentifiers reads the stored identifiers out of a blueprint as fetched from
 // the service. A nil blueprint yields nil, which callers treat as "nothing stored yet" — the create
 // path, where every identifier is the service's to mint.
+//
+// A name two steps share cannot say which of them a block means, so it names neither and both fall
+// back to position. resolve applies the same reasoning to a name two blocks share.
 func newStoredLegacyPayloadIdentifiers(blueprint *blueprints.BlueprintDetail) *storedLegacyPayloadIdentifiers {
 	if blueprint == nil {
 		return nil
@@ -68,8 +71,6 @@ func newStoredLegacyPayloadIdentifiers(blueprint *blueprints.BlueprintDetail) *s
 		stored.stepIndexByName[*step.Name] = i
 	}
 
-	// A name two steps share cannot say which of them a block means, so it names neither and both
-	// fall back to position.
 	for name := range duplicateNames {
 		delete(stored.stepIndexByName, name)
 	}
@@ -111,8 +112,18 @@ func legacyPayloadIdentifiersInStep(step blueprints.BlueprintStep) map[string]st
 // payloads is the service's to mint.
 //
 // Matching runs in two passes, and the order matters. The first claims every step whose name a block
-// names, so inserting or reordering a block keeps the other blocks' identifiers. The second fills
-// the blocks left over from the unclaimed steps by position, which is all an unnamed block has.
+// names, so inserting or reordering a block keeps the other blocks' identifiers. The second walks
+// the steps no name claimed, in stored order, and hands the next one to each block the first pass
+// left over — which is all an unnamed block has, and is what lets a block renamed and moved in the
+// same apply go on continuing the step it came from. Pairing a leftover block with the step at its
+// own index instead would strand a step whenever a name match landed out of position, so a rename
+// combined with a move would mint fresh identifiers for a block whose step was sitting unclaimed.
+//
+// A name more than one block carries claims nothing, for the reason newStoredLegacyPayloadIdentifiers
+// drops a name two steps share: it cannot say which block means which step, and the first block to
+// ask would otherwise take the step and leave its namesake — whose payloads are a different profile
+// — to mint. Both such blocks fall through to the positional pass. The schema permits this, since
+// component_blocks[].name is optional and carries no uniqueness validator.
 //
 // A step is claimed at most once across both passes. Without that, a positional match could take a
 // step that a later block goes on to claim by name, and the same identifier would be written into
@@ -127,8 +138,18 @@ func (s *storedLegacyPayloadIdentifiers) resolve(blockNames []types.String) []ma
 	claimed := make([]bool, len(s.byStepIndex))
 	matchedByName := make([]bool, len(blockNames))
 
+	blockNameCounts := make(map[string]int, len(blockNames))
+	for _, name := range blockNames {
+		if helpers.IsConfiguredValue(name) && name.ValueString() != "" {
+			blockNameCounts[name.ValueString()]++
+		}
+	}
+
 	for i, name := range blockNames {
 		if !helpers.IsConfiguredValue(name) || name.ValueString() == "" {
+			continue
+		}
+		if blockNameCounts[name.ValueString()] > 1 {
 			continue
 		}
 		index, ok := s.stepIndexByName[name.ValueString()]
@@ -140,12 +161,19 @@ func (s *storedLegacyPayloadIdentifiers) resolve(blockNames []types.String) []ma
 		matchedByName[i] = true
 	}
 
+	next := 0
 	for i := range blockNames {
-		if matchedByName[i] || i >= len(s.byStepIndex) || claimed[i] {
+		if matchedByName[i] {
 			continue
 		}
-		resolved[i] = s.byStepIndex[i]
-		claimed[i] = true
+		for next < len(s.byStepIndex) && claimed[next] {
+			next++
+		}
+		if next >= len(s.byStepIndex) {
+			break
+		}
+		resolved[i] = s.byStepIndex[next]
+		claimed[next] = true
 	}
 
 	return resolved

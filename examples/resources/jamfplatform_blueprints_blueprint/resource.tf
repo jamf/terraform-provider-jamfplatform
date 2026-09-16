@@ -417,6 +417,11 @@ resource "jamfplatform_blueprints_blueprint" "unchecked_declaration" {
 # Every `legacy_payloads` entry in a block folds into one `com.jamf.ddm-configuration-profile`
 # component whose `payloadContent` is the array of payloads, so the move is per block rather than
 # per payload: an escaped block carries all of its payloads here, including the ones that validate.
+#
+# `payloadIdentifier` is Jamf Pro's to assign for `legacy_payloads`, which writes the stored value
+# back on every update. `raw_component` sends what you wrote, so state one here and keep it stable
+# between applies: Apple keys an installed payload on its identifier, and a payload arriving without
+# one is stamped afresh on every write.
 resource "jamfplatform_blueprints_blueprint" "unchecked_legacy_payload" {
   name        = "Safari Restrictions (unchecked)"
   description = "Managed by Terraform"
@@ -434,7 +439,8 @@ resource "jamfplatform_blueprints_blueprint" "unchecked_legacy_payload" {
             payloadDisplayName = "Safari Restrictions (unchecked)"
             payloadContent = jsonencode([
               {
-                payloadType = "com.apple.applicationaccess"
+                payloadType       = "com.apple.applicationaccess"
+                payloadIdentifier = "1f9c07a4-3b7e-4c21-9f0d-7a5c8e2b6d41"
 
                 allowSafariHistoryClearing = false
                 allowSafariPrivateBrowsing = false

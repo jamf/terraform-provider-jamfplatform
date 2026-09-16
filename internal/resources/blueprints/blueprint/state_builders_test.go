@@ -432,6 +432,83 @@ func TestFlattenBlockLegacyPayloads_KeepsAuthoredMetadata(t *testing.T) {
 	}
 }
 
+// TestFlattenBlockLegacyPayloads_KeepsAuthoredServiceOwnedMetadata covers the two metadata keys the
+// service assigns itself (see providerMaskedPayloadKeys). The provider strips both from every write
+// and from the server-derived settings, so it has to strip them from the authored string before
+// comparing too: settings is Optional rather than Computed, so the planned value is what the author
+// wrote, and state taking the stripped encoding instead would fail the apply with "Provider produced
+// inconsistent result after apply" and repeat on every plan after it.
+//
+// The Apple spelling is covered alongside the Jamf one because an author is sent to it:
+// appleprofiles.Validate reports `payloadUUID` as a miscased key and names `PayloadUUID` as the
+// spelling to use, and for the seven payload types that declare a top-level wildcard neither
+// spelling is reported at all.
+func TestFlattenBlockLegacyPayloads_KeepsAuthoredServiceOwnedMetadata(t *testing.T) {
+	apiComponents := map[string]blueprints.Component{
+		"com.jamf.ddm-configuration-profile": {
+			Identifier: "com.jamf.ddm-configuration-profile",
+			Configuration: json.RawMessage(`{"payloadDisplayName":"bp","payloadContent":[{` +
+				`"payloadType":"com.apple.applicationaccess","payloadIdentifier":"SERVER-IDENT","payloadUUID":"SERVER-IDENT",` +
+				`"payloadVersion":1,"payloadDisplayName":"Restrictions","payloadOrganization":"JAMF Software",` +
+				`"allowSafariPrivateBrowsing":false}]}`),
+		},
+	}
+
+	tests := []struct {
+		name     string
+		authored string
+	}{
+		{"jamf spelling payloadUUID", `{"allowSafariPrivateBrowsing":false,"payloadUUID":"AUTHORED-UUID"}`},
+		{"jamf spelling payloadIdentifier", `{"allowSafariPrivateBrowsing":false,"payloadIdentifier":"AUTHORED-IDENT"}`},
+		{"apple spelling PayloadUUID", `{"PayloadUUID":"AUTHORED-UUID","allowSafariPrivateBrowsing":false}`},
+		{"apple spelling PayloadIdentifier", `{"PayloadIdentifier":"AUTHORED-IDENT","allowSafariPrivateBrowsing":false}`},
+		{"both keys at once", `{"allowSafariPrivateBrowsing":false,"payloadIdentifier":"AUTHORED-IDENT","payloadUUID":"AUTHORED-UUID"}`},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			prior := []BlockLegacyPayloadModel{{
+				PayloadType: types.StringValue("com.apple.applicationaccess"),
+				Settings:    types.StringValue(tc.authored),
+			}}
+
+			got := flattenBlockLegacyPayloads(prior, apiComponents, map[string]struct{}{})
+
+			if len(got) != 1 {
+				t.Fatalf("expected 1 payload, got %d", len(got))
+			}
+			if got[0].Settings.ValueString() != tc.authored {
+				t.Errorf("expected the authored settings preserved verbatim, got %q", got[0].Settings.ValueString())
+			}
+		})
+	}
+}
+
+// TestFlattenBlockLegacyPayloads_ServiceOwnedMetadataNeverReachesState is the other half of the
+// mask: an author who wrote neither key gets neither back, so the service's own identifier and UUID
+// stay out of state.
+func TestFlattenBlockLegacyPayloads_ServiceOwnedMetadataNeverReachesState(t *testing.T) {
+	apiComponents := map[string]blueprints.Component{
+		"com.jamf.ddm-configuration-profile": {
+			Identifier: "com.jamf.ddm-configuration-profile",
+			Configuration: json.RawMessage(`{"payloadDisplayName":"bp","payloadContent":[{` +
+				`"payloadType":"com.apple.applicationaccess","payloadIdentifier":"SERVER-IDENT","payloadUUID":"SERVER-IDENT",` +
+				`"allowSafariPrivateBrowsing":false}]}`),
+		},
+	}
+
+	got := flattenBlockLegacyPayloads(nil, apiComponents, map[string]struct{}{})
+
+	if len(got) != 1 {
+		t.Fatalf("expected 1 payload, got %d", len(got))
+	}
+	for _, key := range providerMaskedPayloadKeys {
+		if strings.Contains(got[0].Settings.ValueString(), key) {
+			t.Errorf("expected %s masked out of state, got %q", key, got[0].Settings.ValueString())
+		}
+	}
+}
+
 func TestFlattenBlockLegacyPayloads_ToleratesDiscardedNulls(t *testing.T) {
 	// The service stored the payload without PreviewType or GroupingType, because the author gave
 	// them null. The authored string must survive so the nulls stay in configuration shape.
@@ -539,6 +616,38 @@ func TestFlattenFlatLegacyPayloads_MasksStampedMetadataOnImport(t *testing.T) {
 	}
 	if _, exists := settings["allowSafariPrivateBrowsing"]; !exists {
 		t.Errorf("expected the real payload key kept, got %v", settings)
+	}
+}
+
+// TestFlattenFlatLegacyPayloads_KeepsAuthoredServiceOwnedMetadata is the deprecated top-level
+// attribute's half of TestFlattenBlockLegacyPayloads_KeepsAuthoredServiceOwnedMetadata. The
+// attribute is no more Computed than the block one, so a one-sided mask fails an apply there too.
+func TestFlattenFlatLegacyPayloads_KeepsAuthoredServiceOwnedMetadata(t *testing.T) {
+	apiComponents := map[string]blueprints.Component{
+		"com.jamf.ddm-configuration-profile": {
+			Identifier: "com.jamf.ddm-configuration-profile",
+			Configuration: json.RawMessage(`{"payloadDisplayName":"bp","payloadContent":[{` +
+				`"payloadType":"com.apple.applicationaccess","payloadIdentifier":"SERVER-IDENT","payloadUUID":"SERVER-IDENT",` +
+				`"payloadVersion":1,"payloadDisplayName":"Restrictions","payloadOrganization":"JAMF Software",` +
+				`"allowSafariPrivateBrowsing":false}]}`),
+		},
+	}
+	prior, err := helpers.JSONToTerraformDynamic([]any{map[string]any{
+		"payload_type": "com.apple.applicationaccess",
+		"settings": map[string]any{
+			"allowSafariPrivateBrowsing": false,
+			"payloadIdentifier":          "AUTHORED-IDENT",
+			"payloadUUID":                "AUTHORED-UUID",
+		},
+	}})
+	if err != nil {
+		t.Fatalf("failed to build prior dynamic: %v", err)
+	}
+
+	got := flattenFlatLegacyPayloads(prior, apiComponents, map[string]struct{}{})
+
+	if !got.Equal(prior) {
+		t.Errorf("expected the prior dynamic preserved once the service-owned metadata is masked, got %v", got)
 	}
 }
 
@@ -681,6 +790,37 @@ func TestCheckLegacyPayloadDiscards_SilentWhenNothingDiscarded(t *testing.T) {
 			LegacyPayloads: []BlockLegacyPayloadModel{{
 				PayloadType: types.StringValue("com.apple.applicationaccess"),
 				Settings:    types.StringValue(`{"allowSafariPrivateBrowsing":false,"allowCamera":null}`),
+			}},
+		}},
+	}
+
+	if diags := checkLegacyPayloadDiscards(planned, blueprint); len(diags) != 0 {
+		t.Errorf("expected no diagnostics, got %v", diags)
+	}
+}
+
+// TestCheckLegacyPayloadDiscards_SilentForServiceOwnedMetadata pins that a key the provider itself
+// removes is never reported as one the platform dropped. The warning tells an operator to check the
+// key against Apple's documentation and its capitalisation, which for these two keys is a dead end:
+// Apple defines both, and the reason they are absent is the provider, not the platform.
+func TestCheckLegacyPayloadDiscards_SilentForServiceOwnedMetadata(t *testing.T) {
+	blueprint := &blueprints.BlueprintDetail{
+		Steps: []blueprints.BlueprintStep{{
+			Components: []blueprints.Component{{
+				Identifier: "com.jamf.ddm-configuration-profile",
+				Configuration: json.RawMessage(`{"payloadDisplayName":"bp","payloadContent":[{` +
+					`"payloadType":"com.apple.applicationaccess","payloadIdentifier":"SERVER-IDENT","payloadUUID":"SERVER-IDENT",` +
+					`"allowSafariPrivateBrowsing":false}]}`),
+			}},
+		}},
+	}
+	planned := &BlueprintResourceModel{
+		ComponentBlocks: []ComponentBlockModel{{
+			LegacyPayloads: []BlockLegacyPayloadModel{{
+				PayloadType: types.StringValue("com.apple.applicationaccess"),
+				Settings: types.StringValue(
+					`{"PayloadUUID":"APPLE-SPELLING","allowSafariPrivateBrowsing":false,` +
+						`"payloadIdentifier":"AUTHORED-IDENT","payloadUUID":"AUTHORED-UUID"}`),
 			}},
 		}},
 	}

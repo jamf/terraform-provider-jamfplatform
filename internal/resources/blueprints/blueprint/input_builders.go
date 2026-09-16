@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"maps"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -33,6 +34,14 @@ const flatStepName = "Declaration group"
 // stored carries the legacy payload identifiers the service has already assigned, so an update
 // writes them back rather than letting the service mint replacements; it is nil on create. See
 // storedLegacyPayloadIdentifiers.
+//
+// Block mode resolves those identifiers by block name, but flat mode resolves positionally, by
+// asking for one unnamed block. Step 0 is the only step flat mode writes and the only one it reads
+// back (see updateFlatComponentsFromAPI), whereas resolve's name pass matches a name at any index —
+// so asking for the flatStepName constant would hand flat mode the identifiers of a step it does not
+// manage whenever a stored step at another index carries that name, an arrangement the read path
+// permits because it only warns about the extra steps. The name is the provider's own constant
+// rather than anything an operator wrote, so matching on it would honour no authoring intent.
 func (r *BlueprintResource) buildSteps(ctx context.Context, data *BlueprintResourceModel, stored *storedLegacyPayloadIdentifiers) ([]blueprints.BlueprintStep, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	blueprintName := data.Name.ValueString()
@@ -70,7 +79,7 @@ func (r *BlueprintResource) buildSteps(ctx context.Context, data *BlueprintResou
 			{name: "legacy_payloads", identifier: legacyConfigProfileIdentifier},
 		})...)
 		if !flatDiags.HasError() {
-			r.collectLegacyPayloads(&components, &flatDiags, data.LegacyPayloads, blueprintName, stored.resolve([]types.String{types.StringValue(flatStepName)})[0])
+			r.collectLegacyPayloads(&components, &flatDiags, data.LegacyPayloads, blueprintName, stored.resolve([]types.String{types.StringNull()})[0])
 		}
 	}
 	diags.Append(flatDiags...)
@@ -394,6 +403,14 @@ func (r *BlueprintResource) collectBlockLegacyPayloads(allComponents *[]blueprin
 // every write. Dropping it after the authored settings are merged in is deliberate: settings is a
 // free-form object, so the key can reach here from configuration, and the service honours whatever
 // arrives.
+//
+// The drop folds case, and takes `payloadUUID` with it. appleprofiles.Validate reports a lowercase
+// `payloadIdentifier` as a miscased key and directs the author to Apple's `PayloadIdentifier`, which
+// validators.go makes a plan-time error — so the spelling an author is told to write is not the one
+// a single-key delete removes, and the capitalised form would reach the wire beside the provider's
+// own write-back, with no probe saying which of the two the service keys the installed payload on.
+// `payloadUUID` goes the same way because the service reassigns it on every write (see
+// maskServerStampedPayloadKeys), so an authored one is never honoured and must not be sent.
 func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprints.Component, diags *diag.Diagnostics, entries []legacyPayloadEntry, blueprintName string, storedIdentifiers map[string]string) {
 	seenPayloadTypes := make(map[string]bool, len(entries))
 	payloadArray := make([]map[string]any, 0, len(entries))
@@ -414,7 +431,14 @@ func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprint
 
 		payload := map[string]any{"payloadType": entry.PayloadType}
 		maps.Copy(payload, entry.Settings)
-		delete(payload, "payloadIdentifier")
+		maps.DeleteFunc(payload, func(key string, _ any) bool {
+			switch strings.ToLower(key) {
+			case "payloadidentifier", "payloaduuid":
+				return true
+			default:
+				return false
+			}
+		})
 		if identifier, stored := storedIdentifiers[entry.PayloadType]; stored {
 			payload["payloadIdentifier"] = identifier
 		}

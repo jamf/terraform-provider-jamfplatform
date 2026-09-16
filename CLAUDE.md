@@ -210,6 +210,28 @@ branch the table unions — that is inferred from `siri.settings.AllowSiriAI` ap
 picker while absent from release, so re-probe it first if false positives reappear for keys the UI
 offers. User guidance is in `docs/guides/apple-schema-validation.md`.
 
+## Blueprint legacy payload identifiers — one-paragraph orientation
+
+A legacy payload's `payloadIdentifier` is the blueprints service's to assign, not the provider's: it
+is absent from the Blueprints API specification, which requires only `payloadType` in a
+`payloadContent` entry, and wire probing on 2026-09-16 established that a payload arriving without
+one is accepted and stamped with a **fresh UUID on every write**, on POST and on merge-patch alike,
+while one sent with an identifier keeps it verbatim and unvalidated across later writes. Because the
+update is a whole-body merge-patch and Apple keys an *installed* payload on its identifier, letting
+the service mint would re-identify every payload in the blueprint on each unrelated edit and
+reinstall every profile on every scoped device — silently, since the field is masked out of state and
+`deploymentState` reports `OUT_OF_DATE` after any write regardless. So a blueprint update is
+**read-merge-write**, the same shape the configuration profile resources get from
+`payloadhelpers.InjectTopLevelIdentifierValues`: `readStoredLegacyPayloadIdentifiers` fetches the
+blueprint first and writes each stored identifier back, located by step and then by `payloadType`
+with steps matched **by name ahead of position** so that inserting or reordering a block cannot shift
+one block's identifiers onto another's payloads; create sends none, an authored value is discarded
+either way, and a failed pre-read fails the apply rather than falling back to minting. One carve-out
+to know before reaching for the escape hatch: the injection is wired into `legacy_payloads` alone, so
+a legacy profile authored as `raw_component` goes through `collectBlockComponents`, which re-marshals
+the author's own JSON untouched — that author must state a stable identifier themselves, which
+`templates/guides/apple-schema-validation.md` and the resource example both say.
+
 ## Jamf Security Cloud resources — one-paragraph orientation
 
 Terraform construct name format: `jamfplatform_security_cloud_<resource>`; Go package

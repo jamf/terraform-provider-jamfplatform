@@ -217,9 +217,15 @@ func TestBuildSteps_UnstoredPayloadTypeOmitsTheIdentifier(t *testing.T) {
 	}
 }
 
-// TestStoredLegacyPayloadIdentifiers_DuplicateStepNamesFallBackToPosition covers two blocks sharing
-// a name, which the schema permits. An ambiguous name must not resolve to whichever step was read
-// first, so both drop to a positional match.
+// TestStoredLegacyPayloadIdentifiers_DuplicateStepNamesFallBackToPosition covers two stored steps
+// sharing a name, which the schema permits. An ambiguous name must not resolve to whichever step was
+// read first, so both drop to a positional match.
+//
+// The second case is the one that holds newStoredLegacyPayloadIdentifiers to its dedupe: where both
+// blocks carry the shared name, resolve declines it on the block side anyway and the positional pass
+// reproduces the deduped answer, so that case cannot tell whether the stored side deduped. With only
+// one block carrying it, a name that still resolved would hand block 1 the first step and push block
+// 0 onto the second, inverting both.
 func TestStoredLegacyPayloadIdentifiers_DuplicateStepNamesFallBackToPosition(t *testing.T) {
 	t.Parallel()
 
@@ -228,12 +234,24 @@ func TestStoredLegacyPayloadIdentifiers_DuplicateStepNamesFallBackToPosition(t *
 		storedStep("Same", map[string]string{"com.apple.domains": "SECOND"}),
 	))
 
-	resolved := stored.resolve([]types.String{types.StringValue("Same"), types.StringValue("Same")})
-	if got := resolved[0]["com.apple.domains"]; got != "FIRST" {
-		t.Errorf("block 0 resolved to %q, want the positional FIRST", got)
-	}
-	if got := resolved[1]["com.apple.domains"]; got != "SECOND" {
-		t.Errorf("block 1 resolved to %q, want the positional SECOND", got)
+	for _, tc := range []struct {
+		name       string
+		blockNames []types.String
+	}{
+		{"both blocks carry the shared name", []types.String{types.StringValue("Same"), types.StringValue("Same")}},
+		{"only the second block carries it", []types.String{types.StringValue("Other"), types.StringValue("Same")}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			resolved := stored.resolve(tc.blockNames)
+			if got := resolved[0]["com.apple.domains"]; got != "FIRST" {
+				t.Errorf("block 0 resolved to %q, want the positional FIRST", got)
+			}
+			if got := resolved[1]["com.apple.domains"]; got != "SECOND" {
+				t.Errorf("block 1 resolved to %q, want the positional SECOND", got)
+			}
+		})
 	}
 }
 
@@ -366,10 +384,19 @@ func TestBuildSteps_MultipleStepsWithPayloadsOnlyInSome(t *testing.T) {
 	}
 }
 
-// TestStoredLegacyPayloadIdentifiers_ResolveNeverReusesAStep is the invariant behind the two-pass
-// match: a stored step feeds at most one block, whatever mix of named, renamed, inserted and
-// unnamed blocks it is asked about. Handing one step to two blocks would put one identifier in two
-// profiles, which collides on the device rather than merely churning.
+// TestStoredLegacyPayloadIdentifiers_ResolveNeverReusesAStep pins the whole pairing, block by block,
+// across the mixes of named, renamed, inserted and unnamed blocks an apply produces. The invariant
+// behind the two-pass match is that a stored step feeds at most one block — handing one step to two
+// blocks would put one identifier in two profiles, which collides on the device rather than merely
+// churning — but the expected identifier per block is asserted alongside it, since a resolve that
+// matched nothing at all would satisfy the invariant on its own while re-identifying every payload
+// in the blueprint. An empty want is a block that must mint.
+//
+// Where a leftover block sits alongside a step no name claimed, the two are paired: an insert and a
+// rename are indistinguishable from outside, so the inserted block in the first case inherits the
+// departed Third step's identifier rather than leaving it stranded. That is the trade the positional
+// pass exists to make — a block that really is new is one the operator has not deployed yet, while a
+// renamed one is installed on every scoped device.
 func TestStoredLegacyPayloadIdentifiers_ResolveNeverReusesAStep(t *testing.T) {
 	t.Parallel()
 
@@ -382,21 +409,54 @@ func TestStoredLegacyPayloadIdentifiers_ResolveNeverReusesAStep(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		blockNames []types.String
+		want       []string
 	}{
-		{"insert ahead of a named block", []types.String{types.StringValue("Inserted"), types.StringValue("First"), types.StringValue("Second")}},
-		{"reordered", []types.String{types.StringValue("Third"), types.StringValue("First"), types.StringValue("Second")}},
-		{"renamed middle block", []types.String{types.StringValue("First"), types.StringValue("Renamed"), types.StringValue("Third")}},
-		{"all unnamed", []types.String{types.StringNull(), types.StringNull(), types.StringNull()}},
-		{"more blocks than steps", []types.String{types.StringValue("First"), types.StringNull(), types.StringNull(), types.StringNull()}},
-		{"fewer blocks than steps", []types.String{types.StringValue("Third")}},
+		{
+			name:       "insert ahead of a named block",
+			blockNames: []types.String{types.StringValue("Inserted"), types.StringValue("First"), types.StringValue("Second")},
+			want:       []string{"IDENT-3", "IDENT-1", "IDENT-2"},
+		},
+		{
+			name:       "reordered",
+			blockNames: []types.String{types.StringValue("Third"), types.StringValue("First"), types.StringValue("Second")},
+			want:       []string{"IDENT-3", "IDENT-1", "IDENT-2"},
+		},
+		{
+			name:       "renamed middle block",
+			blockNames: []types.String{types.StringValue("First"), types.StringValue("Renamed"), types.StringValue("Third")},
+			want:       []string{"IDENT-1", "IDENT-2", "IDENT-3"},
+		},
+		{
+			name:       "all unnamed",
+			blockNames: []types.String{types.StringNull(), types.StringNull(), types.StringNull()},
+			want:       []string{"IDENT-1", "IDENT-2", "IDENT-3"},
+		},
+		{
+			name:       "more blocks than steps",
+			blockNames: []types.String{types.StringValue("First"), types.StringNull(), types.StringNull(), types.StringNull()},
+			want:       []string{"IDENT-1", "IDENT-2", "IDENT-3", ""},
+		},
+		{
+			name:       "fewer blocks than steps",
+			blockNames: []types.String{types.StringValue("Third")},
+			want:       []string{"IDENT-3"},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
+			resolved := stored.resolve(tc.blockNames)
+			if len(resolved) != len(tc.want) {
+				t.Fatalf("resolve returned %d entries, want one per block (%d)", len(resolved), len(tc.want))
+			}
+
 			seen := make(map[string]int)
-			for i, identifiers := range stored.resolve(tc.blockNames) {
-				identifier, ok := identifiers["com.apple.domains"]
-				if !ok {
+			for i, identifiers := range resolved {
+				identifier := identifiers["com.apple.domains"]
+				if identifier != tc.want[i] {
+					t.Errorf("block %d resolved to %q, want %q", i, identifier, tc.want[i])
+				}
+				if identifier == "" {
 					continue
 				}
 				if previous, reused := seen[identifier]; reused {
@@ -409,7 +469,51 @@ func TestStoredLegacyPayloadIdentifiers_ResolveNeverReusesAStep(t *testing.T) {
 	}
 }
 
-//go:fix inline
+// TestStoredLegacyPayloadIdentifiers_RenamedAndMovedBlockKeepsItsStep covers one apply that both
+// renames a block and moves it. The name pass claims the step the sibling still names, out of
+// position, and the renamed block names nothing — so the positional pass has to offer it the step
+// left unclaimed rather than the step at its own index, which the sibling has already taken. Getting
+// that wrong mints a fresh identifier for every payload in the renamed block, and Apple reinstalls
+// those profiles on every scoped device.
+func TestStoredLegacyPayloadIdentifiers_RenamedAndMovedBlockKeepsItsStep(t *testing.T) {
+	t.Parallel()
+
+	stored := newStoredLegacyPayloadIdentifiers(storedBlueprint(
+		storedStep("A", map[string]string{"com.apple.domains": "IDENT-A"}),
+		storedStep("B", map[string]string{"com.apple.domains": "IDENT-B"}),
+	))
+
+	resolved := stored.resolve([]types.String{types.StringValue("B"), types.StringValue("A renamed")})
+	if got := resolved[0]["com.apple.domains"]; got != "IDENT-B" {
+		t.Errorf("block 0 resolved to %q, want IDENT-B matched by name", got)
+	}
+	if got := resolved[1]["com.apple.domains"]; got != "IDENT-A" {
+		t.Errorf("block 1 resolved to %q, want the unclaimed IDENT-A", got)
+	}
+}
+
+// TestStoredLegacyPayloadIdentifiers_DuplicateBlockNamesFallBackToPosition covers renaming a block
+// onto a sibling's name, which the schema permits: component_blocks[].name is optional and carries
+// no uniqueness validator. A name two blocks carry can name neither step, or the first block to ask
+// takes the step its namesake was continuing and writes that identifier onto a different profile's
+// payloads while the namesake mints a replacement.
+func TestStoredLegacyPayloadIdentifiers_DuplicateBlockNamesFallBackToPosition(t *testing.T) {
+	t.Parallel()
+
+	stored := newStoredLegacyPayloadIdentifiers(storedBlueprint(
+		storedStep("A", map[string]string{"com.apple.domains": "IDENT-A"}),
+		storedStep("B", map[string]string{"com.apple.domains": "IDENT-B"}),
+	))
+
+	resolved := stored.resolve([]types.String{types.StringValue("B"), types.StringValue("B")})
+	if got := resolved[0]["com.apple.domains"]; got != "IDENT-A" {
+		t.Errorf("block 0 resolved to %q, want the positional IDENT-A", got)
+	}
+	if got := resolved[1]["com.apple.domains"]; got != "IDENT-B" {
+		t.Errorf("block 1 resolved to %q, want the positional IDENT-B", got)
+	}
+}
+
 // emptyStoredStep is a stored step carrying no legacy configuration profile component, the shape a
 // block without legacy payloads leaves behind.
 func emptyStoredStep(name string) blueprints.BlueprintStep {

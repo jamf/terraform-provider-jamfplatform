@@ -445,6 +445,11 @@ resource "jamfplatform_blueprints_blueprint" "unchecked_declaration" {
 # Every `legacy_payloads` entry in a block folds into one `com.jamf.ddm-configuration-profile`
 # component whose `payloadContent` is the array of payloads, so the move is per block rather than
 # per payload: an escaped block carries all of its payloads here, including the ones that validate.
+#
+# `payloadIdentifier` is Jamf Pro's to assign for `legacy_payloads`, which writes the stored value
+# back on every update. `raw_component` sends what you wrote, so state one here and keep it stable
+# between applies: Apple keys an installed payload on its identifier, and a payload arriving without
+# one is stamped afresh on every write.
 resource "jamfplatform_blueprints_blueprint" "unchecked_legacy_payload" {
   name        = "Safari Restrictions (unchecked)"
   description = "Managed by Terraform"
@@ -462,7 +467,8 @@ resource "jamfplatform_blueprints_blueprint" "unchecked_legacy_payload" {
             payloadDisplayName = "Safari Restrictions (unchecked)"
             payloadContent = jsonencode([
               {
-                payloadType = "com.apple.applicationaccess"
+                payloadType       = "com.apple.applicationaccess"
+                payloadIdentifier = "1f9c07a4-3b7e-4c21-9f0d-7a5c8e2b6d41"
 
                 allowSafariHistoryClearing = false
                 allowSafariPrivateBrowsing = false
@@ -493,7 +499,7 @@ resource "jamfplatform_blueprints_blueprint" "unchecked_legacy_payload" {
 - `custom_declarations` (Attributes, Deprecated) **"Custom Declarations"** in the Jamf Pro blueprint editor. Manages custom declarative device management declarations with system or user channel types. Prefer `apple_declarations`, which delivers the same declarations and renders them as typed forms in Jamf Pro. (see [below for nested schema](#nestedatt--custom_declarations))
 - `description` (String) Blueprint description. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `disk_management_settings` (Attributes, Deprecated) Disk management settings component for controlling external and network storage restrictions. (see [below for nested schema](#nestedatt--disk_management_settings))
-- `legacy_payloads` (Dynamic, Deprecated) Legacy configuration profile payloads as a list of objects. Each object must have a `payload_type` key (Apple reverse-domain identifier, e.g. `com.apple.applicationaccess`) and an optional `settings` object containing the payload key-value pairs. The payload identifier is auto-generated and the display name uses the blueprint name. Payload validation behaves as described on `component_blocks` → `legacy_payloads` → `settings`.
+- `legacy_payloads` (Dynamic, Deprecated) Legacy configuration profile payloads as a list of objects. Each object must have a `payload_type` key (Apple reverse-domain identifier, e.g. `com.apple.applicationaccess`) and an optional `settings` object containing the payload key-value pairs. The platform assigns each payload's identifier and keeps it across later updates, so it is not settable and does not appear in state. The display name uses the blueprint name. Payload validation behaves as described on `component_blocks` → `legacy_payloads` → `settings`.
 - `math_settings` (Attributes, Deprecated) Math settings component for managing calculator modes and system behavior. (see [below for nested schema](#nestedatt--math_settings))
 - `passcode_policy` (Attributes, Deprecated) Passcode policy component for managing device passcode requirements and restrictions. (see [below for nested schema](#nestedatt--passcode_policy))
 - `raw_component` (Attributes Set, Deprecated) Raw component configuration using key-value pairs. Use it for a component this resource has no attribute for, or to manage one without its attribute's checks. A component managed by its own attribute cannot also be declared here. (see [below for nested schema](#nestedatt--raw_component))
@@ -537,7 +543,7 @@ Optional:
 - `audio_accessory_settings` (Attributes) Audio accessory settings component for managing temporary pairing and unpairing policies. (see [below for nested schema](#nestedatt--component_blocks--audio_accessory_settings))
 - `custom_declarations` (Attributes) **"Custom Declarations"** in the Jamf Pro blueprint editor. Manages custom declarative device management declarations with system or user channel types. Prefer `apple_declarations`, which delivers the same declarations and renders them as typed forms in Jamf Pro. (see [below for nested schema](#nestedatt--component_blocks--custom_declarations))
 - `disk_management_settings` (Attributes) Disk management settings component for controlling external and network storage restrictions. (see [below for nested schema](#nestedatt--component_blocks--disk_management_settings))
-- `legacy_payloads` (Attributes List) Legacy configuration profile payloads in this block. The payload identifier is auto-generated and the display name uses the blueprint name. (see [below for nested schema](#nestedatt--component_blocks--legacy_payloads))
+- `legacy_payloads` (Attributes List) Legacy configuration profile payloads in this block. The platform assigns each payload's identifier and keeps it across later updates, so it is not settable and does not appear in state. The display name uses the blueprint name. (see [below for nested schema](#nestedatt--component_blocks--legacy_payloads))
 - `math_settings` (Attributes) Math settings component for managing calculator modes and system behavior. (see [below for nested schema](#nestedatt--component_blocks--math_settings))
 - `name` (String) Name shown for this component block in the Jamf Blueprints editor (e.g. `Passcode Policy`). When omitted, the platform assigns a default name.
 - `passcode_policy` (Attributes) Passcode policy component for managing device passcode requirements and restrictions. (see [below for nested schema](#nestedatt--component_blocks--passcode_policy))
@@ -627,7 +633,7 @@ Required:
 
 Optional:
 
-- `settings` (String) Payload key-value settings as a JSON object string. Author with `jsonencode({ ... })`. The platform validates each payload against Apple's payload keys for its `payload_type`, and the provider checks the same rules during `plan`, so an unrecognised or miscased key, a wrong value type, or a missing required key is reported before an apply rather than failing one. Each of those is an **error**: Jamf drops a key it does not recognise while reporting success, so a payload carrying one never applies. To skip the checks, move **every** legacy payload in the same block to a single `raw_component` with identifier `com.jamf.ddm-configuration-profile`. The platform stores a block's legacy payloads as one component, so move them all or leave them all here. Two behaviours are absorbed for you instead: a key set to `null` is discarded by Jamf and tolerated here, so nulls can stay in configuration; and Apple's common payload metadata (`payloadDisplayName`, `payloadOrganization`, `payloadUUID`, `payloadVersion`) is stamped onto every payload and hidden unless you set it yourself. Values the platform treats as credentials (a Wi-Fi `Password`, and `EAPClientConfiguration`'s `UserName`, `UserPassword` and `OuterIdentity`) are returned redacted, and the provider keeps what you wrote so the plan still settles. An imported blueprint carries the redaction, because the real value cannot be read back.
+- `settings` (String) Payload key-value settings as a JSON object string. Author with `jsonencode({ ... })`. The platform validates each payload against Apple's payload keys for its `payload_type`, and the provider checks the same rules during `plan`, so an unrecognised or miscased key, a wrong value type, or a missing required key is reported before an apply rather than failing one. Each of those is an **error**: Jamf drops a key it does not recognise while reporting success, so a payload carrying one never applies. To skip the checks, move **every** legacy payload in the same block to a single `raw_component` with identifier `com.jamf.ddm-configuration-profile`. The platform stores a block's legacy payloads as one component, so move them all or leave them all here. Two behaviours are absorbed for you instead: a key set to `null` is discarded by Jamf and tolerated here, so nulls can stay in configuration; and Apple's common payload metadata (`payloadDisplayName`, `payloadOrganization`, `payloadVersion`) is stamped onto every payload and hidden unless you set it yourself. `payloadIdentifier` and `payloadUUID` are not yours to set. The platform assigns both and replaces whatever you write, so neither reaches a device as written and neither appears in state. Leave them out. Values the platform treats as credentials (a Wi-Fi `Password`, and `EAPClientConfiguration`'s `UserName`, `UserPassword` and `OuterIdentity`) are returned redacted, and the provider keeps what you wrote so the plan still settles. An imported blueprint carries the redaction, because the real value cannot be read back.
 
 
 <a id="nestedatt--component_blocks--math_settings"></a>
