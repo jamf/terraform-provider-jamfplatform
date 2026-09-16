@@ -7,6 +7,7 @@ package blueprint_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -78,6 +79,9 @@ type legacyPayloadSpec struct {
 // these tests need — the identifier lives on the payload, so any other component would only add
 // noise to the read-back.
 type legacyPayloadBlock struct {
+	// name is the block's name. Empty renders no `name` attribute at all, which is how the unnamed
+	// authoring style is expressed: the attribute is optional, and a block without one has nothing
+	// but its position for the provider to match it by.
 	name     string
 	payloads []legacyPayloadSpec
 }
@@ -87,7 +91,11 @@ type legacyPayloadBlock struct {
 func legacyIdentifierConfig(groupSuffix, resourceLabel, name, description string, blocks ...legacyPayloadBlock) string {
 	var rendered strings.Builder
 	for _, block := range blocks {
-		fmt.Fprintf(&rendered, "\t\t\t\t{\n\t\t\t\t\tname = %q\n\t\t\t\t\tlegacy_payloads = [\n", block.name)
+		rendered.WriteString("\t\t\t\t{\n")
+		if block.name != "" {
+			fmt.Fprintf(&rendered, "\t\t\t\t\tname = %q\n", block.name)
+		}
+		rendered.WriteString("\t\t\t\t\tlegacy_payloads = [\n")
 		for _, payload := range block.payloads {
 			fmt.Fprintf(&rendered, "\t\t\t\t\t\t{\n\t\t\t\t\t\t\tpayload_type = %q\n\t\t\t\t\t\t\tsettings     = %s\n\t\t\t\t\t\t},\n", payload.payloadType, payload.settings)
 		}
@@ -771,6 +779,176 @@ func TestAccResource_Blueprint_LegacyPayloads_ServiceRemintsWhenIdentifierOmitte
 				PreConfig: stripIdentifiersOutOfBand,
 				Config:    config,
 				Check:     checkStoredIdentifiers(t, addr, reminted),
+			},
+		},
+	})
+}
+
+// legacyDerivedIdentifier reproduces the identifier every released provider version wrote before the
+// service was given the field: the first sixteen bytes of sha256(payloadType), formatted as a UUID.
+// It depended on the payload type alone, so every blueprint in a tenant carrying one payload type
+// held the same value. Reproduced here so a test can assert the provider no longer sends it.
+func legacyDerivedIdentifier(payloadType string) string {
+	sum := sha256.Sum256([]byte(payloadType))
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", sum[0:4], sum[4:6], sum[6:8], sum[8:10], sum[10:16])
+}
+
+// checkStoredIdentifiersAllChanged asserts every recorded payload type is still stored and now
+// carries a different identifier. It is the inverse of checkStoredIdentifiers, for the one case
+// where re-minting is the correct outcome rather than a regression.
+func checkStoredIdentifiersAllChanged(t *testing.T, addr string, recorded map[string]string) resource.TestCheckFunc {
+	t.Helper()
+
+	return func(s *terraform.State) error {
+		if len(recorded) == 0 {
+			return errors.New("no identifiers were recorded, so there is nothing to compare against")
+		}
+
+		blueprintID, err := blueprintIDFromState(s, addr)
+		if err != nil {
+			return err
+		}
+		current, err := readLegacyPayloadIdentifiers(t, blueprintID)
+		if err != nil {
+			return err
+		}
+
+		for payloadType, before := range recorded {
+			after, stored := current[payloadType]
+			if !stored {
+				return fmt.Errorf("payload %s is no longer stored at all, rather than re-identified", payloadType)
+			}
+			if after == before {
+				return fmt.Errorf("payload %s kept identifier %s, but a positional match cannot have found its step", payloadType, before)
+			}
+		}
+		return nil
+	}
+}
+
+// TestAccResource_Blueprint_LegacyPayloads_UnnamedBlocksResolveByPosition covers the authoring style
+// the schema permits but no other test in this file uses: component_blocks[].name is optional, and a
+// block without one has nothing but its position for the provider to match it by.
+//
+// Both halves are asserted, because the guarantee and its boundary are one behaviour. An update the
+// author did not aim at the blocks keeps every identifier, so an unnamed block is not second-class.
+// Reordering two of them re-mints both, because each block then sits over the step the other one
+// left and finds no entry for its own payload type there. That is the cost of leaving blocks
+// unnamed, and pinning it stops the cost being discovered by an operator instead.
+func TestAccResource_Blueprint_LegacyPayloads_UnnamedBlocksResolveByPosition(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-lpid-unnamed-" + suffix
+	addr := "jamfplatform_blueprints_blueprint.lpid_unnamed"
+	recorded := make(map[string]string)
+
+	accessibilityBlock := legacyPayloadBlock{
+		payloads: []legacyPayloadSpec{{payloadType: accessibilityPayloadType, settings: accessibilitySettings}},
+	}
+	domainsBlock := legacyPayloadBlock{
+		payloads: []legacyPayloadSpec{{payloadType: domainsPayloadType, settings: domainsSettings}},
+	}
+
+	config := func(description string, blocks ...legacyPayloadBlock) string {
+		return legacyIdentifierConfig("lpidunnamed", "lpid_unnamed", name, description, blocks...)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBlueprintResourcesDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: config("Acceptance test — safe to delete", accessibilityBlock, domainsBlock),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(addr, "component_blocks.#", "2"),
+					captureStoredIdentifiers(t, addr, recorded),
+				),
+			},
+			{
+				// An unrelated edit. Position is unchanged, so a positional match finds every step.
+				Config: config("Acceptance test — safe to delete, edited", accessibilityBlock, domainsBlock),
+				Check:  checkStoredIdentifiers(t, addr, recorded),
+			},
+			{
+				// Reordered. Neither block can be matched by name, so both take the other's step and
+				// the service mints for both.
+				Config: config("Acceptance test — safe to delete, edited", domainsBlock, accessibilityBlock),
+				Check:  checkStoredIdentifiersAllChanged(t, addr, recorded),
+			},
+		},
+	})
+}
+
+// TestAccResource_Blueprint_LegacyPayloads_ServiceMintsOnCreate isolates what the service does on
+// create, which no other test here can: every one of them observes the create path only as the
+// starting point for an update, and a manual probe through jamf-cli cannot answer it either, because
+// `pro bp apply` randomizes payload identifiers client-side before the request is sent.
+//
+// Two blueprints, created in one apply, carrying the same payload type. The provider sends no
+// identifier for either — legacy_payload_identifiers_test.go's create case pins that against the
+// request body — so whatever comes back was assigned by the service. The two must differ, which is
+// what separates a value minted per payload from any value derived from the payload type, and
+// neither may equal the sha256 derivation the provider itself used to send.
+func TestAccResource_Blueprint_LegacyPayloads_ServiceMintsOnCreate(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	firstAddr := "jamfplatform_blueprints_blueprint.lpid_mint_one"
+	secondAddr := "jamfplatform_blueprints_blueprint.lpid_mint_two"
+	first := make(map[string]string)
+	second := make(map[string]string)
+
+	blueprintHCL := func(label, name string) string {
+		return fmt.Sprintf(`
+			resource "jamfplatform_blueprints_blueprint" %q {
+				name          = %q
+				description   = "Acceptance test — safe to delete"
+				deployed      = false
+				device_groups = [jamfplatform_device_group.scope.id]
+
+				component_blocks = [{
+					name = "Minting"
+					legacy_payloads = [{
+						payload_type = %q
+						settings     = %s
+					}]
+				}]
+			}
+		`, label, name, domainsPayloadType, domainsSettings)
+	}
+
+	config := smartGroupHCL("lpidmint") +
+		blueprintHCL("lpid_mint_one", "tf-acc-lpid-mint-one-"+suffix) +
+		blueprintHCL("lpid_mint_two", "tf-acc-lpid-mint-two-"+suffix)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBlueprintResourcesDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					captureStoredIdentifiers(t, firstAddr, first),
+					captureStoredIdentifiers(t, secondAddr, second),
+					func(*terraform.State) error {
+						one, two := first[domainsPayloadType], second[domainsPayloadType]
+						if one == two {
+							return fmt.Errorf(
+								"both blueprints stored %s for %s; an identifier shared by two separate creates is derived from the payload type rather than minted per payload",
+								one, domainsPayloadType,
+							)
+						}
+						derived := legacyDerivedIdentifier(domainsPayloadType)
+						for label, got := range map[string]string{firstAddr: one, secondAddr: two} {
+							if strings.EqualFold(got, derived) {
+								return fmt.Errorf(
+									"%s stored %s, which is sha256(%s) — the provider is still sending the identifier it used to derive",
+									label, got, domainsPayloadType,
+								)
+							}
+						}
+						return nil
+					},
+				),
 			},
 		},
 	})
