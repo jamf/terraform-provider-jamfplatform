@@ -36,7 +36,7 @@ func (r *BlueprintResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	steps, diags := r.buildSteps(ctx, &data)
+	steps, diags := r.buildSteps(ctx, &data, nil)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return
@@ -191,7 +191,13 @@ func (r *BlueprintResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	steps, diags := r.buildSteps(ctx, &data)
+	stored, storedDiags := r.readStoredLegacyPayloadIdentifiers(updateCtx, data.ID.ValueString())
+	resp.Diagnostics.Append(storedDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	steps, diags := r.buildSteps(ctx, &data, stored)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return

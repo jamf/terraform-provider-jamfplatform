@@ -347,22 +347,41 @@ func legacyPayloadItems(apiComponentsByID map[string]blueprints.Component, prior
 }
 
 // serverStampedPayloadKeys are the per-payload metadata keys the blueprints service writes onto
-// every legacy payload it stores, whether or not the author supplied them. `payloadType` and
-// `payloadIdentifier` are not listed: legacyPayloadItems already lifts those out of settings, the
-// first into `payload_type` and the second because the provider derives it from the payload type
-// (see generatePayloadIdentifier).
+// every legacy payload it stores, whether or not the author supplied them, and which it preserves
+// when the author does supply one — wire-verified 2026-09-16, an authored payloadDisplayName,
+// payloadOrganization and payloadVersion all surviving a create unchanged. That is what makes the
+// conditional mask in maskServerStampedPayloadKeys correct for them.
+//
+// `payloadType` and `payloadIdentifier` are not listed because legacyPayloadItems lifts both out of
+// settings unconditionally, the first into `payload_type` and the second because the service owns it
+// (see storedLegacyPayloadIdentifiers). `payloadUUID` is not listed either, for the opposite reason
+// to the keys that are: the service never honours an authored one. It is always overwritten with the
+// payload's identifier, or with a freshly minted UUID where no identifier was sent, so a conditional
+// mask would keep an authored value in state that the service had already replaced and the plan
+// would never settle. alwaysMaskedPayloadKeys covers it instead.
 var serverStampedPayloadKeys = [...]string{
 	"payloadDisplayName",
 	"payloadOrganization",
-	"payloadUUID",
 	"payloadVersion",
+}
+
+// alwaysMaskedPayloadKeys are the per-payload metadata keys masked out of state whether or not the
+// author supplied them, because the service assigns its own value either way. This is the
+// unconditional mask the configuration profile resources apply to the same keys (see
+// payloadhelpers.maskedPayloadContentKeys).
+var alwaysMaskedPayloadKeys = [...]string{
+	"payloadUUID",
 }
 
 // maskServerStampedPayloadKeys deletes from a payload's server-derived settings every metadata key
 // the service stamps on that the author did not declare, so the stamp never reads as a settings
 // change. A stamped key the author did declare is left in place, because the service preserves an
-// authored value and state must keep reflecting it.
+// authored value and state must keep reflecting it — except for the keys in
+// alwaysMaskedPayloadKeys, which the service reassigns however they were authored.
 func maskServerStampedPayloadKeys(settings map[string]any, priorSettings map[string]any) {
+	for _, key := range alwaysMaskedPayloadKeys {
+		delete(settings, key)
+	}
 	for _, key := range serverStampedPayloadKeys {
 		if _, authored := priorSettings[key]; authored {
 			continue

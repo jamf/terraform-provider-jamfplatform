@@ -29,16 +29,26 @@ const flatStepName = "Declaration group"
 // A block's legacy payloads are checked for a raw_component overlap inside collectBlockComponents,
 // which carries them; the deprecated flat value is not carried there, because the flat (dynamic) and
 // block (JSON-string) shapes differ, so flat mode checks that one overlap itself.
-func (r *BlueprintResource) buildSteps(ctx context.Context, data *BlueprintResourceModel) ([]blueprints.BlueprintStep, diag.Diagnostics) {
+//
+// stored carries the legacy payload identifiers the service has already assigned, so an update
+// writes them back rather than letting the service mint replacements; it is nil on create. See
+// storedLegacyPayloadIdentifiers.
+func (r *BlueprintResource) buildSteps(ctx context.Context, data *BlueprintResourceModel, stored *storedLegacyPayloadIdentifiers) ([]blueprints.BlueprintStep, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	blueprintName := data.Name.ValueString()
 
 	if len(data.ComponentBlocks) > 0 {
+		blockNames := make([]types.String, len(data.ComponentBlocks))
+		for i, block := range data.ComponentBlocks {
+			blockNames[i] = block.Name
+		}
+		storedByBlock := stored.resolve(blockNames)
+
 		steps := make([]blueprints.BlueprintStep, 0, len(data.ComponentBlocks))
-		for _, block := range data.ComponentBlocks {
+		for i, block := range data.ComponentBlocks {
 			components, blockDiags := r.collectBlockComponents(ctx, block)
 			if !blockDiags.HasError() {
-				r.collectBlockLegacyPayloads(&components, &blockDiags, block.LegacyPayloads, blueprintName)
+				r.collectBlockLegacyPayloads(&components, &blockDiags, block.LegacyPayloads, blueprintName, storedByBlock[i])
 			}
 			diags.Append(blockDiags...)
 			if blockDiags.HasError() {
@@ -60,7 +70,7 @@ func (r *BlueprintResource) buildSteps(ctx context.Context, data *BlueprintResou
 			{name: "legacy_payloads", identifier: legacyConfigProfileIdentifier},
 		})...)
 		if !flatDiags.HasError() {
-			r.collectLegacyPayloads(&components, &flatDiags, data.LegacyPayloads, blueprintName)
+			r.collectLegacyPayloads(&components, &flatDiags, data.LegacyPayloads, blueprintName, stored.resolve([]types.String{types.StringValue(flatStepName)})[0])
 		}
 	}
 	diags.Append(flatDiags...)
@@ -312,7 +322,7 @@ type legacyPayloadEntry struct {
 
 // collectLegacyPayloads builds the legacy configuration profile component from the deprecated
 // dynamic top-level legacy_payloads value.
-func (r *BlueprintResource) collectLegacyPayloads(allComponents *[]blueprints.Component, diags *diag.Diagnostics, legacyPayloads types.Dynamic, blueprintName string) {
+func (r *BlueprintResource) collectLegacyPayloads(allComponents *[]blueprints.Component, diags *diag.Diagnostics, legacyPayloads types.Dynamic, blueprintName string, storedIdentifiers map[string]string) {
 	raw, err := helpers.TerraformDynamicToJSON(legacyPayloads)
 	if err != nil {
 		diags.AddError("Error reading legacy payloads", "Could not convert legacy payloads to JSON: "+helpers.APIErrorDetail(err))
@@ -343,12 +353,12 @@ func (r *BlueprintResource) collectLegacyPayloads(allComponents *[]blueprints.Co
 		entries = append(entries, entry)
 	}
 
-	r.appendLegacyConfigProfile(allComponents, diags, entries, blueprintName)
+	r.appendLegacyConfigProfile(allComponents, diags, entries, blueprintName, storedIdentifiers)
 }
 
 // collectBlockLegacyPayloads builds the legacy configuration profile component from a block's
 // legacy_payloads list, whose settings arrive as JSON object strings.
-func (r *BlueprintResource) collectBlockLegacyPayloads(allComponents *[]blueprints.Component, diags *diag.Diagnostics, payloads []BlockLegacyPayloadModel, blueprintName string) {
+func (r *BlueprintResource) collectBlockLegacyPayloads(allComponents *[]blueprints.Component, diags *diag.Diagnostics, payloads []BlockLegacyPayloadModel, blueprintName string, storedIdentifiers map[string]string) {
 	if len(payloads) == 0 {
 		return
 	}
@@ -370,13 +380,21 @@ func (r *BlueprintResource) collectBlockLegacyPayloads(allComponents *[]blueprin
 		entries = append(entries, entry)
 	}
 
-	r.appendLegacyConfigProfile(allComponents, diags, entries, blueprintName)
+	r.appendLegacyConfigProfile(allComponents, diags, entries, blueprintName, storedIdentifiers)
 }
 
 // appendLegacyConfigProfile assembles the shared com.jamf.ddm-configuration-profile component from
 // the flattened legacy payload entries and appends it. It rejects a missing payload type or a
 // duplicate payload type.
-func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprints.Component, diags *diag.Diagnostics, entries []legacyPayloadEntry, blueprintName string) {
+//
+// `payloadIdentifier` is the service's to own, so an authored one is dropped and the stored one
+// written back where there is one; a payload the service has not yet stamped is sent without the
+// key, for the service to mint. This matches the configuration profile resources, which mask the
+// field from the diff unconditionally and overwrite an authored value with the stored one before
+// every write. Dropping it after the authored settings are merged in is deliberate: settings is a
+// free-form object, so the key can reach here from configuration, and the service honours whatever
+// arrives.
+func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprints.Component, diags *diag.Diagnostics, entries []legacyPayloadEntry, blueprintName string, storedIdentifiers map[string]string) {
 	seenPayloadTypes := make(map[string]bool, len(entries))
 	payloadArray := make([]map[string]any, 0, len(entries))
 	for _, entry := range entries {
@@ -394,11 +412,12 @@ func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprint
 		}
 		seenPayloadTypes[entry.PayloadType] = true
 
-		payload := map[string]any{
-			"payloadType":       entry.PayloadType,
-			"payloadIdentifier": generatePayloadIdentifier(entry.PayloadType),
-		}
+		payload := map[string]any{"payloadType": entry.PayloadType}
 		maps.Copy(payload, entry.Settings)
+		delete(payload, "payloadIdentifier")
+		if identifier, stored := storedIdentifiers[entry.PayloadType]; stored {
+			payload["payloadIdentifier"] = identifier
+		}
 		payloadArray = append(payloadArray, payload)
 	}
 

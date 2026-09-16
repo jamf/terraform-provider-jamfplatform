@@ -29,7 +29,7 @@ func TestCollectLegacyPayloads_ValidPayload(t *testing.T) {
 	}
 	dynVal, _ := helpers.JSONToTerraformDynamic(input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "My Blueprint")
+	r.collectLegacyPayloads(&components, &diags, dynVal, "My Blueprint", nil)
 
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %v", diags)
@@ -78,7 +78,7 @@ func TestCollectLegacyPayloads_NoSettings(t *testing.T) {
 	}
 	dynVal, _ := helpers.JSONToTerraformDynamic(input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Blueprint")
+	r.collectLegacyPayloads(&components, &diags, dynVal, "Blueprint", nil)
 
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %v", diags)
@@ -115,7 +115,7 @@ func TestCollectLegacyPayloads_MixedTypeSettings(t *testing.T) {
 	}
 	dynVal, _ := helpers.JSONToTerraformDynamic(input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Test")
+	r.collectLegacyPayloads(&components, &diags, dynVal, "Test", nil)
 
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %v", diags)
@@ -146,7 +146,7 @@ func TestCollectLegacyPayloads_EmptyList(t *testing.T) {
 
 	dynVal, _ := helpers.JSONToTerraformDynamic([]any{})
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Empty Blueprint")
+	r.collectLegacyPayloads(&components, &diags, dynVal, "Empty Blueprint", nil)
 
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %v", diags)
@@ -189,7 +189,7 @@ func TestCollectLegacyPayloads_DuplicatePayloadType(t *testing.T) {
 	}
 	dynVal, _ := helpers.JSONToTerraformDynamic(input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Blueprint")
+	r.collectLegacyPayloads(&components, &diags, dynVal, "Blueprint", nil)
 
 	if !diags.HasError() {
 		t.Fatal("expected error for duplicate payload_type, got none")
@@ -212,7 +212,7 @@ func TestCollectLegacyPayloads_NullDynamic(t *testing.T) {
 	var components []blueprints.Component
 	var diags diag.Diagnostics
 
-	r.collectLegacyPayloads(&components, &diags, types.DynamicNull(), "Blueprint")
+	r.collectLegacyPayloads(&components, &diags, types.DynamicNull(), "Blueprint", nil)
 
 	if !diags.HasError() {
 		t.Error("expected error for null dynamic value")

@@ -445,8 +445,6 @@ resource "jamfplatform_blueprints_blueprint" "unchecked_declaration" {
 # Every `legacy_payloads` entry in a block folds into one `com.jamf.ddm-configuration-profile`
 # component whose `payloadContent` is the array of payloads, so the move is per block rather than
 # per payload: an escaped block carries all of its payloads here, including the ones that validate.
-# `payloadIdentifier` is derived per payload type when the typed attribute builds the component, so
-# state one explicitly — any stable UUID will do, as long as it does not change between applies.
 resource "jamfplatform_blueprints_blueprint" "unchecked_legacy_payload" {
   name        = "Safari Restrictions (unchecked)"
   description = "Managed by Terraform"
@@ -464,8 +462,7 @@ resource "jamfplatform_blueprints_blueprint" "unchecked_legacy_payload" {
             payloadDisplayName = "Safari Restrictions (unchecked)"
             payloadContent = jsonencode([
               {
-                payloadType       = "com.apple.applicationaccess"
-                payloadIdentifier = "1f9c07a4-3b7e-4c21-9f0d-7a5c8e2b6d41"
+                payloadType = "com.apple.applicationaccess"
 
                 allowSafariHistoryClearing = false
                 allowSafariPrivateBrowsing = false
