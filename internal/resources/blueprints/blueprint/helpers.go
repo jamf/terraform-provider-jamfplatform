@@ -5,22 +5,245 @@ package blueprint
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
-// generatePayloadIdentifier produces a deterministic UUID-formatted identifier from a payload type string.
-func generatePayloadIdentifier(payloadType string) string {
-	hash := sha256.Sum256([]byte(payloadType))
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
-		hash[0:4], hash[4:6], hash[6:8], hash[8:10], hash[10:16])
+// storedLegacyPayloadIdentifiers holds the `payloadIdentifier` the blueprints service has already
+// assigned to each stored legacy payload, so an update can send the value back rather than let the
+// service mint a replacement.
+//
+// The service owns this field. It is absent from the Blueprints API specification — which requires
+// only `payloadType` in a `payloadContent` entry — and wire probing on 2026-09-16 established that a
+// payload sent without one is accepted and stamped with a fresh UUID **on every write**.
+// `payloadContent` is an array and a merge-patch replaces an array wholesale, so a body omitting the
+// key re-identifies every payload in the blueprint whenever any part of it changed.
+//
+// Jamf's own web app avoids that by reading the blueprint, mutating one field and writing the stored
+// identifiers back, which a UI save confirms: editing one payload's setting in the web app left the
+// identifier and the per-payload display name, organization and version untouched, wire-verified
+// 2026-09-16. The web app also mints its own identifiers client-side, lowercase where the service
+// mints uppercase, which is why it must be sending them back. This type is that read half, so the
+// provider keeps what the web app would have kept. It mirrors the configuration profile resources,
+// where payloadhelpers.InjectTopLevelIdentifierValues carries the stored identifier onto the
+// outgoing payload for the same reason.
+//
+// A rotated identifier does **not** reinstall the payload on a device. That reads as the obvious
+// reason to preserve one, and it is wrong: wire-verified on macOS 26.6, 2026-09-16, a blueprint
+// write followed by a deploy reinstalls the profile whether the identifiers moved or not, and a
+// write rotating all four replaced the payload in place with no orphan and no duplicate. Parity with
+// the web app and a stable stored blueprint are the reasons here, not device churn.
+//
+// Nor does a duplicated identifier collide. Two blueprints delivering the same payload type under
+// one identifier install as two profiles, each keeping its own settings, wire-verified the same day:
+// the device keys a payload on its **profile's** top-level identifier, which Jamf assigns per
+// blueprint, rather than on the nested one. Managed preferences composite the same way: two
+// blueprints setting disjoint keys of one payload type land every key in the single
+// /Library/Managed Preferences/<domain>.plist, and they do so whether the two share an identifier or
+// carry different ones, so the merge is keyed on the preference domain and the identifier plays no
+// part either way. The plist's own PayloadUUID records whichever payload wrote last.
+//
+// So the derivation every released version used, sha256 of the payload type and therefore identical
+// across every blueprint sharing a type, needs no migration: there is nothing for a re-mint to
+// repair.
+//
+// A payload is located by step and by `payloadType`, the same pairing checkLegacyPayloadDiscards
+// uses, because a type is unique within a block (appendLegacyConfigProfile rejects a duplicate).
+// Steps are matched by name ahead of position so that inserting or reordering a block keeps every
+// other block's identifiers: a positional match alone would shift them onto neighbouring payloads.
+// Position remains the fallback, since a block name is optional and need not be unique.
+type storedLegacyPayloadIdentifiers struct {
+	stepIndexByName map[string]int
+	byStepIndex     []map[string]string
+	// ambiguous holds identifiers dropped because more than one payload type in a single step
+	// carried them, so the service reissues a distinct one for each. macOS refuses a whole profile
+	// whose payload identifiers are not unique — "the PayloadIdentifier is used more than once in
+	// the profile", ConfigProfilePluginDomain:-107, wire-verified on macOS 26.6 on 2026-09-16,
+	// where neither payload installed and the device retried indefinitely while the blueprint
+	// reported DEPLOYED and SUCCEEDED. Writing a stored duplicate back would reproduce that profile
+	// on every update, so a duplicate names nothing, the same way a name two steps share does.
+	//
+	// The scope is one step, and that is measured rather than assumed. A step's legacy payloads fold
+	// into one component and install as one profile, so a duplicate inside a step is what the device
+	// rejects. The same identifier on payloads in two different steps of one blueprint installed
+	// cleanly, as did the same identifier in two separate blueprints, because each is a profile of
+	// its own and the device scopes the uniqueness rule to a profile. Widening this to the whole
+	// blueprint would re-identify payloads a device is content with.
+	ambiguous []string
+}
+
+// newStoredLegacyPayloadIdentifiers reads the stored identifiers out of a blueprint as fetched from
+// the service. A nil blueprint yields nil, which callers treat as "nothing stored yet" — the create
+// path, where every identifier is the service's to mint.
+//
+// A name two steps share cannot say which of them a block means, so it names neither and both fall
+// back to position. resolve applies the same reasoning to a name two blocks share.
+func newStoredLegacyPayloadIdentifiers(blueprint *blueprints.BlueprintDetail) *storedLegacyPayloadIdentifiers {
+	if blueprint == nil {
+		return nil
+	}
+
+	stored := &storedLegacyPayloadIdentifiers{
+		stepIndexByName: make(map[string]int, len(blueprint.Steps)),
+		byStepIndex:     make([]map[string]string, 0, len(blueprint.Steps)),
+	}
+	duplicateNames := make(map[string]bool, len(blueprint.Steps))
+
+	for i, step := range blueprint.Steps {
+		identifiers, ambiguous := legacyPayloadIdentifiersInStep(step)
+		stored.byStepIndex = append(stored.byStepIndex, identifiers)
+		stored.ambiguous = append(stored.ambiguous, ambiguous...)
+
+		if step.Name == nil || *step.Name == "" {
+			continue
+		}
+		if _, seen := stored.stepIndexByName[*step.Name]; seen {
+			duplicateNames[*step.Name] = true
+			continue
+		}
+		stored.stepIndexByName[*step.Name] = i
+	}
+
+	for name := range duplicateNames {
+		delete(stored.stepIndexByName, name)
+	}
+
+	return stored
+}
+
+// legacyPayloadIdentifiersInStep maps payload type to stored identifier for a step's legacy
+// configuration profile component. A payload the service has not stamped is omitted rather than
+// mapped to the empty string, so a caller cannot mistake it for a stored value.
+func legacyPayloadIdentifiersInStep(step blueprints.BlueprintStep) (map[string]string, []string) {
+	identifiers := make(map[string]string)
+	for _, component := range step.Components {
+		if component.Identifier != legacyConfigProfileIdentifier {
+			continue
+		}
+
+		var configuration struct {
+			PayloadContent []struct {
+				PayloadType       string `json:"payloadType"`
+				PayloadIdentifier string `json:"payloadIdentifier"`
+			} `json:"payloadContent"`
+		}
+		if err := json.Unmarshal(component.Configuration, &configuration); err != nil {
+			continue
+		}
+		for _, payload := range configuration.PayloadContent {
+			if payload.PayloadType == "" || payload.PayloadIdentifier == "" {
+				continue
+			}
+			identifiers[payload.PayloadType] = payload.PayloadIdentifier
+		}
+	}
+
+	return identifiers, dropDuplicateIdentifiers(identifiers)
+}
+
+// dropDuplicateIdentifiers removes from one step's map every identifier more than one payload type
+// carries, and returns those identifiers sorted. Dropping rather than keeping one of them is what
+// makes the outcome safe: the service then mints a distinct value for each, and a rotated identifier
+// costs nothing (see storedLegacyPayloadIdentifiers), where writing the duplicate back costs the
+// whole profile.
+func dropDuplicateIdentifiers(identifiers map[string]string) []string {
+	typesByIdentifier := make(map[string][]string, len(identifiers))
+	for payloadType, identifier := range identifiers {
+		typesByIdentifier[identifier] = append(typesByIdentifier[identifier], payloadType)
+	}
+
+	var duplicates []string
+	for identifier, payloadTypes := range typesByIdentifier {
+		if len(payloadTypes) < 2 {
+			continue
+		}
+		duplicates = append(duplicates, identifier)
+		for _, payloadType := range payloadTypes {
+			delete(identifiers, payloadType)
+		}
+	}
+	slices.Sort(duplicates)
+	return duplicates
+}
+
+// resolve pairs each component block with the stored identifiers of the step it continues, one entry
+// per block and in block order. A block with no stored counterpart gets nil, so every one of its
+// payloads is the service's to mint.
+//
+// Matching runs in two passes, and the order matters. The first claims every step whose name a block
+// names, so inserting or reordering a block keeps the other blocks' identifiers. The second walks
+// the steps no name claimed, in stored order, and hands the next one to each block the first pass
+// left over — which is all an unnamed block has, and is what lets a block renamed and moved in the
+// same apply go on continuing the step it came from. Pairing a leftover block with the step at its
+// own index instead would strand a step whenever a name match landed out of position, so a rename
+// combined with a move would mint fresh identifiers for a block whose step was sitting unclaimed.
+//
+// A name more than one block carries claims nothing, for the reason newStoredLegacyPayloadIdentifiers
+// drops a name two steps share: it cannot say which block means which step, and the first block to
+// ask would otherwise take the step and leave its namesake — whose payloads are a different profile
+// — to mint. Both such blocks fall through to the positional pass. The schema permits this, since
+// component_blocks[].name is optional and carries no uniqueness validator.
+//
+// A step is claimed at most once across both passes. Without that, a positional match could take a
+// step that a later block goes on to claim by name, and the same identifier would be written into
+// two profiles — which is worse than minting a new one, because Apple keys an installed payload on
+// its identifier and two profiles would then be fighting over the same payload on the device.
+func (s *storedLegacyPayloadIdentifiers) resolve(blockNames []types.String) []map[string]string {
+	resolved := make([]map[string]string, len(blockNames))
+	if s == nil {
+		return resolved
+	}
+
+	claimed := make([]bool, len(s.byStepIndex))
+	matchedByName := make([]bool, len(blockNames))
+
+	blockNameCounts := make(map[string]int, len(blockNames))
+	for _, name := range blockNames {
+		if helpers.IsConfiguredValue(name) && name.ValueString() != "" {
+			blockNameCounts[name.ValueString()]++
+		}
+	}
+
+	for i, name := range blockNames {
+		if !helpers.IsConfiguredValue(name) || name.ValueString() == "" {
+			continue
+		}
+		if blockNameCounts[name.ValueString()] > 1 {
+			continue
+		}
+		index, ok := s.stepIndexByName[name.ValueString()]
+		if !ok || claimed[index] {
+			continue
+		}
+		resolved[i] = s.byStepIndex[index]
+		claimed[index] = true
+		matchedByName[i] = true
+	}
+
+	next := 0
+	for i := range blockNames {
+		if matchedByName[i] {
+			continue
+		}
+		for next < len(s.byStepIndex) && claimed[next] {
+			next++
+		}
+		if next >= len(s.byStepIndex) {
+			break
+		}
+		resolved[i] = s.byStepIndex[next]
+		claimed[next] = true
+	}
+
+	return resolved
 }
 
 // describeBlueprintBlocks renders one numbered line per component block, naming the block and the
@@ -178,4 +401,41 @@ func scopeDeviceGroups(scope *blueprints.BlueprintScope) []string {
 // would have a later apply recreate it alongside itself.
 func isDeleteMaybeComplete(err error) bool {
 	return helpers.IsServerError(err) && !helpers.IsEdgeBlocked(err)
+}
+
+// readStoredLegacyPayloadIdentifiers fetches the blueprint so an update can write its stored legacy
+// payload identifiers back rather than let the service mint replacements. This is the read half of
+// the read-merge-write the Jamf web app performs, and the reason it cannot be served from Terraform
+// state: the identifiers are masked out of state on read, because the service owns them and an
+// authored value is discarded.
+//
+// A failed read is an error rather than a fallback to minting. Proceeding would re-identify every
+// legacy payload in the blueprint, and it would do so silently, since the field is masked out of
+// state. A failed apply the operator can retry is the better outcome.
+func (r *BlueprintResource) readStoredLegacyPayloadIdentifiers(ctx context.Context, blueprintID string) (*storedLegacyPayloadIdentifiers, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	blueprint, err := r.client.GetBlueprint(ctx, blueprintID)
+	if err != nil {
+		diags.AddError(
+			"Error reading the blueprint before updating it",
+			"This read failed, so nothing reached Jamf Pro and the blueprint is unchanged. Retry the apply. "+
+				"Reported while reading: "+helpers.APIErrorDetail(err),
+		)
+		return nil, diags
+	}
+
+	stored := newStoredLegacyPayloadIdentifiers(blueprint)
+	if len(stored.ambiguous) > 0 {
+		diags.AddWarning(
+			"Legacy payload identifiers were reissued",
+			"Jamf Pro held one identifier on more than one legacy payload of this blueprint: "+
+				strings.Join(stored.ambiguous, ", ")+". A device refuses a configuration profile whose payload "+
+				"identifiers are not unique, and refuses all of its payloads rather than the duplicated ones, so "+
+				"the provider left those out of this update for Jamf Pro to assign fresh ones. Your settings are "+
+				"unaffected. A blueprint reaches this state by being edited outside Terraform.",
+		)
+	}
+
+	return stored, diags
 }

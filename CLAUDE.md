@@ -210,6 +210,48 @@ branch the table unions — that is inferred from `siri.settings.AllowSiriAI` ap
 picker while absent from release, so re-probe it first if false positives reappear for keys the UI
 offers. User guidance is in `docs/guides/apple-schema-validation.md`.
 
+## Blueprint legacy payload identifiers — one-paragraph orientation
+
+A legacy payload's `payloadIdentifier` is the blueprints service's to assign, not the provider's: it
+is absent from the Blueprints API specification, which requires only `payloadType` in a
+`payloadContent` entry, and wire probing on 2026-09-16 established that a payload arriving without
+one is accepted and stamped with a **fresh UUID on every write**, on POST and on merge-patch alike,
+while one sent with an identifier keeps it verbatim and unvalidated across later writes.
+`payloadContent` is an array and a merge-patch replaces an array wholesale, so a body omitting the
+key re-identifies every payload on each unrelated edit, silently, since the field is masked out of
+state and `deploymentState` reports `OUT_OF_DATE` after any write regardless. The reason to preserve
+it is **parity with the web app**, which mints its own identifiers client-side (lowercase, where the
+service mints uppercase) and sends them back on every save: editing one payload in the web app left
+the identifier, display name, organization and version untouched, wire-verified 2026-09-16. What it
+is **not** is a device concern, and that trap is worth recording because it reads as the obvious
+one — on macOS 26.6, 2026-09-16, a write plus a deploy reinstalled the profile whether the
+identifiers moved or not, and a write rotating all four replaced the payload in place with no orphan
+and no duplicate. A **duplicated** identifier is equally inert: two blueprints delivering one payload
+type under the same identifier installed as two profiles, each keeping its own settings, because the
+device keys a payload on its *profile's* top-level identifier rather than the nested one, and
+managed preferences composite on the **preference domain**: two blueprints setting disjoint keys of
+one payload type land every key in the single `/Library/Managed Preferences/<domain>.plist`, whether
+they share an identifier or not. The derivation every released version used was sha256 of the payload
+type, so identical across every blueprint sharing a type, and it therefore needs no migration and no
+taint. One duplicate **is** fatal, and only one: two payloads in a **single step** sharing an
+identifier make macOS refuse the whole profile and every payload in it (`the PayloadIdentifier is
+used more than once in the profile`, `ConfigProfilePluginDomain:-107`), retrying forever while the
+blueprint reports `DEPLOYED`/`SUCCEEDED`. A step is one component and so one profile, which is why
+the rule scopes there and why the same identifier across two steps, or across two blueprints,
+installs cleanly. The provider does not originate that shape but would propagate one, since stored
+identifiers are read by payload type, so `dropDuplicateIdentifiers` drops any identifier two types in
+a step share and warns, letting the service reissue distinct ones. So a blueprint update is
+**read-merge-write**, the same shape the configuration profile resources get from
+`payloadhelpers.InjectTopLevelIdentifierValues`: `readStoredLegacyPayloadIdentifiers` fetches the
+blueprint first and writes each stored identifier back, located by step and then by `payloadType`
+with steps matched **by name ahead of position** so that inserting or reordering a block cannot shift
+one block's identifiers onto another's payloads; create sends none, an authored value is discarded
+either way, and a failed pre-read fails the apply rather than falling back to minting. One carve-out:
+the injection is wired into `legacy_payloads` alone, so a legacy profile authored as `raw_component`
+goes through `collectBlockComponents`, which re-marshals the author's own JSON untouched, and its
+identifiers rotate on every write. The documentation deliberately says nothing about that, because
+the field is the service's and an operator has nothing to do with it.
+
 ## Jamf Security Cloud resources — one-paragraph orientation
 
 Terraform construct name format: `jamfplatform_security_cloud_<resource>`; Go package

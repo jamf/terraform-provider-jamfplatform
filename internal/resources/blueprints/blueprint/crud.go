@@ -6,6 +6,7 @@ package blueprint
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
@@ -36,7 +37,7 @@ func (r *BlueprintResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	steps, diags := r.buildSteps(ctx, &data)
+	steps, diags := r.buildSteps(ctx, &data, nil)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return
@@ -168,6 +169,10 @@ func (r *BlueprintResource) Read(ctx context.Context, req resource.ReadRequest, 
 }
 
 // Update updates the Blueprint resource.
+//
+// It reads the blueprint first only when the configuration writes legacy payloads, since that read
+// exists to preserve their service-owned identifiers and nothing else consumes it — see
+// hasLegacyPayloads, whose condition mirrors buildSteps'.
 func (r *BlueprintResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data BlueprintResourceModel
 
@@ -191,7 +196,17 @@ func (r *BlueprintResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	steps, diags := r.buildSteps(ctx, &data)
+	var stored *storedLegacyPayloadIdentifiers
+	if data.hasLegacyPayloads() {
+		var storedDiags diag.Diagnostics
+		stored, storedDiags = r.readStoredLegacyPayloadIdentifiers(updateCtx, data.ID.ValueString())
+		resp.Diagnostics.Append(storedDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	steps, diags := r.buildSteps(ctx, &data, stored)
 	if diags.HasError() {
 		resp.Diagnostics.Append(diags...)
 		return

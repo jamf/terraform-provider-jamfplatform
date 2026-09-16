@@ -296,6 +296,9 @@ func parseComponentConfiguration(apiComponentsByID map[string]blueprints.Compone
 // a stamped key the author did not write is dropped, and one the author did write is kept, since
 // the service echoes an authored value back verbatim. priorSettingsByType carries the author's
 // settings keyed by payload type, and may be nil (import — nothing authored to mask against).
+//
+// `payloadType` is lifted out into `payload_type` rather than masked, and the keys the service owns
+// outright come off whatever the author wrote (see providerMaskedPayloadKeys).
 func legacyPayloadItems(apiComponentsByID map[string]blueprints.Component, priorSettingsByType map[string]map[string]any) []any {
 	rawJSON, ok := parseComponentConfiguration(apiComponentsByID, "com.jamf.ddm-configuration-profile")
 	if !ok {
@@ -323,7 +326,7 @@ func legacyPayloadItems(apiComponentsByID map[string]blueprints.Component, prior
 
 		settingsMap := make(map[string]any, len(payloadMap))
 		for k, v := range payloadMap {
-			if k == "payloadType" || k == "payloadIdentifier" {
+			if k == "payloadType" {
 				continue
 			}
 			settingsMap[k] = v
@@ -347,27 +350,74 @@ func legacyPayloadItems(apiComponentsByID map[string]blueprints.Component, prior
 }
 
 // serverStampedPayloadKeys are the per-payload metadata keys the blueprints service writes onto
-// every legacy payload it stores, whether or not the author supplied them. `payloadType` and
-// `payloadIdentifier` are not listed: legacyPayloadItems already lifts those out of settings, the
-// first into `payload_type` and the second because the provider derives it from the payload type
-// (see generatePayloadIdentifier).
+// every legacy payload it stores, whether or not the author supplied them, and which it preserves
+// when the author does supply one — wire-verified 2026-09-16, an authored payloadDisplayName,
+// payloadOrganization and payloadVersion all surviving a create unchanged. That is what makes the
+// conditional mask in maskServerStampedPayloadKeys correct for them.
+//
+// `payloadType` is not listed because legacyPayloadItems lifts it out of settings into
+// `payload_type`. `payloadIdentifier` and `payloadUUID` are not listed either, for the opposite
+// reason to the keys that are: the service assigns both however they were authored, so keeping an
+// authored value would be keeping one the service had already replaced. providerMaskedPayloadKeys
+// covers those.
 var serverStampedPayloadKeys = [...]string{
 	"payloadDisplayName",
 	"payloadOrganization",
-	"payloadUUID",
 	"payloadVersion",
 }
 
-// maskServerStampedPayloadKeys deletes from a payload's server-derived settings every metadata key
-// the service stamps on that the author did not declare, so the stamp never reads as a settings
-// change. A stamped key the author did declare is left in place, because the service preserves an
-// authored value and state must keep reflecting it.
+// providerMaskedPayloadKeys are the per-payload metadata keys the provider removes from **both** sides
+// of the diff, because the service owns them rather than the author. It assigns `payloadIdentifier`
+// on the first write and preserves it afterwards (see storedLegacyPayloadIdentifiers), and
+// overwrites `payloadUUID` with that identifier on every write, minting one where no identifier was
+// sent — wire-verified 2026-09-16 — so an authored value for either is never honoured. The write
+// path sends neither (see appendLegacyConfigProfile), legacyPayloadItems drops both from the
+// server-derived settings, and legacyPayloadSettingsMatch drops them from the authored settings.
+//
+// Both sides is the load-bearing part. A payload's `settings` is Optional rather than Computed, so
+// the planned value is the string the author wrote: removing the key from the server side alone is
+// as much a mismatch as leaving a different value on it, which replaces the authored string in state
+// and fails the apply with "Provider produced inconsistent result after apply". Pruning both sides
+// is what makes an authored copy of a Jamf-owned key a no-op — no diff, no error, the authored bytes
+// surviving verbatim. It is also what the configuration profile resources do with the same keys,
+// where payloadhelpers.MaskPayload runs over the wire payload and the authored one alike.
+var providerMaskedPayloadKeys = [...]string{
+	"payloadIdentifier",
+	"payloadUUID",
+}
+
+// maskServerStampedPayloadKeys deletes from a payload's server-derived settings the metadata keys
+// the service owns outright (see providerMaskedPayloadKeys), and every key it merely stamps on that
+// the author did not declare, so the stamp never reads as a settings change. A stamped key the
+// author did declare is left in place, because the service preserves an authored value and state
+// must keep reflecting it.
 func maskServerStampedPayloadKeys(settings map[string]any, priorSettings map[string]any) {
+	deleteProviderMaskedPayloadKeys(settings)
 	for _, key := range serverStampedPayloadKeys {
 		if _, authored := priorSettings[key]; authored {
 			continue
 		}
 		delete(settings, key)
+	}
+}
+
+// deleteProviderMaskedPayloadKeys removes from one payload's settings every key the service owns
+// rather than the author (see providerMaskedPayloadKeys), matching key names case-insensitively.
+//
+// Case folds because the two sides spell these keys differently. Jamf writes its own metadata with a
+// lowercase leading `p`, while Apple declares `PayloadIdentifier` and `PayloadUUID`, so
+// appleprofiles.Validate reports the Jamf spelling as a miscased key and directs the author to
+// Apple's — and the write path drops both spellings for that reason (see appendLegacyConfigProfile).
+// An exact-match delete would leave whichever spelling the author chose on the authored side of the
+// diff only, which is the mismatch this removal exists to prevent.
+func deleteProviderMaskedPayloadKeys(settings map[string]any) {
+	for key := range settings {
+		for _, masked := range providerMaskedPayloadKeys {
+			if strings.EqualFold(key, masked) {
+				delete(settings, key)
+				break
+			}
+		}
 	}
 }
 
@@ -502,6 +552,11 @@ func flattenFlatLegacyPayloads(prior types.Dynamic, apiComponentsByID map[string
 // dynamic value, keyed by payload type, so the wire payloads can be masked against what was
 // actually written. It returns nil when the prior value carries nothing usable (import, or a first
 // create with no prior state).
+//
+// A key the service owns is dropped as it is read (see providerMaskedPayloadKeys), because nothing
+// downstream may treat one as authored: the provider strips it from every write, so
+// appendLegacyPayloadDiscardWarnings would otherwise name a key the provider removed as one Jamf
+// discarded, and send the operator to Apple's documentation over a key that is not theirs to set.
 func priorSettingsFromDynamic(prior types.Dynamic) map[string]map[string]any {
 	if prior.IsNull() || prior.IsUnknown() {
 		return nil
@@ -525,6 +580,7 @@ func priorSettingsFromDynamic(prior types.Dynamic) map[string]map[string]any {
 		}
 		payloadType, _ := obj["payload_type"].(string)
 		if settings, ok := obj["settings"].(map[string]any); ok {
+			deleteProviderMaskedPayloadKeys(settings)
 			settingsByType[payloadType] = settings
 		}
 	}
@@ -533,7 +589,8 @@ func priorSettingsFromDynamic(prior types.Dynamic) map[string]map[string]any {
 
 // priorSettingsFromBlockPayloads reads the author's per-payload settings out of a block's typed
 // legacy payload list, keyed by payload type, decoding each settings JSON string. It returns nil
-// when nothing was authored.
+// when nothing was authored. A key the service owns is dropped as it is read, for the reason
+// priorSettingsFromDynamic gives.
 func priorSettingsFromBlockPayloads(prior []BlockLegacyPayloadModel) map[string]map[string]any {
 	if len(prior) == 0 {
 		return nil
@@ -548,6 +605,7 @@ func priorSettingsFromBlockPayloads(prior []BlockLegacyPayloadModel) map[string]
 		if err := json.Unmarshal([]byte(entry.Settings.ValueString()), &settings); err != nil {
 			continue
 		}
+		deleteProviderMaskedPayloadKeys(settings)
 		settingsByType[entry.PayloadType.ValueString()] = settings
 	}
 	return settingsByType
@@ -640,7 +698,7 @@ func flattenBlockLegacyPayloads(prior []BlockLegacyPayloadModel, apiComponentsBy
 		switch {
 		case !hasSettings:
 			entry.Settings = types.StringNull()
-		case jsonStringMatchesObject(priorByType[payloadType], settings):
+		case legacyPayloadSettingsMatch(priorByType[payloadType], settings):
 			entry.Settings = priorByType[payloadType]
 		default:
 			if encoded, err := json.Marshal(settings); err == nil {
@@ -654,32 +712,73 @@ func flattenBlockLegacyPayloads(prior []BlockLegacyPayloadModel, apiComponentsBy
 	return result
 }
 
-// jsonStringMatchesObject reports whether a JSON object string the author wrote is semantically
-// identical to the object the server returned, comparing canonical JSON encodings (sorted keys,
-// float64 numbers) with the explicit nulls pruned from both sides (see pruneJSONNulls). It is what
-// keeps an authored JSON string stable when the server echoes an equivalent value.
+// jsonStringMatchesObject reports whether an Apple declaration's authored payload string is
+// semantically identical to the object the server returned (see jsonValueMatchesObject), which is
+// what keeps a payload authored with file() or jsonencode() stable when the platform re-serialises
+// an equivalent value.
 //
-// Both JSON-string attributes in this resource use it — a legacy payload's settings and an Apple
-// declaration's payload — because both services accept an object, store it their own way and
-// re-serialise it on the way out. The two differ on what becomes of a key whose value is null, and
-// pruning both sides is what lets one helper serve both. A legacy configuration profile payload's
-// null key is dropped, so the server value has no null to prune and pruning it is a no-op. An Apple
-// declaration payload's null key is stored and echoed back verbatim: on the EU gateway, 2026-09-12,
-// a POST /blueprints/v1/blueprints carrying payload {"Enabled":true,"ForceProfanityFilter":null} was
-// read back with the null intact. Pruning only the authored side would then mismatch, state would
-// take the canonical encoding rather than the authored bytes, and because payload is Required the
-// framework would reject the apply as an inconsistent result.
+// Nothing is pruned from the authored object beyond its explicit nulls. A declaration payload is a
+// key vocabulary the provider passes through untouched, so a key named like one of Jamf's own
+// payload metadata fields would be the author's and must keep its place in the diff — the opposite
+// of a legacy payload's settings (see legacyPayloadSettingsMatch).
 func jsonStringMatchesObject(prior types.String, settings map[string]any) bool {
+	decoded, ok := decodeJSONObjectString(prior)
+	if !ok {
+		return false
+	}
+	return jsonValueMatchesObject(decoded, settings)
+}
+
+// legacyPayloadSettingsMatch reports whether the settings string authored for a legacy payload is
+// semantically identical to what the service stored, ignoring the metadata keys the service owns
+// rather than the author (see providerMaskedPayloadKeys). legacyPayloadItems has already taken those
+// off the server-derived object, so they have to come off the authored copy too: comparing an
+// authored `payloadUUID` against its absence is as much a mismatch as comparing it against a
+// different value, and `settings` is Optional rather than Computed, so a mismatch replaces the
+// authored string in state and fails the apply as an inconsistent result.
+func legacyPayloadSettingsMatch(prior types.String, settings map[string]any) bool {
+	decoded, ok := decodeJSONObjectString(prior)
+	if !ok {
+		return false
+	}
+	if object, isObject := decoded.(map[string]any); isObject {
+		deleteProviderMaskedPayloadKeys(object)
+	}
+	return jsonValueMatchesObject(decoded, settings)
+}
+
+// decodeJSONObjectString decodes an authored JSON-string attribute into plain Go values, reporting
+// false when there is nothing to compare: a null or unknown value, or a string that is not JSON.
+// The decoded value is fresh and shared with nothing, so a caller may prune it in place.
+func decodeJSONObjectString(prior types.String) (any, bool) {
 	if prior.IsNull() || prior.IsUnknown() {
-		return false
+		return nil, false
 	}
 
-	var priorObj any
-	if err := json.Unmarshal([]byte(prior.ValueString()), &priorObj); err != nil {
-		return false
+	var decoded any
+	if err := json.Unmarshal([]byte(prior.ValueString()), &decoded); err != nil {
+		return nil, false
 	}
+	return decoded, true
+}
 
-	priorBytes, err := json.Marshal(pruneJSONNulls(priorObj))
+// jsonValueMatchesObject reports whether an authored value is semantically identical to the object
+// the server returned, comparing canonical JSON encodings (sorted keys, float64 numbers) with the
+// explicit nulls pruned from both sides (see pruneJSONNulls).
+//
+// Both JSON-string attributes in this resource compare through it — a legacy payload's settings and
+// an Apple declaration's payload — because both services accept an object, store it their own way
+// and re-serialise it on the way out. The two differ on what becomes of a key whose value is null,
+// and pruning both sides is what lets one comparison serve both. A legacy configuration profile
+// payload's null key is dropped, so the server value has no null to prune and pruning it is a no-op.
+// An Apple declaration payload's null key is stored and echoed back verbatim: on the EU gateway,
+// 2026-09-12, a POST /blueprints/v1/blueprints carrying payload
+// {"Enabled":true,"ForceProfanityFilter":null} was read back with the null intact. Pruning only the
+// authored side would then mismatch, state would take the canonical encoding rather than the
+// authored bytes, and because payload is Required the framework would reject the apply as an
+// inconsistent result.
+func jsonValueMatchesObject(prior any, settings map[string]any) bool {
+	priorBytes, err := json.Marshal(pruneJSONNulls(prior))
 	if err != nil {
 		return false
 	}
@@ -699,6 +798,11 @@ func jsonStringMatchesObject(prior types.String, settings map[string]any) bool {
 // json.Marshal sorts object keys, so the comparison is order-independent for
 // object keys and insensitive to the dynamic null-typing that otherwise causes
 // a perpetual diff.
+//
+// The authored side also loses the metadata keys the service owns, for the reason
+// legacyPayloadSettingsMatch gives about the block attribute: legacyPayloadItems has already taken
+// them off the items this compares against, and the deprecated top-level attribute is no more
+// Computed than the block one, so a one-sided removal would fail the apply.
 func dynamicPayloadsMatchJSON(prior types.Dynamic, apiItems []any) bool {
 	if prior.IsNull() || prior.IsUnknown() {
 		return false
@@ -708,6 +812,7 @@ func dynamicPayloadsMatchJSON(prior types.Dynamic, apiItems []any) bool {
 	if err != nil {
 		return false
 	}
+	deleteFlatPayloadProviderMaskedKeys(priorJSON)
 
 	priorBytes, err := json.Marshal(pruneJSONNulls(priorJSON))
 	if err != nil {
@@ -720,6 +825,26 @@ func dynamicPayloadsMatchJSON(prior types.Dynamic, apiItems []any) bool {
 	}
 
 	return bytes.Equal(priorBytes, apiBytes)
+}
+
+// deleteFlatPayloadProviderMaskedKeys removes the keys the service owns from every item's settings in
+// a decoded copy of the deprecated top-level payload list (see providerMaskedPayloadKeys). It edits
+// the value in place, which is safe because helpers.TerraformDynamicToJSON builds a fresh structure
+// per call and the state value the flattener preserves is the types.Dynamic itself.
+func deleteFlatPayloadProviderMaskedKeys(items any) {
+	list, ok := items.([]any)
+	if !ok {
+		return
+	}
+	for _, item := range list {
+		object, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if settings, ok := object["settings"].(map[string]any); ok {
+			deleteProviderMaskedPayloadKeys(settings)
+		}
+	}
 }
 
 // checkLegacyPayloadDiscards warns when the blueprints service did not store a legacy payload as it

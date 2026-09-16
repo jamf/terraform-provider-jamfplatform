@@ -72,7 +72,7 @@ const legacyPayloadSettingsBehaviour = "The platform validates each payload agai
 	"block's legacy payloads as one component, so move them all or leave them all here. " +
 	"Two behaviours are absorbed for you instead: a key set to `null` is discarded by Jamf and tolerated here, so nulls " +
 	"can stay in configuration; and Apple's common payload metadata (`payloadDisplayName`, `payloadOrganization`, " +
-	"`payloadUUID`, `payloadVersion`) is stamped onto every payload and hidden unless you set it yourself. " +
+	"`payloadVersion`) is stamped onto every payload and hidden unless you set it yourself. " +
 	"Values the platform treats as credentials (a Wi-Fi `Password`, and `EAPClientConfiguration`'s `UserName`, `UserPassword` " +
 	"and `OuterIdentity`) are returned redacted, and the provider keeps what you wrote so the plan still settles. " +
 	"An imported blueprint carries the redaction, because the real value cannot be read back."

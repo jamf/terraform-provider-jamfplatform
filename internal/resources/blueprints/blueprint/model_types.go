@@ -181,6 +181,30 @@ func (m *BlueprintResourceModel) hasFlatComponents() bool {
 		(!m.LegacyPayloads.IsNull() && !m.LegacyPayloads.IsUnknown())
 }
 
+// hasLegacyPayloads reports whether the configuration writes a legacy configuration profile
+// component, which is the only thing the stored payload identifiers are consumed for. Update reads
+// them from the service before building its request, and that read is a whole extra round trip on
+// every apply, so it is worth skipping for a blueprint authored entirely with typed components,
+// raw_component or apple_declarations — where a failed read would otherwise abort an apply with a
+// diagnostic naming a feature the configuration never mentions.
+//
+// The condition mirrors buildSteps exactly, including its precedence: component_blocks displaces the
+// deprecated flat attribute rather than adding to it, so a model carrying blocks never consults the
+// flat value. A gate that disagreed with the consumer would hand buildSteps a nil stored value and
+// have the service mint a fresh identifier for every payload, which is the churn the read exists to
+// prevent.
+func (m *BlueprintResourceModel) hasLegacyPayloads() bool {
+	if len(m.ComponentBlocks) > 0 {
+		for _, block := range m.ComponentBlocks {
+			if len(block.LegacyPayloads) > 0 {
+				return true
+			}
+		}
+		return false
+	}
+	return !m.LegacyPayloads.IsNull() && !m.LegacyPayloads.IsUnknown()
+}
+
 // blueprintIdentityModel defines the resource identity shared with list results.
 type blueprintIdentityModel struct {
 	ID types.String `tfsdk:"id"`

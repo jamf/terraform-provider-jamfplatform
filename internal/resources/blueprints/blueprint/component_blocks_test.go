@@ -129,7 +129,7 @@ func TestBuildSteps_BlockMode(t *testing.T) {
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, nil)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -169,7 +169,7 @@ func TestBuildSteps_FlatMode(t *testing.T) {
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, nil)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -496,7 +496,7 @@ func TestTypedComponents_RoundTripWithoutLandingInRawComponent(t *testing.T) {
 			steps, buildDiags := r.buildSteps(ctx, &BlueprintResourceModel{
 				Name:            types.StringValue("BP"),
 				ComponentBlocks: model.ComponentBlocks,
-			})
+			}, nil)
 			if buildDiags.HasError() {
 				t.Fatalf("unexpected write diagnostics: %v", buildDiags)
 			}
@@ -595,7 +595,7 @@ func TestBuildSteps_AppleDeclarationsAndRawComponentConflictEmitsNoStep(t *testi
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, nil)
 	if !diags.HasError() {
 		t.Fatal("expected an error from the conflicting block")
 	}
@@ -740,7 +740,7 @@ func TestBuildSteps_ConflictingBlockReportsOnlyTheOverlap(t *testing.T) {
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, nil)
 	if len(steps) != 0 {
 		t.Fatalf("expected no steps, got %+v", steps)
 	}
@@ -791,7 +791,7 @@ func TestBuildSteps_TypedAndRawComponentConflictEmitsNoStep(t *testing.T) {
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, nil)
 	if !diags.HasError() {
 		t.Fatal("expected an error from the conflicting block")
 	}
@@ -813,7 +813,7 @@ func TestBuildSteps_FlatLegacyPayloadsAndRawComponentConflictEmitsNoStep(t *test
 		},
 	}
 
-	steps, diags := r.buildSteps(context.Background(), data)
+	steps, diags := r.buildSteps(context.Background(), data, nil)
 	if !diags.HasError() {
 		t.Fatal("expected an error for legacy_payloads set alongside a raw_component for the same component")
 	}
