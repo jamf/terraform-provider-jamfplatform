@@ -172,15 +172,13 @@ component_blocks = [
           payloadDisplayName = "Safari Restrictions"
           payloadContent = jsonencode([
             {
-              payloadType       = "com.apple.applicationaccess"
-              payloadIdentifier = "1f9c07a4-3b7e-4c21-9f0d-7a5c8e2b6d41"
+              payloadType = "com.apple.applicationaccess"
 
               allowSafariHistoryClearing = false
               allowSafariPrivateBrowsing = false
             },
             {
-              payloadType       = "com.apple.dock"
-              payloadIdentifier = "6b2d51e8-90af-4d3c-8c17-2ea94f60b7d3"
+              payloadType = "com.apple.dock"
 
               tilesize = 48
             },
@@ -192,10 +190,9 @@ component_blocks = [
 ]
 ```
 
-Three things to carry across:
+Two things to carry across:
 
 - **Each payload's settings sit alongside `payloadType`**, not nested under a `settings` key. The typed attribute merges them in.
-- **State a `payloadIdentifier` per payload here.** `legacy_payloads` lets Jamf Pro assign one and writes the stored value back on every update. `raw_component` sends exactly what you wrote, and a payload arriving without an identifier is stamped with a fresh one on every write. Any stable value will do. Apple keys an installed payload on its identifier, so one that changes reinstalls the profile on every scoped device.
 - **`payloadDisplayName` is per component.** The typed attribute uses the blueprint's own name.
 
 Moving a block to `raw_component` shows up in the plan as one component destroyed and another created. Read it before you apply.

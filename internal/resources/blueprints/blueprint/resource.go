@@ -144,7 +144,7 @@ func blueprintSchemaAttributes(ctx context.Context) map[string]schema.Attribute 
 			Delete: true,
 		}),
 		"legacy_payloads": schema.DynamicAttribute{
-			MarkdownDescription: "Legacy configuration profile payloads as a list of objects. Each object must have a `payload_type` key (Apple reverse-domain identifier, e.g. `com.apple.applicationaccess`) and an optional `settings` object containing the payload key-value pairs. The platform assigns each payload's identifier and keeps it across later updates, so it is not settable and does not appear in state. The display name uses the blueprint name. Payload validation behaves as described on `component_blocks` → `legacy_payloads` → `settings`.",
+			MarkdownDescription: "Legacy configuration profile payloads as a list of objects. Each object must have a `payload_type` key (Apple reverse-domain payload type, e.g. `com.apple.applicationaccess`) and an optional `settings` object containing the payload key-value pairs. Jamf Pro names each payload after the blueprint. Payload validation behaves as described on `component_blocks` → `legacy_payloads` → `settings`.",
 			Optional:            true,
 			DeprecationMessage:  componentAttrDeprecation,
 			Validators: []validator.Dynamic{
@@ -339,7 +339,7 @@ func componentBlockAttributes() map[string]schema.Attribute {
 			},
 		},
 		"legacy_payloads": schema.ListNestedAttribute{
-			MarkdownDescription: "Legacy configuration profile payloads in this block. The platform assigns each payload's identifier and keeps it across later updates, so it is not settable and does not appear in state. The display name uses the blueprint name.",
+			MarkdownDescription: "Legacy configuration profile payloads in this block. Jamf Pro names each payload after the blueprint.",
 			Optional:            true,
 			Validators: []validator.List{
 				blockLegacyPayloadSchemaValidator(),
@@ -347,7 +347,7 @@ func componentBlockAttributes() map[string]schema.Attribute {
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
 					"payload_type": schema.StringAttribute{
-						MarkdownDescription: "Apple reverse-domain payload identifier, e.g. `com.apple.applicationaccess`.",
+						MarkdownDescription: "Apple reverse-domain payload type, e.g. `com.apple.applicationaccess`.",
 						Required:            true,
 					},
 					"settings": schema.StringAttribute{

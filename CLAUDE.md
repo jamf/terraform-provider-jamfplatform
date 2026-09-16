@@ -216,21 +216,27 @@ A legacy payload's `payloadIdentifier` is the blueprints service's to assign, no
 is absent from the Blueprints API specification, which requires only `payloadType` in a
 `payloadContent` entry, and wire probing on 2026-09-16 established that a payload arriving without
 one is accepted and stamped with a **fresh UUID on every write**, on POST and on merge-patch alike,
-while one sent with an identifier keeps it verbatim and unvalidated across later writes. Because the
-update is a whole-body merge-patch and Apple keys an *installed* payload on its identifier, letting
-the service mint would re-identify every payload in the blueprint on each unrelated edit and
-reinstall every profile on every scoped device — silently, since the field is masked out of state and
-`deploymentState` reports `OUT_OF_DATE` after any write regardless. So a blueprint update is
+while one sent with an identifier keeps it verbatim and unvalidated across later writes.
+`payloadContent` is an array and a merge-patch replaces an array wholesale, so a body omitting the
+key re-identifies every payload on each unrelated edit, silently, since the field is masked out of
+state and `deploymentState` reports `OUT_OF_DATE` after any write regardless. The reason to preserve
+it is **parity with the web app**, which mints its own identifiers client-side (lowercase, where the
+service mints uppercase) and sends them back on every save: editing one payload in the web app left
+the identifier, display name, organization and version untouched, wire-verified 2026-09-16. What it
+is **not** is a device concern, and that trap is worth recording because it reads as the obvious
+one — on macOS 26.6, 2026-09-16, a write plus a deploy reinstalled the profile whether the
+identifiers moved or not, and a write rotating all four replaced the payload in place with no orphan
+and no duplicate. So a blueprint update is
 **read-merge-write**, the same shape the configuration profile resources get from
 `payloadhelpers.InjectTopLevelIdentifierValues`: `readStoredLegacyPayloadIdentifiers` fetches the
 blueprint first and writes each stored identifier back, located by step and then by `payloadType`
 with steps matched **by name ahead of position** so that inserting or reordering a block cannot shift
 one block's identifiers onto another's payloads; create sends none, an authored value is discarded
-either way, and a failed pre-read fails the apply rather than falling back to minting. One carve-out
-to know before reaching for the escape hatch: the injection is wired into `legacy_payloads` alone, so
-a legacy profile authored as `raw_component` goes through `collectBlockComponents`, which re-marshals
-the author's own JSON untouched — that author must state a stable identifier themselves, which
-`templates/guides/apple-schema-validation.md` and the resource example both say.
+either way, and a failed pre-read fails the apply rather than falling back to minting. One carve-out:
+the injection is wired into `legacy_payloads` alone, so a legacy profile authored as `raw_component`
+goes through `collectBlockComponents`, which re-marshals the author's own JSON untouched, and its
+identifiers rotate on every write. The documentation deliberately says nothing about that, because
+the field is the service's and an operator has nothing to do with it.
 
 ## Jamf Security Cloud resources — one-paragraph orientation
 

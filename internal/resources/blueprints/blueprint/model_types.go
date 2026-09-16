@@ -191,7 +191,8 @@ func (m *BlueprintResourceModel) hasFlatComponents() bool {
 // The condition mirrors buildSteps exactly, including its precedence: component_blocks displaces the
 // deprecated flat attribute rather than adding to it, so a model carrying blocks never consults the
 // flat value. A gate that disagreed with the consumer would hand buildSteps a nil stored value and
-// have it mint fresh identifiers, reinstalling every profile on every scoped device.
+// have the service mint a fresh identifier for every payload, which is the churn the read exists to
+// prevent.
 func (m *BlueprintResourceModel) hasLegacyPayloads() bool {
 	if len(m.ComponentBlocks) > 0 {
 		for _, block := range m.ComponentBlocks {

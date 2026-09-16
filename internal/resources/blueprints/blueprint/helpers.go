@@ -22,14 +22,24 @@ import (
 //
 // The service owns this field. It is absent from the Blueprints API specification — which requires
 // only `payloadType` in a `payloadContent` entry — and wire probing on 2026-09-16 established that a
-// payload sent without one is accepted and stamped with a fresh UUID **on every write**. Because the
-// update is a whole-body merge-patch, letting it mint would re-identify every payload in the
-// blueprint whenever any part of it changed, and Apple keys an installed payload on its identifier,
-// so each unrelated edit would reinstall every profile on every scoped device. Jamf's own web app
-// avoids that by reading the blueprint, mutating one field and writing the stored identifiers back;
-// this type is that read half. It mirrors the configuration profile resources, where
-// payloadhelpers.InjectTopLevelIdentifierValues carries the stored identifier onto the outgoing
-// payload for the same reason.
+// payload sent without one is accepted and stamped with a fresh UUID **on every write**.
+// `payloadContent` is an array and a merge-patch replaces an array wholesale, so a body omitting the
+// key re-identifies every payload in the blueprint whenever any part of it changed.
+//
+// Jamf's own web app avoids that by reading the blueprint, mutating one field and writing the stored
+// identifiers back, which a UI save confirms: editing one payload's setting in the web app left the
+// identifier and the per-payload display name, organization and version untouched, wire-verified
+// 2026-09-16. The web app also mints its own identifiers client-side, lowercase where the service
+// mints uppercase, which is why it must be sending them back. This type is that read half, so the
+// provider keeps what the web app would have kept. It mirrors the configuration profile resources,
+// where payloadhelpers.InjectTopLevelIdentifierValues carries the stored identifier onto the
+// outgoing payload for the same reason.
+//
+// A rotated identifier does **not** reinstall the payload on a device. That reads as the obvious
+// reason to preserve one, and it is wrong: wire-verified on macOS 26.6, 2026-09-16, a blueprint
+// write followed by a deploy reinstalls the profile whether the identifiers moved or not, and a
+// write rotating all four replaced the payload in place with no orphan and no duplicate. Parity with
+// the web app and a stable stored blueprint are the reasons here, not device churn.
 //
 // A payload is located by step and by `payloadType`, the same pairing checkLegacyPayloadDiscards
 // uses, because a type is unique within a block (appendLegacyConfigProfile rejects a duplicate).
@@ -342,17 +352,18 @@ func isDeleteMaybeComplete(err error) bool {
 // state: the identifiers are masked out of state on read, because the service owns them and an
 // authored value is discarded.
 //
-// A failed read is an error rather than a fallback to minting. Proceeding would silently re-identify
-// every legacy payload in the blueprint, reinstalling the profiles on every scoped device, which is
-// worse than a failed apply the operator can retry.
+// A failed read is an error rather than a fallback to minting. Proceeding would re-identify every
+// legacy payload in the blueprint, and it would do so silently, since the field is masked out of
+// state. A failed apply the operator can retry is the better outcome.
 func (r *BlueprintResource) readStoredLegacyPayloadIdentifiers(ctx context.Context, blueprintID string) (*storedLegacyPayloadIdentifiers, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	blueprint, err := r.client.GetBlueprint(ctx, blueprintID)
 	if err != nil {
 		diags.AddError(
-			"Error reading blueprint before update",
-			"Could not read the blueprint's stored legacy payload identifiers, which an update must preserve: "+helpers.APIErrorDetail(err),
+			"Error reading the blueprint before updating it",
+			"This read failed, so nothing reached Jamf Pro and the blueprint is unchanged. Retry the apply. "+
+				"Reported while reading: "+helpers.APIErrorDetail(err),
 		)
 		return nil, diags
 	}
