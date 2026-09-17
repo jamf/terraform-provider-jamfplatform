@@ -49,9 +49,7 @@ func TestAcceptance_ProGroups_PatchReportingStillRefused(t *testing.T) {
 	classic := proclassic.New(base)
 	proClient := pro.New(base)
 
-	title := firstAvailablePatchTitle(t, ctx, classic)
-
-	titleID := createPatchSoftwareTitle(t, ctx, classic, title)
+	title, titleID := configureAnyPatchSoftwareTitle(t, ctx, classic)
 	t.Cleanup(func() {
 		if err := classic.DeletePatchSoftwareTitleByID(ctx, titleID); err != nil {
 			t.Logf("cleaning up patch software title %s: %v", titleID, err)
@@ -109,65 +107,71 @@ type patchTitleFixture struct {
 // so the tripwire looks there and skips rather than hunting.
 const patchTitleSourceID = 1
 
-// firstAvailablePatchTitle returns any title the tenant's Jamf patch source
-// publishes, or skips.
+// configureAnyPatchSoftwareTitle configures the first catalogue title the tenant
+// will actually accept, and returns it with its new id.
 //
-// It skips rather than failing because an empty catalogue cannot distinguish "the
-// endpoint refused the criterion" from "no such criterion exists here" — and that
-// ambiguity is exactly what made this finding unprovable on the first attempt.
-// Absence of tenant data is not evidence.
-func firstAvailablePatchTitle(t *testing.T, ctx context.Context, classic *proclassic.Client) patchTitleFixture {
+// It walks the catalogue rather than taking the first entry, because a title can
+// be server-side corrupt in a way that is intrinsic to the title and not to the
+// tenant: catalogue title 518 ("010 Editor") is a standing example, and it sorts
+// first, so taking entry zero is the least robust choice available. A create that
+// fails moves to the next title; the test only gives up when the catalogue is
+// exhausted.
+//
+// Configuring a title is what makes Jamf Pro generate the per-title
+// "Patch Reporting: <name>" criterion in the first place, which is why the
+// fixture exists at all.
+//
+// The create goes through the classic endpoint because it is the only one that
+// mints an id: the configurations surface takes the classic title id as input, so
+// there is no modern create to use here. See
+// internal/resources/pro/patch_software_title/crud.go for the full reasoning.
+func configureAnyPatchSoftwareTitle(t *testing.T, ctx context.Context, classic *proclassic.Client) (patchTitleFixture, string) {
 	t.Helper()
 
-	titles, err := classic.ListPatchAvailableTitlesBySourceID(ctx, "1")
+	titles, err := classic.ListPatchAvailableTitlesBySourceID(ctx, strconv.Itoa(patchTitleSourceID))
 	if err != nil {
 		t.Skipf("listing available patch titles on source %d: %v", patchTitleSourceID, err)
 	}
 	if titles == nil || titles.AvailableTitles == nil || titles.AvailableTitles.AvailableTitle == nil {
 		t.Skipf("the tenant's patch title source %d publishes nothing, so there is no patch reporting criterion to send", patchTitleSourceID)
 	}
+
+	attempted := 0
 	for _, at := range *titles.AvailableTitles.AvailableTitle {
 		if at.AppName == nil || *at.AppName == "" || at.NameID == nil || *at.NameID == "" {
 			continue
 		}
-		version := ""
+		fixture := patchTitleFixture{
+			appName:  *at.AppName,
+			nameID:   *at.NameID,
+			sourceID: patchTitleSourceID,
+		}
 		if at.CurrentVersion != nil {
-			version = *at.CurrentVersion
+			fixture.currentVersion = *at.CurrentVersion
 		}
-		return patchTitleFixture{
-			appName:        *at.AppName,
-			nameID:         *at.NameID,
-			sourceID:       patchTitleSourceID,
-			currentVersion: version,
+
+		attempted++
+		created, err := classic.CreatePatchSoftwareTitleByID(ctx, "0", &proclassic.PatchSoftwareTitle{
+			Name:     &fixture.appName,
+			NameID:   &fixture.nameID,
+			SourceID: &fixture.sourceID,
+		})
+		if err != nil {
+			t.Logf("catalogue title %q (%s) could not be configured, trying the next one: %v", fixture.appName, fixture.nameID, err)
+			continue
 		}
+		if created == nil || created.ID == nil {
+			t.Logf("catalogue title %q (%s) was configured but reported no id, trying the next one", fixture.appName, fixture.nameID)
+			continue
+		}
+		return fixture, strconv.Itoa(*created.ID)
 	}
-	t.Skipf("the tenant's patch title source %d publishes no usable title", patchTitleSourceID)
-	return patchTitleFixture{}
-}
 
-// createPatchSoftwareTitle configures the catalogue title on the tenant and
-// returns its id, which is what makes Jamf Pro generate the per-title
-// "Patch Reporting: <name>" criterion in the first place.
-//
-// The create is the classic endpoint because that is the only one that mints an
-// id: the configurations surface requires the classic title id as input, so there
-// is no modern create to use here. See
-// internal/resources/pro/patch_software_title/crud.go for the full reasoning.
-func createPatchSoftwareTitle(t *testing.T, ctx context.Context, classic *proclassic.Client, title patchTitleFixture) string {
-	t.Helper()
-
-	created, err := classic.CreatePatchSoftwareTitleByID(ctx, "0", &proclassic.PatchSoftwareTitle{
-		Name:     &title.appName,
-		NameID:   &title.nameID,
-		SourceID: &title.sourceID,
-	})
-	if err != nil {
-		t.Fatalf("creating the patch software title fixture %q: %v", title.appName, err)
+	if attempted == 0 {
+		t.Skipf("the tenant's patch title source %d publishes no usable title", patchTitleSourceID)
 	}
-	if created == nil || created.ID == nil {
-		t.Fatalf("creating the patch software title fixture %q returned no id", title.appName)
-	}
-	return strconv.Itoa(*created.ID)
+	t.Skipf("none of the %d catalogue titles on source %d could be configured, so there is no patch reporting criterion to send", attempted, patchTitleSourceID)
+	return patchTitleFixture{}, ""
 }
 
 // createClassicSmartGroupWithCriterion creates a smart computer group carrying
