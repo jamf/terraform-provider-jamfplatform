@@ -65,13 +65,16 @@
 // creates unmanaged: the static computer group refused it, and the identical
 // request succeeded once `remote_management.managed` was flipped true.
 //
-// The managed requirement is a further asymmetry between the two device types,
-// and it runs the opposite way to the siteId one. A static COMPUTER group refuses
-// an unmanaged computer; a static MOBILE DEVICE group accepts an unmanaged device
-// without complaint (probed on a freshly minted record whose managed flag was
-// still false, and whose own attempt to set it answered 500). So a membership
-// fixture for a computer group has to be managed and one for a mobile group does
-// not.
+// The managed requirement applies to BOTH device types, and unlike siteId it is
+// not an asymmetry. A static group of either kind refuses an unmanaged device.
+//
+// That took two goes to get right, and the way it misled is worth recording. A
+// hand probe minted a mobile record, tried to set managed, got a 500, and then
+// watched a static group accept the device anyway — from which the obvious
+// conclusion was that mobile groups take unmanaged devices. They do not: the 500
+// had applied the change regardless, so the device was managed by the time the
+// group saw it. A write that reports failure and succeeds anyway will invert a
+// conclusion drawn from its status code, so read the state back instead.
 //
 // Deleting a group that anything is scoped to is 422 HAS_DEPENDENCIES, and the
 // description names the dependents. It is permanent rather than

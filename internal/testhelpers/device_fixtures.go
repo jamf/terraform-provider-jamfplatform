@@ -34,17 +34,17 @@ import (
 // Three wire facts shape them, each probed on Jamf Pro 11.32.0 on 2026-09-17:
 //
 //   - A minted record is UNMANAGED unless the create says otherwise, and a
-//     static COMPUTER group refuses an unmanaged computer with the same
-//     400 INVALID_DEVICE it uses for a device that does not exist. So the
-//     computer create sets remote_management.managed itself, which works in one
-//     call and needs no follow-up write — there is no classic computer update in
-//     the SDK to make one with.
-//   - A static MOBILE DEVICE group accepts an unmanaged device without
-//     complaint, so the mobile fixture needs nothing extra. Setting managed on a
-//     mobile record answers 500 anyway.
-//   - An unmanaged record is invisible to smart groups, and the pro lane runs
-//     serially, so a fixture cannot perturb another suite's membership counts
-//     while it exists.
+//     static group of EITHER kind refuses an unmanaged device with the same
+//     400 INVALID_DEVICE it uses for a device that does not exist. So both
+//     creates set managed themselves, which works in one call.
+//   - Setting managed on a mobile record AFTER the fact answers 500 and applies
+//     anyway. That is worth knowing because it is how this rule got recorded
+//     backwards at first: a hand probe flipped the flag, read the 500 as a
+//     failure, watched a static group accept the device, and concluded that
+//     mobile groups take unmanaged devices. They do not. The flag had been set.
+//   - Both records are minted managed, so they are visible to smart groups while
+//     they exist. The pro lane runs serially and each fixture is deleted by the
+//     test that made it, so the window is one test long.
 
 // MintComputerFixture creates a managed computer inventory record and returns its
 // Jamf Pro id, deleting it when the test finishes.
@@ -96,11 +96,11 @@ func MintComputerFixture(t *testing.T, label string) string {
 // MintMobileDeviceFixture creates a mobile device inventory record and returns
 // its Jamf Pro id, deleting it when the test finishes.
 //
-// Unlike the computer fixture this one stays unmanaged, because a static mobile
-// device group accepts it that way and the write that would change it answers
-// 500.
+// It is minted managed for the same reason the computer fixture is: a static
+// group refuses an unmanaged device.
 //
-// The create returns the record, so no lookup is needed.
+// The create returns the record, so no lookup is needed, unlike the computer
+// create which reports no identifier at all.
 func MintMobileDeviceFixture(t *testing.T, label string) string {
 	t.Helper()
 
@@ -112,11 +112,13 @@ func MintMobileDeviceFixture(t *testing.T, label string) string {
 	serial := fixtureSerial("M", suffix)
 	udid := fixtureMobileUDID(serial)
 
+	managed := true
 	created, err := classic.CreateMobileDeviceByID(ctx, "0", &proclassic.MobileDevicePost{
 		General: &proclassic.MobileDevicePostGeneral{
 			Name:         &name,
 			SerialNumber: &serial,
 			UDID:         &udid,
+			Managed:      &managed,
 		},
 	})
 	if err != nil {
