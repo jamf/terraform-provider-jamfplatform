@@ -77,11 +77,11 @@ func assignSmartComputerGroupDataSourceModel(state *SmartComputerGroupDataSource
 func searchResultModel(item pro.SmartComputerGroupSearch, platformIDs map[string]string) SmartComputerGroupsDataSourceResultModel {
 	siteID := item.SiteID
 	return SmartComputerGroupsDataSourceResultModel{
-		ID:              types.StringValue(item.ID),
-		PlatformID:      progroups.PlatformIDValue(platformIDs, item.ID),
-		Name:            types.StringValue(item.Name),
-		Description:     types.StringValue(item.Description),
-		SiteID:          progroups.SiteIDForState(&siteID),
-		MembershipCount: types.Int64Value(int64(item.MembershipCount)),
+		ID:          types.StringValue(item.ID),
+		PlatformID:  progroups.PlatformIDValue(platformIDs, item.ID),
+		Name:        types.StringValue(item.Name),
+		Description: types.StringValue(item.Description),
+		SiteID:      progroups.SiteIDForState(&siteID),
+		MemberCount: types.Int64Value(int64(item.MembershipCount)),
 	}
 }

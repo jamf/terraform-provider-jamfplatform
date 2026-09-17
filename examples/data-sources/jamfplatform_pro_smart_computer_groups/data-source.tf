@@ -28,6 +28,6 @@ data "jamfplatform_pro_smart_computer_groups" "eau_claire" {
 output "macbook_group_sizes" {
   value = {
     for group in data.jamfplatform_pro_smart_computer_groups.macbooks.smart_computer_groups :
-    group.name => group.membership_count
+    group.name => group.member_count
   }
 }

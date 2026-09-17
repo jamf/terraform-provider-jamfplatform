@@ -59,7 +59,7 @@ data "jamfplatform_pro_smart_computer_groups" "eau_claire" {
 output "macbook_group_sizes" {
   value = {
     for group in data.jamfplatform_pro_smart_computer_groups.macbooks.smart_computer_groups :
-    group.name => group.membership_count
+    group.name => group.member_count
   }
 }
 ```
@@ -108,7 +108,7 @@ Read-Only:
 
 - `description` (String) Free-text note stored beside the group.
 - `id` (String) Jamf Pro identifier of the group.
-- `membership_count` (Number) How many computers Jamf Pro currently counts in the group.
+- `member_count` (Number) How many computers the group holds.
 - `name` (String) Group name as it appears in Jamf Pro.
 - `platform_id` (String) Identifier for this group across Jamf Platform, for targeting it from a blueprint, a compliance benchmark, or any `jamfplatform_device_*` construct that asks for a group.
 - `site_id` (String) Jamf Pro site the group belongs to. `-1` means no site.

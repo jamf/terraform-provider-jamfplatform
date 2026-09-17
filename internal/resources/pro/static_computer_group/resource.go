@@ -171,7 +171,7 @@ func (r *StaticComputerGroupResource) Schema(ctx context.Context, req resource.S
 				},
 			},
 			"assigned_computer_ids": schema.SetAttribute{
-				MarkdownDescription: "Jamf Pro computer identifiers to hold in the group, as strings. Omit the attribute and Terraform leaves membership alone, so computers assigned in Jamf Pro stay where they are. Set it to `[]` to empty the group. A populated set is the whole membership, and a computer you remove from it leaves the group. A group that belongs to a site accepts only computers assigned to that same site.",
+				MarkdownDescription: "Jamf Pro computer identifiers to hold in the group, as strings. Omit the attribute and the group keeps the computers Jamf Pro already holds. Terraform manages that by reading the membership and sending it straight back, because Jamf Pro gives no way to leave it untouched, so a computer you assign or remove between that read and that write goes back the way it was. An update changing only the name or the site can undo a change you made in Jamf Pro while it ran. Set it to `[]` to empty the group. A populated set is the whole membership, and a computer you remove from it leaves the group. A group that belongs to a site accepts only computers assigned to that same site.",
 				Optional:            true,
 				ElementType:         types.StringType,
 				PlanModifiers: []planmodifier.Set{

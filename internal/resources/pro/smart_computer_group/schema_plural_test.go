@@ -46,7 +46,7 @@ func TestSmartComputerGroupsDataSource_Schema(t *testing.T) {
 	if !ok {
 		t.Fatalf("smart_computer_groups should be a ListNestedAttribute, got %T", groups)
 	}
-	for _, name := range []string{"id", "platform_id", "name", "description", "site_id", "membership_count"} {
+	for _, name := range []string{"id", "platform_id", "name", "description", "site_id", "member_count"} {
 		if _, ok := nested.NestedObject.Attributes[name]; !ok {
 			t.Errorf("smart_computer_groups nested object missing attribute %q", name)
 		}

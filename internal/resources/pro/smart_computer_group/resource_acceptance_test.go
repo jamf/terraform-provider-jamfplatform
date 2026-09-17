@@ -486,7 +486,7 @@ func TestAccDataSource_ProSmartComputerGroups_FilterByName(t *testing.T) {
 					resource.TestCheckResourceAttr("data.jamfplatform_pro_smart_computer_groups.lookup", "smart_computer_groups.#", "1"),
 					resource.TestCheckResourceAttr("data.jamfplatform_pro_smart_computer_groups.lookup", "smart_computer_groups.0.name", name),
 					resource.TestCheckResourceAttrSet("data.jamfplatform_pro_smart_computer_groups.lookup", "smart_computer_groups.0.platform_id"),
-					resource.TestCheckResourceAttrSet("data.jamfplatform_pro_smart_computer_groups.lookup", "smart_computer_groups.0.membership_count"),
+					resource.TestCheckResourceAttrSet("data.jamfplatform_pro_smart_computer_groups.lookup", "smart_computer_groups.0.member_count"),
 				),
 			},
 		},

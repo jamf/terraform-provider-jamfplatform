@@ -75,7 +75,7 @@ output "design_macs_platform_id" {
 
 ### Optional
 
-- `assigned_computer_ids` (Set of String) Jamf Pro computer identifiers to hold in the group, as strings. Omit the attribute and Terraform leaves membership alone, so computers assigned in Jamf Pro stay where they are. Set it to `[]` to empty the group. A populated set is the whole membership, and a computer you remove from it leaves the group. A group that belongs to a site accepts only computers assigned to that same site.
+- `assigned_computer_ids` (Set of String) Jamf Pro computer identifiers to hold in the group, as strings. Omit the attribute and the group keeps the computers Jamf Pro already holds. Terraform manages that by reading the membership and sending it straight back, because Jamf Pro gives no way to leave it untouched, so a computer you assign or remove between that read and that write goes back the way it was. An update changing only the name or the site can undo a change you made in Jamf Pro while it ran. Set it to `[]` to empty the group. A populated set is the whole membership, and a computer you remove from it leaves the group. A group that belongs to a site accepts only computers assigned to that same site.
 - `description` (String) Note Jamf Pro keeps with the group. Set it to an empty string to clear it; dropping the attribute from your configuration keeps whatever Jamf Pro already holds.
 - `site_id` (String) Jamf Pro site the group belongs to. `-1` means no site, and is the default.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))

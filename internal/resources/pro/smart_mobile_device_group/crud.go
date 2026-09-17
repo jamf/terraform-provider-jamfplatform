@@ -273,7 +273,16 @@ func (r *SmartMobileDeviceGroupResource) Create(ctx context.Context, req resourc
 
 	got, err := r.client.GetSmartMobileDeviceGroupV2(createCtx, readID)
 	if err != nil {
-		recordCreatedGroup(createCtx, r.client, &plan, readID, resp)
+		if recoveryErr := recordCreatedGroup(createCtx, r.client, &plan, readID, resp); recoveryErr != nil {
+			resp.Diagnostics.AddError(
+				"Created the Jamf Pro "+writeLabel()+" but recorded nothing for it",
+				"The group exists in Jamf Pro. Reading it back failed, Terraform then looked up the identifier it stores from a second place, and that failed too, so state holds no record of the group. Terraform addressed the group as "+readID+
+					". Check for a "+writeLabel()+" named "+plan.Name.ValueString()+" and import it, or delete it and apply again."+
+					"\n\nThe read said: "+helpers.APIErrorDetail(err)+
+					"\n\nThe lookup said: "+helpers.APIErrorDetail(recoveryErr),
+			)
+			return
+		}
 		resp.Diagnostics.AddError("Error reading the created Jamf Pro "+writeLabel(), helpers.APIErrorDetail(err))
 		return
 	}
@@ -538,13 +547,21 @@ func (r *SmartMobileDeviceGroupResource) Delete(ctx context.Context, req resourc
 // Jamf Pro one, so it is recovered from a DIFFERENT endpoint than the one that
 // just failed — which is what makes the attempt worth making rather than a retry
 // of the same request.
-func recordCreatedGroup(ctx context.Context, client *pro.Client, plan *SmartMobileDeviceGroupResourceModel, readID string, resp *resource.CreateResponse) {
+//
+// A nil return means state was recorded, which both paths reach whenever the
+// Jamf Pro identifier is known: the group is under management and the next
+// refresh repairs whatever the failed read would have set, so the caller reports
+// only the read failure. A non-nil return means the recovery was needed and
+// failed, nothing could be recorded, and the caller reports the identifier it
+// read by along with both failures so the group can still be found by hand.
+func recordCreatedGroup(ctx context.Context, client *pro.Client, plan *SmartMobileDeviceGroupResourceModel, readID string, resp *resource.CreateResponse) error {
 	if plan.ID.IsNull() || plan.ID.IsUnknown() || plan.ID.ValueString() == "" {
 		jamfProID, err := progroups.JamfProIDForPlatformID(ctx, client, readID)
 		if err != nil {
-			return
+			return err
 		}
 		plan.ID = types.StringValue(jamfProID)
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	return nil
 }

@@ -125,8 +125,8 @@ func TestSearchResultModel(t *testing.T) {
 	if got.PlatformID.ValueString() != "11111111-2222-3333-4444-555555555555" {
 		t.Errorf("platform_id: got %q", got.PlatformID.ValueString())
 	}
-	if got.MembershipCount.ValueInt64() != 12 {
-		t.Errorf("membership_count: got %d", got.MembershipCount.ValueInt64())
+	if got.MemberCount.ValueInt64() != 12 {
+		t.Errorf("member_count: got %d", got.MemberCount.ValueInt64())
 	}
 	if got.SiteID.ValueString() != "7" {
 		t.Errorf("site_id: got %q", got.SiteID.ValueString())

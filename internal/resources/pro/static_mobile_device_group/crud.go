@@ -121,7 +121,16 @@ func (r *StaticMobileDeviceGroupResource) Create(ctx context.Context, req resour
 
 	got, err := r.client.GetStaticMobileDeviceGroupV2(createCtx, created.ID)
 	if err != nil {
-		recordCreatedGroup(createCtx, r.client, &plan, created.ID, resp)
+		if recoveryErr := recordCreatedGroup(createCtx, r.client, &plan, created.ID, resp); recoveryErr != nil {
+			resp.Diagnostics.AddError(
+				"Created the Jamf Pro static mobile device group but recorded nothing for it",
+				"The group exists in Jamf Pro. Reading it back failed, Terraform then looked up the identifier it stores from a second place, and that failed too, so state holds no record of the group. Its identifier across Jamf Platform is "+created.ID+
+					". Find the group in Jamf Pro and import it, or delete it and apply again."+
+					"\n\nThe read said: "+helpers.APIErrorDetail(err)+
+					"\n\nThe lookup said: "+helpers.APIErrorDetail(recoveryErr),
+			)
+			return
+		}
 		resp.Diagnostics.AddError("Error reading the created Jamf Pro static mobile device group", helpers.APIErrorDetail(err))
 		return
 	}
@@ -373,13 +382,17 @@ func (r *StaticMobileDeviceGroupResource) resolvePlatformID(ctx context.Context,
 // and recoverable from a DIFFERENT endpoint than the one that just failed, which
 // is what makes the attempt worth making rather than a retry of the same call.
 //
-// When even that fails there is nothing to record, and the error the caller adds
-// names the platform identifier so the group can still be found.
-func recordCreatedGroup(ctx context.Context, client *pro.Client, plan *StaticMobileDeviceGroupResourceModel, platformID string, resp *resource.CreateResponse) {
+// A nil return means state was recorded: the group is under management and the
+// next refresh repairs whatever the failed read would have set, so the caller
+// reports only the read failure. A non-nil return means nothing could be
+// recorded, and the caller reports the platform identifier and both failures
+// together so the group can still be found by hand.
+func recordCreatedGroup(ctx context.Context, client *pro.Client, plan *StaticMobileDeviceGroupResourceModel, platformID string, resp *resource.CreateResponse) error {
 	jamfProID, err := progroups.JamfProIDForPlatformID(ctx, client, platformID)
 	if err != nil {
-		return
+		return err
 	}
 	plan.ID = types.StringValue(jamfProID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	return nil
 }

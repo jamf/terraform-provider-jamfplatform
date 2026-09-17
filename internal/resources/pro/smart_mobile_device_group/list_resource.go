@@ -60,6 +60,12 @@ func NewSmartMobileDeviceGroupListResource() list.ListResource {
 // carries any advisory the platform-identifier bridge raised, which has nowhere
 // else to go: a list stream has no diagnostics channel of its own, and assigning
 // one replaces every result already collected.
+//
+// A group whose identity or resource state cannot be written keeps its place in
+// the stream with the reason attached to the result itself. It deliberately does
+// not replace the stream: a diagnostics-only stream assigned part-way through a
+// loop discards every result already gathered, so a single unwritable group
+// would empty the whole query.
 type SmartMobileDeviceGroupListResource struct {
 	client *pro.Client
 	pd     *providerdata.Data
@@ -166,8 +172,8 @@ func (r *SmartMobileDeviceGroupListResource) List(ctx context.Context, req list.
 		id := types.StringValue(g.GroupID)
 		result.Diagnostics.Append(helpers.SetIdentity(ctx, result.Identity, smartMobileDeviceGroupIdentityModel{ID: id})...)
 		if result.Diagnostics.HasError() {
-			stream.Results = list.ListResultsStreamDiagnostics(result.Diagnostics)
-			return
+			results = append(results, result)
+			continue
 		}
 
 		if req.IncludeResource {
@@ -191,8 +197,8 @@ func (r *SmartMobileDeviceGroupListResource) List(ctx context.Context, req list.
 			assignSmartMobileDeviceGroupResourceModel(&state, got)
 			result.Diagnostics.Append(result.Resource.Set(ctx, &state)...)
 			if result.Diagnostics.HasError() {
-				stream.Results = list.ListResultsStreamDiagnostics(result.Diagnostics)
-				return
+				results = append(results, result)
+				continue
 			}
 		}
 

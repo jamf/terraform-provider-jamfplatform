@@ -60,12 +60,12 @@ type SmartComputerGroupsDataSourceModel struct {
 // and points a consumer needing criteria at the singular lookup — the same split
 // jamfplatform_pro_user_groups makes for the same reason.
 type SmartComputerGroupsDataSourceResultModel struct {
-	ID              types.String `tfsdk:"id"`
-	PlatformID      types.String `tfsdk:"platform_id"`
-	Name            types.String `tfsdk:"name"`
-	Description     types.String `tfsdk:"description"`
-	SiteID          types.String `tfsdk:"site_id"`
-	MembershipCount types.Int64  `tfsdk:"membership_count"`
+	ID          types.String `tfsdk:"id"`
+	PlatformID  types.String `tfsdk:"platform_id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	SiteID      types.String `tfsdk:"site_id"`
+	MemberCount types.Int64  `tfsdk:"member_count"`
 }
 
 // SmartComputerGroupListResourceModel is the config model for list queries.

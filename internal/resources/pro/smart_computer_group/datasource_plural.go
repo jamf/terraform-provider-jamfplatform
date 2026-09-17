@@ -99,8 +99,8 @@ func (d *SmartComputerGroupsDataSource) Schema(ctx context.Context, req datasour
 							MarkdownDescription: "Jamf Pro site the group belongs to. `" + progroups.NoSiteID + "` means no site.",
 							Computed:            true,
 						},
-						"membership_count": schema.Int64Attribute{
-							MarkdownDescription: "How many computers Jamf Pro currently counts in the group.",
+						"member_count": schema.Int64Attribute{
+							MarkdownDescription: "How many computers the group holds.",
 							Computed:            true,
 						},
 					},

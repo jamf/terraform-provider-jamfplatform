@@ -39,6 +39,12 @@ var (
 // tenant would pay that for each one. Leaving it out is also the right generated
 // configuration, because omitting the attribute is how an operator says "leave
 // the membership to Jamf Pro".
+//
+// A group whose identity or resource state cannot be written keeps its place in
+// the stream with the reason attached to the result itself. It deliberately does
+// not replace the stream: a diagnostics-only stream assigned part-way through a
+// loop discards every result already gathered, so a single unwritable group
+// would empty the whole query.
 type StaticComputerGroupListResource struct {
 	client *pro.Client
 	pd     *providerdata.Data
@@ -147,8 +153,8 @@ func (r *StaticComputerGroupListResource) List(ctx context.Context, req list.Lis
 		id := types.StringValue(group.ID)
 		result.Diagnostics.Append(helpers.SetIdentity(ctx, result.Identity, staticComputerGroupIdentityModel{ID: id})...)
 		if result.Diagnostics.HasError() {
-			stream.Results = list.ListResultsStreamDiagnostics(result.Diagnostics)
-			return
+			results = append(results, result)
+			continue
 		}
 
 		if req.IncludeResource {
@@ -163,8 +169,8 @@ func (r *StaticComputerGroupListResource) List(ctx context.Context, req list.Lis
 			}
 			result.Diagnostics.Append(result.Resource.Set(ctx, &state)...)
 			if result.Diagnostics.HasError() {
-				stream.Results = list.ListResultsStreamDiagnostics(result.Diagnostics)
-				return
+				results = append(results, result)
+				continue
 			}
 		}
 
