@@ -115,8 +115,15 @@ func TestWriteDiagnosticsAnchoring(t *testing.T) {
 	if !device.HasError() {
 		t.Fatal("expected an error")
 	}
-	if at := device.Errors()[0]; !strings.Contains(at.Detail(), "site") {
-		t.Errorf("the membership message should explain the site cause too:\n%s", at.Detail())
+	// All three causes have to be named. Jamf Pro answers identically for a
+	// device that does not exist, one outside the group's site, and an unmanaged
+	// computer, so a message that lists only some of them sends the operator
+	// looking in the wrong place with no hint that there is anywhere else to look.
+	detail := device.Errors()[0].Detail()
+	for _, cause := range []string{"does not exist", "site", "not managed"} {
+		if !strings.Contains(detail, cause) {
+			t.Errorf("the membership message omits the %q cause:\n%s", cause, detail)
+		}
 	}
 
 	site := WriteDiagnostics(apiError(http.StatusForbidden, codeInvalidPrivilege, "siteId", "denied"), "smart computer group", sitePath, path.Empty())

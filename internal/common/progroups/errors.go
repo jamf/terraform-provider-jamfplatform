@@ -116,7 +116,10 @@ func WriteDiagnostics(err error, label string, sitePath, membersPath path.Path) 
 		diags.Append(atAttribute(
 			membersPath,
 			"Jamf Pro rejected one or more members of this group",
-			"Jamf Pro reported that at least one of the listed devices cannot be a member, and does not say which. There are two causes and it reports them identically: a device that does not exist, or — when the group belongs to a site — a device that is not assigned to that same site. A group in a site can only contain devices in it."+
+			"Jamf Pro reported that at least one of the listed devices cannot be a member, and does not say which one or why. Three causes produce this same answer:"+
+				"\n\n1. The device does not exist."+
+				"\n2. The group belongs to a site and the device is not assigned to that same site. A group in a site holds only devices in it."+
+				"\n3. For a computer group, the computer is not managed. Jamf Pro refuses an unmanaged computer as a static group member."+
 				"\n\nJamf Pro's response: "+helpers.APIErrorDetail(err),
 		))
 	case IsDuplicateName(err):

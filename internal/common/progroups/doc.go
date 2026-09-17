@@ -55,10 +55,23 @@
 //
 // A static group that has a site accepts only devices assigned to that same site.
 // Anything else is 400 INVALID_DEVICE on `field: assignments` with nothing
-// applied, and the same code covers a device id that does not exist — probed both
-// ways round, including moving a computer into the site and watching the identical
-// request start succeeding. InvalidDevice names both possibilities because the
-// server does not distinguish them.
+// applied — probed both ways round, including moving a computer into the site and
+// watching the identical request start succeeding.
+//
+// That one code covers THREE different causes, which is why the diagnostic lists
+// all three rather than guessing: a device id that does not exist, a device
+// outside the group's site, and — computer groups only — a computer that is not
+// managed. The third was found by minting a computer record, which Jamf Pro
+// creates unmanaged: the static computer group refused it, and the identical
+// request succeeded once `remote_management.managed` was flipped true.
+//
+// The managed requirement is a further asymmetry between the two device types,
+// and it runs the opposite way to the siteId one. A static COMPUTER group refuses
+// an unmanaged computer; a static MOBILE DEVICE group accepts an unmanaged device
+// without complaint (probed on a freshly minted record whose managed flag was
+// still false, and whose own attempt to set it answered 500). So a membership
+// fixture for a computer group has to be managed and one for a mobile group does
+// not.
 //
 // Deleting a group that anything is scoped to is 422 HAS_DEPENDENCIES, and the
 // description names the dependents. It is permanent rather than

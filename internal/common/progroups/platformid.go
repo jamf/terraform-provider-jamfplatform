@@ -65,6 +65,24 @@ import (
 // so a name-based bridge could return a different group whose name differed only
 // in case, and two groups of different types may legitimately share a name.
 
+// platform_id can be NULL in state, and that is fine. It cannot be UNKNOWN in an
+// update plan, and no construct needs to guard against it.
+//
+// The attribute is Computed-only with UseStateForUnknown. In an update the
+// modifier always fires — the state is not null, the planned value is unknown,
+// and the configuration value is Null rather than Unknown because nothing may set
+// the attribute — so the planned value becomes the prior state value verbatim.
+// Read the framework's own source before doubting this: UseStateForUnknown ends
+// with `resp.PlanValue = req.StateValue` and does NOT skip a null one. That is
+// UseNonNullStateForUnknown, a different modifier, and conflating the two reads as
+// a critical bug that is not there.
+//
+// So a resource whose bridge lookup failed carries a null platform_id, plans null,
+// applies null, and passes the consistency check. Read repopulates it on the next
+// refresh, which `terraform plan` performs anyway, so the null heals without an
+// apply. A guard that re-resolves the identifier on an unknown plan value is dead
+// code, and one that errors on it would fail an apply that was about to succeed.
+
 // forbiddenWarningKey and transientWarningKey latch the two advisories the bridge
 // can raise, so a configuration holding forty of these groups reports each cause
 // once per provider invocation rather than forty times. The strings are stable
