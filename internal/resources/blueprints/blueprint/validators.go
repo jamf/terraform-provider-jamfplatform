@@ -164,29 +164,30 @@ func (v legacyPayloadSchemaValidator) ValidateDynamic(_ context.Context, req val
 // multi-domain payload is actively harmful rather than merely unidiomatic; editor parity is why the
 // rule holds regardless of what a device does with it.
 //
-// payloadLabel names the payload for an operator when the attribute path cannot. The block carrier
-// passes an empty string, because its path already points at the element. The deprecated flat
-// carrier passes a position and type, since a dynamic value has no traversable path for its
-// elements and every finding lands on the attribute itself.
+// payloadLabel names the payload for an operator when the attribute path cannot, and heads the
+// detail as its subject. The block carrier passes an empty string and the detail says "This
+// payload", because its path already points at the element. The deprecated flat carrier passes a
+// position and type, since a dynamic value has no traversable path for its elements and every
+// finding lands on the attribute itself.
 func appendMCXDomainProblems(diags *diag.Diagnostics, payloadType string, settings map[string]any, settingsPath path.Path, payloadLabel string) {
 	domains, present := mcxPreferenceDomains(payloadType, settings)
 	if !present || len(domains) == 1 {
 		return
 	}
 
-	prefix := ""
+	subject := "This payload"
 	if payloadLabel != "" {
-		prefix = payloadLabel + ": "
+		subject = payloadLabel
 	}
 
 	if len(domains) == 0 {
 		diags.AddAttributeError(
 			settingsPath,
 			"Custom settings payload sets no preference domain",
-			prefix+"this payload's PayloadContent dictionary sets no preference domain. The platform discards an "+
-				"empty dictionary, so the payload cannot be stored and the apply fails. Set one preference domain "+
-				"under PayloadContent, or remove the payload. A domain set to null counts as none, because the "+
-				"platform discards it before storing the payload.",
+			subject+" sets no preference domain under PayloadContent. The platform discards an empty "+
+				"dictionary, so the payload cannot be stored and the apply fails. Set one preference domain, "+
+				"or remove the payload. A domain set to null counts as none, because the platform drops it "+
+				"before storing.",
 		)
 		return
 	}
@@ -195,11 +196,11 @@ func appendMCXDomainProblems(diags *diag.Diagnostics, payloadType string, settin
 		settingsPath,
 		"Custom settings payload sets more than one preference domain",
 		fmt.Sprintf(
-			"%sthis payload sets %d preference domains: %s. A Mac applies one and discards the rest without "+
-				"reporting it, and you cannot predict which one it keeps. Write one payload per preference domain, "+
-				"as the Jamf Pro profile editor does: a profile covering three domains carries three custom settings "+
-				"payloads. A component block may carry as many custom settings payloads as it has domains.",
-			prefix, len(domains), strings.Join(domains, ", "),
+			"%s sets %d preference domains: %s. A Mac applies one and drops the rest without reporting it, "+
+				"and you cannot predict which one it keeps. Write one payload per preference domain, as the "+
+				"Jamf Pro profile editor does. A component block may carry as many custom settings payloads "+
+				"as it has domains.",
+			subject, len(domains), strings.Join(domains, ", "),
 		),
 	)
 }

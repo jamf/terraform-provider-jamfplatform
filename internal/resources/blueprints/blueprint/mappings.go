@@ -87,13 +87,13 @@ const legacyPayloadSettingsBehaviour = "The platform validates each payload agai
 	"carrying one never applies. " +
 	"A custom settings payload (`com.apple.ManagedClient.preferences`) sets exactly one preference domain under " +
 	"`PayloadContent`, and the provider refuses any other count during `plan`. A Mac applies one of several domains and " +
-	"drops the rest, and the platform discards an empty dictionary. Write one payload per domain, as the Jamf Pro " +
+	"drops the rest. The platform discards an empty dictionary. Write one payload per domain, as the Jamf Pro " +
 	"profile editor does; a block may carry as many custom settings payloads as it has domains. " +
 	"To skip the checks, move **every** legacy payload in the same block to a " +
 	"single `raw_component` with identifier `com.jamf.ddm-configuration-profile`. The platform stores a " +
-	"block's legacy payloads as one component, so move them all or leave them all here. That escape does not " +
-	"reach the one-domain rule: a `raw_component` still sends a multi-domain payload, a Mac still drops all but " +
-	"one domain, and the block's payload identifiers are then reissued on every write. Split the domains instead. " +
+	"block's legacy payloads as one component, so move them all or leave them all here. A `raw_component` sends a " +
+	"multi-domain payload unchanged, so a Mac still drops all but one domain and the block's payload identifiers " +
+	"are reissued on every write. Split the domains rather than moving them. " +
 	"Two behaviours are absorbed for you instead: a key set to `null` is discarded by Jamf and tolerated here, so nulls " +
 	"can stay in configuration; and Apple's common payload metadata (`payloadDisplayName`, `payloadOrganization`, " +
 	"`payloadVersion`) is stamped onto every payload and hidden unless you set it yourself. " +

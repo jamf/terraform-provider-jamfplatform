@@ -479,8 +479,8 @@ func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprint
 func duplicateLegacyPayloadDiagnostic(payloadType string, settings map[string]any, location string) (string, string) {
 	if domains, _ := mcxPreferenceDomains(payloadType, settings); len(domains) == 1 {
 		return "Duplicate preference domain",
-			"The component block " + location + " sets the " + domains[0] + " preference domain in more than one custom settings payload. Give each domain its own payload."
+			location + " sets the " + domains[0] + " preference domain in more than one custom settings payload. Give each domain its own payload."
 	}
 	return "Duplicate payload_type",
-		"A component block declares each payload type once. The component block " + location + " declares " + payloadType + " more than once."
+		location + " declares " + payloadType + " more than once. Declare each payload type once per block."
 }
