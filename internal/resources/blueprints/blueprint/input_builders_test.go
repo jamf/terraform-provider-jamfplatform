@@ -31,7 +31,7 @@ func TestCollectLegacyPayloads_ValidPayload(t *testing.T) {
 	}
 	dynVal, _ := helpers.JSONToTerraformDynamic(input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "My Blueprint", nil)
+	r.collectLegacyPayloads(&components, &diags, dynVal, "My Blueprint", "legacy_payloads", nil)
 
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %v", diags)
@@ -80,7 +80,7 @@ func TestCollectLegacyPayloads_NoSettings(t *testing.T) {
 	}
 	dynVal, _ := helpers.JSONToTerraformDynamic(input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Blueprint", nil)
+	r.collectLegacyPayloads(&components, &diags, dynVal, "Blueprint", "legacy_payloads", nil)
 
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %v", diags)
@@ -117,7 +117,7 @@ func TestCollectLegacyPayloads_MixedTypeSettings(t *testing.T) {
 	}
 	dynVal, _ := helpers.JSONToTerraformDynamic(input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Test", nil)
+	r.collectLegacyPayloads(&components, &diags, dynVal, "Test", "legacy_payloads", nil)
 
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %v", diags)
@@ -148,7 +148,7 @@ func TestCollectLegacyPayloads_EmptyList(t *testing.T) {
 
 	dynVal, _ := helpers.JSONToTerraformDynamic([]any{})
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Empty Blueprint", nil)
+	r.collectLegacyPayloads(&components, &diags, dynVal, "Empty Blueprint", "legacy_payloads", nil)
 
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %v", diags)
@@ -191,7 +191,7 @@ func TestCollectLegacyPayloads_DuplicatePayloadType(t *testing.T) {
 	}
 	dynVal, _ := helpers.JSONToTerraformDynamic(input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Blueprint", nil)
+	r.collectLegacyPayloads(&components, &diags, dynVal, "Blueprint", "legacy_payloads", nil)
 
 	if !diags.HasError() {
 		t.Fatal("expected error for duplicate payload_type, got none")
@@ -214,7 +214,7 @@ func TestCollectLegacyPayloads_NullDynamic(t *testing.T) {
 	var components []blueprints.Component
 	var diags diag.Diagnostics
 
-	r.collectLegacyPayloads(&components, &diags, types.DynamicNull(), "Blueprint", nil)
+	r.collectLegacyPayloads(&components, &diags, types.DynamicNull(), "Blueprint", "legacy_payloads", nil)
 
 	if !diags.HasError() {
 		t.Error("expected error for null dynamic value")
@@ -493,5 +493,102 @@ func TestHasLegacyPayloads(t *testing.T) {
 				t.Errorf("hasLegacyPayloads() = %t, want %t", got, tc.want)
 			}
 		})
+	}
+}
+
+// buildBlockLegacyPayloads runs one component block's legacy payloads through the builder and
+// returns its diagnostics, which is where every duplicate is caught.
+// duplicateTestBlockLocation is how describeBlockPosition renders the block buildBlockLegacyPayloads
+// builds. Both duplicate diagnostics are raised below the validators and so carry no attribute path,
+// which is why they have to name the block in their own text.
+const duplicateTestBlockLocation = "component_blocks[0] (Block 1)"
+
+func buildBlockLegacyPayloads(t *testing.T, payloads ...[2]string) diag.Diagnostics {
+	t.Helper()
+
+	data := &BlueprintResourceModel{
+		Name:            types.StringValue("BP"),
+		ComponentBlocks: []ComponentBlockModel{blockWithLegacyPayloads("Block 1", payloads...)},
+	}
+	_, diags := (&BlueprintResource{}).buildSteps(context.Background(), data, nil)
+	return diags
+}
+
+// TestBuildSteps_SamePreferenceDomainTwiceIsRejected is the duplicate that survives the fix. Several
+// custom settings payloads in one block are now legitimate, one per preference domain, so the check
+// moved from the payload type onto the domain rather than being removed: two payloads setting the
+// same domain leave the last write to decide what a Mac gets, which is not something to send.
+func TestBuildSteps_SamePreferenceDomainTwiceIsRejected(t *testing.T) {
+	t.Parallel()
+
+	diags := buildBlockLegacyPayloads(t,
+		[2]string{mcxPayloadType, mcxSettings(t, "com.example.repeated")},
+		[2]string{mcxPayloadType, mcxSettings(t, "com.example.repeated")},
+	)
+	if !diags.HasError() {
+		t.Fatal("the same preference domain in two payloads of one block was accepted")
+	}
+
+	reported := diags.Errors()[0]
+	if reported.Summary() != "Duplicate preference domain" {
+		t.Errorf("summary = %q, want the domain named rather than the payload type", reported.Summary())
+	}
+	if !strings.Contains(reported.Detail(), "com.example.repeated") {
+		t.Errorf("detail does not name the repeated domain: %s", reported.Detail())
+	}
+	if !strings.Contains(reported.Detail(), duplicateTestBlockLocation) {
+		t.Errorf("detail does not name the component block: %s", reported.Detail())
+	}
+}
+
+// TestBuildSteps_TwoDomainlessCustomSettingsPayloadsAreRejected covers the payload an empty
+// preference dictionary produces. No author can write one: appendMCXDomainProblems refuses it during
+// plan, because Jamf discards an empty dictionary and the shape cannot round-trip. This exercises
+// appendLegacyConfigProfile directly, below the validator, where the payloads can also come from the
+// wire — a domainless payload has no domain to be identified by and falls back to its payload type,
+// which is what leaves the duplicate check able to see two of them, where keying on a domain that is
+// not there would let both through and send two payloads the service stamps as one.
+func TestBuildSteps_TwoDomainlessCustomSettingsPayloadsAreRejected(t *testing.T) {
+	t.Parallel()
+
+	diags := buildBlockLegacyPayloads(t,
+		[2]string{mcxPayloadType, mcxSettings(t)},
+		[2]string{mcxPayloadType, mcxSettings(t)},
+	)
+	if !diags.HasError() {
+		t.Fatal("two custom settings payloads with no preference domain were accepted")
+	}
+	reported := diags.Errors()[0]
+	if reported.Summary() != "Duplicate payload_type" {
+		t.Errorf("summary = %q, want the payload type named — there is no domain to name", reported.Summary())
+	}
+	if !strings.Contains(reported.Detail(), duplicateTestBlockLocation) {
+		t.Errorf("detail does not name the component block: %s", reported.Detail())
+	}
+}
+
+// TestBuildSteps_RepeatedPayloadTypeInABlockIsStillRejected keeps the rule the fix relaxed for one
+// payload type from being relaxed for the rest. Every other type appears at most once in a block,
+// since a second one carries no domain to tell it apart and would take the first's stored identifier.
+func TestBuildSteps_RepeatedPayloadTypeInABlockIsStillRejected(t *testing.T) {
+	t.Parallel()
+
+	diags := buildBlockLegacyPayloads(t,
+		[2]string{"com.apple.domains", `{"EmailDomains":["first.example"]}`},
+		[2]string{"com.apple.domains", `{"EmailDomains":["second.example"]}`},
+	)
+	if !diags.HasError() {
+		t.Fatal("a repeated payload type in one block was accepted")
+	}
+
+	reported := diags.Errors()[0]
+	if reported.Summary() != "Duplicate payload_type" {
+		t.Errorf("summary = %q", reported.Summary())
+	}
+	if !strings.Contains(reported.Detail(), "com.apple.domains") {
+		t.Errorf("detail does not name the repeated type: %s", reported.Detail())
+	}
+	if !strings.Contains(reported.Detail(), duplicateTestBlockLocation) {
+		t.Errorf("detail does not name the component block: %s", reported.Detail())
 	}
 }

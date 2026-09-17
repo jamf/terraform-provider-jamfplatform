@@ -294,12 +294,14 @@ func parseComponentConfiguration(apiComponentsByID map[string]blueprints.Compone
 // The blueprints service stamps its own metadata onto every payload it stores (see
 // serverStampedPayloadKeys), so a payload's settings are masked against what the author declared:
 // a stamped key the author did not write is dropped, and one the author did write is kept, since
-// the service echoes an authored value back verbatim. priorSettingsByType carries the author's
-// settings keyed by payload type, and may be nil (import — nothing authored to mask against).
+// the service echoes an authored value back verbatim. priorSettingsByIdentity carries the author's
+// settings keyed by legacyPayloadIdentity, and may be nil (import — nothing authored to mask
+// against). The identity is derived from the stored payload, so several managed preferences payloads
+// in one block each mask against the one the author wrote for their own preference domain.
 //
 // `payloadType` is lifted out into `payload_type` rather than masked, and the keys the service owns
 // outright come off whatever the author wrote (see providerMaskedPayloadKeys).
-func legacyPayloadItems(apiComponentsByID map[string]blueprints.Component, priorSettingsByType map[string]map[string]any) []any {
+func legacyPayloadItems(apiComponentsByID map[string]blueprints.Component, priorSettingsByIdentity map[string]map[string]any) []any {
 	rawJSON, ok := parseComponentConfiguration(apiComponentsByID, "com.jamf.ddm-configuration-profile")
 	if !ok {
 		return nil
@@ -331,8 +333,9 @@ func legacyPayloadItems(apiComponentsByID map[string]blueprints.Component, prior
 			}
 			settingsMap[k] = v
 		}
-		maskServerStampedPayloadKeys(settingsMap, priorSettingsByType[payloadType])
-		if restored, ok := restoreRedactedValues(settingsMap, priorSettingsByType[payloadType]).(map[string]any); ok {
+		identity := legacyPayloadIdentity(payloadType, settingsMap)
+		maskServerStampedPayloadKeys(settingsMap, priorSettingsByIdentity[identity])
+		if restored, ok := restoreRedactedValues(settingsMap, priorSettingsByIdentity[identity]).(map[string]any); ok {
 			settingsMap = restored
 		}
 
@@ -549,9 +552,9 @@ func flattenFlatLegacyPayloads(prior types.Dynamic, apiComponentsByID map[string
 }
 
 // priorSettingsFromDynamic reads the author's per-payload settings out of the deprecated top-level
-// dynamic value, keyed by payload type, so the wire payloads can be masked against what was
-// actually written. It returns nil when the prior value carries nothing usable (import, or a first
-// create with no prior state).
+// dynamic value, keyed by legacyPayloadIdentity, so the wire payloads can be masked against what
+// was actually written. It returns nil when the prior value carries nothing usable (import, or a
+// first create with no prior state).
 //
 // A key the service owns is dropped as it is read (see providerMaskedPayloadKeys), because nothing
 // downstream may treat one as authored: the provider strips it from every write, so
@@ -572,7 +575,7 @@ func priorSettingsFromDynamic(prior types.Dynamic) map[string]map[string]any {
 		return nil
 	}
 
-	settingsByType := make(map[string]map[string]any, len(items))
+	settingsByIdentity := make(map[string]map[string]any, len(items))
 	for _, item := range items {
 		obj, ok := item.(map[string]any)
 		if !ok {
@@ -581,22 +584,22 @@ func priorSettingsFromDynamic(prior types.Dynamic) map[string]map[string]any {
 		payloadType, _ := obj["payload_type"].(string)
 		if settings, ok := obj["settings"].(map[string]any); ok {
 			deleteProviderMaskedPayloadKeys(settings)
-			settingsByType[payloadType] = settings
+			settingsByIdentity[legacyPayloadIdentity(payloadType, settings)] = settings
 		}
 	}
-	return settingsByType
+	return settingsByIdentity
 }
 
 // priorSettingsFromBlockPayloads reads the author's per-payload settings out of a block's typed
-// legacy payload list, keyed by payload type, decoding each settings JSON string. It returns nil
-// when nothing was authored. A key the service owns is dropped as it is read, for the reason
-// priorSettingsFromDynamic gives.
+// legacy payload list, keyed by legacyPayloadIdentity, decoding each settings JSON string. It
+// returns nil when nothing was authored. A key the service owns is dropped as it is read, for the
+// reason priorSettingsFromDynamic gives.
 func priorSettingsFromBlockPayloads(prior []BlockLegacyPayloadModel) map[string]map[string]any {
 	if len(prior) == 0 {
 		return nil
 	}
 
-	settingsByType := make(map[string]map[string]any, len(prior))
+	settingsByIdentity := make(map[string]map[string]any, len(prior))
 	for _, entry := range prior {
 		if !helpers.IsConfiguredValue(entry.Settings) {
 			continue
@@ -606,9 +609,9 @@ func priorSettingsFromBlockPayloads(prior []BlockLegacyPayloadModel) map[string]
 			continue
 		}
 		deleteProviderMaskedPayloadKeys(settings)
-		settingsByType[entry.PayloadType.ValueString()] = settings
+		settingsByIdentity[legacyPayloadIdentity(entry.PayloadType.ValueString(), settings)] = settings
 	}
-	return settingsByType
+	return settingsByIdentity
 }
 
 // flattenAppleDeclarations renders the wire Apple declarations into a block's declaration list.
@@ -670,6 +673,10 @@ func flattenAppleDeclarations(diags *diag.Diagnostics, prior []AppleDeclarationM
 // payload's settings as a canonical JSON string. When the user manages the configuration profile as
 // a raw_component the prior value is left untouched. For each payload, the prior settings string is
 // preserved when it is semantically identical to the server value, keeping diffs stable.
+//
+// A payload is paired with the prior entry by legacyPayloadIdentity rather than by payload type, so
+// several managed preferences payloads in one block each keep the JSON string the author wrote for
+// their own preference domain instead of all taking the first one's.
 func flattenBlockLegacyPayloads(prior []BlockLegacyPayloadModel, apiComponentsByID map[string]blueprints.Component, rawIdentifiers map[string]struct{}) []BlockLegacyPayloadModel {
 	if _, handledAsRaw := rawIdentifiers["com.jamf.ddm-configuration-profile"]; handledAsRaw {
 		return prior
@@ -680,9 +687,9 @@ func flattenBlockLegacyPayloads(prior []BlockLegacyPayloadModel, apiComponentsBy
 		return nil
 	}
 
-	priorByType := make(map[string]types.String, len(prior))
+	priorByIdentity := make(map[string]types.String, len(prior))
 	for _, entry := range prior {
-		priorByType[entry.PayloadType.ValueString()] = entry.Settings
+		priorByIdentity[blockLegacyPayloadIdentity(entry)] = entry.Settings
 	}
 
 	result := make([]BlockLegacyPayloadModel, 0, len(items))
@@ -695,11 +702,12 @@ func flattenBlockLegacyPayloads(prior []BlockLegacyPayloadModel, apiComponentsBy
 		entry := BlockLegacyPayloadModel{PayloadType: types.StringValue(payloadType)}
 
 		settings, hasSettings := obj["settings"].(map[string]any)
+		identity := legacyPayloadIdentity(payloadType, settings)
 		switch {
 		case !hasSettings:
 			entry.Settings = types.StringNull()
-		case legacyPayloadSettingsMatch(priorByType[payloadType], settings):
-			entry.Settings = priorByType[payloadType]
+		case legacyPayloadSettingsMatch(priorByIdentity[identity], settings):
+			entry.Settings = priorByIdentity[identity]
 		default:
 			if encoded, err := json.Marshal(settings); err == nil {
 				entry.Settings = types.StringValue(string(encoded))
@@ -895,8 +903,13 @@ func describeBlockPosition(index int, name types.String) string {
 
 // appendLegacyPayloadDiscardWarnings compares each payload's authored settings against what the
 // step actually stored and adds one warning per payload that lost keys.
-func appendLegacyPayloadDiscardWarnings(diags *diag.Diagnostics, authoredByType map[string]map[string]any, step blueprints.BlueprintStep, location string) {
-	if len(authoredByType) == 0 {
+//
+// Both sides are keyed by legacyPayloadIdentity, so several managed preferences payloads in one
+// block are each compared against what was stored for their own preference domain. Keying by
+// payload type would compare one of them against another's settings and report every key of both as
+// discarded. The identity doubles as the label the warning names the payload by.
+func appendLegacyPayloadDiscardWarnings(diags *diag.Diagnostics, authoredByIdentity map[string]map[string]any, step blueprints.BlueprintStep, location string) {
+	if len(authoredByIdentity) == 0 {
 		return
 	}
 
@@ -905,19 +918,19 @@ func appendLegacyPayloadDiscardWarnings(diags *diag.Diagnostics, authoredByType 
 		apiComponentsByID[comp.Identifier] = comp
 	}
 
-	storedByType := make(map[string]map[string]any)
-	for _, item := range legacyPayloadItems(apiComponentsByID, authoredByType) {
+	storedByIdentity := make(map[string]map[string]any)
+	for _, item := range legacyPayloadItems(apiComponentsByID, authoredByIdentity) {
 		obj, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
 		payloadType, _ := obj["payload_type"].(string)
 		settings, _ := obj["settings"].(map[string]any)
-		storedByType[payloadType] = settings
+		storedByIdentity[legacyPayloadIdentity(payloadType, settings)] = settings
 	}
 
-	for _, payloadType := range slices.Sorted(maps.Keys(authoredByType)) {
-		discarded := discardedSettingsPaths(authoredByType[payloadType], storedByType[payloadType], "")
+	for _, identity := range slices.Sorted(maps.Keys(authoredByIdentity)) {
+		discarded := discardedSettingsPaths(authoredByIdentity[identity], storedByIdentity[identity], "")
 		if len(discarded) == 0 {
 			continue
 		}
@@ -925,10 +938,10 @@ func appendLegacyPayloadDiscardWarnings(diags *diag.Diagnostics, authoredByType 
 			"Legacy payload settings were not stored",
 			fmt.Sprintf(
 				"Jamf did not store %d setting(s) written for the %s payload in %s: %s. "+
-					"The platform validates each legacy payload against Apple's payload keys for that payload type and silently drops any key it does not define, "+
+					"The platform validates each legacy payload against Apple's payload keys for that payload type and drops any key it does not define without reporting it, "+
 					"so these settings will not reach any device and Terraform will report a difference on every plan. "+
 					"Check each key against Apple's documentation for this payload type, including its exact capitalisation.",
-				len(discarded), payloadType, location, strings.Join(discarded, ", "),
+				len(discarded), identity, location, strings.Join(discarded, ", "),
 			),
 		)
 	}

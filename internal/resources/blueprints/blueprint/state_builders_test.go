@@ -1040,3 +1040,99 @@ func TestBlockOnlyComponentIdentifiers_CoversEveryTypedComponentWithoutFlatField
 		}
 	}
 }
+
+// TestFlattenBlockLegacyPayloads_EachPreferenceDomainKeepsItsOwnAuthoredString covers the read side
+// of one block carrying a custom settings payload per preference domain. Each payload's authored
+// JSON string must be paired with the wire payload for its own domain: pairing by payload type
+// leaves only one of them in the lookup, so the others are re-encoded and every plan reports a
+// difference in a string that says the same thing.
+func TestFlattenBlockLegacyPayloads_EachPreferenceDomainKeepsItsOwnAuthoredString(t *testing.T) {
+	apiComponents := map[string]blueprints.Component{
+		"com.jamf.ddm-configuration-profile": {
+			Identifier: "com.jamf.ddm-configuration-profile",
+			Configuration: json.RawMessage(`{"payloadDisplayName":"bp","payloadContent":[` +
+				`{"payloadType":"com.apple.ManagedClient.preferences","payloadIdentifier":"one","payloadUUID":"one",` +
+				`"PayloadContent":{"com.example.first":{"Forced":[{"mcx_preference_settings":{"key":1}}]}}},` +
+				`{"payloadType":"com.apple.ManagedClient.preferences","payloadIdentifier":"two","payloadUUID":"two",` +
+				`"PayloadContent":{"com.example.second":{"Forced":[{"mcx_preference_settings":{"key":2}}]}}}]}`),
+		},
+	}
+
+	authoredFirst := `{ "PayloadContent": { "com.example.first": { "Forced": [ { "mcx_preference_settings": { "key": 1 } } ] } } }`
+	authoredSecond := `{ "PayloadContent": { "com.example.second": { "Forced": [ { "mcx_preference_settings": { "key": 2 } } ] } } }`
+	prior := []BlockLegacyPayloadModel{
+		{PayloadType: types.StringValue("com.apple.ManagedClient.preferences"), Settings: types.StringValue(authoredFirst)},
+		{PayloadType: types.StringValue("com.apple.ManagedClient.preferences"), Settings: types.StringValue(authoredSecond)},
+	}
+
+	got := flattenBlockLegacyPayloads(prior, apiComponents, map[string]struct{}{})
+
+	if len(got) != 2 {
+		t.Fatalf("expected 2 payloads, got %d: %v", len(got), got)
+	}
+	if got[0].Settings.ValueString() != authoredFirst {
+		t.Errorf("the first domain did not keep its authored string, got %q", got[0].Settings.ValueString())
+	}
+	if got[1].Settings.ValueString() != authoredSecond {
+		t.Errorf("the second domain did not keep its authored string, got %q", got[1].Settings.ValueString())
+	}
+}
+
+// TestCheckLegacyPayloadDiscards_SeveralPreferenceDomainsCompareIndependently pins the keying
+// appendLegacyPayloadDiscardWarnings depends on. Both sides key on legacyPayloadIdentity, so each
+// custom settings payload is compared against what was stored for its own preference domain. Keying
+// by payload type collapses the two to one entry and compares one payload against the other's
+// settings, which reports every key of both as discarded.
+//
+// The payloads are stored in the reverse of the authored order deliberately: with the orders
+// matching, a type-keyed comparison happens to pick the right settings and the regression is
+// invisible. The array order is the service's, so nothing guarantees it matches configuration.
+func TestCheckLegacyPayloadDiscards_SeveralPreferenceDomainsCompareIndependently(t *testing.T) {
+	const (
+		first  = "com.example.first"
+		second = "com.example.second"
+	)
+	mcxSettings := func(domain, key string) string {
+		return `{"PayloadContent":{"` + domain + `":{"Forced":[{"mcx_preference_settings":{"` + key + `":true}}]}}}`
+	}
+	storedPayload := func(domain, key string) string {
+		return `{"payloadType":"com.apple.ManagedClient.preferences","payloadIdentifier":"pi-` + domain + `",` +
+			`"PayloadContent":{"` + domain + `":{"Forced":[{"mcx_preference_settings":{"` + key + `":true}}]}}}`
+	}
+
+	stepName := "Preferences"
+	blueprint := &blueprints.BlueprintDetail{
+		Steps: []blueprints.BlueprintStep{{
+			Name: &stepName,
+			Components: []blueprints.Component{{
+				Identifier: "com.jamf.ddm-configuration-profile",
+				Configuration: json.RawMessage(`{"payloadDisplayName":"bp","payloadContent":[` +
+					storedPayload(second, "SecondKey") + `,` + storedPayload(first, "FirstKey") + `]}`),
+			}},
+		}},
+	}
+	planned := &BlueprintResourceModel{
+		ComponentBlocks: []ComponentBlockModel{{
+			Name: types.StringValue(stepName),
+			LegacyPayloads: []BlockLegacyPayloadModel{
+				{
+					PayloadType: types.StringValue("com.apple.ManagedClient.preferences"),
+					Settings:    types.StringValue(mcxSettings(first, "FirstKey")),
+				},
+				{
+					PayloadType: types.StringValue("com.apple.ManagedClient.preferences"),
+					Settings:    types.StringValue(mcxSettings(second, "SecondKey")),
+				},
+			},
+		}},
+	}
+
+	diags := checkLegacyPayloadDiscards(planned, blueprint)
+
+	if diags.WarningsCount() != 0 {
+		t.Errorf("two faithfully stored preference domains produced %d warning(s): %v", diags.WarningsCount(), diags.Warnings())
+	}
+	if diags.ErrorsCount() != 0 {
+		t.Errorf("expected no errors, got %v", diags.Errors())
+	}
+}

@@ -55,6 +55,15 @@ const (
 	accessibilityPayloadType = "com.apple.universalaccess"
 	domainsPayloadType       = "com.apple.domains"
 	fileProviderPayloadType  = "com.apple.fileproviderd"
+	mcxPayloadTypeName       = "com.apple.ManagedClient.preferences"
+)
+
+// The preference domains the custom settings tests author, one payload each. They are throwaway
+// reverse-domain names no real application reads, so a run that leaves a profile behind changes
+// nothing on a device.
+const (
+	firstPreferenceDomain  = "com.tf-acc-safe-to-delete.first"
+	secondPreferenceDomain = "com.tf-acc-safe-to-delete.second"
 )
 
 // The settings each payload type is authored with. They are HCL expressions rather than JSON so the
@@ -115,11 +124,37 @@ func legacyIdentifierConfig(groupSuffix, resourceLabel, name, description string
 		`, resourceLabel, name, description, rendered.String()))
 }
 
+// storedPayloadKey returns the key one stored legacy payload is followed by, which is the payload
+// type for most payloads and the payload type plus its preference domain for a custom settings
+// payload. It restates the provider's own legacyPayloadIdentity for the same reason
+// legacyConfigProfileComponent restates a constant: these tests are `package blueprint_test` behind
+// the acceptance build tag and cannot reach an unexported function.
+//
+// The domain has to be part of the key. A block may carry a custom settings payload per preference
+// domain, because a Mac applies one domain of a payload that sets several and discards the rest, so
+// keying by payload type alone would collapse every one of them onto a single entry — and a
+// collapsed map is one an assertion about "the identifier did not change" passes vacuously.
+func storedPayloadKey(payload map[string]any) string {
+	payloadType, _ := payload["payloadType"].(string)
+	if payloadType != mcxPayloadTypeName {
+		return payloadType
+	}
+
+	domains, ok := payload["PayloadContent"].(map[string]any)
+	if !ok || len(domains) != 1 {
+		return payloadType
+	}
+	for domain := range domains {
+		return payloadType + " (" + domain + ")"
+	}
+	return payloadType
+}
+
 // readLegacyPayloadIdentifiers reads a blueprint back through the SDK and returns the
-// `payloadIdentifier` the service holds for each of its legacy payloads, keyed by payload type. The
-// key is unique across the whole blueprint here — a type is unique within a block, and no test below
-// gives two blocks the same one — which is what lets an identifier be followed through a reorder or
-// a rename, where position and block name both move.
+// `payloadIdentifier` the service holds for each of its legacy payloads, keyed by storedPayloadKey.
+// The key is unique across the whole blueprint here — a payload is unique within a block, and no
+// test below gives two blocks the same one — which is what lets an identifier be followed through a
+// reorder or a rename, where position and block name both move.
 //
 // Reading the wire is the only way to assert any of this: neither `payloadIdentifier` nor
 // `payloadUUID` ever reaches Terraform state.
@@ -152,29 +187,28 @@ func readLegacyPayloadIdentifiers(t *testing.T, blueprintID string) (map[string]
 			}
 
 			var configuration struct {
-				PayloadContent []struct {
-					PayloadType       string `json:"payloadType"`
-					PayloadIdentifier string `json:"payloadIdentifier"`
-					PayloadUUID       string `json:"payloadUUID"`
-				} `json:"payloadContent"`
+				PayloadContent []map[string]any `json:"payloadContent"`
 			}
 			if err := json.Unmarshal(component.Configuration, &configuration); err != nil {
 				return nil, fmt.Errorf("decoding the stored %s component of blueprint %s: %w", legacyConfigProfileComponent, blueprintID, err)
 			}
 
 			for _, payload := range configuration.PayloadContent {
+				key := storedPayloadKey(payload)
+				identifier, _ := payload["payloadIdentifier"].(string)
+				uuid, _ := payload["payloadUUID"].(string)
 				switch {
-				case payload.PayloadType == "":
+				case key == "":
 					return nil, fmt.Errorf("blueprint %s stores a legacy payload with no payloadType", blueprintID)
-				case payload.PayloadIdentifier == "":
-					return nil, fmt.Errorf("blueprint %s stores the %s payload with no payloadIdentifier, which the service assigns on every write", blueprintID, payload.PayloadType)
-				case payload.PayloadUUID != payload.PayloadIdentifier:
+				case identifier == "":
+					return nil, fmt.Errorf("blueprint %s stores the %s payload with no payloadIdentifier, which the service assigns on every write", blueprintID, key)
+				case uuid != identifier:
 					return nil, fmt.Errorf(
 						"blueprint %s stores the %s payload with payloadUUID %s against payloadIdentifier %s; the provider masks payloadUUID because the service overwrites it with the identifier",
-						blueprintID, payload.PayloadType, payload.PayloadUUID, payload.PayloadIdentifier,
+						blueprintID, key, uuid, identifier,
 					)
 				}
-				identifiers[payload.PayloadType] = payload.PayloadIdentifier
+				identifiers[key] = identifier
 			}
 		}
 	}
@@ -1085,4 +1119,41 @@ func TestAccResource_Blueprint_LegacyPayloads_DuplicateIdentifierIsReissued(t *t
 			},
 		},
 	})
+}
+
+// checkStoredIdentifiersAreDistinct returns a Check asserting the blueprint stores wantCount legacy
+// payloads and that no two of them carry the same identifier.
+//
+// checkStoredIdentifiers cannot say this. It compares each recorded identifier against what is
+// stored now, so two payloads that shared one identifier from the first apply would agree with
+// themselves forever. The count is asserted in the same place because a collapse and a duplicate
+// have the same cause: several payloads keyed as one. A block's payloads install as a single
+// profile, and macOS refuses a profile whose payload identifiers are not unique — every payload in
+// it, not the duplicated ones.
+func checkStoredIdentifiersAreDistinct(t *testing.T, addr string, wantCount int) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		blueprintID, err := blueprintIDFromState(s, addr)
+		if err != nil {
+			return err
+		}
+
+		current, err := readLegacyPayloadIdentifiers(t, blueprintID)
+		if err != nil {
+			return err
+		}
+		if len(current) != wantCount {
+			return fmt.Errorf("the service stores %d identified legacy payloads, want %d: %v", len(current), wantCount, current)
+		}
+
+		keysByIdentifier := make(map[string][]string, len(current))
+		for key, identifier := range current {
+			keysByIdentifier[identifier] = append(keysByIdentifier[identifier], key)
+		}
+		for identifier, keys := range keysByIdentifier {
+			if len(keys) > 1 {
+				return fmt.Errorf("payloadIdentifier %s is shared by %s, which makes a Mac refuse the whole profile", identifier, strings.Join(keys, " and "))
+			}
+		}
+		return nil
+	}
 }

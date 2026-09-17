@@ -4,13 +4,19 @@
 package blueprint
 
 import (
+	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/appleprofiles"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
 // payloadProblemCase pins one appleprofiles.ProblemKind to the diagnostic appendPayloadProblems
@@ -179,5 +185,472 @@ func TestAppendPayloadProblems_SnapshotEscapeHatchIsPerBlock(t *testing.T) {
 				t.Errorf("a finding the snapshot cannot explain must not offer the escape hatch, got %q", detail)
 			}
 		})
+	}
+}
+
+// The summaries appendMCXDomainProblems reports for the two counts it refuses. They are named here
+// rather than restated at each assertion so that the empty case can be asserted absent wherever the
+// multi-domain case is asserted present, and the other way round.
+const (
+	severalPreferenceDomainsSummary  = "Custom settings payload sets more than one preference domain"
+	emptyPreferenceDictionarySummary = "Custom settings payload sets no preference domain"
+)
+
+// mcxSettings renders a custom settings payload's settings for the named preference domains, each
+// forcing one key of its own. That is the shape the Jamf Pro profile editor writes. Passing no
+// domain at all renders the empty dictionary, which the provider refuses during plan.
+func mcxSettings(t *testing.T, domains ...string) string {
+	t.Helper()
+
+	content := make(map[string]any, len(domains))
+	for i, domain := range domains {
+		content[domain] = map[string]any{
+			"Forced": []any{map[string]any{"mcx_preference_settings": map[string]any{"orderedKey": i}}},
+		}
+	}
+
+	encoded, err := json.Marshal(map[string]any{mcxPreferenceDomainsKey: content})
+	if err != nil {
+		t.Fatalf("marshalling a custom settings payload: %v", err)
+	}
+	return string(encoded)
+}
+
+// legacyPayloadElementType is the object type of one entry in a block's legacy_payloads list.
+func legacyPayloadElementType() types.ObjectType {
+	return types.ObjectType{AttrTypes: map[string]attr.Type{
+		"payload_type": types.StringType,
+		"settings":     types.StringType,
+	}}
+}
+
+// legacyPayloadListValue builds a block's legacy_payloads list from (payload type, settings) pairs,
+// so a test can drive ValidateList the way the framework does.
+func legacyPayloadListValue(t *testing.T, payloads ...[2]string) types.List {
+	t.Helper()
+
+	elementType := legacyPayloadElementType()
+	elements := make([]attr.Value, 0, len(payloads))
+	for _, payload := range payloads {
+		element, diags := types.ObjectValue(elementType.AttrTypes, map[string]attr.Value{
+			"payload_type": types.StringValue(payload[0]),
+			"settings":     types.StringValue(payload[1]),
+		})
+		if diags.HasError() {
+			t.Fatalf("building a legacy payload element: %v", diags)
+		}
+		elements = append(elements, element)
+	}
+
+	list, diags := types.ListValue(elementType, elements)
+	if diags.HasError() {
+		t.Fatalf("building the legacy payload list: %v", diags)
+	}
+	return list
+}
+
+// legacyPayloadsListPath is the path the framework passes ValidateList.
+func legacyPayloadsListPath() path.Path {
+	return path.Root("component_blocks").AtListIndex(0).AtName("legacy_payloads")
+}
+
+// validateBlockLegacyPayloads runs the block list validator over a value and returns its
+// diagnostics.
+func validateBlockLegacyPayloads(t *testing.T, list types.List) diag.Diagnostics {
+	t.Helper()
+
+	var resp validator.ListResponse
+	blockLegacyPayloadSchemaValidator().ValidateList(
+		context.Background(),
+		validator.ListRequest{Path: legacyPayloadsListPath(), ConfigValue: list},
+		&resp,
+	)
+	return resp.Diagnostics
+}
+
+// validateFlatLegacyPayloads runs the deprecated top-level validator over the same payloads, where
+// settings arrive as objects rather than JSON strings.
+func validateFlatLegacyPayloads(t *testing.T, payloads ...[2]string) diag.Diagnostics {
+	t.Helper()
+
+	items := make([]any, 0, len(payloads))
+	for _, payload := range payloads {
+		var settings map[string]any
+		if err := json.Unmarshal([]byte(payload[1]), &settings); err != nil {
+			t.Fatalf("decoding settings for the flat carrier: %v", err)
+		}
+		items = append(items, map[string]any{"payload_type": payload[0], "settings": settings})
+	}
+
+	value, err := helpers.JSONToTerraformDynamic(items)
+	if err != nil {
+		t.Fatalf("building the flat legacy_payloads value: %v", err)
+	}
+
+	var resp validator.DynamicResponse
+	flatLegacyPayloadSchemaValidator().ValidateDynamic(
+		context.Background(),
+		validator.DynamicRequest{Path: path.Root("legacy_payloads"), ConfigValue: value},
+		&resp,
+	)
+	return resp.Diagnostics
+}
+
+// TestLegacyPayloadValidator_SeveralPreferenceDomainsIsAnError covers the finding no other layer can
+// produce. Apple declares the dictionary the domains sit under as free-form, so appleprofiles stops
+// descending at it, and Jamf stores every domain faithfully — the loss happens on the device, which
+// applies one domain and discards the rest while the deploy reports SUCCEEDED. Without this check
+// the apply is green, every later plan settles, and two of three domains never reach a Mac.
+func TestLegacyPayloadValidator_SeveralPreferenceDomainsIsAnError(t *testing.T) {
+	t.Parallel()
+
+	settings := mcxSettings(t, "com.example.first", "com.example.second")
+
+	for _, tc := range []struct {
+		name  string
+		diags func(*testing.T) diag.Diagnostics
+		want  path.Path
+	}{
+		{
+			name: "block carrier",
+			diags: func(t *testing.T) diag.Diagnostics {
+				t.Helper()
+				return validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, settings}))
+			},
+			want: legacyPayloadsListPath().AtListIndex(0).AtName("settings"),
+		},
+		{
+			name: "flat carrier",
+			diags: func(t *testing.T) diag.Diagnostics {
+				t.Helper()
+				return validateFlatLegacyPayloads(t, [2]string{mcxPayloadType, settings})
+			},
+			want: path.Root("legacy_payloads"),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			diags := tc.diags(t)
+			if !diags.HasError() {
+				t.Fatalf("two preference domains in one payload produced no error: %v", diags)
+			}
+			if len(diags.Warnings()) != 0 {
+				t.Errorf("the finding must be an error, not a warning: %v", diags.Warnings())
+			}
+			if len(diags.Errors()) != 1 {
+				t.Fatalf("expected exactly 1 error, got %v", diags.Errors())
+			}
+
+			reported := diags.Errors()[0]
+			if reported.Summary() != severalPreferenceDomainsSummary {
+				t.Errorf("summary = %q", reported.Summary())
+			}
+			for _, domain := range []string{"com.example.first", "com.example.second"} {
+				if !strings.Contains(reported.Detail(), domain) {
+					t.Errorf("detail does not name %s: %s", domain, reported.Detail())
+				}
+			}
+
+			withPath, ok := reported.(diag.DiagnosticWithPath)
+			if !ok {
+				t.Fatalf("expected an attribute error carrying a path, got %T", reported)
+			}
+			if !withPath.Path().Equal(tc.want) {
+				t.Errorf("path = %s, want %s", withPath.Path(), tc.want)
+			}
+		})
+	}
+}
+
+// TestLegacyPayloadValidator_OnePreferenceDomainPasses is the other half: the check must not reject
+// the shape the whole fix tells an author to write. A rule that fired on a single domain would make
+// every custom settings payload unauthorable.
+func TestLegacyPayloadValidator_OnePreferenceDomainPasses(t *testing.T) {
+	t.Parallel()
+
+	settings := mcxSettings(t, "com.example.only")
+
+	if diags := validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, settings})); diags.HasError() {
+		t.Errorf("the block carrier rejected a single preference domain: %v", diags.Errors())
+	}
+	if diags := validateFlatLegacyPayloads(t, [2]string{mcxPayloadType, settings}); diags.HasError() {
+		t.Errorf("the flat carrier rejected a single preference domain: %v", diags.Errors())
+	}
+}
+
+// TestLegacyPayloadValidator_NoPreferenceDomainsIsRefused pins the shape that cannot round-trip.
+// Jamf discards an empty dictionary: a payload sent with `PayloadContent: {}` reads back carrying
+// only the stamped metadata keys, so the read finds no settings, flattenBlockLegacyPayloads writes a
+// null, and Terraform fails the apply with "Provider produced inconsistent result after apply".
+// State cannot hold what the author wrote, whatever the provider stores for it, so the refusal has
+// to arrive at plan time. The summary is the empty case's own, not the multi-domain one, so an
+// operator reads the count that applies.
+func TestLegacyPayloadValidator_NoPreferenceDomainsIsRefused(t *testing.T) {
+	t.Parallel()
+
+	settings := mcxSettings(t)
+
+	for _, tc := range []struct {
+		name  string
+		diags func(*testing.T) diag.Diagnostics
+	}{
+		{
+			name: "block carrier",
+			diags: func(t *testing.T) diag.Diagnostics {
+				t.Helper()
+				return validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, settings}))
+			},
+		},
+		{
+			name: "flat carrier",
+			diags: func(t *testing.T) diag.Diagnostics {
+				t.Helper()
+				return validateFlatLegacyPayloads(t, [2]string{mcxPayloadType, settings})
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			diags := tc.diags(t)
+			if !diags.HasError() {
+				t.Fatalf("an empty preference dictionary produced no error: %v", diags)
+			}
+			if len(diags.Warnings()) != 0 {
+				t.Errorf("the finding must be an error, not a warning: %v", diags.Warnings())
+			}
+			if len(diags.Errors()) != 1 {
+				t.Fatalf("expected exactly 1 error, got %v", diags.Errors())
+			}
+			if summary := diags.Errors()[0].Summary(); summary != emptyPreferenceDictionarySummary {
+				t.Errorf("summary = %q, want the empty case's own summary", summary)
+			}
+		})
+	}
+}
+
+// TestLegacyPayloadValidator_AbsentPreferenceDictionaryStaysApplesFinding keeps the domain-count
+// check out of the way of the one that was already there. A payload carrying no dictionary at all is
+// a missing required key, which names the key and offers the escape hatch; reporting the domain
+// count instead would replace a precise diagnostic with a vaguer one.
+//
+// Both count summaries are asserted absent, the empty one above all: an absent dictionary and an
+// empty dictionary are one line apart in mcxPreferenceDomains, and conflating them would report
+// Jamf discarding a dictionary the author never wrote.
+func TestLegacyPayloadValidator_AbsentPreferenceDictionaryStaysApplesFinding(t *testing.T) {
+	t.Parallel()
+
+	diags := validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, `{}`}))
+	if !diags.HasError() {
+		t.Fatal("a custom settings payload with no preference dictionary produced no error")
+	}
+	for _, reported := range diags.Errors() {
+		switch reported.Summary() {
+		case severalPreferenceDomainsSummary, emptyPreferenceDictionarySummary:
+			t.Errorf("a domain count was reported for a payload that carries no dictionary: %s", reported.Detail())
+		}
+	}
+	if summary := diags.Errors()[0].Summary(); summary != "Legacy payload is missing a required setting" {
+		t.Errorf("summary = %q, want Apple's missing-required-key finding", summary)
+	}
+}
+
+// TestLegacyPayloadValidator_NullDomainIsNotADomain pins the count against the platform's own
+// null-discard behaviour, which the rest of this pipeline already honours: pruneJSONNulls tolerates
+// an authored null and legacyPayloadSettingsBehaviour promises an author their nulls can stay in
+// configuration. Wire-probed on the EU environment, 2026-09-17. `PayloadContent` sent as
+// {"com.example.kept": {...}, "com.example.nulled": null} read back carrying only the kept domain,
+// so counting the null one refuses a configuration the platform stores as a single domain, and the
+// diagnostic would name a domain that never reaches a device. One sent as
+// {"com.example.onlynull": null} read back with no PayloadContent at all, which is the shape the
+// empty case exists to refuse — so counting it as a domain lets the very failure that branch was
+// written for through to the apply.
+func TestLegacyPayloadValidator_NullDomainIsNotADomain(t *testing.T) {
+	t.Parallel()
+
+	settings := func(t *testing.T, content map[string]any) string {
+		t.Helper()
+		encoded, err := json.Marshal(map[string]any{mcxPreferenceDomainsKey: content})
+		if err != nil {
+			t.Fatalf("marshalling a custom settings payload: %v", err)
+		}
+		return string(encoded)
+	}
+	domain := map[string]any{"Forced": []any{map[string]any{"mcx_preference_settings": map[string]any{"A": true}}}}
+
+	t.Run("one real domain beside a null one passes", func(t *testing.T) {
+		t.Parallel()
+
+		value := settings(t, map[string]any{"com.example.kept": domain, "com.example.nulled": nil})
+		if diags := validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, value})); diags.HasError() {
+			t.Errorf("the block carrier refused a payload the platform stores as one domain: %v", diags.Errors())
+		}
+		if diags := validateFlatLegacyPayloads(t, [2]string{mcxPayloadType, value}); diags.HasError() {
+			t.Errorf("the flat carrier refused a payload the platform stores as one domain: %v", diags.Errors())
+		}
+	})
+
+	t.Run("a single null domain is the empty case", func(t *testing.T) {
+		t.Parallel()
+
+		value := settings(t, map[string]any{"com.example.onlynull": nil})
+		diags := validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, value}))
+		if !diags.HasError() {
+			t.Fatal("a payload whose only preference domain is null produced no error")
+		}
+		if summary := diags.Errors()[0].Summary(); summary != emptyPreferenceDictionarySummary {
+			t.Errorf("summary = %q, want the empty-dictionary finding", summary)
+		}
+	})
+}
+
+// TestLegacyPayloadValidator_DomainCountAppliesToCustomSettingsOnly pins the payload-type guard,
+// which is the only thing scoping this rule to the managed preferences envelope. Apple declares a
+// top-level PayloadContent on other payload types, and com.apple.security.scep declares it as a
+// dictionary of named keys rather than of preference domains — so without the guard a SCEP payload
+// is refused for setting several "preference domains" that are really its own settings, and a
+// single-key one takes a domain-keyed identity that rotates its stored identifier on every write.
+func TestLegacyPayloadValidator_DomainCountAppliesToCustomSettingsOnly(t *testing.T) {
+	t.Parallel()
+
+	const scepPayloadType = "com.apple.security.scep"
+	scep, err := json.Marshal(map[string]any{mcxPreferenceDomainsKey: map[string]any{
+		"URL":     "https://scep.example.com/scep",
+		"Name":    "Example CA",
+		"Keysize": 2048,
+	}})
+	if err != nil {
+		t.Fatalf("marshalling a SCEP payload: %v", err)
+	}
+
+	for _, reported := range validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{scepPayloadType, string(scep)})).Errors() {
+		switch reported.Summary() {
+		case severalPreferenceDomainsSummary, emptyPreferenceDictionarySummary:
+			t.Errorf("a preference-domain count was reported for %s: %s", scepPayloadType, reported.Detail())
+		}
+	}
+
+	if got := legacyPayloadIdentity(scepPayloadType, map[string]any{mcxPreferenceDomainsKey: map[string]any{"URL": "https://scep.example.com/scep"}}); got != scepPayloadType {
+		t.Errorf("legacyPayloadIdentity(%s) = %q, want the bare payload type", scepPayloadType, got)
+	}
+}
+
+// TestMCXPreferenceDomains covers the reads no other test reaches: the case-folded key, a
+// dictionary that is not one, and the multi-domain arm of legacyPayloadIdentity. The last is
+// load-bearing on the read path alone — configuration can no longer carry a multi-domain payload,
+// but a blueprint edited outside Terraform can, and it has to key on the bare type so the duplicate
+// check can still see two of them in one block.
+func TestMCXPreferenceDomains(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name        string
+		payloadType string
+		settings    map[string]any
+		want        []string
+		wantPresent bool
+	}{
+		{
+			name:        "apple's spelling",
+			payloadType: mcxPayloadType,
+			settings:    map[string]any{mcxPreferenceDomainsKey: map[string]any{"com.example.b": map[string]any{}, "com.example.a": map[string]any{}}},
+			want:        []string{"com.example.a", "com.example.b"},
+			wantPresent: true,
+		},
+		{
+			name:        "a miscased key still carries its domains",
+			payloadType: mcxPayloadType,
+			settings:    map[string]any{"payloadcontent": map[string]any{"com.example.a": map[string]any{}}},
+			want:        []string{"com.example.a"},
+			wantPresent: true,
+		},
+		{
+			name:        "apple's spelling wins over a miscased sibling",
+			payloadType: mcxPayloadType,
+			settings:    map[string]any{mcxPreferenceDomainsKey: map[string]any{"com.example.correct": map[string]any{}}, "payloadcontent": map[string]any{"com.example.miscased": map[string]any{}}},
+			want:        []string{"com.example.correct"},
+			wantPresent: true,
+		},
+		{
+			name:        "a dictionary that is not one",
+			payloadType: mcxPayloadType,
+			settings:    map[string]any{mcxPreferenceDomainsKey: "not-a-dictionary"},
+			want:        nil,
+			wantPresent: false,
+		},
+		{
+			name:        "an absent dictionary is not an empty one",
+			payloadType: mcxPayloadType,
+			settings:    map[string]any{"PayloadDisplayName": "Custom Settings"},
+			want:        nil,
+			wantPresent: false,
+		},
+		{
+			name:        "another payload type yields nothing",
+			payloadType: "com.apple.security.scep",
+			settings:    map[string]any{mcxPreferenceDomainsKey: map[string]any{"URL": "https://scep.example.com/scep"}},
+			want:        nil,
+			wantPresent: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, present := mcxPreferenceDomains(tc.payloadType, tc.settings)
+			if present != tc.wantPresent {
+				t.Errorf("present = %t, want %t", present, tc.wantPresent)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("domains = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestLegacyPayloadIdentity_FallsBackWithoutASingleDomain pins the read-path fallback. Two domains
+// and none both key on the bare payload type, which is what leaves appendLegacyConfigProfile's
+// duplicate check able to see two such payloads in one block and reject the second.
+func TestLegacyPayloadIdentity_FallsBackWithoutASingleDomain(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		content map[string]any
+	}{
+		{name: "two domains", content: map[string]any{"com.example.a": map[string]any{}, "com.example.b": map[string]any{}}},
+		{name: "no domains", content: map[string]any{}},
+		{name: "only a null domain", content: map[string]any{"com.example.a": nil}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := legacyPayloadIdentity(mcxPayloadType, map[string]any{mcxPreferenceDomainsKey: tc.content})
+			if got != mcxPayloadType {
+				t.Errorf("identity = %q, want the bare payload type", got)
+			}
+		})
+	}
+
+	single := legacyPayloadIdentity(mcxPayloadType, map[string]any{mcxPreferenceDomainsKey: map[string]any{"com.example.a": map[string]any{}}})
+	if want := mcxPayloadType + " (com.example.a)"; single != want {
+		t.Errorf("identity = %q, want %q", single, want)
+	}
+}
+
+// TestMCXPayloadTypeIsAppleDeclared is the tripwire for the payload type this whole rule keys on.
+// Nothing else would notice a typo: mcxPreferenceDomains returns nothing for an unrecognised type,
+// so a misspelled constant makes the rule silently inert rather than failing. The acceptance tests
+// restate the spelling because they are an external test package and cannot read the constant, so
+// they agree with themselves; this asserts it against Apple's generated table instead.
+func TestMCXPayloadTypeIsAppleDeclared(t *testing.T) {
+	t.Parallel()
+
+	payload, ok := appleprofiles.Lookup(mcxPayloadType)
+	if !ok {
+		t.Fatalf("Apple's schema table declares no payload type %q", mcxPayloadType)
+	}
+	if _, declared := payload.Keys[mcxPreferenceDomainsKey]; !declared {
+		t.Errorf("Apple's schema for %s declares no %s key", mcxPayloadType, mcxPreferenceDomainsKey)
 	}
 }
