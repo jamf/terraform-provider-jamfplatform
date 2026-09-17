@@ -121,6 +121,7 @@ func (r *StaticMobileDeviceGroupResource) Create(ctx context.Context, req resour
 
 	got, err := r.client.GetStaticMobileDeviceGroupV2(createCtx, created.ID)
 	if err != nil {
+		recordCreatedGroup(createCtx, r.client, &plan, created.ID, resp)
 		resp.Diagnostics.AddError("Error reading the created Jamf Pro static mobile device group", helpers.APIErrorDetail(err))
 		return
 	}
@@ -360,4 +361,25 @@ func (r *StaticMobileDeviceGroupResource) resolvePlatformID(ctx context.Context,
 		state.PlatformID = resolved
 	}
 	return diags
+}
+
+// recordCreatedGroup records a group the create has already made, when the
+// mandatory read-after-create is what failed.
+//
+// Returning an error and no state is what orphans a group: Terraform keeps no
+// record of it, the next apply is refused for a duplicate name, and the group
+// has to be found and imported by hand. The create reported the platform
+// identifier, so the Jamf Pro identifier the resource keys on is recoverable —
+// and recoverable from a DIFFERENT endpoint than the one that just failed, which
+// is what makes the attempt worth making rather than a retry of the same call.
+//
+// When even that fails there is nothing to record, and the error the caller adds
+// names the platform identifier so the group can still be found.
+func recordCreatedGroup(ctx context.Context, client *pro.Client, plan *StaticMobileDeviceGroupResourceModel, platformID string, resp *resource.CreateResponse) {
+	jamfProID, err := progroups.JamfProIDForPlatformID(ctx, client, platformID)
+	if err != nil {
+		return
+	}
+	plan.ID = types.StringValue(jamfProID)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }

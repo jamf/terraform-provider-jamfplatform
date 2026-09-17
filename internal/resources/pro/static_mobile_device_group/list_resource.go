@@ -172,16 +172,27 @@ func (r *StaticMobileDeviceGroupListResource) List(ctx context.Context, req list
 		"returned": len(results),
 	})
 
-	if len(results) == 0 {
+	if len(results) == 0 && len(bridgeDiags) == 0 {
 		stream.Results = list.NoListResults
 		return
 	}
 
+	// A bridge advisory has to survive an empty page. The platform-identifier
+	// lookup's warning is normally attached to the first result, and a query that
+	// matched nothing has no first result to carry it — which is the very case
+	// where an operator is most likely to suspect a permission problem and most
+	// deserves to be told about one. So it travels as a trailing
+	// diagnostics-only result instead, built as a literal rather than through
+	// req.NewListResult, which allocates an identity the pass-through branch
+	// then rejects.
 	stream.Results = func(push func(list.ListResult) bool) {
 		for _, result := range results {
 			if !push(result) {
 				return
 			}
+		}
+		if len(results) == 0 && len(bridgeDiags) > 0 {
+			push(list.ListResult{Diagnostics: bridgeDiags})
 		}
 	}
 }

@@ -33,7 +33,7 @@ import (
 // on exactly the plans where an operator most wants it, and it is advisory
 // either way. It reads the attribute through criteriaAtPlanTime instead of
 // decoding the resource model for the reason recorded on that helper.
-func (r *SmartMobileDeviceGroupResource) reportMembershipImpact(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+func (r *SmartMobileDeviceGroupResource) reportMembershipImpact(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse, suppressed []criteria.CriterionModel) {
 	if r.pd == nil {
 		return
 	}
@@ -62,6 +62,10 @@ func (r *SmartMobileDeviceGroupResource) reportMembershipImpact(ctx context.Cont
 			return
 		}
 		prior = models
+	}
+
+	if len(suppressed) > 0 {
+		planned = suppressed
 	}
 
 	action := impact.ActionUpdate

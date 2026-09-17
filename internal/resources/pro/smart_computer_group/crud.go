@@ -49,17 +49,13 @@ package smart_computer_group
 
 import (
 	"context"
-	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-
-	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
@@ -98,60 +94,6 @@ func classifyWrite(err error) writeOutcome {
 	}
 }
 
-// classicCriteriaRefusalPhrase is how Jamf Pro's older group interface reports a
-// criterion it will not store: 409 "Problem with criteria", reproduced on
-// 11.32.0 against a misspelled criterion name and recorded in
-// internal/common/progroups/fallback.go.
-//
-// It is matched as a phrase because that surface reports no error code at all.
-// Its body is an HTML status page and the SDK lifts the message into a detail
-// whose code is empty, so the code classifiers in internal/common/progroups
-// cannot see this refusal and the wording is the only thing left to key on.
-const classicCriteriaRefusalPhrase = "problem with criteria"
-
-// classicRefusedCriteria reports whether a fallback write failed because Jamf
-// Pro's older group interface refused the criteria as well.
-//
-// That surface still validates criterion NAMES, so a misspelling is refused on
-// both paths, and that is the one failure whose diagnosis is the criteria. Every
-// other way the second write can fail — a name already in use, a refused site, a
-// gateway timeout — has nothing to do with them, and saying otherwise sends the
-// operator to edit a criterion that was never the problem.
-func classicRefusedCriteria(err error) bool {
-	apiErr := jamfplatform.AsAPIError(err)
-	if apiErr == nil || !apiErr.HasStatus(http.StatusConflict) {
-		return false
-	}
-	for _, detail := range apiErr.Errors {
-		if strings.Contains(strings.ToLower(detail.Description), classicCriteriaRefusalPhrase) {
-			return true
-		}
-	}
-	return false
-}
-
-// fallbackWriteDiagnostics turns a failed fallback write into diagnostics,
-// blaming the criteria only where the older interface refused them too.
-//
-// Everything else goes through progroups.WriteDiagnostics, which names the
-// duplicate name and the refused site Jamf Pro reports with a code. The criteria
-// refusal that sent the write down this path travels with it as a warning: the
-// request that failed is one nothing in the configuration asked for, so the
-// error beside it would otherwise arrive with no account of why it was made.
-func fallbackWriteDiagnostics(modernErr, classicErr error) diag.Diagnostics {
-	if classicRefusedCriteria(classicErr) {
-		return progroups.BothRefusedDiagnostics(groupLabel, modernErr, classicErr)
-	}
-	var diags diag.Diagnostics
-	diags.AddWarning(
-		"Jamf Pro would not accept this "+groupLabel+"'s criteria the usual way",
-		"Jamf Pro refused one of this group's criteria, although it offers the same combination in the web interface, so the provider repeated the write through Jamf Pro's older group interface. That second write then failed for its own reason, reported alongside this notice, and the criteria are not it."+
-			"\n\nWhat Jamf Pro said about the criteria: "+helpers.APIErrorDetail(modernErr),
-	)
-	diags.Append(progroups.WriteDiagnostics(classicErr, groupLabel, path.Root("site_id"), path.Empty())...)
-	return diags
-}
-
 // ModifyPlan raises the membership impact alert, then suppresses a no-op diff
 // where a directory-service group criterion's planned value is a different
 // representation of the group already in state (a group name swapped for the
@@ -161,31 +103,56 @@ func fallbackWriteDiagnostics(modernErr, classicErr error) diag.Diagnostics {
 // and destroy cases the suppression pass returns early on. Suppression itself is
 // soft: any resolution failure leaves the diff intact.
 func (r *SmartComputerGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	r.reportMembershipImpact(ctx, req, resp)
+	suppressed := r.suppressEquivalentCriteria(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	r.reportMembershipImpact(ctx, req, resp, suppressed)
+}
 
+// suppressEquivalentCriteria collapses a directory-service group criterion whose
+// planned value names the same group as the stored one in the other
+// representation, and returns the criteria as they will actually be written.
+//
+// The returned slice is nil whenever nothing was suppressed, including every
+// case the pass cannot run in: a create, a destroy, no resolver, or a criteria
+// list not yet settled. A caller reads nil as "use the plan as it stands".
+//
+// It runs BEFORE the impact alert so the alert can see its result. Suppression
+// can collapse an apparent criteria change to nothing at all, and an alert
+// computed from the raw plan would then announce that the group's membership is
+// changing on a plan that turns out to be a no-op.
+func (r *SmartComputerGroupResource) suppressEquivalentCriteria(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) []criteria.CriterionModel {
 	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() || r.ldap == nil {
-		return
+		return nil
 	}
-	var plan, state SmartComputerGroupResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	if resp.Diagnostics.HasError() || len(plan.Criteria) == 0 {
-		return
+	planned, plannedSettled, plannedDiags := criteria.CriteriaAtPlanTime(ctx, req.Plan, path.Root("criteria"))
+	resp.Diagnostics.Append(plannedDiags...)
+	if resp.Diagnostics.HasError() || !plannedSettled || len(planned) == 0 {
+		return nil
+	}
+	prior, priorSettled, priorDiags := criteria.CriteriaAtPlanTime(ctx, req.State, path.Root("criteria"))
+	resp.Diagnostics.Append(priorDiags...)
+	if resp.Diagnostics.HasError() || !priorSettled {
+		return nil
 	}
 
-	suppressed := criteria.SuppressEquivalentDSGroupValues(ctx, r.ldap, plan.Criteria, state.Criteria)
+	suppressed := criteria.SuppressEquivalentDSGroupValues(ctx, r.ldap, planned, prior)
 	changed := false
 	for i := range suppressed {
-		if !suppressed[i].Value.Equal(plan.Criteria[i].Value) {
+		if !suppressed[i].Value.Equal(planned[i].Value) {
 			changed = true
 			break
 		}
 	}
 	if !changed {
-		return
+		return nil
 	}
-	plan.Criteria = suppressed
-	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("criteria"), suppressed)...)
+	if resp.Diagnostics.HasError() {
+		return nil
+	}
+	return suppressed
 }
 
 // Create creates a Jamf Pro smart computer group.
@@ -327,7 +294,7 @@ func recordCreatedGroup(ctx context.Context, plan SmartComputerGroupResourceMode
 func (r *SmartComputerGroupResource) createThroughOlderInterface(ctx context.Context, plan *SmartComputerGroupResourceModel, modernErr error, diags, deferred *diag.Diagnostics) bool {
 	created, err := r.classicClient.CreateComputerGroupByID(ctx, "0", buildClassicSmartComputerGroupInput(*plan))
 	if err != nil {
-		diags.Append(fallbackWriteDiagnostics(modernErr, err)...)
+		diags.Append(progroups.FallbackWriteDiagnostics(groupLabel, path.Root("site_id"), path.Empty(), modernErr, err)...)
 		return false
 	}
 	if created == nil || created.ID == nil {
@@ -555,7 +522,7 @@ func (r *SmartComputerGroupResource) Update(ctx context.Context, req resource.Up
 // it resolved on the model so state carries it too.
 func (r *SmartComputerGroupResource) updateThroughOlderInterface(ctx context.Context, plan *SmartComputerGroupResourceModel, priorDescription types.String, modernErr error, diags, deferred *diag.Diagnostics) bool {
 	if err := r.classicClient.UpdateComputerGroupByID(ctx, plan.ID.ValueString(), buildClassicSmartComputerGroupInput(*plan)); err != nil {
-		diags.Append(fallbackWriteDiagnostics(modernErr, err)...)
+		diags.Append(progroups.FallbackWriteDiagnostics(groupLabel, path.Root("site_id"), path.Empty(), modernErr, err)...)
 		return false
 	}
 	diags.Append(progroups.FallbackWarning(groupLabel, modernErr))

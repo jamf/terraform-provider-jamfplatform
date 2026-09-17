@@ -5,9 +5,11 @@ package progroups
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 
@@ -156,3 +158,55 @@ func BothRefusedDiagnostics(label string, modernErr, classicErr error) diag.Diag
 // the fallback itself triggers on the refusal rather than on the name, so no
 // write path depends on this spelling.
 const PatchReportingCriterionPrefix = "Patch Reporting: "
+
+// classicCriteriaRefusalPhrase is how Jamf Pro's older group interface says it
+// will not accept a criterion. It answers 409 with this phrase and names
+// nothing, which is why the group endpoint's message leads whenever both
+// surfaces refuse.
+const classicCriteriaRefusalPhrase = "problem with criteria"
+
+// OlderInterfaceRefusedCriteria reports whether a fallback write failed because
+// the older group interface refused the criteria as well.
+//
+// That surface still validates criterion NAMES, so a misspelling is refused on
+// both paths, and that is the one failure whose diagnosis really is the
+// criteria. Every other way the second write can fail — a name already in use, a
+// refused site, a gateway timeout — has nothing to do with them.
+func OlderInterfaceRefusedCriteria(err error) bool {
+	apiErr := jamfplatform.AsAPIError(err)
+	if apiErr == nil || !apiErr.HasStatus(http.StatusConflict) {
+		return false
+	}
+	for _, detail := range apiErr.Errors {
+		if strings.Contains(strings.ToLower(detail.Description), classicCriteriaRefusalPhrase) {
+			return true
+		}
+	}
+	return false
+}
+
+// FallbackWriteDiagnostics turns a failed fallback write into diagnostics,
+// blaming the criteria only where the older interface refused them too.
+//
+// Everything else goes through WriteDiagnostics, which names the duplicate name
+// and the refused site Jamf Pro reports with a code. The criteria refusal that
+// sent the write down this path travels with it as a warning: the request that
+// failed is one nothing in the configuration asked for, so the error beside it
+// would otherwise arrive with no account of why it was made.
+//
+// Saying "your criteria are wrong" for a duplicate name sends the operator to
+// edit a criterion that was never the problem, which is the whole reason this
+// classifies rather than reporting one message for every failure.
+func FallbackWriteDiagnostics(label string, sitePath, membersPath path.Path, modernErr, classicErr error) diag.Diagnostics {
+	if OlderInterfaceRefusedCriteria(classicErr) {
+		return BothRefusedDiagnostics(label, modernErr, classicErr)
+	}
+	var diags diag.Diagnostics
+	diags.AddWarning(
+		fmt.Sprintf("Jamf Pro would not accept this %s's criteria the usual way", label),
+		"Jamf Pro refused one of this group's criteria, although it offers the same combination in the web interface, so the provider repeated the write through Jamf Pro's older group interface. That second write then failed for its own reason, reported alongside this notice, and the criteria are not it."+
+			"\n\nWhat Jamf Pro said about the criteria: "+helpers.APIErrorDetail(modernErr),
+	)
+	diags.Append(WriteDiagnostics(classicErr, label, sitePath, membersPath)...)
+	return diags
+}

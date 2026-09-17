@@ -72,6 +72,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
+
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/progroups"
@@ -108,22 +110,41 @@ func writeLabel() string {
 // of the resource model cannot carry it. Only the attribute is written back, so
 // a suppression never round-trips the rest of the object.
 func (r *SmartMobileDeviceGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	r.reportMembershipImpact(ctx, req, resp)
-
-	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() || r.ldap == nil {
+	suppressed := r.suppressEquivalentCriteria(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
 		return
+	}
+	r.reportMembershipImpact(ctx, req, resp, suppressed)
+}
+
+// suppressEquivalentCriteria collapses a directory-service group criterion whose
+// planned value names the same group as the stored one in the other
+// representation, and returns the criteria as they will actually be written.
+//
+// The returned slice is nil whenever nothing was suppressed, which includes
+// every case the pass cannot run in: a create, a destroy, no resolver, or a
+// criteria list not yet settled. A caller reads nil as "use the plan as it
+// stands".
+//
+// It runs BEFORE the impact alert so the alert can see its result. Suppression
+// can collapse an apparent criteria change to nothing, and an alert computed
+// from the raw plan would then announce that membership is changing on a plan
+// that turns out to be a no-op.
+func (r *SmartMobileDeviceGroupResource) suppressEquivalentCriteria(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) []criteria.CriterionModel {
+	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() || r.ldap == nil {
+		return nil
 	}
 
 	planned, plannedSettled, plannedDiags := criteriaAtPlanTime(ctx, req.Plan)
 	resp.Diagnostics.Append(plannedDiags...)
 	if resp.Diagnostics.HasError() || !plannedSettled || len(planned) == 0 {
-		return
+		return nil
 	}
 
 	prior, priorSettled, priorDiags := criteriaAtPlanTime(ctx, req.State)
 	resp.Diagnostics.Append(priorDiags...)
 	if resp.Diagnostics.HasError() || !priorSettled {
-		return
+		return nil
 	}
 
 	suppressed := criteria.SuppressEquivalentDSGroupValues(ctx, r.ldap, planned, prior)
@@ -135,9 +156,13 @@ func (r *SmartMobileDeviceGroupResource) ModifyPlan(ctx context.Context, req res
 		}
 	}
 	if !changed {
-		return
+		return nil
 	}
 	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("criteria"), suppressed)...)
+	if resp.Diagnostics.HasError() {
+		return nil
+	}
+	return suppressed
 }
 
 // newGroupID is the identifier the older group interface takes in the path of a
@@ -213,7 +238,7 @@ func (r *SmartMobileDeviceGroupResource) Create(ctx context.Context, req resourc
 	case fallbackApplies(createErr):
 		classicCreated, classicErr := r.classicClient.CreateMobileDeviceGroupByID(createCtx, newGroupID, buildClassicSmartMobileDeviceGroupInput(plan))
 		if classicErr != nil {
-			resp.Diagnostics.Append(progroups.BothRefusedDiagnostics(writeLabel(), createErr, classicErr)...)
+			resp.Diagnostics.Append(progroups.FallbackWriteDiagnostics(writeLabel(), path.Root("site_id"), path.Empty(), createErr, classicErr)...)
 			return
 		}
 		resp.Diagnostics.Append(progroups.FallbackWarning(writeLabel(), createErr))
@@ -248,6 +273,7 @@ func (r *SmartMobileDeviceGroupResource) Create(ctx context.Context, req resourc
 
 	got, err := r.client.GetSmartMobileDeviceGroupV2(createCtx, readID)
 	if err != nil {
+		recordCreatedGroup(createCtx, r.client, &plan, readID, resp)
 		resp.Diagnostics.AddError("Error reading the created Jamf Pro "+writeLabel(), helpers.APIErrorDetail(err))
 		return
 	}
@@ -425,7 +451,7 @@ func (r *SmartMobileDeviceGroupResource) Update(ctx context.Context, req resourc
 			return
 		}
 		if classicErr := r.classicClient.UpdateMobileDeviceGroupByID(updateCtx, plan.ID.ValueString(), buildClassicSmartMobileDeviceGroupInput(plan)); classicErr != nil {
-			resp.Diagnostics.Append(progroups.BothRefusedDiagnostics(writeLabel(), updateErr, classicErr)...)
+			resp.Diagnostics.Append(progroups.FallbackWriteDiagnostics(writeLabel(), path.Root("site_id"), path.Empty(), updateErr, classicErr)...)
 			return
 		}
 		resp.Diagnostics.Append(progroups.FallbackWarning(writeLabel(), updateErr))
@@ -496,4 +522,29 @@ func (r *SmartMobileDeviceGroupResource) Delete(ctx context.Context, req resourc
 		}
 		resp.Diagnostics.Append(progroups.DeleteDiagnostics(err, writeLabel())...)
 	}
+}
+
+// recordCreatedGroup records a group the create has already made, when the
+// mandatory read-after-create is what failed.
+//
+// Returning an error and no state orphans the group: Terraform keeps no record
+// of it, the next apply is refused for a duplicate name, and it has to be found
+// and imported by hand.
+//
+// The two create paths arrive here differently, which is why readID is not
+// assumed to be either kind of identifier. The fallback write already knows the
+// Jamf Pro identifier and set it, so there is nothing to recover. The modern
+// write read back by platform identifier and was relying on this call for the
+// Jamf Pro one, so it is recovered from a DIFFERENT endpoint than the one that
+// just failed — which is what makes the attempt worth making rather than a retry
+// of the same request.
+func recordCreatedGroup(ctx context.Context, client *pro.Client, plan *SmartMobileDeviceGroupResourceModel, readID string, resp *resource.CreateResponse) {
+	if plan.ID.IsNull() || plan.ID.IsUnknown() || plan.ID.ValueString() == "" {
+		jamfProID, err := progroups.JamfProIDForPlatformID(ctx, client, readID)
+		if err != nil {
+			return
+		}
+		plan.ID = types.StringValue(jamfProID)
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }

@@ -98,11 +98,14 @@ func TestAcceptance_ProGroups_ModernWriteRefusalsStillPresent(t *testing.T) {
 		}}
 		groupName := acctest.RandomWithPrefix("tf-acc-canary")
 		site := progroups.NoSiteID
-		_, err := proClient.CreateSmartMobileDeviceGroupV2(ctx, &pro.SmartGroupAssignmentV2{
+		created, err := proClient.CreateSmartMobileDeviceGroupV2(ctx, &pro.SmartGroupAssignmentV2{
 			GroupName: groupName,
 			SiteID:    &site,
 			Criteria:  &criteria,
 		}, true)
+		removeIfCreated(t, created, func(id string) error {
+			return proClient.DeleteSmartMobileDeviceGroupV2(context.Background(), id)
+		})
 		assertRefused(t, err, name, "PI-1032, mobile — the ticket is filed against computer groups only")
 	})
 }
@@ -114,11 +117,14 @@ func assertComputerCriterionRefused(t *testing.T, ctx context.Context, proClient
 
 	criteria := []pro.ComputerSmartGroupCriteriaV2{criterion}
 	site := progroups.NoSiteID
-	_, err := proClient.CreateSmartComputerGroupV3(ctx, &pro.SmartComputerGroupV3{
+	created, err := proClient.CreateSmartComputerGroupV3(ctx, &pro.SmartComputerGroupV3{
 		Name:     acctest.RandomWithPrefix("tf-acc-canary"),
 		SiteID:   &site,
 		Criteria: &criteria,
 	}, true)
+	removeIfCreated(t, created, func(id string) error {
+		return proClient.DeleteSmartComputerGroupV3(context.Background(), id)
+	})
 	assertRefused(t, err, criterion.Name, ticket)
 }
 
@@ -249,4 +255,27 @@ func configureAnyPatchSoftwareTitle(t *testing.T, ctx context.Context, classic *
 	}
 	t.Skipf("none of the %d catalogue titles on source %d could be configured", attempted, patchTitleSourceID)
 	return patchTitleFixture{}, ""
+}
+
+// removeIfCreated deletes a group the canary did not expect to exist.
+//
+// The canary asserts that Jamf Pro REFUSES these criteria, so the create is
+// expected to fail and normally leaves nothing behind. The day the defect is
+// fixed it succeeds instead, and without this the group it made would be
+// orphaned — on every run from then on, three at a time, onto a shared estate
+// where the duplicate names later collide. The failure this test exists to
+// report must not also litter the tenant reporting it.
+//
+// It runs before the assertion on purpose: assertRefused calls t.Fatalf, which
+// ends the test immediately, so anything registered after it would never run.
+func removeIfCreated(t *testing.T, created *pro.HrefResponse, del func(string) error) {
+	t.Helper()
+	if created == nil || created.ID == "" {
+		return
+	}
+	t.Cleanup(func() {
+		if err := del(created.ID); err != nil {
+			t.Errorf("leaving canary group %s behind on the tenant: %v", created.ID, err)
+		}
+	})
 }

@@ -5,6 +5,7 @@ package smart_computer_group
 
 import (
 	"errors"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"net/http"
 	"strings"
 	"testing"
@@ -346,7 +347,7 @@ func TestClassicRefusedCriteria(t *testing.T) {
 
 	for label, tc := range cases {
 		t.Run(label, func(t *testing.T) {
-			if got := classicRefusedCriteria(tc.err); got != tc.want {
+			if got := progroups.OlderInterfaceRefusedCriteria(tc.err); got != tc.want {
 				t.Errorf("classicRefusedCriteria = %v, want %v", got, tc.want)
 			}
 		})
@@ -362,7 +363,7 @@ func TestFallbackWriteDiagnostics_BlamesTheCriteriaOnlyWhenBothRefusedThem(t *te
 	modernErr := refusal("The criterion Operating Sistem Version is not valid")
 
 	t.Run("both refused the criteria", func(t *testing.T) {
-		got := fallbackWriteDiagnostics(modernErr, classicRefusal(http.StatusConflict, "Problem with criteria"))
+		got := progroups.FallbackWriteDiagnostics(groupLabel, path.Root("site_id"), path.Empty(), modernErr, classicRefusal(http.StatusConflict, "Problem with criteria"))
 		if len(got) != 1 || !got.HasError() {
 			t.Fatalf("expected the both-refused error on its own, got %v", got)
 		}
@@ -383,7 +384,7 @@ func TestFallbackWriteDiagnostics_BlamesTheCriteriaOnlyWhenBothRefusedThem(t *te
 				Description: "Group named x already exists",
 			}},
 		}
-		got := fallbackWriteDiagnostics(modernErr, duplicate)
+		got := progroups.FallbackWriteDiagnostics(groupLabel, path.Root("site_id"), path.Empty(), modernErr, duplicate)
 		if !got.HasError() {
 			t.Fatalf("a failed write must still fail the apply, got %v", got)
 		}
@@ -411,7 +412,7 @@ func TestFallbackWriteDiagnostics_BlamesTheCriteriaOnlyWhenBothRefusedThem(t *te
 	})
 
 	t.Run("the second write failed in transport", func(t *testing.T) {
-		got := fallbackWriteDiagnostics(modernErr, errors.New("connection reset by peer"))
+		got := progroups.FallbackWriteDiagnostics(groupLabel, path.Root("site_id"), path.Empty(), modernErr, errors.New("connection reset by peer"))
 		if !got.HasError() {
 			t.Fatalf("a failed write must still fail the apply, got %v", got)
 		}

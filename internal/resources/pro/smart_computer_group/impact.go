@@ -31,7 +31,7 @@ import (
 // group's membership. It runs for creates and destroys as well as updates,
 // because a group entering or leaving management changes what everything scoped
 // to it applies to.
-func (r *SmartComputerGroupResource) reportMembershipImpact(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+func (r *SmartComputerGroupResource) reportMembershipImpact(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse, suppressed []criteria.CriterionModel) {
 	if r.pd == nil {
 		return
 	}
@@ -55,6 +55,10 @@ func (r *SmartComputerGroupResource) reportMembershipImpact(ctx context.Context,
 		if diags := req.Plan.Get(ctx, &plan); diags.HasError() {
 			return
 		}
+	}
+
+	if len(suppressed) > 0 {
+		plan.Criteria = suppressed
 	}
 
 	action := impact.ActionUpdate

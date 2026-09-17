@@ -47,58 +47,13 @@ func resolvePlatformIDForRead(ctx context.Context, client *pro.Client, pd *provi
 	return resolved, diags
 }
 
-// criteriaSource is the single method criteriaAtPlanTime needs of one side of a
-// plan. Both tfsdk.Plan and tfsdk.State satisfy it, which is what lets the
-// suppression guard and the impact alert share one reader.
-type criteriaSource interface {
-	GetAttribute(ctx context.Context, attributePath path.Path, target any) diag.Diagnostics
-}
-
-// criteriaAtPlanTime reads the group's criteria out of one side of a plan and
-// reports whether the value is settled enough to compare.
+// criteriaAtPlanTime reads this group's criteria out of one side of a plan.
 //
-// It reads the one attribute rather than decoding the whole object, and the
-// reason is a trap the resource model hides. Criteria is a Go slice of
-// criteria.CriterionModel, and the framework's reflection cannot put an unknown
-// value into a slice or a struct: it raises a "Value Conversion Error" carrying
-// "This is always an error in the provider", which aborts the plan. A
-// configuration whose criteria list is derived from something Terraform has not
-// created yet — a data source reading a resource created in the same apply, or a
-// module output from one — presents exactly that unknown, and applies perfectly
-// well once the value lands. Reading the attribute as a types.List keeps the
-// unknown representable, so it can be deferred instead of crashing the plan.
-//
-// The second return is false when nothing can be compared yet: an unknown list,
-// or a list holding an element that is itself unknown or null. An unknown value
-// inside a known element is fine and is not checked for, because every field of
-// a criterion is an attr.Value that carries its own unknown — `priority` is
-// Optional+Computed and is routinely unknown at plan.
-//
-// A null list is settled and yields no criteria, which is the configuration that
-// stores a group with no criteria at all.
-func criteriaAtPlanTime(ctx context.Context, from criteriaSource) ([]criteria.CriterionModel, bool, diag.Diagnostics) {
-	var diags diag.Diagnostics
-
-	var configured types.List
-	diags.Append(from.GetAttribute(ctx, path.Root("criteria"), &configured)...)
-	if diags.HasError() || configured.IsUnknown() {
-		return nil, false, diags
-	}
-	if configured.IsNull() {
-		return nil, true, diags
-	}
-	for _, element := range configured.Elements() {
-		if element.IsNull() || element.IsUnknown() {
-			return nil, false, diags
-		}
-	}
-
-	models, modelDiags := criteria.CriteriaModelsFromList(ctx, configured)
-	diags.Append(modelDiags...)
-	if diags.HasError() {
-		return nil, false, diags
-	}
-	return models, true, diags
+// It is a thin wrapper over criteria.CriteriaAtPlanTime, which carries the
+// reasoning: the resource model's criteria field is a Go slice, and the
+// framework cannot put an unknown into one without aborting the plan.
+func criteriaAtPlanTime(ctx context.Context, from criteria.AttributeSource) ([]criteria.CriterionModel, bool, diag.Diagnostics) {
+	return criteria.CriteriaAtPlanTime(ctx, from, path.Root("criteria"))
 }
 
 // criterionListsDiffer reports whether two criterion lists describe different
