@@ -104,7 +104,7 @@ func (d *DeviceGroupDataSource) Schema(ctx context.Context, req datasource.Schem
 							Computed:            true,
 						},
 						"and_or": schema.StringAttribute{
-							MarkdownDescription: "Join type between criteria (AND/OR).",
+							MarkdownDescription: "How this criterion joins the one before it. The first criterion's value is never used.",
 							Computed:            true,
 						},
 						"has_opening_parenthesis": schema.BoolAttribute{

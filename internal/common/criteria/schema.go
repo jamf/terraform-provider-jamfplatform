@@ -60,7 +60,7 @@ func CriterionAttributes(operators []string) map[string]schema.Attribute {
 			Required:            true,
 		},
 		"and_or": schema.StringAttribute{
-			MarkdownDescription: "How this criterion joins to the next. Valid values are `and` or `or`. Defaults to `and` if omitted.",
+			MarkdownDescription: "How this criterion joins the one before it. Valid values are `and` or `or`. The first criterion in the list has nothing to join to, so its value is never used. Defaults to `and` if omitted.",
 			Optional:            true,
 			Computed:            true,
 			Default:             stringdefault.StaticString(proclassic.CriterionAndOrAnd),

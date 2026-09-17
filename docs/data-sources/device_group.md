@@ -79,7 +79,7 @@ Optional:
 
 Read-Only:
 
-- `and_or` (String) Join type between criteria (AND/OR).
+- `and_or` (String) How this criterion joins the one before it. The first criterion's value is never used.
 - `criteria` (String) Inventory attribute used in the criterion.
 - `has_closing_parenthesis` (Boolean) Whether the criterion ends a parenthetical expression.
 - `has_opening_parenthesis` (Boolean) Whether the criterion starts a parenthetical expression.
