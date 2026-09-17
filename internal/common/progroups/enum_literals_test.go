@@ -26,11 +26,9 @@ func TestEnumLiteralsComeFromTheSDK(t *testing.T) {
 			"INVALID_PRIVILEGE": "Same: no generated constant. Observed on the mobile creates with siteId absent and on a computer PUT naming a nonexistent site, 2026-09-17.",
 		},
 		Ignore: map[string]string{
-			"-1":                               "The Jamf Pro no-site sentinel, not a member of any vocabulary.",
-			"progroups.platform_id.forbidden":  "A providerdata.FiredOnce latch key.",
-			"progroups.platform_id.transient":  "A providerdata.FiredOnce latch key.",
-			"progroups.platform_id.ambiguous":  "A providerdata.FiredOnce latch key.",
-			"progroups.platform_id.unresolved": "A providerdata.FiredOnce latch key.",
+			"-1":                              "The Jamf Pro no-site sentinel, not a member of any vocabulary.",
+			"progroups.platform_id.forbidden": "A providerdata.FiredOnce latch key.",
+			"progroups.platform_id.transient": "A providerdata.FiredOnce latch key.",
 		},
 	})
 	if err != nil {
