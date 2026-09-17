@@ -137,13 +137,13 @@ Set `payloadKey` yourself. It is the 1-based position of the declaration within 
 
 ## One preference domain per custom settings payload
 
-A `com.apple.ManagedClient.preferences` payload — "Application & Custom Settings" in the Jamf Pro profile editor — sets **exactly one** preference domain under `PayloadContent`. Any other count is refused during `plan`.
+A `com.apple.ManagedClient.preferences` payload, which the Jamf Pro profile editor calls "Application & Custom Settings", sets **exactly one** preference domain under `PayloadContent`. Any other count is refused during `plan`.
 
-**This is a breaking change.** A configuration that planned cleanly on `v0.32.0` and earlier can now fail, and a multi-domain payload was never delivering what it looked like it was delivering.
+**This is a breaking change.** A configuration that planned cleanly on `v0.32.0` and earlier can now fail. A payload that named three domains only ever delivered one of them.
 
-A Mac applies one domain of several and drops the rest. Nothing reports the loss: the apply succeeds, Jamf stores every domain faithfully, the deploy reports `SUCCEEDED`, `com.apple.ManagedClient` logs nothing, and every later plan settles. Which domain survives is not predictable. Splitting the same domains one per payload delivers all of them, which is what the Jamf Pro editor produces.
+A Mac applies one domain of several and drops the rest. Nothing reports the loss. The apply succeeds, Jamf stores every domain, the deploy reports `SUCCEEDED`, `com.apple.ManagedClient` logs nothing, and every later plan settles. Which domain survives is not predictable: of two profiles probed on macOS 26.6, one kept the second of three domains and the other kept the last of four. Split the same domains one per payload and all of them apply, which is what the Jamf Pro editor produces.
 
-Write one payload per domain. A component block may carry as many custom settings payloads as it has domains — a repeated `payload_type` used to be rejected outright, and for this payload type it no longer is.
+Write one payload per domain. A component block may carry as many custom settings payloads as it has domains. A repeated `payload_type` used to be rejected outright, and for this one payload type it no longer is.
 
 Before:
 
@@ -153,7 +153,7 @@ legacy_payloads = [
     payload_type = "com.apple.ManagedClient.preferences"
     settings = jsonencode({
       PayloadContent = {
-        "com.apple.Safari"        = { Forced = [{ mcx_preference_settings = { AutoOpenSafeDownloads = false } }] }
+        "com.apple.Safari"         = { Forced = [{ mcx_preference_settings = { AutoOpenSafeDownloads = false } }] }
         "com.apple.SoftwareUpdate" = { Forced = [{ mcx_preference_settings = { AutomaticCheckEnabled = true } }] }
       }
     })
@@ -184,11 +184,11 @@ legacy_payloads = [
 ]
 ```
 
-Splitting a payload reissues the payload identifiers Jamf owns for that block, so the profile reinstalls once. Nothing is orphaned and nothing is duplicated.
+Splitting a payload reissues the payload identifiers Jamf owns for that block, so the profile reinstalls once and every domain then applies.
 
-**A domain set to `null` counts as none.** The platform discards a null-valued key before storing the payload, so a payload whose only domain is null stores nothing at all. That one is refused for its own reason: an empty `PayloadContent` dictionary is discarded too, so the settings you wrote cannot be read back and the apply fails with `Provider produced inconsistent result after apply`. A null domain alongside a real one is fine, and the real one is the one that counts.
+**A domain set to `null` counts as none.** The platform discards a null-valued key before storing the payload, so a payload whose only domain is null stores nothing at all. An empty `PayloadContent` dictionary goes the same way, which is why both carry their own diagnostic: the settings you wrote cannot be read back, and the apply fails with `Provider produced inconsistent result after apply`. Write a null domain alongside a real one and the real one still counts.
 
-**`raw_component` is not the escape hatch for this finding.** It silences the check and changes nothing else: the payload still carries several domains, a Mac still drops all but one, and the block's payload identifiers are then reissued on every write rather than held steady. Split the domains instead. The escape below is for a schema finding the embedded snapshot could explain, which this is not — it is device behaviour, not a stale key table.
+**Split the domains rather than reaching for `raw_component`.** Moving the block silences the check and changes nothing a device sees. The payload still carries several domains, a Mac still drops all but one, and the block's payload identifiers are reissued on every write. The escape below answers a schema finding, where the provider's embedded key tables may be older than your tenant. This one is device behaviour, and a newer table will not change it.
 
 ## Delivering a legacy configuration profile payload unchecked
 
