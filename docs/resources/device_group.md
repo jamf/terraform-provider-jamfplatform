@@ -132,7 +132,7 @@ Required:
 
 Optional:
 
-- `and_or` (String) How this criterion joins to the next. Valid values are `and` or `or`. Defaults to `and` if omitted.
+- `and_or` (String) How this criterion joins the one before it. Valid values are `and` or `or`. The first criterion in the list has nothing to join to, so its value is never used. Defaults to `and` if omitted.
 - `has_closing_parenthesis` (Boolean) Whether the criterion ends a parenthetical grouping.
 - `has_opening_parenthesis` (Boolean) Whether the criterion begins a parenthetical grouping.
 - `order` (Number) Execution order for the criterion. Defaults to the element index if omitted.

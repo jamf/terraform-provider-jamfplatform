@@ -138,9 +138,13 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/self_service_plus_settings"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/service_discovery_enrollment"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/site"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/smart_computer_group"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/smart_mobile_device_group"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/smtp_server"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/sso_failover_url"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/sso_settings"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/static_computer_group"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/static_mobile_device_group"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/supervision_identity"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/tenant_id"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/pro/user"
@@ -554,6 +558,10 @@ func (p *JamfPlatformProvider) Resources(ctx context.Context) []func() resource.
 		service_discovery_enrollment.NewServiceDiscoveryEnrollmentResource,
 		smtp_server.NewSmtpServerResource,
 		site.NewSiteResource,
+		smart_computer_group.NewSmartComputerGroupResource,
+		smart_mobile_device_group.NewSmartMobileDeviceGroupResource,
+		static_computer_group.NewStaticComputerGroupResource,
+		static_mobile_device_group.NewStaticMobileDeviceGroupResource,
 		sso_failover_url.NewSsoFailoverURLResource,
 		sso_settings.NewSsoSettingsResource,
 		class.NewClassResource,
@@ -711,6 +719,14 @@ func (p *JamfPlatformProvider) DataSources(ctx context.Context) []func() datasou
 		sso_settings.NewSsoSettingsDataSource,
 		sso_settings.NewSsoSpMetadataDataSource,
 		site.NewSitesDataSource,
+		smart_computer_group.NewSmartComputerGroupDataSource,
+		smart_computer_group.NewSmartComputerGroupsDataSource,
+		smart_mobile_device_group.NewSmartMobileDeviceGroupDataSource,
+		smart_mobile_device_group.NewSmartMobileDeviceGroupsDataSource,
+		static_computer_group.NewStaticComputerGroupDataSource,
+		static_computer_group.NewStaticComputerGroupsDataSource,
+		static_mobile_device_group.NewStaticMobileDeviceGroupDataSource,
+		static_mobile_device_group.NewStaticMobileDeviceGroupsDataSource,
 		class.NewClassDataSource,
 		user_group.NewUserGroupDataSource,
 		user_group.NewUserGroupsDataSource,
@@ -789,6 +805,10 @@ func (p *JamfPlatformProvider) ListResources(ctx context.Context) []func() list.
 		patch_policy.NewPatchPolicyListResource,
 		patch_software_title.NewPatchSoftwareTitleListResource,
 		site.NewSiteListResource,
+		smart_computer_group.NewSmartComputerGroupListResource,
+		smart_mobile_device_group.NewSmartMobileDeviceGroupListResource,
+		static_computer_group.NewStaticComputerGroupListResource,
+		static_mobile_device_group.NewStaticMobileDeviceGroupListResource,
 		class.NewClassListResource,
 		user_group.NewUserGroupListResource,
 		advanced_computer_search.NewAdvancedComputerSearchListResource,

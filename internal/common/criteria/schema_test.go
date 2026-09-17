@@ -4,6 +4,7 @@
 package criteria
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -54,5 +55,45 @@ func TestCriterionAttributes_SearchTypeUsesGivenOperatorVocabulary(t *testing.T)
 	desc := searchType.MarkdownDescription
 	if got, want := desc, Description(subset); got != want {
 		t.Errorf("search_type description not derived from given operators\n got: %q\nwant: %q", got, want)
+	}
+}
+
+// TestAndOrDescriptionStatesTheJoinDirection pins that the shared and_or
+// description says WHICH neighbour the value joins, and names the right one.
+//
+// The direction is not guessable and the wording was wrong once: every consumer
+// of CriterionAttributes rendered "joins to the next" to the Terraform Registry,
+// which is backwards. Wire-probed on Jamf Pro 11.32.0, 2026-09-17, with two
+// criteria that cannot both match one computer — "Computer Name is A" and
+// "Computer Name is B":
+//
+//	andOr ["or", "and"]  -> 0 members, so AND applied  (criterion 1's value)
+//	andOr ["and", "or"]  -> 2 members, so OR applied   (criterion 1's value)
+//
+// The operator that takes effect is always the SECOND criterion's, so a
+// criterion's and_or joins it to the one BEFORE it and the first entry's value
+// is ignored.
+//
+// An operator who believes the old wording writes `or` on the first of two
+// criteria to mean "A or B", gets `and`, and the group silently holds the wrong
+// computers while the plan stays empty. Nothing else in the suite would catch a
+// regression here, because the provider passes and_or through verbatim — the
+// defect is entirely in what the documentation claims.
+func TestAndOrDescriptionStatesTheJoinDirection(t *testing.T) {
+	attrs := CriterionAttributes(Operators)
+	andOr, ok := attrs["and_or"]
+	if !ok {
+		t.Fatal("and_or is missing from the shared criterion attributes")
+	}
+	got := andOr.GetMarkdownDescription()
+
+	if !strings.Contains(got, "before it") {
+		t.Errorf("the description must say the value joins the criterion BEFORE this one:\n%s", got)
+	}
+	if !strings.Contains(got, "never used") {
+		t.Errorf("the description must say the first criterion's value is unused:\n%s", got)
+	}
+	if strings.Contains(got, "to the next") || strings.Contains(got, "joins the next") {
+		t.Errorf("the description claims a forward join, which is the wire-disproven direction:\n%s", got)
 	}
 }
