@@ -129,6 +129,18 @@ func mcxBlockPayload(value int, domains ...string) legacyPayloadSpec {
 	return legacyPayloadSpec{payloadType: mcxPayloadTypeName, settings: mcxBlockSettings(value, domains...)}
 }
 
+// mcxNullDomainPayload is one custom settings payload forcing a real preference domain beside a
+// second domain set to null. The platform discards a null-valued key before it stores the payload,
+// wire-probed on the EU environment 2026-09-17, so this stores as a single domain and must plan and
+// apply as one — the count the provider reports has to agree with the count the platform keeps.
+func mcxNullDomainPayload(value int, domain, nullDomain string) legacyPayloadSpec {
+	settings := fmt.Sprintf(
+		"jsonencode({ PayloadContent = { %q = { Forced = [{ mcx_preference_settings = { %s = %d } }] }, %q = null } })",
+		domain, mcxForcedKey, value, nullDomain,
+	)
+	return legacyPayloadSpec{payloadType: mcxPayloadTypeName, settings: settings}
+}
+
 // mcxFlatPayload is the same payload for the deprecated top-level attribute, where settings is an
 // object rather than a JSON string.
 func mcxFlatPayload(value int, domains ...string) legacyPayloadSpec {
@@ -422,6 +434,14 @@ func TestAccResource_Blueprint_LegacyPayloads_MCXDuplicatePayloadsRefused(t *tes
 // "Provider produced inconsistent result after apply": Jamf discards an empty dictionary, so state
 // cannot hold what the author wrote. That case now sits in
 // TestAccResource_Blueprint_LegacyPayloads_MCXSeveralDomainsRefusedAtPlan, where nothing is applied.
+//
+// Steps 3 and 4 are the boundary a null domain sits on, and they are here rather than in a unit test
+// because only a tenant can prove the half that matters: the platform discards a null-valued key
+// before it stores the payload, so a payload naming two domains where one is null stores as one and
+// must plan, apply and then re-plan empty. A provider counting the null key would refuse this
+// configuration at plan while naming a domain the platform never stores, and one counting a lone
+// null domain as a domain would send a payload that reads back with no PayloadContent at all and
+// fail the apply with "Provider produced inconsistent result after apply".
 func TestAccResource_Blueprint_LegacyPayloads_MCXDomainCountBoundariesApply(t *testing.T) {
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
@@ -456,6 +476,20 @@ func TestAccResource_Blueprint_LegacyPayloads_MCXDomainCountBoundariesApply(t *t
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
 				},
 				Check: checkStoredIdentifiersAreDistinct(t, addr, 1),
+			},
+			{
+				Config: config(mcxNullDomainPayload(1, firstPreferenceDomain, secondPreferenceDomain)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(addr, "component_blocks.0.legacy_payloads.#", "1"),
+					checkMCXForcedValue(addr, "component_blocks.0.legacy_payloads.0.settings", firstPreferenceDomain, 1),
+					checkStoredIdentifiersAreDistinct(t, addr, 1),
+				),
+			},
+			{
+				Config: config(mcxNullDomainPayload(1, firstPreferenceDomain, secondPreferenceDomain)),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
 			},
 		},
 	})

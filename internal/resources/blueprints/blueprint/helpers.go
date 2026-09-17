@@ -134,6 +134,17 @@ func newStoredLegacyPayloadIdentifiers(blueprint *blueprints.BlueprintDetail) *s
 // domains are as real as any other payload's. Apple's spelling wins where a payload somehow carries
 // both, so the answer does not depend on map iteration order. The miscasing itself is reported
 // separately by appleprofiles.Validate.
+//
+// A null-valued key is not a domain. The platform discards one before it stores the payload (see
+// pruneJSONNulls, and legacyPayloadSettingsBehaviour, which promises an author their nulls can stay
+// in configuration), so a null domain reaches no device and must be counted as absent — wire-probed
+// on the EU environment, 2026-09-17, where `PayloadContent` sent as
+// {"com.example.kept": {...}, "com.example.nulled": null} read back carrying only the kept domain,
+// and one sent as {"com.example.onlynull": null} read back with no PayloadContent at all. Counting
+// it would break the rule in both directions: a payload storing one domain beside a null one would
+// be refused for setting two, naming a domain that is never stored, and a payload whose only domain
+// is null would pass as one and then fail the apply with an inconsistent result, which is the very
+// outcome appendMCXDomainProblems' empty case exists to refuse at plan.
 func mcxPreferenceDomains(payloadType string, settings map[string]any) ([]string, bool) {
 	if payloadType != mcxPayloadType {
 		return nil, false
@@ -152,11 +163,20 @@ func mcxPreferenceDomains(payloadType string, settings map[string]any) ([]string
 		return nil, false
 	}
 
-	domains, ok := content.(map[string]any)
+	stored, ok := content.(map[string]any)
 	if !ok {
 		return nil, false
 	}
-	return slices.Sorted(maps.Keys(domains)), true
+
+	domains := make([]string, 0, len(stored))
+	for domain, value := range stored {
+		if value == nil {
+			continue
+		}
+		domains = append(domains, domain)
+	}
+	slices.Sort(domains)
+	return domains, true
 }
 
 // legacyPayloadIdentity returns the key one legacy payload is located by within a component block.

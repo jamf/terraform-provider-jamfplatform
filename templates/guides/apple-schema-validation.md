@@ -14,6 +14,7 @@ Two things moved:
 
 - **Legacy configuration profile payload findings were warnings. They are now errors.** `component_blocks[].legacy_payloads` was checked before, but a finding that the embedded schemas could explain printed as a warning and the apply went ahead.
 - **Declaration payloads are checked for the first time.** Both `component_blocks[].apple_declarations` and `component_blocks[].custom_declarations` now have their `payload` validated against the declaration type Apple publishes.
+- **A custom settings payload sets exactly one preference domain.** A `com.apple.ManagedClient.preferences` payload that carries several is refused, and so is one that carries none. See [One preference domain per custom settings payload](#one-preference-domain-per-custom-settings-payload).
 
 If your plan is clean, you have nothing to do.
 
@@ -87,6 +88,8 @@ State carries across on its own, through a state upgrader that runs on the first
 | Wrong value type | A string where a boolean is declared, and so on | No |
 | Miscased type or key name | The name matches a declared one apart from case | No |
 | Declaration kind does not match its type | `kind` disagrees with the declaration type's prefix | No |
+| Custom settings payload sets more than one preference domain | One `com.apple.ManagedClient.preferences` payload carries several domains | No |
+| Custom settings payload sets no preference domain | Its `PayloadContent` dictionary sets no domain, or sets only null ones | No |
 
 The right-hand column is the one to read first. A finding marked **Yes** says so in its own detail, names the upstream branches and commits the schemas came from, and points at the escape hatch. A finding marked **No** is wrong against every revision of Apple's schema that declares the name at all, so the provider's age cannot be the cause.
 
@@ -131,6 +134,61 @@ component_blocks = [
 ```
 
 Set `payloadKey` yourself. It is the 1-based position of the declaration within the request, and it is what a `$PAYLOAD_<n>` cross-reference from another declaration resolves against. The typed components derive it from list order; `raw_component` derives nothing, so a declaration without a key cannot be referenced.
+
+## One preference domain per custom settings payload
+
+A `com.apple.ManagedClient.preferences` payload — "Application & Custom Settings" in the Jamf Pro profile editor — sets **exactly one** preference domain under `PayloadContent`. Any other count is refused during `plan`.
+
+**This is a breaking change.** A configuration that planned cleanly on `v0.32.0` and earlier can now fail, and a multi-domain payload was never delivering what it looked like it was delivering.
+
+A Mac applies one domain of several and drops the rest. Nothing reports the loss: the apply succeeds, Jamf stores every domain faithfully, the deploy reports `SUCCEEDED`, `com.apple.ManagedClient` logs nothing, and every later plan settles. Which domain survives is not predictable. Splitting the same domains one per payload delivers all of them, which is what the Jamf Pro editor produces.
+
+Write one payload per domain. A component block may carry as many custom settings payloads as it has domains — a repeated `payload_type` used to be rejected outright, and for this payload type it no longer is.
+
+Before:
+
+```hcl
+legacy_payloads = [
+  {
+    payload_type = "com.apple.ManagedClient.preferences"
+    settings = jsonencode({
+      PayloadContent = {
+        "com.apple.Safari"        = { Forced = [{ mcx_preference_settings = { AutoOpenSafeDownloads = false } }] }
+        "com.apple.SoftwareUpdate" = { Forced = [{ mcx_preference_settings = { AutomaticCheckEnabled = true } }] }
+      }
+    })
+  },
+]
+```
+
+After:
+
+```hcl
+legacy_payloads = [
+  {
+    payload_type = "com.apple.ManagedClient.preferences"
+    settings = jsonencode({
+      PayloadContent = {
+        "com.apple.Safari" = { Forced = [{ mcx_preference_settings = { AutoOpenSafeDownloads = false } }] }
+      }
+    })
+  },
+  {
+    payload_type = "com.apple.ManagedClient.preferences"
+    settings = jsonencode({
+      PayloadContent = {
+        "com.apple.SoftwareUpdate" = { Forced = [{ mcx_preference_settings = { AutomaticCheckEnabled = true } }] }
+      }
+    })
+  },
+]
+```
+
+Splitting a payload reissues the payload identifiers Jamf owns for that block, so the profile reinstalls once. Nothing is orphaned and nothing is duplicated.
+
+**A domain set to `null` counts as none.** The platform discards a null-valued key before storing the payload, so a payload whose only domain is null stores nothing at all. That one is refused for its own reason: an empty `PayloadContent` dictionary is discarded too, so the settings you wrote cannot be read back and the apply fails with `Provider produced inconsistent result after apply`. A null domain alongside a real one is fine, and the real one is the one that counts.
+
+**`raw_component` is not the escape hatch for this finding.** It silences the check and changes nothing else: the payload still carries several domains, a Mac still drops all but one, and the block's payload identifiers are then reissued on every write rather than held steady. Split the domains instead. The escape below is for a schema finding the embedded snapshot could explain, which this is not — it is device behaviour, not a stale key table.
 
 ## Delivering a legacy configuration profile payload unchecked
 

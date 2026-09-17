@@ -88,7 +88,7 @@ func (v legacyPayloadSchemaValidator) ValidateList(ctx context.Context, req vali
 		}
 
 		appendPayloadProblems(&resp.Diagnostics, payload.PayloadType.ValueString(), settings, entry, entry.AtName("payload_type"), entry.AtName("settings"))
-		appendMCXDomainProblems(&resp.Diagnostics, payload.PayloadType.ValueString(), settings, entry.AtName("settings"))
+		appendMCXDomainProblems(&resp.Diagnostics, payload.PayloadType.ValueString(), settings, entry.AtName("settings"), "")
 	}
 }
 
@@ -108,7 +108,7 @@ func (v legacyPayloadSchemaValidator) ValidateDynamic(_ context.Context, req val
 		return
 	}
 
-	for _, item := range items {
+	for i, item := range items {
 		obj, ok := item.(map[string]any)
 		if !ok {
 			continue
@@ -122,7 +122,7 @@ func (v legacyPayloadSchemaValidator) ValidateDynamic(_ context.Context, req val
 		// A dynamic value carries no traversable schema path for its elements, so every finding is
 		// reported against the attribute itself and located by the path in its detail.
 		appendPayloadProblems(&resp.Diagnostics, payloadType, settings, req.Path, req.Path, req.Path)
-		appendMCXDomainProblems(&resp.Diagnostics, payloadType, settings, req.Path)
+		appendMCXDomainProblems(&resp.Diagnostics, payloadType, settings, req.Path, fmt.Sprintf("payload %d (%s)", i+1, payloadType))
 	}
 }
 
@@ -154,20 +154,39 @@ func (v legacyPayloadSchemaValidator) ValidateDynamic(_ context.Context, req val
 //
 // An absent dictionary is appleprofiles.Validate's to report as a missing required key, and this
 // check stays out of its way: mcxPreferenceDomains reports whether the dictionary exists at all,
-// which is what separates an absent one from an empty one.
-func appendMCXDomainProblems(diags *diag.Diagnostics, payloadType string, settings map[string]any, settingsPath path.Path) {
+// which is what separates an absent one from an empty one. A null-valued domain is not one either,
+// for the reason mcxPreferenceDomains gives.
+//
+// The rule is not a macOS workaround, and the distinction matters because the device evidence above
+// is macOS 26.6 alone and says nothing about iOS. One domain per payload is the shape the Jamf Pro
+// profile editor produces on every platform, so it is the shape the platform's own tooling, its
+// stored blueprints and any operator reading either will agree on. The macOS observation is why a
+// multi-domain payload is actively harmful rather than merely unidiomatic; editor parity is why the
+// rule holds regardless of what a device does with it.
+//
+// payloadLabel names the payload for an operator when the attribute path cannot. The block carrier
+// passes an empty string, because its path already points at the element. The deprecated flat
+// carrier passes a position and type, since a dynamic value has no traversable path for its
+// elements and every finding lands on the attribute itself.
+func appendMCXDomainProblems(diags *diag.Diagnostics, payloadType string, settings map[string]any, settingsPath path.Path, payloadLabel string) {
 	domains, present := mcxPreferenceDomains(payloadType, settings)
 	if !present || len(domains) == 1 {
 		return
+	}
+
+	prefix := ""
+	if payloadLabel != "" {
+		prefix = payloadLabel + ": "
 	}
 
 	if len(domains) == 0 {
 		diags.AddAttributeError(
 			settingsPath,
 			"Custom settings payload sets no preference domain",
-			"This payload's PayloadContent dictionary is empty. Jamf discards an empty dictionary, so the payload "+
-				"cannot be stored and the apply fails. Set one preference domain under PayloadContent, or remove "+
-				"the payload.",
+			prefix+"this payload's PayloadContent dictionary sets no preference domain. The platform discards an "+
+				"empty dictionary, so the payload cannot be stored and the apply fails. Set one preference domain "+
+				"under PayloadContent, or remove the payload. A domain set to null counts as none, because the "+
+				"platform discards it before storing the payload.",
 		)
 		return
 	}
@@ -176,10 +195,11 @@ func appendMCXDomainProblems(diags *diag.Diagnostics, payloadType string, settin
 		settingsPath,
 		"Custom settings payload sets more than one preference domain",
 		fmt.Sprintf(
-			"This payload sets %d preference domains: %s. A Mac applies one and discards the rest without "+
+			"%sthis payload sets %d preference domains: %s. A Mac applies one and discards the rest without "+
 				"reporting it, and you cannot predict which one it keeps. Write one payload per preference domain, "+
-				"as the Jamf Pro profile editor does: a profile covering three domains carries three custom settings payloads.",
-			len(domains), strings.Join(domains, ", "),
+				"as the Jamf Pro profile editor does: a profile covering three domains carries three custom settings "+
+				"payloads. A component block may carry as many custom settings payloads as it has domains.",
+			prefix, len(domains), strings.Join(domains, ", "),
 		),
 	)
 }

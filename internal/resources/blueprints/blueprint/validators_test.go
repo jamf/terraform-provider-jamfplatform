@@ -6,6 +6,7 @@ package blueprint
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -452,5 +453,204 @@ func TestLegacyPayloadValidator_AbsentPreferenceDictionaryStaysApplesFinding(t *
 	}
 	if summary := diags.Errors()[0].Summary(); summary != "Legacy payload is missing a required setting" {
 		t.Errorf("summary = %q, want Apple's missing-required-key finding", summary)
+	}
+}
+
+// TestLegacyPayloadValidator_NullDomainIsNotADomain pins the count against the platform's own
+// null-discard behaviour, which the rest of this pipeline already honours: pruneJSONNulls tolerates
+// an authored null and legacyPayloadSettingsBehaviour promises an author their nulls can stay in
+// configuration. Wire-probed on the EU environment, 2026-09-17. `PayloadContent` sent as
+// {"com.example.kept": {...}, "com.example.nulled": null} read back carrying only the kept domain,
+// so counting the null one refuses a configuration the platform stores as a single domain, and the
+// diagnostic would name a domain that never reaches a device. One sent as
+// {"com.example.onlynull": null} read back with no PayloadContent at all, which is the shape the
+// empty case exists to refuse — so counting it as a domain lets the very failure that branch was
+// written for through to the apply.
+func TestLegacyPayloadValidator_NullDomainIsNotADomain(t *testing.T) {
+	t.Parallel()
+
+	settings := func(t *testing.T, content map[string]any) string {
+		t.Helper()
+		encoded, err := json.Marshal(map[string]any{mcxPreferenceDomainsKey: content})
+		if err != nil {
+			t.Fatalf("marshalling a custom settings payload: %v", err)
+		}
+		return string(encoded)
+	}
+	domain := map[string]any{"Forced": []any{map[string]any{"mcx_preference_settings": map[string]any{"A": true}}}}
+
+	t.Run("one real domain beside a null one passes", func(t *testing.T) {
+		t.Parallel()
+
+		value := settings(t, map[string]any{"com.example.kept": domain, "com.example.nulled": nil})
+		if diags := validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, value})); diags.HasError() {
+			t.Errorf("the block carrier refused a payload the platform stores as one domain: %v", diags.Errors())
+		}
+		if diags := validateFlatLegacyPayloads(t, [2]string{mcxPayloadType, value}); diags.HasError() {
+			t.Errorf("the flat carrier refused a payload the platform stores as one domain: %v", diags.Errors())
+		}
+	})
+
+	t.Run("a single null domain is the empty case", func(t *testing.T) {
+		t.Parallel()
+
+		value := settings(t, map[string]any{"com.example.onlynull": nil})
+		diags := validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, value}))
+		if !diags.HasError() {
+			t.Fatal("a payload whose only preference domain is null produced no error")
+		}
+		if summary := diags.Errors()[0].Summary(); summary != emptyPreferenceDictionarySummary {
+			t.Errorf("summary = %q, want the empty-dictionary finding", summary)
+		}
+	})
+}
+
+// TestLegacyPayloadValidator_DomainCountAppliesToCustomSettingsOnly pins the payload-type guard,
+// which is the only thing scoping this rule to the managed preferences envelope. Apple declares a
+// top-level PayloadContent on other payload types, and com.apple.security.scep declares it as a
+// dictionary of named keys rather than of preference domains — so without the guard a SCEP payload
+// is refused for setting several "preference domains" that are really its own settings, and a
+// single-key one takes a domain-keyed identity that rotates its stored identifier on every write.
+func TestLegacyPayloadValidator_DomainCountAppliesToCustomSettingsOnly(t *testing.T) {
+	t.Parallel()
+
+	const scepPayloadType = "com.apple.security.scep"
+	scep, err := json.Marshal(map[string]any{mcxPreferenceDomainsKey: map[string]any{
+		"URL":     "https://scep.example.com/scep",
+		"Name":    "Example CA",
+		"Keysize": 2048,
+	}})
+	if err != nil {
+		t.Fatalf("marshalling a SCEP payload: %v", err)
+	}
+
+	for _, reported := range validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{scepPayloadType, string(scep)})).Errors() {
+		switch reported.Summary() {
+		case severalPreferenceDomainsSummary, emptyPreferenceDictionarySummary:
+			t.Errorf("a preference-domain count was reported for %s: %s", scepPayloadType, reported.Detail())
+		}
+	}
+
+	if got := legacyPayloadIdentity(scepPayloadType, map[string]any{mcxPreferenceDomainsKey: map[string]any{"URL": "https://scep.example.com/scep"}}); got != scepPayloadType {
+		t.Errorf("legacyPayloadIdentity(%s) = %q, want the bare payload type", scepPayloadType, got)
+	}
+}
+
+// TestMCXPreferenceDomains covers the reads no other test reaches: the case-folded key, a
+// dictionary that is not one, and the multi-domain arm of legacyPayloadIdentity. The last is
+// load-bearing on the read path alone — configuration can no longer carry a multi-domain payload,
+// but a blueprint edited outside Terraform can, and it has to key on the bare type so the duplicate
+// check can still see two of them in one block.
+func TestMCXPreferenceDomains(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name        string
+		payloadType string
+		settings    map[string]any
+		want        []string
+		wantPresent bool
+	}{
+		{
+			name:        "apple's spelling",
+			payloadType: mcxPayloadType,
+			settings:    map[string]any{mcxPreferenceDomainsKey: map[string]any{"com.example.b": map[string]any{}, "com.example.a": map[string]any{}}},
+			want:        []string{"com.example.a", "com.example.b"},
+			wantPresent: true,
+		},
+		{
+			name:        "a miscased key still carries its domains",
+			payloadType: mcxPayloadType,
+			settings:    map[string]any{"payloadcontent": map[string]any{"com.example.a": map[string]any{}}},
+			want:        []string{"com.example.a"},
+			wantPresent: true,
+		},
+		{
+			name:        "apple's spelling wins over a miscased sibling",
+			payloadType: mcxPayloadType,
+			settings:    map[string]any{mcxPreferenceDomainsKey: map[string]any{"com.example.correct": map[string]any{}}, "payloadcontent": map[string]any{"com.example.miscased": map[string]any{}}},
+			want:        []string{"com.example.correct"},
+			wantPresent: true,
+		},
+		{
+			name:        "a dictionary that is not one",
+			payloadType: mcxPayloadType,
+			settings:    map[string]any{mcxPreferenceDomainsKey: "not-a-dictionary"},
+			want:        nil,
+			wantPresent: false,
+		},
+		{
+			name:        "an absent dictionary is not an empty one",
+			payloadType: mcxPayloadType,
+			settings:    map[string]any{"PayloadDisplayName": "Custom Settings"},
+			want:        nil,
+			wantPresent: false,
+		},
+		{
+			name:        "another payload type yields nothing",
+			payloadType: "com.apple.security.scep",
+			settings:    map[string]any{mcxPreferenceDomainsKey: map[string]any{"URL": "https://scep.example.com/scep"}},
+			want:        nil,
+			wantPresent: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, present := mcxPreferenceDomains(tc.payloadType, tc.settings)
+			if present != tc.wantPresent {
+				t.Errorf("present = %t, want %t", present, tc.wantPresent)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("domains = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestLegacyPayloadIdentity_FallsBackWithoutASingleDomain pins the read-path fallback. Two domains
+// and none both key on the bare payload type, which is what leaves appendLegacyConfigProfile's
+// duplicate check able to see two such payloads in one block and reject the second.
+func TestLegacyPayloadIdentity_FallsBackWithoutASingleDomain(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		content map[string]any
+	}{
+		{name: "two domains", content: map[string]any{"com.example.a": map[string]any{}, "com.example.b": map[string]any{}}},
+		{name: "no domains", content: map[string]any{}},
+		{name: "only a null domain", content: map[string]any{"com.example.a": nil}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := legacyPayloadIdentity(mcxPayloadType, map[string]any{mcxPreferenceDomainsKey: tc.content})
+			if got != mcxPayloadType {
+				t.Errorf("identity = %q, want the bare payload type", got)
+			}
+		})
+	}
+
+	single := legacyPayloadIdentity(mcxPayloadType, map[string]any{mcxPreferenceDomainsKey: map[string]any{"com.example.a": map[string]any{}}})
+	if want := mcxPayloadType + " (com.example.a)"; single != want {
+		t.Errorf("identity = %q, want %q", single, want)
+	}
+}
+
+// TestMCXPayloadTypeIsAppleDeclared is the tripwire for the payload type this whole rule keys on.
+// Nothing else would notice a typo: mcxPreferenceDomains returns nothing for an unrecognised type,
+// so a misspelled constant makes the rule silently inert rather than failing. The acceptance tests
+// restate the spelling because they are an external test package and cannot read the constant, so
+// they agree with themselves; this asserts it against Apple's generated table instead.
+func TestMCXPayloadTypeIsAppleDeclared(t *testing.T) {
+	t.Parallel()
+
+	payload, ok := appleprofiles.Lookup(mcxPayloadType)
+	if !ok {
+		t.Fatalf("Apple's schema table declares no payload type %q", mcxPayloadType)
+	}
+	if _, declared := payload.Keys[mcxPreferenceDomainsKey]; !declared {
+		t.Errorf("Apple's schema for %s declares no %s key", mcxPayloadType, mcxPreferenceDomainsKey)
 	}
 }

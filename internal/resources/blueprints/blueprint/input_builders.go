@@ -57,7 +57,7 @@ func (r *BlueprintResource) buildSteps(ctx context.Context, data *BlueprintResou
 		for i, block := range data.ComponentBlocks {
 			components, blockDiags := r.collectBlockComponents(ctx, block)
 			if !blockDiags.HasError() {
-				r.collectBlockLegacyPayloads(&components, &blockDiags, block.LegacyPayloads, blueprintName, storedByBlock[i])
+				r.collectBlockLegacyPayloads(&components, &blockDiags, block.LegacyPayloads, blueprintName, describeBlockPosition(i, block.Name), storedByBlock[i])
 			}
 			diags.Append(blockDiags...)
 			if blockDiags.HasError() {
@@ -79,7 +79,7 @@ func (r *BlueprintResource) buildSteps(ctx context.Context, data *BlueprintResou
 			{name: "legacy_payloads", identifier: legacyConfigProfileIdentifier},
 		})...)
 		if !flatDiags.HasError() {
-			r.collectLegacyPayloads(&components, &flatDiags, data.LegacyPayloads, blueprintName, stored.resolve([]types.String{types.StringNull()})[0])
+			r.collectLegacyPayloads(&components, &flatDiags, data.LegacyPayloads, blueprintName, "legacy_payloads", stored.resolve([]types.String{types.StringNull()})[0])
 		}
 	}
 	diags.Append(flatDiags...)
@@ -331,7 +331,7 @@ type legacyPayloadEntry struct {
 
 // collectLegacyPayloads builds the legacy configuration profile component from the deprecated
 // dynamic top-level legacy_payloads value.
-func (r *BlueprintResource) collectLegacyPayloads(allComponents *[]blueprints.Component, diags *diag.Diagnostics, legacyPayloads types.Dynamic, blueprintName string, storedIdentifiers map[string]string) {
+func (r *BlueprintResource) collectLegacyPayloads(allComponents *[]blueprints.Component, diags *diag.Diagnostics, legacyPayloads types.Dynamic, blueprintName, location string, storedIdentifiers map[string]string) {
 	raw, err := helpers.TerraformDynamicToJSON(legacyPayloads)
 	if err != nil {
 		diags.AddError("Error reading legacy payloads", "Could not convert legacy payloads to JSON: "+helpers.APIErrorDetail(err))
@@ -362,12 +362,12 @@ func (r *BlueprintResource) collectLegacyPayloads(allComponents *[]blueprints.Co
 		entries = append(entries, entry)
 	}
 
-	r.appendLegacyConfigProfile(allComponents, diags, entries, blueprintName, storedIdentifiers)
+	r.appendLegacyConfigProfile(allComponents, diags, entries, blueprintName, location, storedIdentifiers)
 }
 
 // collectBlockLegacyPayloads builds the legacy configuration profile component from a block's
 // legacy_payloads list, whose settings arrive as JSON object strings.
-func (r *BlueprintResource) collectBlockLegacyPayloads(allComponents *[]blueprints.Component, diags *diag.Diagnostics, payloads []BlockLegacyPayloadModel, blueprintName string, storedIdentifiers map[string]string) {
+func (r *BlueprintResource) collectBlockLegacyPayloads(allComponents *[]blueprints.Component, diags *diag.Diagnostics, payloads []BlockLegacyPayloadModel, blueprintName, location string, storedIdentifiers map[string]string) {
 	if len(payloads) == 0 {
 		return
 	}
@@ -389,13 +389,18 @@ func (r *BlueprintResource) collectBlockLegacyPayloads(allComponents *[]blueprin
 		entries = append(entries, entry)
 	}
 
-	r.appendLegacyConfigProfile(allComponents, diags, entries, blueprintName, storedIdentifiers)
+	r.appendLegacyConfigProfile(allComponents, diags, entries, blueprintName, location, storedIdentifiers)
 }
 
 // appendLegacyConfigProfile assembles the shared com.jamf.ddm-configuration-profile component from
 // the flattened legacy payload entries and appends it. It rejects a missing payload type and a
 // payload the block already declares, which legacyPayloadIdentity defines: a repeated payload type
 // for most payloads, and a repeated preference domain for a managed preferences payload.
+//
+// location names the component block for an operator, in the form describeBlockPosition renders and
+// appendLegacyPayloadDiscardWarnings already reports against. Both duplicate diagnostics are raised
+// here rather than in a validator, so neither carries an attribute path, and a blueprint with
+// several blocks would otherwise leave nothing to say which one to edit.
 //
 // Several managed preferences payloads in one block are deliberately allowed, because a payload
 // carries one preference domain and a block covering three domains needs three payloads (see
@@ -416,7 +421,7 @@ func (r *BlueprintResource) collectBlockLegacyPayloads(allComponents *[]blueprin
 // own write-back, with no probe saying which of the two the service keys the installed payload on.
 // `payloadUUID` goes the same way because the service reassigns it on every write (see
 // maskServerStampedPayloadKeys), so an authored one is never honoured and must not be sent.
-func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprints.Component, diags *diag.Diagnostics, entries []legacyPayloadEntry, blueprintName string, storedIdentifiers map[string]string) {
+func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprints.Component, diags *diag.Diagnostics, entries []legacyPayloadEntry, blueprintName, location string, storedIdentifiers map[string]string) {
 	seenPayloads := make(map[string]bool, len(entries))
 	payloadArray := make([]map[string]any, 0, len(entries))
 	for _, entry := range entries {
@@ -427,7 +432,7 @@ func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprint
 
 		identity := legacyPayloadIdentity(entry.PayloadType, entry.Settings)
 		if seenPayloads[identity] {
-			diags.AddError(duplicateLegacyPayloadDiagnostic(entry.PayloadType, entry.Settings))
+			diags.AddError(duplicateLegacyPayloadDiagnostic(entry.PayloadType, entry.Settings, location))
 			return
 		}
 		seenPayloads[identity] = true
@@ -471,11 +476,11 @@ func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprint
 // A managed preferences payload gets its own wording because repeating that payload type is
 // legitimate: what cannot repeat is the preference domain, and a message naming the type alone would
 // read as contradicting the rule that sent the author here.
-func duplicateLegacyPayloadDiagnostic(payloadType string, settings map[string]any) (string, string) {
+func duplicateLegacyPayloadDiagnostic(payloadType string, settings map[string]any, location string) (string, string) {
 	if domains, _ := mcxPreferenceDomains(payloadType, settings); len(domains) == 1 {
 		return "Duplicate preference domain",
-			"This component block sets the " + domains[0] + " preference domain in more than one custom settings payload. Give each domain its own payload."
+			"The component block " + location + " sets the " + domains[0] + " preference domain in more than one custom settings payload. Give each domain its own payload."
 	}
 	return "Duplicate payload_type",
-		"A component block declares each payload type once. This block declares " + payloadType + " more than once."
+		"A component block declares each payload type once. The component block " + location + " declares " + payloadType + " more than once."
 }
