@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -55,16 +56,18 @@ import (
 // across every blueprint sharing a type, needs no migration: there is nothing for a re-mint to
 // repair.
 //
-// A payload is located by step and by `payloadType`, the same pairing checkLegacyPayloadDiscards
-// uses, because a type is unique within a block (appendLegacyConfigProfile rejects a duplicate).
+// A payload is located by step and by legacyPayloadIdentity, the same pairing
+// checkLegacyPayloadDiscards uses. That is the payload type for most payloads, and the type plus the
+// preference domain for a managed preferences payload, of which a block may carry one per domain;
+// appendLegacyConfigProfile rejects a repeat of either, so the identity is unique within a block.
 // Steps are matched by name ahead of position so that inserting or reordering a block keeps every
 // other block's identifiers: a positional match alone would shift them onto neighbouring payloads.
 // Position remains the fallback, since a block name is optional and need not be unique.
 type storedLegacyPayloadIdentifiers struct {
 	stepIndexByName map[string]int
 	byStepIndex     []map[string]string
-	// ambiguous holds identifiers dropped because more than one payload type in a single step
-	// carried them, so the service reissues a distinct one for each. macOS refuses a whole profile
+	// ambiguous holds identifiers dropped because more than one payload in a single step carried
+	// them, so the service reissues a distinct one for each. macOS refuses a whole profile
 	// whose payload identifiers are not unique — "the PayloadIdentifier is used more than once in
 	// the profile", ConfigProfilePluginDomain:-107, wire-verified on macOS 26.6 on 2026-09-16,
 	// where neither payload installed and the device retried indefinitely while the blueprint
@@ -119,9 +122,99 @@ func newStoredLegacyPayloadIdentifiers(blueprint *blueprints.BlueprintDetail) *s
 	return stored
 }
 
-// legacyPayloadIdentifiersInStep maps payload type to stored identifier for a step's legacy
-// configuration profile component. A payload the service has not stamped is omitted rather than
-// mapped to the empty string, so a caller cannot mistake it for a stored value.
+// mcxPreferenceDomains returns the preference domains a managed preferences payload declares,
+// sorted, and reports whether the payload carries the dictionary they sit under at all. A payload of
+// any other type yields nothing, so a caller need not test the type first.
+//
+// `settings` may be either an authored settings object or a whole stored payload dictionary: the
+// only key read is the one the domains sit under, which both carry in the same place.
+//
+// The key is matched without regard to case, because Jamf stores a miscased key under Apple's
+// spelling, so a payload authored `payloadcontent` reaches a device as `PayloadContent` and its
+// domains are as real as any other payload's. Apple's spelling wins where a payload somehow carries
+// both, so the answer does not depend on map iteration order. The miscasing itself is reported
+// separately by appleprofiles.Validate.
+func mcxPreferenceDomains(payloadType string, settings map[string]any) ([]string, bool) {
+	if payloadType != mcxPayloadType {
+		return nil, false
+	}
+
+	content, present := settings[mcxPreferenceDomainsKey]
+	if !present {
+		for _, key := range slices.Sorted(maps.Keys(settings)) {
+			if strings.EqualFold(key, mcxPreferenceDomainsKey) {
+				content, present = settings[key], true
+				break
+			}
+		}
+	}
+	if !present {
+		return nil, false
+	}
+
+	domains, ok := content.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	return slices.Sorted(maps.Keys(domains)), true
+}
+
+// legacyPayloadIdentity returns the key one legacy payload is located by within a component block.
+// It is the payload type for every payload but one, and the payload type followed by the preference
+// domain in brackets for a managed preferences payload, of which a block may carry several.
+//
+// One key per payload is what the read-merge-write of stored identifiers depends on. A block's
+// payloads fold into a single profile, and macOS refuses a profile whose payload identifiers are not
+// unique — refusing every payload in it rather than the duplicated ones ("the PayloadIdentifier is
+// used more than once in the profile", ConfigProfilePluginDomain:-107, wire-verified on macOS 26.6
+// on 2026-09-16). Keying several managed preferences payloads on their shared type collapses them to
+// one entry, so each would be written with the same stored identifier and none of them would
+// install.
+//
+// A payload type never contains " (", so a composite key cannot collide with a bare one, and the
+// composite doubles as the label a diagnostic names the payload by.
+//
+// A managed preferences payload with no single domain falls back to its bare type, because there is
+// no domain to key it on. Neither shape that reaches the fallback is authorable: appendMCXDomainProblems
+// refuses both more than one domain and none at all during plan. The fallback still runs on the read
+// path, where the payloads come from the wire rather than from configuration and a blueprint edited
+// outside Terraform can carry either shape, so it keys on the type. That also leaves
+// appendLegacyConfigProfile's duplicate check able to see two domainless payloads in one block and
+// reject the second, which is the invariant its unit test pins.
+func legacyPayloadIdentity(payloadType string, settings map[string]any) string {
+	domains, _ := mcxPreferenceDomains(payloadType, settings)
+	if len(domains) != 1 {
+		return payloadType
+	}
+	return payloadType + " (" + domains[0] + ")"
+}
+
+// blockLegacyPayloadIdentity returns the legacyPayloadIdentity of one entry in a block's typed
+// legacy payload list, decoding its settings JSON string. Unparseable or absent settings yield the
+// bare payload type, which is what the entry would key on anyway: collectBlockLegacyPayloads reports
+// settings it cannot decode, and a payload without any carries no preference domain.
+func blockLegacyPayloadIdentity(entry BlockLegacyPayloadModel) string {
+	payloadType := entry.PayloadType.ValueString()
+	if !helpers.IsConfiguredValue(entry.Settings) {
+		return payloadType
+	}
+
+	var settings map[string]any
+	if err := json.Unmarshal([]byte(entry.Settings.ValueString()), &settings); err != nil {
+		return payloadType
+	}
+	return legacyPayloadIdentity(payloadType, settings)
+}
+
+// legacyPayloadIdentifiersInStep maps each legacy payload of a step's configuration profile
+// component to the identifier the service stored for it, keyed by legacyPayloadIdentity. A payload
+// the service has not stamped is omitted rather than mapped to the empty string, so a caller cannot
+// mistake it for a stored value.
+//
+// The identity comes from the stored payload's own dictionary rather than from configuration,
+// because this reads the wire: a stored managed preferences payload carries its preference domain
+// there, and a blueprint edited outside Terraform may carry a payload the configuration has never
+// described.
 func legacyPayloadIdentifiersInStep(step blueprints.BlueprintStep) (map[string]string, []string) {
 	identifiers := make(map[string]string)
 	for _, component := range step.Components {
@@ -130,44 +223,43 @@ func legacyPayloadIdentifiersInStep(step blueprints.BlueprintStep) (map[string]s
 		}
 
 		var configuration struct {
-			PayloadContent []struct {
-				PayloadType       string `json:"payloadType"`
-				PayloadIdentifier string `json:"payloadIdentifier"`
-			} `json:"payloadContent"`
+			PayloadContent []map[string]any `json:"payloadContent"`
 		}
 		if err := json.Unmarshal(component.Configuration, &configuration); err != nil {
 			continue
 		}
 		for _, payload := range configuration.PayloadContent {
-			if payload.PayloadType == "" || payload.PayloadIdentifier == "" {
+			payloadType, _ := payload["payloadType"].(string)
+			identifier, _ := payload["payloadIdentifier"].(string)
+			if payloadType == "" || identifier == "" {
 				continue
 			}
-			identifiers[payload.PayloadType] = payload.PayloadIdentifier
+			identifiers[legacyPayloadIdentity(payloadType, payload)] = identifier
 		}
 	}
 
 	return identifiers, dropDuplicateIdentifiers(identifiers)
 }
 
-// dropDuplicateIdentifiers removes from one step's map every identifier more than one payload type
+// dropDuplicateIdentifiers removes from one step's map every identifier more than one payload
 // carries, and returns those identifiers sorted. Dropping rather than keeping one of them is what
 // makes the outcome safe: the service then mints a distinct value for each, and a rotated identifier
 // costs nothing (see storedLegacyPayloadIdentifiers), where writing the duplicate back costs the
 // whole profile.
 func dropDuplicateIdentifiers(identifiers map[string]string) []string {
-	typesByIdentifier := make(map[string][]string, len(identifiers))
-	for payloadType, identifier := range identifiers {
-		typesByIdentifier[identifier] = append(typesByIdentifier[identifier], payloadType)
+	identitiesByIdentifier := make(map[string][]string, len(identifiers))
+	for identity, identifier := range identifiers {
+		identitiesByIdentifier[identifier] = append(identitiesByIdentifier[identifier], identity)
 	}
 
 	var duplicates []string
-	for identifier, payloadTypes := range typesByIdentifier {
-		if len(payloadTypes) < 2 {
+	for identifier, identities := range identitiesByIdentifier {
+		if len(identities) < 2 {
 			continue
 		}
 		duplicates = append(duplicates, identifier)
-		for _, payloadType := range payloadTypes {
-			delete(identifiers, payloadType)
+		for _, identity := range identities {
+			delete(identifiers, identity)
 		}
 	}
 	slices.Sort(duplicates)

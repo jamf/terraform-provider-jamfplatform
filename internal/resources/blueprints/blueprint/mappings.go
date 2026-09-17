@@ -24,6 +24,23 @@ const appleDeclarationsIdentifier = "com.jamf.ddm-strict"
 // package — and it must not reach user-facing text.
 const legacyConfigProfileIdentifier = "com.jamf.ddm-configuration-profile"
 
+// mcxPayloadType is Apple's payload type for the managed preferences envelope the Jamf Pro profile
+// editor calls "Application & Custom Settings", and mcxPreferenceDomainsKey is Apple's spelling of
+// the dictionary its preference domains sit under.
+//
+// It is the one payload type a component block may carry more than once, because a payload holds a
+// single preference domain: wire probing on macOS 26.6 on 2026-09-17 found a payload storing three
+// domains applied exactly one of them and dropped the rest, with the deploy reporting SUCCEEDED and
+// com.apple.ManagedClient logging nothing. Which domain survived was not predictable — a trio
+// stored as Safari, SoftwareUpdate, Terminal applied SoftwareUpdate, and a quad stored as
+// Accessibility, Safari, Terminal, dock applied dock, so neither first nor last fits both, and Jamf
+// re-sorts the keys into ASCII order anyway. The same domains split one per payload all applied,
+// which is also how the Jamf Pro editor builds a profile.
+const (
+	mcxPayloadType          = "com.apple.ManagedClient.preferences"
+	mcxPreferenceDomainsKey = "PayloadContent"
+)
+
 // stronglyTypedComponentIdentifiers lists all component identifiers that have strongly-typed representations.
 var stronglyTypedComponentIdentifiers = map[string]struct{}{
 	"com.jamf.ai-governance":                   {},
@@ -70,6 +87,9 @@ const legacyPayloadSettingsBehaviour = "The platform validates each payload agai
 	"carrying one never applies. To skip the checks, move **every** legacy payload in the same block to a " +
 	"single `raw_component` with identifier `com.jamf.ddm-configuration-profile`. The platform stores a " +
 	"block's legacy payloads as one component, so move them all or leave them all here. " +
+	"A custom settings payload (`com.apple.ManagedClient.preferences`) sets exactly one preference domain under " +
+	"`PayloadContent`, and the provider refuses any other count during `plan`. A Mac applies one of several domains and " +
+	"drops the rest, and Jamf discards an empty dictionary. Write one payload per domain, as the Jamf Pro profile editor does. " +
 	"Two behaviours are absorbed for you instead: a key set to `null` is discarded by Jamf and tolerated here, so nulls " +
 	"can stay in configuration; and Apple's common payload metadata (`payloadDisplayName`, `payloadOrganization`, " +
 	"`payloadVersion`) is stamped onto every payload and hidden unless you set it yourself. " +

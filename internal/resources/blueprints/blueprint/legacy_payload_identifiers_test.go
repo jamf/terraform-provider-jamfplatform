@@ -6,6 +6,7 @@ package blueprint
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -590,5 +591,185 @@ func TestStoredLegacyPayloadIdentifiers_DistinctIdentifiersAreKept(t *testing.T)
 	}
 	if len(stored.ambiguous) != 0 {
 		t.Errorf("ambiguous = %v, want empty: two distinct identifiers are the healthy case", stored.ambiguous)
+	}
+}
+
+// blockWithLegacyPayloads builds a component block carrying several legacy payloads from (payload
+// type, settings) pairs, which is what a block covering more than one preference domain needs.
+func blockWithLegacyPayloads(name string, payloads ...[2]string) ComponentBlockModel {
+	entries := make([]BlockLegacyPayloadModel, 0, len(payloads))
+	for _, payload := range payloads {
+		entries = append(entries, BlockLegacyPayloadModel{
+			PayloadType: types.StringValue(payload[0]),
+			Settings:    types.StringValue(payload[1]),
+		})
+	}
+
+	block := ComponentBlockModel{LegacyPayloads: entries}
+	if name != "" {
+		block.Name = types.StringValue(name)
+	}
+	return block
+}
+
+// storedStepWithPayloads builds one stored step from whole payload dictionaries, so a fixture can
+// carry the preference domain a custom settings payload is identified by. storedStep cannot: it
+// writes a payload type and an identifier and nothing else.
+func storedStepWithPayloads(t *testing.T, name string, payloads ...map[string]any) blueprints.BlueprintStep {
+	t.Helper()
+
+	configuration, err := json.Marshal(map[string]any{"payloadContent": payloads})
+	if err != nil {
+		t.Fatalf("marshalling a stored step: %v", err)
+	}
+	return blueprints.BlueprintStep{
+		Name:       &name,
+		Components: []blueprints.Component{{Identifier: legacyConfigProfileIdentifier, Configuration: configuration}},
+	}
+}
+
+// storedMCXPayload builds one stored custom settings payload for a preference domain, already
+// carrying the identifier the service assigned it.
+func storedMCXPayload(t *testing.T, domain, identifier string) map[string]any {
+	t.Helper()
+
+	var settings map[string]any
+	if err := json.Unmarshal([]byte(mcxSettings(t, domain)), &settings); err != nil {
+		t.Fatalf("decoding a custom settings payload: %v", err)
+	}
+
+	payload := map[string]any{"payloadType": mcxPayloadType, "payloadIdentifier": identifier}
+	maps.Copy(payload, settings)
+	return payload
+}
+
+// legacyPayloadsByIdentity decodes a built step's legacy payloads keyed by legacyPayloadIdentity, so
+// several custom settings payloads stay separate. legacyPayloadsInStep keys by payload type and
+// would collapse them to whichever the map iteration reached last, which is the very failure these
+// tests are about.
+func legacyPayloadsByIdentity(t *testing.T, step blueprints.BlueprintStep) map[string]map[string]any {
+	t.Helper()
+
+	payloads := make(map[string]map[string]any)
+	for _, component := range step.Components {
+		if component.Identifier != legacyConfigProfileIdentifier {
+			continue
+		}
+		var configuration struct {
+			PayloadContent []map[string]any `json:"payloadContent"`
+		}
+		if err := json.Unmarshal(component.Configuration, &configuration); err != nil {
+			t.Fatalf("unmarshal legacy component configuration: %v", err)
+		}
+		for _, payload := range configuration.PayloadContent {
+			payloadType, _ := payload["payloadType"].(string)
+			payloads[legacyPayloadIdentity(payloadType, payload)] = payload
+		}
+	}
+	return payloads
+}
+
+// TestBuildSteps_SeveralPreferenceDomainsAreSeparatePayloads covers the shape the fix exists to make
+// authorable: one block, one custom settings payload per preference domain. Before payload identity
+// took the domain into account, a block's payloads were keyed by type alone, so the second of these
+// would have overwritten the first and one domain would silently never be sent.
+func TestBuildSteps_SeveralPreferenceDomainsAreSeparatePayloads(t *testing.T) {
+	t.Parallel()
+
+	data := &BlueprintResourceModel{
+		Name: types.StringValue("BP"),
+		ComponentBlocks: []ComponentBlockModel{blockWithLegacyPayloads("Block 1",
+			[2]string{mcxPayloadType, mcxSettings(t, "com.example.first")},
+			[2]string{mcxPayloadType, mcxSettings(t, "com.example.second")},
+		)},
+	}
+
+	steps, diags := (&BlueprintResource{}).buildSteps(context.Background(), data, nil)
+	if diags.HasError() {
+		t.Fatalf("two preference domains in one block were rejected: %v", diags.Errors())
+	}
+
+	payloads := legacyPayloadsByIdentity(t, steps[0])
+	if len(payloads) != 2 {
+		t.Fatalf("the block sent %d payloads, want 2: %v", len(payloads), payloads)
+	}
+	for _, domain := range []string{"com.example.first", "com.example.second"} {
+		identity := mcxPayloadType + " (" + domain + ")"
+		payload, sent := payloads[identity]
+		if !sent {
+			t.Fatalf("no payload was sent for %s", domain)
+		}
+		if _, present := payload["payloadIdentifier"]; present {
+			t.Errorf("%s: create sent payloadIdentifier %v, want the key omitted", domain, payload["payloadIdentifier"])
+		}
+	}
+}
+
+// TestBuildSteps_StoredIdentifiersFollowThePreferenceDomain is the trap this fix is mostly about. A
+// block's payloads fold into one profile, and macOS refuses a profile whose payload identifiers are
+// not unique — every payload in it, not the duplicated ones. Keying stored identifiers by payload
+// type writes one value onto every custom settings payload in the block, so none of them install
+// while the blueprint reports DEPLOYED.
+func TestBuildSteps_StoredIdentifiersFollowThePreferenceDomain(t *testing.T) {
+	t.Parallel()
+
+	data := &BlueprintResourceModel{
+		Name: types.StringValue("BP"),
+		ComponentBlocks: []ComponentBlockModel{blockWithLegacyPayloads("Block 1",
+			[2]string{mcxPayloadType, mcxSettings(t, "com.example.first")},
+			[2]string{mcxPayloadType, mcxSettings(t, "com.example.second")},
+		)},
+	}
+	stored := newStoredLegacyPayloadIdentifiers(storedBlueprint(storedStepWithPayloads(t, "Block 1",
+		storedMCXPayload(t, "com.example.first", "IDENT-FIRST"),
+		storedMCXPayload(t, "com.example.second", "IDENT-SECOND"),
+	)))
+
+	steps, diags := (&BlueprintResource{}).buildSteps(context.Background(), data, stored)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags.Errors())
+	}
+
+	payloads := legacyPayloadsByIdentity(t, steps[0])
+	for domain, want := range map[string]string{"com.example.first": "IDENT-FIRST", "com.example.second": "IDENT-SECOND"} {
+		payload, sent := payloads[mcxPayloadType+" ("+domain+")"]
+		if !sent {
+			t.Fatalf("no payload was sent for %s", domain)
+		}
+		if got := payload["payloadIdentifier"]; got != want {
+			t.Errorf("%s: payloadIdentifier = %v, want its own %s", domain, got, want)
+		}
+	}
+}
+
+// TestBuildSteps_AnUnstoredPreferenceDomainMintsItsOwn covers a domain added to a block whose other
+// domain the service already stamped. The new payload must reach the wire with no identifier, for
+// the service to mint a distinct one — taking the sibling's would be the duplicate macOS refuses the
+// whole profile over.
+func TestBuildSteps_AnUnstoredPreferenceDomainMintsItsOwn(t *testing.T) {
+	t.Parallel()
+
+	data := &BlueprintResourceModel{
+		Name: types.StringValue("BP"),
+		ComponentBlocks: []ComponentBlockModel{blockWithLegacyPayloads("Block 1",
+			[2]string{mcxPayloadType, mcxSettings(t, "com.example.first")},
+			[2]string{mcxPayloadType, mcxSettings(t, "com.example.added")},
+		)},
+	}
+	stored := newStoredLegacyPayloadIdentifiers(storedBlueprint(storedStepWithPayloads(t, "Block 1",
+		storedMCXPayload(t, "com.example.first", "IDENT-FIRST"),
+	)))
+
+	steps, diags := (&BlueprintResource{}).buildSteps(context.Background(), data, stored)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags.Errors())
+	}
+
+	payloads := legacyPayloadsByIdentity(t, steps[0])
+	if got := payloads[mcxPayloadType+" (com.example.first)"]["payloadIdentifier"]; got != "IDENT-FIRST" {
+		t.Errorf("the stored domain sent payloadIdentifier %v, want IDENT-FIRST", got)
+	}
+	if got, present := payloads[mcxPayloadType+" (com.example.added)"]["payloadIdentifier"]; present {
+		t.Errorf("the added domain sent payloadIdentifier %v, want the key omitted", got)
 	}
 }

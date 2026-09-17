@@ -1040,3 +1040,40 @@ func TestBlockOnlyComponentIdentifiers_CoversEveryTypedComponentWithoutFlatField
 		}
 	}
 }
+
+// TestFlattenBlockLegacyPayloads_EachPreferenceDomainKeepsItsOwnAuthoredString covers the read side
+// of one block carrying a custom settings payload per preference domain. Each payload's authored
+// JSON string must be paired with the wire payload for its own domain: pairing by payload type
+// leaves only one of them in the lookup, so the others are re-encoded and every plan reports a
+// difference in a string that says the same thing.
+func TestFlattenBlockLegacyPayloads_EachPreferenceDomainKeepsItsOwnAuthoredString(t *testing.T) {
+	apiComponents := map[string]blueprints.Component{
+		"com.jamf.ddm-configuration-profile": {
+			Identifier: "com.jamf.ddm-configuration-profile",
+			Configuration: json.RawMessage(`{"payloadDisplayName":"bp","payloadContent":[` +
+				`{"payloadType":"com.apple.ManagedClient.preferences","payloadIdentifier":"one","payloadUUID":"one",` +
+				`"PayloadContent":{"com.example.first":{"Forced":[{"mcx_preference_settings":{"key":1}}]}}},` +
+				`{"payloadType":"com.apple.ManagedClient.preferences","payloadIdentifier":"two","payloadUUID":"two",` +
+				`"PayloadContent":{"com.example.second":{"Forced":[{"mcx_preference_settings":{"key":2}}]}}}]}`),
+		},
+	}
+
+	authoredFirst := `{ "PayloadContent": { "com.example.first": { "Forced": [ { "mcx_preference_settings": { "key": 1 } } ] } } }`
+	authoredSecond := `{ "PayloadContent": { "com.example.second": { "Forced": [ { "mcx_preference_settings": { "key": 2 } } ] } } }`
+	prior := []BlockLegacyPayloadModel{
+		{PayloadType: types.StringValue("com.apple.ManagedClient.preferences"), Settings: types.StringValue(authoredFirst)},
+		{PayloadType: types.StringValue("com.apple.ManagedClient.preferences"), Settings: types.StringValue(authoredSecond)},
+	}
+
+	got := flattenBlockLegacyPayloads(prior, apiComponents, map[string]struct{}{})
+
+	if len(got) != 2 {
+		t.Fatalf("expected 2 payloads, got %d: %v", len(got), got)
+	}
+	if got[0].Settings.ValueString() != authoredFirst {
+		t.Errorf("the first domain did not keep its authored string, got %q", got[0].Settings.ValueString())
+	}
+	if got[1].Settings.ValueString() != authoredSecond {
+		t.Errorf("the second domain did not keep its authored string, got %q", got[1].Settings.ValueString())
+	}
+}

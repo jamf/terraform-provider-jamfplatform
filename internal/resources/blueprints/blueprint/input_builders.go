@@ -393,8 +393,13 @@ func (r *BlueprintResource) collectBlockLegacyPayloads(allComponents *[]blueprin
 }
 
 // appendLegacyConfigProfile assembles the shared com.jamf.ddm-configuration-profile component from
-// the flattened legacy payload entries and appends it. It rejects a missing payload type or a
-// duplicate payload type.
+// the flattened legacy payload entries and appends it. It rejects a missing payload type and a
+// payload the block already declares, which legacyPayloadIdentity defines: a repeated payload type
+// for most payloads, and a repeated preference domain for a managed preferences payload.
+//
+// Several managed preferences payloads in one block are deliberately allowed, because a payload
+// carries one preference domain and a block covering three domains needs three payloads (see
+// mcxPayloadType). Every other payload type still appears at most once.
 //
 // `payloadIdentifier` is the service's to own, so an authored one is dropped and the stored one
 // written back where there is one; a payload the service has not yet stamped is sent without the
@@ -412,7 +417,7 @@ func (r *BlueprintResource) collectBlockLegacyPayloads(allComponents *[]blueprin
 // `payloadUUID` goes the same way because the service reassigns it on every write (see
 // maskServerStampedPayloadKeys), so an authored one is never honoured and must not be sent.
 func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprints.Component, diags *diag.Diagnostics, entries []legacyPayloadEntry, blueprintName string, storedIdentifiers map[string]string) {
-	seenPayloadTypes := make(map[string]bool, len(entries))
+	seenPayloads := make(map[string]bool, len(entries))
 	payloadArray := make([]map[string]any, 0, len(entries))
 	for _, entry := range entries {
 		if entry.PayloadType == "" {
@@ -420,14 +425,12 @@ func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprint
 			return
 		}
 
-		if seenPayloadTypes[entry.PayloadType] {
-			diags.AddError(
-				"Duplicate payload_type",
-				"Legacy payloads must not contain duplicate payload types. Found duplicate: "+entry.PayloadType,
-			)
+		identity := legacyPayloadIdentity(entry.PayloadType, entry.Settings)
+		if seenPayloads[identity] {
+			diags.AddError(duplicateLegacyPayloadDiagnostic(entry.PayloadType, entry.Settings))
 			return
 		}
-		seenPayloadTypes[entry.PayloadType] = true
+		seenPayloads[identity] = true
 
 		payload := map[string]any{"payloadType": entry.PayloadType}
 		maps.Copy(payload, entry.Settings)
@@ -439,7 +442,7 @@ func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprint
 				return false
 			}
 		})
-		if identifier, stored := storedIdentifiers[entry.PayloadType]; stored {
+		if identifier, stored := storedIdentifiers[identity]; stored {
 			payload["payloadIdentifier"] = identifier
 		}
 		payloadArray = append(payloadArray, payload)
@@ -460,4 +463,19 @@ func (r *BlueprintResource) appendLegacyConfigProfile(allComponents *[]blueprint
 		Identifier:    legacyConfigProfileIdentifier,
 		Configuration: json.RawMessage(configJSON),
 	})
+}
+
+// duplicateLegacyPayloadDiagnostic returns the summary and detail for a legacy payload a component
+// block declares twice.
+//
+// A managed preferences payload gets its own wording because repeating that payload type is
+// legitimate: what cannot repeat is the preference domain, and a message naming the type alone would
+// read as contradicting the rule that sent the author here.
+func duplicateLegacyPayloadDiagnostic(payloadType string, settings map[string]any) (string, string) {
+	if domains, _ := mcxPreferenceDomains(payloadType, settings); len(domains) == 1 {
+		return "Duplicate preference domain",
+			"This component block sets the " + domains[0] + " preference domain in more than one custom settings payload. Give each domain its own payload."
+	}
+	return "Duplicate payload_type",
+		"A component block declares each payload type once. This block declares " + payloadType + " more than once."
 }
