@@ -124,6 +124,40 @@ func JamfProVersionInRange(actual, minInclusive, maxExclusive string) bool {
 	return compareSemver(a, lo) >= 0 && compareSemver(a, hi) < 0
 }
 
+// JamfProVersionInRangeStrict reports whether actual falls in the half-open
+// version window [minInclusive, maxExclusive), and is the FAIL-CLOSED twin of
+// JamfProVersionInRange: any parse failure returns false.
+//
+// The two exist because the answer is used for opposite purposes and a single
+// default cannot serve both. JamfProVersionInRange gates a version-specific
+// WORKAROUND, where an unknown tenant version should keep the workaround engaged
+// — the workaround's behaviour is tolerated across the whole supported range, so
+// staying engaged costs nothing and disengaging breaks a tenant inside the
+// window. This function instead gates a REFUSAL: a construct that declines to
+// operate on a known-bad version window. A refusal must be certain, because
+// blocking on "cannot tell" turns an unparseable version string into an outage
+// for every construct that consults it, which is strictly worse than the drift
+// the refusal was protecting against.
+//
+// Pick deliberately. Using this one to gate a workaround silently disables the
+// workaround on an unknown version; using the fail-open one to gate a refusal
+// blocks every tenant whose version will not parse.
+func JamfProVersionInRangeStrict(actual, minInclusive, maxExclusive string) bool {
+	a, err := parseSemverPrefix(actual)
+	if err != nil {
+		return false
+	}
+	lo, err := parseSemverPrefix(minInclusive)
+	if err != nil {
+		return false
+	}
+	hi, err := parseSemverPrefix(maxExclusive)
+	if err != nil {
+		return false
+	}
+	return compareSemver(a, lo) >= 0 && compareSemver(a, hi) < 0
+}
+
 type semver struct {
 	major, minor, patch int
 }
