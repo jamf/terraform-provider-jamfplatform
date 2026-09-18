@@ -29,27 +29,28 @@ func TestTableLoads(t *testing.T) {
 	}
 }
 
-// TestTableUnionsReleaseAndSeed is the staleness guard that a scheduled refresh cannot provide: it
-// fails when someone regenerates the table from Apple's release branch alone. Jamf's
-// generative-declarations service tracks Apple's seed branch, and because an unrecognised name is
-// an error rather than a warning, a release-only table would reject configurations that work —
-// including declaration types the Jamf UI already offers.
-func TestTableUnionsReleaseAndSeed(t *testing.T) {
+// TestTableRefs asserts the branches the table was built from are the ones SeedOnly's meaning
+// depends on: release read first, and anything after it a seed branch.
+//
+// It deliberately does NOT require a seed branch. Apple promotes its seed branch into release at OS
+// GA and deletes it — seed_OS_27_0 went that way, release becoming Release-v27.0 on 2026-09-18 — so
+// for part of every year release is the whole vocabulary and a release-only table is the correct
+// one. This test used to fail on that, which is a staleness guard it cannot honestly provide
+// anyway: whether a seed branch exists is a fact about upstream, and `make test` has no network.
+// What it can check is that a ref nobody expected did not arrive, which is what a seed branch alive
+// under a name the generator's glob no longer matches would eventually look like.
+func TestTableRefs(t *testing.T) {
 	refs := Refs()
-	if len(refs) < 2 {
-		t.Fatalf("table unions %d branch(es) (%v), want at least the release branch and a seed branch", len(refs), refs)
+	if len(refs) == 0 {
+		t.Fatal("table records no upstream branch")
 	}
 	if got := ReleaseRef(); got != "release" {
 		t.Errorf("first ref is %q, want %q: the release branch must be read first so SeedOnly means what it says", got, "release")
 	}
-	seeds := 0
 	for _, ref := range refs[1:] {
-		if strings.HasPrefix(ref, "seed") {
-			seeds++
+		if !strings.HasPrefix(ref, "seed_OS_") {
+			t.Errorf("ref %q follows release but is not a seed_OS_* branch; refs are %v", ref, refs)
 		}
-	}
-	if seeds == 0 {
-		t.Errorf("no seed branch among %v; Apple may have changed its naming convention", refs)
 	}
 }
 
@@ -61,9 +62,9 @@ func TestTableCanaries(t *testing.T) {
 		t.Fatal("com.apple.configuration.siri.settings missing from the table")
 	}
 
-	// Enabled has been on the release branch for years; AllowSiriAI arrived on seed only. Both must
-	// be present, and their provenance must differ — that difference is the whole reason the table
-	// is a union.
+	// Enabled has been on the release branch for years. AllowSiriAI arrived on seed only, which is
+	// what proved the table had to be a union, and reached release with Release-v27.0 — so it is
+	// pinned here for its presence rather than its provenance, which moves with Apple.
 	for _, name := range []string{"Enabled", "ForceProfanityFilter"} {
 		key, ok := siri.Keys[name]
 		if !ok {
@@ -76,16 +77,17 @@ func TestTableCanaries(t *testing.T) {
 	for _, name := range []string{"AllowSiriAI", "ForceReduceSensitiveContent"} {
 		key, ok := siri.Keys[name]
 		if !ok {
-			t.Fatalf("siri.settings.%s missing; the table was probably built from the release branch alone", name)
+			t.Fatalf("siri.settings.%s missing; the Jamf UI offers it, so a plan rejecting it rejects a working configuration", name)
 		}
 		if !key.SeedOnly() {
 			t.Logf("siri.settings.%s is no longer seed-only; Apple has promoted it to release, which is fine", name)
 		}
 	}
 
-	// A declaration type that exists only on seed, and which a real user configuration relies on.
+	// A declaration type that arrived on seed ahead of release, and which a real user configuration
+	// relies on.
 	if _, ok := Lookup("com.apple.configuration.app.settings"); !ok {
-		t.Error("com.apple.configuration.app.settings missing; a seed-only type the Jamf UI already offers")
+		t.Error("com.apple.configuration.app.settings missing; a type the Jamf UI already offers")
 	}
 }
 
