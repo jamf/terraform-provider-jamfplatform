@@ -303,6 +303,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	dropped, err := compareTables(*profilesOut, profiles, *declarationsOut, declarations)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "appleprofiles:", err)
+		os.Exit(1)
+	}
+	if len(dropped.Findings) > 0 {
+		fmt.Fprintf(os.Stderr, "appleprofiles: this regeneration drops %d name(s) the committed tables carry:\n%s",
+			len(dropped.Findings), dropped.report())
+	}
+
 	if err := writeTable(*profilesOut, profiles); err != nil {
 		fmt.Fprintln(os.Stderr, "appleprofiles:", err)
 		os.Exit(1)

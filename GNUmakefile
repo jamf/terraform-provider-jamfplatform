@@ -32,15 +32,26 @@ fmt:
 # diff and commit the regenerated tables.
 #
 # Both tables are the UNION of the release branch and Apple's newest seed (pre-release) branch,
-# because Jamf's generative-declarations service tracks seed: as of 2026-09 seed_OS_27_0 carries 12
-# configuration declaration types and keys such as siri.settings.AllowSiriAI that release does not,
-# all of them already offered in the Jamf UI. A table built from release alone would report those as
-# unknown — and an unknown name is an error, not a warning, so that would block working configs.
+# because Jamf's generative-declarations service tracks seed: while seed_OS_27_0 was open it carried
+# 12 configuration declaration types and keys such as siri.settings.AllowSiriAI that release did
+# not, all of them already offered in the Jamf UI. A table built from release alone would report
+# those as unknown — and an unknown name is an error, not a warning, so that would block working
+# configs.
 #
 # The seed branch is discovered rather than pinned, since its name moves with the OS
-# (seed_OS_27_0 -> seed_OS_28_0). If discovery finds nothing the target FAILS instead of quietly
-# building from release alone, which would turn every seed-only key into an error. Override to pin:
-#   make apple-schemas SEED_REF=seed_OS_27_0
+# (seed_OS_27_0 -> seed_OS_28_0). Discovery finding NOTHING is expected for part of the year: Apple
+# promotes the seed branch into release at OS GA and deletes it, so between that and the next beta
+# release is the whole vocabulary — seed_OS_27_0 went this way, release becoming Release-v27.0 on
+# 2026-09-18. So it builds from release alone rather than refusing. Override to pin a branch
+# discovery would miss:
+#   make apple-schemas SEED_REF=seed_OS_28_0
+#
+# The tables are rebuilt from the checkouts alone, never merged into what is committed, so they
+# carry exactly what Apple declares today and a key Apple withdraws leaves the provider with it.
+# That is the intent — the provider tracks upstream rather than accumulating a vocabulary Apple has
+# retired. The generator still REPORTS every name a regeneration drops, because a withdrawal is the
+# one refresh that turns a plan that works today into a failing one, and it must reach whoever
+# reviews the diff instead of hiding in 6,000 changed lines.
 RELEASE_REF ?= release
 SEED_REF ?=
 apple-schemas:
@@ -52,27 +63,30 @@ apple-schemas:
 			| sed 's#.*refs/heads/##' | sort -V | tail -1)"; \
 	fi; \
 	if [ -z "$$seed" ]; then \
-		echo "apple-schemas: no seed_OS_* branch found upstream." >&2; \
-		echo "  Apple may have changed the naming convention. Building from $(RELEASE_REF) alone" >&2; \
-		echo "  would report every seed-only key as unknown, which is now an error, so refusing." >&2; \
-		echo "  Investigate, then pin explicitly: make apple-schemas SEED_REF=<branch>" >&2; \
-		exit 1; \
+		echo "No seed_OS_* branch upstream, which is expected between an OS release and"; \
+		echo "its next beta. Building from $(RELEASE_REF) alone."; \
+	else \
+		echo "Using seed branch $$seed"; \
 	fi; \
-	echo "Using seed branch $$seed"; \
 	work="$$(mktemp -d)"; \
 	trap 'rm -rf "$$work"' EXIT; \
-	for ref in '$(RELEASE_REF)' "$$seed"; do \
+	newest='$(RELEASE_REF)'; \
+	for ref in '$(RELEASE_REF)' $$seed; do \
 		echo "Cloning apple/device-management ($$ref)..."; \
 		git clone --depth 1 --branch "$$ref" --filter=blob:none --sparse \
 			https://github.com/apple/device-management.git "$$work/$$ref" >/dev/null 2>&1; \
 		git -C "$$work/$$ref" sparse-checkout set mdm/profiles declarative >/dev/null 2>&1; \
+		newest="$$ref"; \
 	done; \
-	cd tools && go run ./appleprofiles \
-		-root '$(RELEASE_REF)'="$$work/$(RELEASE_REF)" \
-		-commit '$(RELEASE_REF)'="$$(git -C "$$work/$(RELEASE_REF)" rev-parse HEAD)" \
-		-root "$$seed=$$work/$$seed" \
-		-commit "$$seed=$$(git -C "$$work/$$seed" rev-parse HEAD)" \
-		-release "$$(git -C "$$work/$$seed" log -1 --format=%s)" \
+	release='$(RELEASE_REF)'; \
+	roots="-root $$release=$$work/$$release"; \
+	roots="$$roots -commit $$release=$$(git -C "$$work/$$release" rev-parse HEAD)"; \
+	if [ -n "$$seed" ]; then \
+		roots="$$roots -root $$seed=$$work/$$seed"; \
+		roots="$$roots -commit $$seed=$$(git -C "$$work/$$seed" rev-parse HEAD)"; \
+	fi; \
+	cd tools && go run ./appleprofiles $$roots \
+		-release "$$(git -C "$$work/$$newest" log -1 --format=%s)" \
 		-profiles-out ../internal/common/appleprofiles/profiles.json \
 		-declarations-out ../internal/common/appledeclarations/declarations.json
 
