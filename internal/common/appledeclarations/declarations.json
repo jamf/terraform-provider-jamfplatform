@@ -1,14 +1,12 @@
 {
  "source": "https://github.com/apple/device-management",
  "commits": {
-  "release": "67045e2fa06f528b196c01edee6a8bf88b844beb",
-  "seed_OS_27_0": "b0180185a5e4077070710033341b71d0cbe1a18a"
+  "release": "09f249a06e7e3289930bf6d05f38fb562f748ebf"
  },
  "refs": [
-  "release",
-  "seed_OS_27_0"
+  "release"
  ],
- "release": "Seed8",
+ "release": "Release-v27.0",
  "declarations": {
   "com.apple.activation.simple": {
    "title": "Activation:Simple",
@@ -17,8 +15,7 @@
     "Predicate": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "StandardConfigurations": {
@@ -27,19 +24,16 @@
      "item": {
       "type": "string",
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.asset.credential.acme": {
@@ -53,8 +47,7 @@
       "AfterFirstUnlock"
      ],
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Authentication": {
@@ -68,14 +61,12 @@
         "None"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Reference": {
@@ -85,42 +76,36 @@
       "ContentType": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "DataURL": {
        "type": "string",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Hash-SHA-256": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Size": {
        "type": "integer",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.asset.credential.certificate": {
@@ -138,14 +123,12 @@
         "None"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Reference": {
@@ -155,42 +138,36 @@
       "ContentType": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "DataURL": {
        "type": "string",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Hash-SHA-256": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Size": {
        "type": "integer",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.asset.credential.identity": {
@@ -204,8 +181,7 @@
       "AfterFirstUnlock"
      ],
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Authentication": {
@@ -219,14 +195,12 @@
         "None"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Reference": {
@@ -236,42 +210,36 @@
       "ContentType": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "DataURL": {
        "type": "string",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Hash-SHA-256": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Size": {
        "type": "integer",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.asset.credential.scep": {
@@ -285,8 +253,7 @@
       "AfterFirstUnlock"
      ],
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Authentication": {
@@ -300,14 +267,12 @@
         "None"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Reference": {
@@ -317,42 +282,36 @@
       "ContentType": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "DataURL": {
        "type": "string",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Hash-SHA-256": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Size": {
        "type": "integer",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.asset.credential.userpassword": {
@@ -370,14 +329,12 @@
         "None"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Reference": {
@@ -387,42 +344,36 @@
       "ContentType": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "DataURL": {
        "type": "string",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Hash-SHA-256": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Size": {
        "type": "integer",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.asset.data": {
@@ -440,14 +391,12 @@
         "None"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Reference": {
@@ -457,42 +406,36 @@
       "ContentType": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "DataURL": {
        "type": "string",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Hash-SHA-256": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Size": {
        "type": "integer",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.asset.useridentity": {
@@ -502,21 +445,18 @@
     "EmailAddress": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "FullName": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.accessibility.settings": {
@@ -529,17 +469,17 @@
       "AllowLiveRecognition": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.account.caldav": {
@@ -549,43 +489,37 @@
     "AuthenticationCredentialsAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "HostName": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Path": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Port": {
      "type": "integer",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.account.carddav": {
@@ -595,43 +529,37 @@
     "AuthenticationCredentialsAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "HostName": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Path": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Port": {
      "type": "integer",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.account.exchange": {
@@ -641,29 +569,25 @@
     "AuthenticationCredentialsAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AuthenticationIdentityAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "CalendarServiceActive": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ContactsServiceActive": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "EnabledProtocolTypes": {
@@ -676,90 +600,77 @@
        "EWS"
       ],
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "External Path": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ExternalHostName": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ExternalPort": {
      "type": "integer",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "HostName": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "LockCalendarService": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "LockContactsService": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "LockMailService": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "LockNotesService": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "LockRemindersService": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "MailServiceActive": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "NotesServiceActive": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "OAuth": {
@@ -769,49 +680,42 @@
        "type": "boolean",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SignInURL": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "TokenRequestURL": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Path": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Port": {
      "type": "integer",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "RemindersServiceActive": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "SMIME": {
@@ -824,42 +728,36 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "IdentityAssetReference": {
          "type": "string",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "IdentityUserOverrideable": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "PerMessageSwitchEnabled": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "UserOverrideable": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Signing": {
@@ -869,61 +767,52 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "IdentityAssetReference": {
          "type": "string",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "IdentityUserOverrideable": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "UserOverrideable": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "UserIdentityAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.account.google": {
@@ -934,21 +823,18 @@
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.account.ldap": {
@@ -958,23 +844,20 @@
     "AuthenticationCredentialsAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "HostName": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Port": {
      "type": "integer",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "SearchSettings": {
@@ -990,47 +873,40 @@
          "Subtree"
         ],
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "SearchBase": {
         "type": "string",
         "required": true,
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "VisibleDescription": {
         "type": "string",
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.account.mail": {
@@ -1044,8 +920,7 @@
       "AuthenticationCredentialsAssetReference": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AuthenticationMethod": {
@@ -1059,30 +934,26 @@
         "HTTPMD5"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "HostName": {
        "type": "string",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IMAPPathPrefix": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Port": {
        "type": "integer",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ServerType": {
@@ -1093,14 +964,12 @@
         "POP"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "OutgoingServer": {
@@ -1110,8 +979,7 @@
       "AuthenticationCredentialsAssetReference": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AuthenticationMethod": {
@@ -1125,29 +993,25 @@
         "HTTPMD5"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "HostName": {
        "type": "string",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Port": {
        "type": "integer",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "SMIME": {
@@ -1160,42 +1024,36 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "IdentityAssetReference": {
          "type": "string",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "IdentityUserOverrideable": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "PerMessageSwitchEnabled": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "UserOverrideable": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Signing": {
@@ -1205,61 +1063,52 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "IdentityAssetReference": {
          "type": "string",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "IdentityUserOverrideable": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "UserOverrideable": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "UserIdentityAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.account.subscribed-calendar": {
@@ -1269,29 +1118,25 @@
     "AuthenticationCredentialsAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "CalendarURL": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.app.managed": {
@@ -1301,8 +1146,7 @@
     "AppComposedIdentifier": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AppConfig": {
@@ -1317,34 +1161,29 @@
           "type": "string",
           "required": true,
           "refs": [
-           "release",
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "Identifier": {
           "type": "string",
           "required": true,
           "refs": [
-           "release",
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "DataAssetReference": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Identities": {
@@ -1356,27 +1195,23 @@
           "type": "string",
           "required": true,
           "refs": [
-           "release",
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "Identifier": {
           "type": "string",
           "required": true,
           "refs": [
-           "release",
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Passwords": {
@@ -1388,40 +1223,34 @@
           "type": "string",
           "required": true,
           "refs": [
-           "release",
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "Identifier": {
           "type": "string",
           "required": true,
           "refs": [
-           "release",
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AppStoreID": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Attributes": {
@@ -1432,89 +1261,76 @@
        "item": {
         "type": "string",
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AssociatedDomainsEnableDirectDownloads": {
        "type": "boolean",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "CellularSliceUUID": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ContentFilterUUID": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "DNSProxyUUID": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Hideable": {
        "type": "boolean",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Lockable": {
        "type": "boolean",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "RelayUUID": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "TapToPayScreenLock": {
        "type": "boolean",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "VPNUUID": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "BundleID": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ExtensionConfigs": {
@@ -1531,34 +1347,29 @@
            "type": "string",
            "required": true,
            "refs": [
-            "release",
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Identifier": {
            "type": "string",
            "required": true,
            "refs": [
-            "release",
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "DataAssetReference": {
         "type": "string",
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "Identities": {
@@ -1570,27 +1381,23 @@
            "type": "string",
            "required": true,
            "refs": [
-            "release",
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Identifier": {
            "type": "string",
            "required": true,
            "refs": [
-            "release",
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "Passwords": {
@@ -1602,45 +1409,38 @@
            "type": "string",
            "required": true,
            "refs": [
-            "release",
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Identifier": {
            "type": "string",
            "required": true,
            "refs": [
-            "release",
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "IncludeInBackup": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "InstallBehavior": {
@@ -1654,8 +1454,7 @@
         "StoreSettings"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Install": {
@@ -1665,8 +1464,7 @@
         "Required"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "License": {
@@ -1679,51 +1477,35 @@
           "User"
          ],
          "refs": [
-          "release",
-          "seed_OS_27_0"
-         ]
-        },
-        "VPPType": {
-         "type": "string",
-         "enum": [
-          "Device",
-          "User"
-         ],
-         "refs": [
           "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Version": {
        "type": "integer",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "LegacyAppConfigAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ManifestURL": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "UpdateBehavior": {
@@ -1738,27 +1520,23 @@
         "StoreSettings"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "iOSApp": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.app.settings": {
@@ -1773,11 +1551,11 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AllowedBinaries": {
@@ -1788,19 +1566,19 @@
          "CDHash": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "PathPrefix": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "SigningID": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "SigningState": {
@@ -1814,28 +1592,28 @@
            "Apple"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "TeamID": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AlwaysAllowManagedApps": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "DeniedApps": {
@@ -1843,11 +1621,11 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "DeniedBinaries": {
@@ -1858,19 +1636,19 @@
          "CDHash": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "PathPrefix": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "SigningID": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "SigningState": {
@@ -1884,27 +1662,27 @@
            "Apple"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "TeamID": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Privacy": {
@@ -1922,7 +1700,7 @@
            "Allow"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "Bluetooth": {
@@ -1932,7 +1710,7 @@
            "Allow"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "Camera": {
@@ -1942,7 +1720,7 @@
            "Allow"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "Dictation": {
@@ -1952,7 +1730,7 @@
            "Allow"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "LocalNetwork": {
@@ -1962,7 +1740,7 @@
            "Allow"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "Location": {
@@ -1973,7 +1751,7 @@
            "Always"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "LocationAccuracy": {
@@ -1984,7 +1762,7 @@
            "Precise"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "Microphone": {
@@ -1994,33 +1772,33 @@
            "Allow"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "OrganizationJustification": {
           "type": "string",
           "required": true,
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.audio-accessory.settings": {
@@ -2042,8 +1820,7 @@
            "min": 0,
            "max": 23,
            "refs": [
-            "release",
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Policy": {
@@ -2054,39 +1831,33 @@
             "Hour"
            ],
            "refs": [
-            "release",
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Disabled": {
        "type": "boolean",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.content-cache.settings": {
@@ -2096,43 +1867,43 @@
     "AllowCacheDelete": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowPersonalCaching": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowSharedCaching": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AutoActivation": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AutoEnableTetheredCaching": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "CacheLimit": {
      "type": "integer",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DataPath": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DeclarativeStatusInterval": {
@@ -2140,31 +1911,31 @@
      "min": 300,
      "max": 86400,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DenyActivation": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DenyTetheredCaching": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DisplayAlerts": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "KeepAwake": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ListenRanges": {
@@ -2176,14 +1947,14 @@
         "type": "string",
         "required": true,
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "last": {
         "type": "string",
         "required": true,
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "type": {
@@ -2193,40 +1964,40 @@
          "IPv6"
         ],
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ListenRangesOnly": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ListenWithPeersAndParents": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "LocalSubnetsOnly": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "LogClientIdentity": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ManagementReportingInterval": {
@@ -2234,7 +2005,7 @@
      "min": 60,
      "max": 86400,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ManagementSecurityConfig": {
@@ -2245,19 +2016,19 @@
       "specificServerCert"
      ],
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ManagementStatusCertificateReference": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ManagementStatusTarget": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ParentSelectionPolicy": {
@@ -2270,7 +2041,7 @@
       "sticky-available"
      ],
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Parents": {
@@ -2278,11 +2049,11 @@
      "item": {
       "type": "string",
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PeerFilterRanges": {
@@ -2294,14 +2065,14 @@
         "type": "string",
         "required": true,
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "last": {
         "type": "string",
         "required": true,
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "type": {
@@ -2311,16 +2082,16 @@
          "IPv6"
         ],
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PeerListenRanges": {
@@ -2332,14 +2103,14 @@
         "type": "string",
         "required": true,
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "last": {
         "type": "string",
         "required": true,
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "type": {
@@ -2349,34 +2120,34 @@
          "IPv6"
         ],
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PeerLocalSubnetsOnly": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PersonalCacheLimit": {
      "type": "integer",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Port": {
      "type": "integer",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PublicRanges": {
@@ -2388,14 +2159,14 @@
         "type": "string",
         "required": true,
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "last": {
         "type": "string",
         "required": true,
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "type": {
@@ -2405,21 +2176,21 @@
          "IPv6"
         ],
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.diskmanagement.settings": {
@@ -2437,8 +2208,7 @@
         "Disallowed"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "NetworkStorage": {
@@ -2449,20 +2219,17 @@
         "Disallowed"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.extensible-sso": {
@@ -2474,18 +2241,18 @@
      "item": {
       "type": "string",
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ExtensionComposedIdentifier": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ExtensionData": {
@@ -2493,11 +2260,11 @@
      "any": {
       "type": "any",
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Hosts": {
@@ -2505,11 +2272,11 @@
      "item": {
       "type": "string",
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PlatformSSO": {
@@ -2521,30 +2288,30 @@
         "AllowExpressMode": {
          "type": "boolean",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "ReaderGroupIdentifier": {
          "type": "data",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "ReaderIssuerCertificateAssetReference": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "TerminalIdentityAssetReference": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Account": {
@@ -2553,24 +2320,24 @@
         "DisplayName": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "SynchronizeProfilePicture": {
          "type": "boolean",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AllowDeviceIdentifiersInAttestation": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AuthenticationMethod": {
@@ -2582,7 +2349,7 @@
         "OpenID"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Authorization": {
@@ -2593,11 +2360,11 @@
          "item": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "AdministratorGroups": {
@@ -2605,11 +2372,11 @@
          "item": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "AuthorizationGroups": {
@@ -2617,17 +2384,17 @@
          "any": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "EnableIdentityProviderAccounts": {
          "type": "boolean",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "UserAuthorizationMode": {
@@ -2638,19 +2405,19 @@
           "Groups"
          ],
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "LoginFrequency": {
        "type": "integer",
        "min": 3600,
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Policies": {
@@ -2659,7 +2426,7 @@
         "AuthenticationGracePeriod": {
          "type": "integer",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "FileVault": {
@@ -2676,11 +2443,11 @@
            "AllowOpenIDForTouchIDFallback"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "Login": {
@@ -2697,11 +2464,11 @@
            "AllowOpenIDForTouchIDFallback"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "NonPlatformSSOAccounts": {
@@ -2709,17 +2476,17 @@
          "item": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "OfflineGracePeriod": {
          "type": "integer",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "Unlock": {
@@ -2737,28 +2504,28 @@
            "AllowOpenIDForTouchIDFallback"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "RegistrationToken": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "UseSharedDeviceKeys": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "UserCreation": {
@@ -2767,19 +2534,19 @@
         "EnableAtLogin": {
          "type": "boolean",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "EnableFirstUserDuringSetup": {
          "type": "boolean",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "EnableRegistrationDuringSetup": {
          "type": "boolean",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "NewUserAuthenticationMethods": {
@@ -2793,11 +2560,11 @@
            "OpenID"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "NewUserAuthorizationMode": {
@@ -2809,13 +2576,13 @@
           "Temporary"
          ],
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "TemporarySessionQuickLogin": {
          "type": "boolean",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "TokenToUserMapping": {
@@ -2824,23 +2591,23 @@
           "AccountName": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "FullName": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "WebAuthentication": {
@@ -2849,7 +2616,7 @@
         "AllowPasswordSync": {
          "type": "boolean",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "URLAllowList": {
@@ -2857,27 +2624,27 @@
          "item": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Realm": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ScreenLockedBehavior": {
@@ -2887,7 +2654,7 @@
       "DoNotHandle"
      ],
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Type": {
@@ -2898,7 +2665,7 @@
       "Redirect"
      ],
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "URLs": {
@@ -2906,16 +2673,16 @@
      "item": {
       "type": "string",
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.external-intelligence.settings": {
@@ -2925,8 +2692,7 @@
     "AllowSignIn": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowedWorkspaceIDs": {
@@ -2934,26 +2700,22 @@
      "item": {
       "type": "string",
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Enabled": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.intelligence.settings": {
@@ -2963,56 +2725,49 @@
     "AllowAppleIntelligenceReport": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowGenmoji": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowImagePlayground": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowImageWand": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowPersonalizedHandwritingResults": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowVisualIntelligence": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowVisualIntelligenceSummary": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowWritingTools": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Apps": {
@@ -3024,12 +2779,12 @@
         "AllowNaturalLanguageEditing": {
          "type": "boolean",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Mail": {
@@ -3038,21 +2793,18 @@
         "AllowSmartReplies": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "AllowSummary": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Notes": {
@@ -3061,21 +2813,18 @@
         "AllowTranscription": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "AllowTranscriptionSummary": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Safari": {
@@ -3084,40 +2833,34 @@
         "AllowSummary": {
          "type": "boolean",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ForceOnDeviceOnlyDictation": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ForceOnDeviceOnlyTranslation": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.keyboard.settings": {
@@ -3127,63 +2870,54 @@
     "AllowAutoCorrection": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowDefinitionLookup": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowDictation": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowMathKeyboardSuggestions": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowPredictiveText": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowSlideToType": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowSpellCheck": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowTextReplacement": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.legacy": {
@@ -3193,20 +2927,18 @@
     "ProfileAssetReference": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ProfileURL": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.legacy.interactive": {
@@ -3216,28 +2948,25 @@
     "ProfileAssetReference": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ProfileURL": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.management.status-subscriptions": {
@@ -3254,25 +2983,21 @@
         "type": "string",
         "required": true,
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.management.test": {
@@ -3283,15 +3008,13 @@
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "EchoDataAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ReturnStatus": {
@@ -3302,14 +3025,12 @@
       "Unlocked"
      ],
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.math.settings": {
@@ -3326,14 +3047,12 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "InputModes": {
@@ -3343,22 +3062,19 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "UnitConversion": {
          "type": "boolean",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "MathNotesMode": {
@@ -3368,14 +3084,12 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ProgrammerMode": {
@@ -3385,14 +3099,12 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ScientificMode": {
@@ -3402,20 +3114,17 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "SystemBehavior": {
@@ -3425,28 +3134,24 @@
        "type": "boolean",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "MathNotes": {
        "type": "boolean",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.migration-assistant.settings": {
@@ -3458,13 +3163,11 @@
      "item": {
       "type": "string",
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ExcludedPaths": {
@@ -3472,13 +3175,11 @@
      "item": {
       "type": "string",
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "RequiredPaths": {
@@ -3486,35 +3187,30 @@
      "item": {
       "type": "string",
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ShouldDoManagedMigration": {
      "type": "boolean",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ShouldMigrateSecurityPrivacySettings": {
      "type": "boolean",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.network.dns-proxy": {
@@ -3525,19 +3221,19 @@
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DNSProxyUUID": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ProviderComposedIdentifier": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ProviderConfiguration": {
@@ -3545,23 +3241,23 @@
      "any": {
       "type": "any",
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.network.dns-settings": {
@@ -3575,7 +3271,7 @@
       "AllowFailover": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "DNSProtocol": {
@@ -3586,13 +3282,13 @@
         "TLS"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IdentityAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ServerAddresses": {
@@ -3600,23 +3296,23 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ServerName": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ServerURL": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SupplementalMatchDomains": {
@@ -3624,16 +3320,16 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "OnDemandRules": {
@@ -3650,7 +3346,7 @@
          "EvaluateConnection"
         ],
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "ActionParameters": {
@@ -3666,7 +3362,7 @@
             "ConnectIfNeeded"
            ],
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Domains": {
@@ -3675,20 +3371,20 @@
            "item": {
             "type": "string",
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "DNSDomainMatch": {
@@ -3696,11 +3392,11 @@
         "item": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "DNSServerAddressMatch": {
@@ -3708,11 +3404,11 @@
         "item": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "InterfaceTypeMatch": {
@@ -3723,7 +3419,7 @@
          "Cellular"
         ],
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "SSIDMatch": {
@@ -3731,44 +3427,44 @@
         "item": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "URLStringProbe": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ProhibitDisablement": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.network.relay": {
@@ -3778,7 +3474,7 @@
     "AllowDNSFailover": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ExcludedDomains": {
@@ -3786,11 +3482,11 @@
      "item": {
       "type": "string",
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ExcludedFQDNs": {
@@ -3798,11 +3494,11 @@
      "item": {
       "type": "string",
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "MatchDomains": {
@@ -3810,11 +3506,11 @@
      "item": {
       "type": "string",
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "MatchFQDNs": {
@@ -3822,17 +3518,17 @@
      "item": {
       "type": "string",
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "RelayUUID": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Relays": {
@@ -3846,29 +3542,29 @@
         "any": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "HTTP2RelayURL": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "HTTP3RelayURL": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "IdentityAssetReference": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "PublicKeyData": {
@@ -3876,38 +3572,38 @@
         "item": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "UIToggleEnabled": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.network.vpn.always-on": {
@@ -3917,13 +3613,13 @@
     "AllowAllCaptiveNetworkPlugins": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowCaptiveWebSheet": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowedCaptiveNetworkPlugins": {
@@ -3935,16 +3631,16 @@
         "type": "string",
         "required": true,
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ApplicationExceptions": {
@@ -3956,7 +3652,7 @@
         "type": "string",
         "required": true,
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "LimitToProtocols": {
@@ -3967,20 +3663,20 @@
           "UDP"
          ],
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ServiceExceptions": {
@@ -3996,7 +3692,7 @@
          "Drop"
         ],
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "ServiceName": {
@@ -4009,16 +3705,16 @@
          "DeviceCommunication"
         ],
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "TunnelConfigurations": {
@@ -4037,7 +3733,7 @@
            "CredentialsAssetReference": {
             "type": "string",
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "ExtendedAuth": {
@@ -4046,25 +3742,25 @@
              "CredentialsAssetReference": {
               "type": "string",
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              },
              "Enabled": {
               "type": "boolean",
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              },
              "ServerCertificateCommonName": {
               "type": "string",
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              },
              "ServerCertificateIssuerCommonName": {
               "type": "string",
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              },
              "TLSMaximumVersion": {
@@ -4076,7 +3772,7 @@
                "1.3"
               ],
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              },
              "TLSMinimumVersion": {
@@ -4088,18 +3784,18 @@
                "1.3"
               ],
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              }
             },
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "IdentityAssetReference": {
             "type": "string",
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "IdentityCertificateType": {
@@ -4112,7 +3808,7 @@
              "RSA-PSS"
             ],
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "Method": {
@@ -4124,12 +3820,12 @@
              "Certificate"
             ],
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            }
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "ChildSecurityAssociationParameters": {
@@ -4150,7 +3846,7 @@
              32
             ],
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "EncryptionAlgorithm": {
@@ -4163,7 +3859,7 @@
              "ChaCha20Poly1305"
             ],
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "IntegrityAlgorithm": {
@@ -4174,7 +3870,7 @@
              "SHA2-512"
             ],
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "LifeTimeInMinutes": {
@@ -4182,7 +3878,7 @@
             "min": 10,
             "max": 1440,
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "PostQuantumKeyExchangeMethods": {
@@ -4195,59 +3891,59 @@
               37
              ],
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            }
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "DisableMOBIKE": {
           "type": "boolean",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "DisableRedirect": {
           "type": "boolean",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "EnableCertificateRevocationCheck": {
           "type": "boolean",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "EnableNATKeepAliveOffload": {
           "type": "boolean",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "EnablePFS": {
           "type": "boolean",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "EnforceStrictAlgorithmSelection": {
           "type": "boolean",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "HostName": {
           "type": "string",
           "required": true,
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "IKESecurityAssociationParameters": {
@@ -4268,7 +3964,7 @@
              32
             ],
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "EncryptionAlgorithm": {
@@ -4281,7 +3977,7 @@
              "ChaCha20Poly1305"
             ],
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "IntegrityAlgorithm": {
@@ -4292,7 +3988,7 @@
              "SHA2-512"
             ],
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "LifeTimeInMinutes": {
@@ -4300,7 +3996,7 @@
             "min": 10,
             "max": 1440,
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "PostQuantumKeyExchangeMethods": {
@@ -4313,16 +4009,16 @@
               37
              ],
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            }
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "Idle": {
@@ -4337,19 +4033,19 @@
              "High"
             ],
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            }
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "LocalIdentifier": {
           "type": "string",
           "required": true,
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "MTU": {
@@ -4357,13 +4053,13 @@
           "min": 1280,
           "max": 1400,
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "NATKeepAliveInterval": {
           "type": "integer",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "PostQuantumKeyExchange": {
@@ -4372,48 +4068,48 @@
            "AllowFallback": {
             "type": "boolean",
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "PPK": {
             "type": "data",
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "PPKIdentifier": {
             "type": "string",
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "PPKMandatory": {
             "type": "boolean",
             "refs": [
-             "seed_OS_27_0"
+             "release"
             ]
            }
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "RemoteIdentifier": {
           "type": "string",
           "required": true,
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "UseConfigurationAttributeInternalIPSubnet": {
           "type": "boolean",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "Interfaces": {
@@ -4425,11 +4121,11 @@
           "WiFi"
          ],
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "ProtocolType": {
@@ -4439,34 +4135,34 @@
          "IKEv2"
         ],
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "UIToggleEnabled": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.network.vpn.ikev2": {
@@ -4480,7 +4176,7 @@
       "CredentialsAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ExtendedAuth": {
@@ -4489,25 +4185,25 @@
         "CredentialsAssetReference": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "Enabled": {
          "type": "boolean",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "ServerCertificateCommonName": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "ServerCertificateIssuerCommonName": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "TLSMaximumVersion": {
@@ -4519,7 +4215,7 @@
           "1.3"
          ],
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "TLSMinimumVersion": {
@@ -4531,18 +4227,18 @@
           "1.3"
          ],
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IdentityAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IdentityCertificateType": {
@@ -4555,7 +4251,7 @@
         "RSA-PSS"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Method": {
@@ -4567,12 +4263,12 @@
         "Certificate"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ChildSecurityAssociationParameters": {
@@ -4593,7 +4289,7 @@
         32
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "EncryptionAlgorithm": {
@@ -4606,7 +4302,7 @@
         "ChaCha20Poly1305"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IntegrityAlgorithm": {
@@ -4617,7 +4313,7 @@
         "SHA2-512"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "LifeTimeInMinutes": {
@@ -4625,7 +4321,7 @@
        "min": 10,
        "max": 1440,
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "PostQuantumKeyExchangeMethods": {
@@ -4638,16 +4334,16 @@
          37
         ],
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DNS": {
@@ -4656,13 +4352,13 @@
       "DomainName": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IdentityAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SearchDomains": {
@@ -4670,11 +4366,11 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ServerAddresses": {
@@ -4683,11 +4379,11 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SupplementalMatchDomains": {
@@ -4695,65 +4391,65 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SupplementalMatchDomainsNoSearch": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DisableMOBIKE": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DisableRedirect": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "EnableCertificateRevocationCheck": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "EnableFallback": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "EnablePFS": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "EnforceStrictAlgorithmSelection": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "HostName": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "IKESecurityAssociationParameters": {
@@ -4774,7 +4470,7 @@
         32
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "EncryptionAlgorithm": {
@@ -4787,7 +4483,7 @@
         "ChaCha20Poly1305"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IntegrityAlgorithm": {
@@ -4798,7 +4494,7 @@
         "SHA2-512"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "LifeTimeInMinutes": {
@@ -4806,7 +4502,7 @@
        "min": 10,
        "max": 1440,
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "PostQuantumKeyExchangeMethods": {
@@ -4819,16 +4515,16 @@
          37
         ],
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Idle": {
@@ -4843,31 +4539,31 @@
         "High"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Disconnect": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Timer": {
        "type": "integer",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "LocalIdentifier": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "MTU": {
@@ -4875,7 +4571,7 @@
      "min": 1280,
      "max": 1400,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "NetworkRouting": {
@@ -4884,42 +4580,42 @@
       "EnforceRoutes": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ExcludeAPNs": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ExcludeCellularServices": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ExcludeDeviceCommunication": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ExcludeLocalNetworks": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IncludeAllNetworks": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "OnDemand": {
@@ -4928,13 +4624,13 @@
       "DisableUserOverride": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Enabled": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Rules": {
@@ -4953,7 +4649,7 @@
            "Ignore"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "ActionParameters": {
@@ -4969,7 +4665,7 @@
               "NeverConnect"
              ],
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "Domains": {
@@ -4978,11 +4674,11 @@
              "item": {
               "type": "string",
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              },
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "RequiredDNSServers": {
@@ -4990,26 +4686,26 @@
              "item": {
               "type": "string",
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              },
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "RequiredURLStringProbe": {
              "type": "string",
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             }
            },
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "DNSDomainMatch": {
@@ -5017,11 +4713,11 @@
           "item": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "DNSServerAddressMatch": {
@@ -5029,11 +4725,11 @@
           "item": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "InterfaceTypeMatch": {
@@ -5044,7 +4740,7 @@
            "Cellular"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "SSIDMatch": {
@@ -5052,31 +4748,31 @@
           "item": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "URLStringProbe": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PostQuantumKeyExchange": {
@@ -5085,30 +4781,30 @@
       "AllowFallback": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "PPK": {
        "type": "data",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "PPKIdentifier": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "PPKMandatory": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Proxies": {
@@ -5117,19 +4813,19 @@
       "AutoConfigEnable": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AutoConfigURLString": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AutoDiscoveryEnable": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Protocol": {
@@ -5138,7 +4834,7 @@
         "CredentialsAssetReference": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "HTTP": {
@@ -5147,13 +4843,13 @@
           "Enable": {
            "type": "boolean",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "HostName": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Port": {
@@ -5161,12 +4857,12 @@
            "min": 0,
            "max": 65535,
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "HTTPS": {
@@ -5175,13 +4871,13 @@
           "Enable": {
            "type": "boolean",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "HostName": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Port": {
@@ -5189,17 +4885,17 @@
            "min": 0,
            "max": 65535,
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SupplementalMatchDomains": {
@@ -5207,41 +4903,41 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "RemoteIdentifier": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "UseConfigurationAttributeInternalIPSubnet": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.network.vpn.ipsec": {
@@ -5255,19 +4951,19 @@
       "CredentialsAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IdentityAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "LocalIdentifier": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "LocalIdentifierType": {
@@ -5276,7 +4972,7 @@
         "KeyID"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Method": {
@@ -5287,13 +4983,13 @@
         "Certificate"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "PromptForVPNPIN": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "XAuth": {
@@ -5302,14 +4998,14 @@
         "CredentialsAssetReference": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "Enabled": {
          "type": "boolean",
          "required": true,
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "PasswordEncryption": {
@@ -5318,17 +5014,17 @@
           "Prompt"
          ],
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DNS": {
@@ -5337,13 +5033,13 @@
       "DomainName": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IdentityAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SearchDomains": {
@@ -5351,11 +5047,11 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ServerAddresses": {
@@ -5364,11 +5060,11 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SupplementalMatchDomains": {
@@ -5376,29 +5072,29 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SupplementalMatchDomainsNoSearch": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "HostName": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Idle": {
@@ -5407,18 +5103,18 @@
       "Disconnect": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Timer": {
        "type": "integer",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "OnDemand": {
@@ -5427,7 +5123,7 @@
       "Enabled": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Rules": {
@@ -5446,7 +5142,7 @@
            "Ignore"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "ActionParameters": {
@@ -5462,7 +5158,7 @@
               "NeverConnect"
              ],
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "Domains": {
@@ -5471,11 +5167,11 @@
              "item": {
               "type": "string",
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              },
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "RequiredDNSServers": {
@@ -5483,26 +5179,26 @@
              "item": {
               "type": "string",
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              },
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "RequiredURLStringProbe": {
              "type": "string",
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             }
            },
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "DNSDomainMatch": {
@@ -5510,11 +5206,11 @@
           "item": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "DNSServerAddressMatch": {
@@ -5522,11 +5218,11 @@
           "item": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "InterfaceTypeMatch": {
@@ -5537,7 +5233,7 @@
            "Cellular"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "SSIDMatch": {
@@ -5545,31 +5241,31 @@
           "item": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "URLStringProbe": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Proxies": {
@@ -5578,19 +5274,19 @@
       "AutoConfigEnable": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AutoConfigURLString": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AutoDiscoveryEnable": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Protocol": {
@@ -5599,7 +5295,7 @@
         "CredentialsAssetReference": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "HTTP": {
@@ -5608,13 +5304,13 @@
           "Enable": {
            "type": "boolean",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "HostName": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Port": {
@@ -5622,12 +5318,12 @@
            "min": 0,
            "max": 65535,
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "HTTPS": {
@@ -5636,13 +5332,13 @@
           "Enable": {
            "type": "boolean",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "HostName": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Port": {
@@ -5650,17 +5346,17 @@
            "min": 0,
            "max": 65535,
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SupplementalMatchDomains": {
@@ -5668,28 +5364,28 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.network.vpn.vpn-plugin": {
@@ -5703,13 +5399,13 @@
       "CredentialsAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IdentityAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Method": {
@@ -5721,12 +5417,12 @@
         "Password+Certificate"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DNS": {
@@ -5735,13 +5431,13 @@
       "DomainName": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IdentityAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SearchDomains": {
@@ -5749,11 +5445,11 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ServerAddresses": {
@@ -5762,11 +5458,11 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SupplementalMatchDomains": {
@@ -5774,29 +5470,29 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SupplementalMatchDomainsNoSearch": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "HostName": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Idle": {
@@ -5805,18 +5501,18 @@
       "Disconnect": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Timer": {
        "type": "integer",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "NetworkRouting": {
@@ -5825,42 +5521,42 @@
       "EnforceRoutes": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ExcludeAPNs": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ExcludeCellularServices": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ExcludeDeviceCommunication": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ExcludeLocalNetworks": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IncludeAllNetworks": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "OnDemand": {
@@ -5869,13 +5565,13 @@
       "DisableUserOverride": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Enabled": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Rules": {
@@ -5894,7 +5590,7 @@
            "Ignore"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "ActionParameters": {
@@ -5910,7 +5606,7 @@
               "NeverConnect"
              ],
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "Domains": {
@@ -5919,11 +5615,11 @@
              "item": {
               "type": "string",
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              },
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "RequiredDNSServers": {
@@ -5931,26 +5627,26 @@
              "item": {
               "type": "string",
               "refs": [
-               "seed_OS_27_0"
+               "release"
               ]
              },
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "RequiredURLStringProbe": {
              "type": "string",
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             }
            },
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "DNSDomainMatch": {
@@ -5958,11 +5654,11 @@
           "item": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "DNSServerAddressMatch": {
@@ -5970,11 +5666,11 @@
           "item": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "InterfaceTypeMatch": {
@@ -5985,7 +5681,7 @@
            "Cellular"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "SSIDMatch": {
@@ -5993,31 +5689,31 @@
           "item": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "URLStringProbe": {
           "type": "string",
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Provider": {
@@ -6026,7 +5722,7 @@
       "ComposedIdentifier": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Type": {
@@ -6036,12 +5732,12 @@
         "app-proxy"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Proxies": {
@@ -6050,19 +5746,19 @@
       "AutoConfigEnable": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AutoConfigURLString": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "AutoDiscoveryEnable": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Protocol": {
@@ -6071,7 +5767,7 @@
         "CredentialsAssetReference": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "HTTP": {
@@ -6080,13 +5776,13 @@
           "Enable": {
            "type": "boolean",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "HostName": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Port": {
@@ -6094,12 +5790,12 @@
            "min": 0,
            "max": 65535,
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "HTTPS": {
@@ -6108,13 +5804,13 @@
           "Enable": {
            "type": "boolean",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "HostName": {
            "type": "string",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Port": {
@@ -6122,17 +5818,17 @@
            "min": 0,
            "max": 65535,
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SupplementalMatchDomains": {
@@ -6140,23 +5836,23 @@
        "item": {
         "type": "string",
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "SubType": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VendorConfig": {
@@ -6165,42 +5861,42 @@
       "Group": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "LoginGroupOrDomain": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Realm": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Role": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.package": {
@@ -6217,22 +5913,19 @@
         "Required"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ManifestURL": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "UninstallBehavior": {
@@ -6241,18 +5934,17 @@
       "Remove": {
        "type": "boolean",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.passcode.settings": {
@@ -6262,8 +5954,7 @@
     "ChangeAtNextAuth": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "CustomRegex": {
@@ -6274,34 +5965,29 @@
        "any": {
         "type": "string",
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Regex": {
        "type": "string",
        "required": true,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "FailedAttemptsResetInMinutes": {
      "type": "integer",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "MaximumFailedAttempts": {
@@ -6309,15 +5995,13 @@
      "min": 2,
      "max": 11,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "MaximumGracePeriodInMinutes": {
      "type": "integer",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "MaximumInactivityInMinutes": {
@@ -6325,8 +6009,7 @@
      "min": 0,
      "max": 15,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "MaximumPasscodeAgeInDays": {
@@ -6334,8 +6017,7 @@
      "min": 0,
      "max": 730,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "MinimumComplexCharacters": {
@@ -6343,8 +6025,7 @@
      "min": 0,
      "max": 4,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "MinimumLength": {
@@ -6352,8 +6033,7 @@
      "min": 0,
      "max": 16,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PasscodeReuseLimit": {
@@ -6361,35 +6041,30 @@
      "min": 1,
      "max": 50,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "RequireAlphanumericPasscode": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "RequireComplexPasscode": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "RequirePasscode": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.safari.bookmarks": {
@@ -6412,72 +6087,61 @@
            "item": {
             "type": "dictionary",
             "refs": [
-             "release",
-             "seed_OS_27_0"
+             "release"
             ]
            },
            "refs": [
-            "release",
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "Title": {
            "type": "string",
            "required": true,
            "refs": [
-            "release",
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "URL": {
            "type": "string",
            "refs": [
-            "release",
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "GroupIdentifier": {
         "type": "string",
         "required": true,
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "Title": {
         "type": "string",
         "required": true,
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.safari.extensions.settings": {
@@ -6494,13 +6158,11 @@
         "item": {
          "type": "string",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "DeniedDomains": {
@@ -6508,13 +6170,11 @@
         "item": {
          "type": "string",
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "PrivateBrowsing": {
@@ -6525,8 +6185,7 @@
          "AlwaysOff"
         ],
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "State": {
@@ -6537,25 +6196,21 @@
          "AlwaysOff"
         ],
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.safari.settings": {
@@ -6571,50 +6226,43 @@
       "Always"
      ],
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowDisablingFraudWarning": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowHistoryClearing": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowJavaScript": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowPopups": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowPrivateBrowsing": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowSummary": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "NewTabStartPage": {
@@ -6623,15 +6271,13 @@
       "ExtensionIdentifier": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "HomepageURL": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "PageType": {
@@ -6643,14 +6289,12 @@
         "Extension"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Privacy": {
@@ -6668,7 +6312,7 @@
            "Allow"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "Microphone": {
@@ -6678,34 +6322,33 @@
            "Allow"
           ],
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "OrganizationJustification": {
           "type": "string",
           "required": true,
           "refs": [
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.screensharing.connection": {
@@ -6715,16 +6358,14 @@
     "AuthenticationCredentialsAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ConnectionUUID": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DisplayConfiguration": {
@@ -6739,43 +6380,37 @@
         "Virtual2"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "DisplayName": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "HostName": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Port": {
      "type": "integer",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.screensharing.connection.group": {
@@ -6786,16 +6421,14 @@
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "GroupName": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Members": {
@@ -6804,19 +6437,16 @@
      "item": {
       "type": "string",
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.screensharing.host.settings": {
@@ -6828,8 +6458,7 @@
      "min": 0,
      "max": 2,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PortBase": {
@@ -6837,35 +6466,30 @@
      "min": 1024,
      "max": 65535,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PreventCopyFilesFromHost": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PreventCopyFilesToHost": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PreventHighPerformanceConnections": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.security.certificate": {
@@ -6876,14 +6500,12 @@
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.security.identity": {
@@ -6893,29 +6515,25 @@
     "AllowAllAppsAccess": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "CredentialAssetReference": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "KeyIsExtractable": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.security.passkey.attestation": {
@@ -6926,15 +6544,13 @@
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AttestationIdentityKeyIsExtractable": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "RelyingParties": {
@@ -6943,19 +6559,16 @@
      "item": {
       "type": "string",
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.services.background-tasks": {
@@ -6965,8 +6578,7 @@
     "ExecutableAssetReference": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "LaunchdConfigurations": {
@@ -6982,48 +6594,41 @@
          "agent"
         ],
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "FileAssetReference": {
         "type": "string",
         "required": true,
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        }
       },
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "TaskDescription": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "TaskType": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.services.configuration-files": {
@@ -7034,22 +6639,19 @@
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ServiceType": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.siri.settings": {
@@ -7059,47 +6661,42 @@
     "AllowSiriAI": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowUserGeneratedContent": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AllowWhileLocked": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Enabled": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ForceProfanityFilter": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ForceReduceSensitiveContent": {
      "type": "boolean",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.softwareupdate.enforcement.specific": {
@@ -7109,37 +6706,32 @@
     "DetailsURL": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "TargetBuildVersion": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "TargetLocalDateTime": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "TargetOSVersion": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.softwareupdate.settings": {
@@ -7149,8 +6741,7 @@
     "AllowStandardUserOSUpdates": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "AutomaticActions": {
@@ -7164,8 +6755,7 @@
         "AlwaysOff"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "InstallOSUpdates": {
@@ -7176,8 +6766,7 @@
         "AlwaysOff"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "InstallSecurityUpdate": {
@@ -7188,14 +6777,12 @@
         "AlwaysOff"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Beta": {
@@ -7210,27 +6797,23 @@
           "type": "string",
           "required": true,
           "refs": [
-           "release",
-           "seed_OS_27_0"
+           "release"
           ]
          },
          "Token": {
           "type": "string",
           "required": true,
           "refs": [
-           "release",
-           "seed_OS_27_0"
+           "release"
           ]
          }
         },
         "refs": [
-         "release",
-         "seed_OS_27_0"
+         "release"
         ]
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "ProgramEnrollment": {
@@ -7241,8 +6824,7 @@
         "AlwaysOff"
        ],
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "RequireProgram": {
@@ -7252,28 +6834,24 @@
          "type": "string",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "Token": {
          "type": "string",
          "required": true,
          "refs": [
-          "release",
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Deferrals": {
@@ -7284,8 +6862,7 @@
        "min": 1,
        "max": 90,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "MajorPeriodInDays": {
@@ -7293,8 +6870,7 @@
        "min": 1,
        "max": 90,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "MinorPeriodInDays": {
@@ -7302,8 +6878,7 @@
        "min": 1,
        "max": 90,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "SystemPeriodInDays": {
@@ -7311,21 +6886,18 @@
        "min": 1,
        "max": 90,
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Notifications": {
      "type": "boolean",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "RapidSecurityResponse": {
@@ -7334,21 +6906,18 @@
       "Enable": {
        "type": "boolean",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "EnableRollback": {
        "type": "boolean",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "RecommendedCadence": {
@@ -7359,14 +6928,12 @@
       "Newest"
      ],
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.watch.enrollment": {
@@ -7378,27 +6945,23 @@
      "item": {
       "type": "string",
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "EnrollmentProfileURL": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.configuration.webcontent-filter.plugin": {
@@ -7411,24 +6974,24 @@
       "CredentialsAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "IdentityAssetReference": {
        "type": "string",
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ContentFilterUUID": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Filter": {
@@ -7441,12 +7004,12 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Grade": {
@@ -7456,7 +7019,7 @@
         "inspector"
        ],
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Packets": {
@@ -7466,18 +7029,18 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "ProviderComposedIdentifier": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "Sockets": {
@@ -7487,18 +7050,18 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "ProviderComposedIdentifier": {
          "type": "string",
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       },
       "URLs": {
@@ -7508,7 +7071,7 @@
          "type": "boolean",
          "required": true,
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         },
         "Parameters": {
@@ -7517,7 +7080,7 @@
           "FailClosed": {
            "type": "boolean",
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "PIR": {
@@ -7527,74 +7090,74 @@
             "AuthenticationTokenAssetReference": {
              "type": "string",
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "PrivacyPassIssuerURL": {
              "type": "string",
              "required": true,
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             },
             "ServerURL": {
              "type": "string",
              "required": true,
              "refs": [
-              "seed_OS_27_0"
+              "release"
              ]
             }
            },
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "PrefilterFetchFrequency": {
            "type": "integer",
            "min": 2700,
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           },
           "ProviderComposedIdentifier": {
            "type": "string",
            "required": true,
            "refs": [
-            "seed_OS_27_0"
+            "release"
            ]
           }
          },
          "refs": [
-          "seed_OS_27_0"
+          "release"
          ]
         }
        },
        "refs": [
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Organization": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "PluginBundleID": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "ServerAddress": {
      "type": "string",
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VendorConfig": {
@@ -7602,23 +7165,23 @@
      "any": {
       "type": "any",
       "refs": [
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "VisibleName": {
      "type": "string",
      "required": true,
      "refs": [
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.management.organization-info": {
@@ -7628,16 +7191,14 @@
     "Email": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Name": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Proof": {
@@ -7646,27 +7207,23 @@
       "IdentityToken": {
        "type": "string",
        "refs": [
-        "release",
-        "seed_OS_27_0"
+        "release"
        ]
       }
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "URL": {
      "type": "string",
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.management.properties": {
@@ -7676,13 +7233,11 @@
    "any": {
     "type": "any",
     "refs": [
-     "release",
-     "seed_OS_27_0"
+     "release"
     ]
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   },
   "com.apple.management.server-capabilities": {
@@ -7695,27 +7250,23 @@
      "any": {
       "type": "any",
       "refs": [
-       "release",
-       "seed_OS_27_0"
+       "release"
       ]
      },
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     },
     "Version": {
      "type": "string",
      "required": true,
      "refs": [
-      "release",
-      "seed_OS_27_0"
+      "release"
      ]
     }
    },
    "refs": [
-    "release",
-    "seed_OS_27_0"
+    "release"
    ]
   }
  },
