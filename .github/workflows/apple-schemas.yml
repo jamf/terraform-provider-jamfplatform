@@ -45,12 +45,23 @@ jobs:
           go-version-file: "go.mod"
           cache: true
 
-      # apple-schemas discovers Apple's newest seed_OS_* branch and unions it with release. It fails
-      # rather than falling back to release alone if discovery finds nothing, because a release-only
-      # table would report every seed-only key as unknown — and that is an error, so it would block
-      # working configurations. A failure here means Apple changed the branch naming convention.
+      # apple-schemas discovers Apple's newest seed_OS_* branch and unions it with release, building
+      # from release alone when no seed branch is open — which is the normal state between an OS
+      # release and its next beta, since Apple promotes seed into release at GA and deletes it.
+      #
+      # The tables track upstream rather than accumulating a vocabulary Apple has retired, so a key
+      # Apple withdraws leaves the provider with it. That is deliberate, and it is also the one
+      # refresh that turns a plan which works today into a failing one — so the generator's report
+      # of what a regeneration dropped is captured here and carried into the pull request body,
+      # where it reaches a reviewer instead of hiding in several thousand changed lines.
       - name: Regenerate the schema tables
-        run: make apple-schemas
+        run: |
+          set -euo pipefail
+          make apple-schemas 2>&1 | tee /tmp/apple-schemas.log
+          grep -E '^  - ' /tmp/apple-schemas.log > /tmp/apple-schemas-removals.txt || true
+          if [ -s /tmp/apple-schemas-removals.txt ]; then
+            echo "::warning::This refresh withdraws names the committed tables carry; see the pull request body."
+          fi
 
       - name: Check for changes
         id: diff
@@ -98,6 +109,14 @@ jobs:
           set -euo pipefail
           branch="chore/apple-schemas-refresh"
 
+          # The generator's removal report, if it found any, promoted from a log line nobody reads
+          # into the body of the pull request a human is about to review.
+          REMOVALS=""
+          if [ -s /tmp/apple-schemas-removals.txt ]; then
+            REMOVALS="$(printf '\n**Apple has withdrawn names the committed tables carry.** The tables track upstream rather than retaining a retired vocabulary, so these are gone from the provider too — and each becomes an error at plan time, so a configuration using one stops working:\n\n%s\n' "$(cat /tmp/apple-schemas-removals.txt)")"
+          fi
+          export REMOVALS
+
           cat > /tmp/commit-message <<EOF
           chore(appleschemas): refresh Apple schemas to ${UPSTREAM_RELEASE}
 
@@ -120,6 +139,7 @@ jobs:
           - a change to \`statusItems\`, which would start reporting existing status subscriptions as unknown
 
           A key moving from the seed branch to release is expected and safe; watch instead for a key leaving the union entirely.
+          ${REMOVALS}
 
           Opened by the Apple Schemas workflow.
           EOF
