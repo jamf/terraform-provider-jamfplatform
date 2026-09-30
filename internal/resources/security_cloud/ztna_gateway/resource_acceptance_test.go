@@ -173,7 +173,7 @@ func TestAccResource_SecurityCloudZtnaGateway_IPSecGateway(t *testing.T) {
 		CheckDestroy:             testAccCheckGatewayDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: ipsecGatewayConfig(name, regionB, tenantID, "10.20.0.0/16", peerHostA, "AES-256", "SHA-512", "Group 14 (modp2048)", 28800, `["0.0.0.0/0"]`, 1),
+				Config: ipsecGatewayConfig(name, regionB, tenantID, `["3.66.107.208"]`, "10.20.0.0/16", peerHostA, "AES-256", "SHA-512", "Group 14 (modp2048)", 28800, `["0.0.0.0/0"]`, 1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("jamfplatform_security_cloud_ztna_gateway.test", "id"),
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec.key_exchange_protocol", "IKEv2"),
@@ -185,10 +185,12 @@ func TestAccResource_SecurityCloudZtnaGateway_IPSecGateway(t *testing.T) {
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec.customer_side.subnets.#", "1"),
 					resource.TestCheckNoResourceAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec.jamf_side.authentication_secret"),
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec.jamf_side.authentication_secret_wo_version", "1"),
+					resource.TestCheckTypeSetElemAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec_source_ip_addresses.*", "3.66.107.208"),
+					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec_source_ip_addresses.#", "1"),
 				),
 			},
 			{
-				Config: ipsecGatewayConfig(name, regionB, tenantID, "10.20.0.0/16", peerHostB, "AES-128", "SHA-256", "Group 19 (ecp256)", 3600, `["10.30.0.0/16", "192.168.50.0/24"]`, 2),
+				Config: ipsecGatewayConfig(name, regionB, tenantID, `["3.66.107.208", "3.121.43.105"]`, "10.20.0.0/16", peerHostB, "AES-128", "SHA-256", "Group 19 (ecp256)", 3600, `["10.30.0.0/16", "192.168.50.0/24"]`, 2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec.phase_1.encryption", "AES-128"),
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec.phase_1.integrity", "SHA-256"),
@@ -197,6 +199,7 @@ func TestAccResource_SecurityCloudZtnaGateway_IPSecGateway(t *testing.T) {
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec.customer_side.host", peerHostB),
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec.customer_side.subnets.#", "2"),
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec.jamf_side.authentication_secret_wo_version", "2"),
+					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_gateway.test", "ipsec_source_ip_addresses.#", "2"),
 				),
 			},
 			{
@@ -248,7 +251,7 @@ func TestAccResource_SecurityCloudZtnaGateway_FormChangeForcesReplace(t *testing
 				Check: resource.TestCheckResourceAttrSet("jamfplatform_security_cloud_ztna_gateway.test", "id"),
 			},
 			{
-				Config: ipsecGatewayConfig(name, regionC, tenantID, "192.168.60.0/24", peerHostA, "AES-256", "SHA-512", "Group 14 (modp2048)", 28800, `["0.0.0.0/0"]`, 1),
+				Config: ipsecGatewayConfig(name, regionC, tenantID, `["54.220.161.57"]`, "192.168.60.0/24", peerHostA, "AES-256", "SHA-512", "Group 14 (modp2048)", 28800, `["0.0.0.0/0"]`, 1),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectResourceAction("jamfplatform_security_cloud_ztna_gateway.test", plancheck.ResourceActionReplace),
@@ -292,6 +295,25 @@ func TestAccResource_SecurityCloudZtnaGateway_SourceAddressesRequireIPSec(t *tes
 	})
 }
 
+// TestAccResource_SecurityCloudZtnaGateway_IPSecRequiresSourceAddresses pins the converse rule at
+// plan time. Jamf Security Cloud refuses an IPsec gateway without source addresses, wire-probed
+// 2026-09-30, so the plan has to fail before the create reaches it.
+func TestAccResource_SecurityCloudZtnaGateway_IPSecRequiresSourceAddresses(t *testing.T) {
+	testhelpers.AccPreCheckSecurityCloud(t)
+	tenantID := testhelpers.RequireSecurityCloudTenantID(t)
+	suffix := testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      ipsecGatewayConfig("tf-acc-jsc-gw-noaddr-"+suffix, regionA, tenantID, "null", "10.70.0.0/16", peerHostA, "AES-256", "SHA-512", "Group 14 (modp2048)", 28800, `["0.0.0.0/0"]`, 1),
+				ExpectError: regexpIPSecNeedsSourceAddresses,
+			},
+		},
+	})
+}
+
 // TestAccResource_SecurityCloudZtnaGateway_InvalidJamfSubnetRejectedAtPlan pins the
 // private-range check. The server answers with the whole `ipsec` block named and
 // nothing about which address, so the plan-time check is what makes the mistake
@@ -305,7 +327,7 @@ func TestAccResource_SecurityCloudZtnaGateway_InvalidJamfSubnetRejectedAtPlan(t 
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:      ipsecGatewayConfig("tf-acc-jsc-gw-badsubnet-"+suffix, regionA, tenantID, "8.8.8.0/24", peerHostA, "AES-256", "SHA-512", "Group 14 (modp2048)", 28800, `["0.0.0.0/0"]`, 1),
+				Config:      ipsecGatewayConfig("tf-acc-jsc-gw-badsubnet-"+suffix, regionA, tenantID, `["3.9.67.90"]`, "8.8.8.0/24", peerHostA, "AES-256", "SHA-512", "Group 14 (modp2048)", 28800, `["0.0.0.0/0"]`, 1),
 				ExpectError: regexpSubnetNotPrivate,
 			},
 		},
@@ -325,7 +347,7 @@ func TestAccResource_SecurityCloudZtnaGateway_InvalidCipherRejectedAtPlan(t *tes
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:      ipsecGatewayConfig("tf-acc-jsc-gw-badcipher-"+suffix, regionA, tenantID, "10.40.0.0/16", peerHostA, "AES-999", "SHA-512", "Group 14 (modp2048)", 28800, `["0.0.0.0/0"]`, 1),
+				Config:      ipsecGatewayConfig("tf-acc-jsc-gw-badcipher-"+suffix, regionA, tenantID, `["3.9.67.90"]`, "10.40.0.0/16", peerHostA, "AES-999", "SHA-512", "Group 14 (modp2048)", 28800, `["0.0.0.0/0"]`, 1),
 				ExpectError: regexpInvalidAttributeValueMatch,
 			},
 		},
@@ -349,6 +371,7 @@ func TestAccResource_SecurityCloudZtnaGateway_LowercaseVendorRejectedAtPlan(t *t
 						name       = "tf-acc-jsc-gw-vendor-%s"
 						egress_region = %q
 						tenant_ids = [%q]
+						ipsec_source_ip_addresses = ["3.9.67.90"]
 
 						contact = {
 							name  = "Terraform Acceptance"
@@ -557,12 +580,13 @@ func TestAccListResource_SecurityCloudZtnaGateway_Basic(t *testing.T) {
 // ipsecGatewayConfig renders a full IPsec gateway config. The pre-shared key is
 // literal rather than parameterised because it is WriteOnly — it never reaches
 // state, so there is nothing for a test to correlate it against.
-func ipsecGatewayConfig(name, region, tenantID, jamfSubnet, peerHost, encryption, integrity, dhGroup string, lifetime int, customerSubnets string, woVersion int) string {
+func ipsecGatewayConfig(name, region, tenantID, sourceAddresses, jamfSubnet, peerHost, encryption, integrity, dhGroup string, lifetime int, customerSubnets string, woVersion int) string {
 	return fmt.Sprintf(`
 		resource "jamfplatform_security_cloud_ztna_gateway" "test" {
 			name       = %q
 			egress_region = %q
 			tenant_ids = [%q]
+			ipsec_source_ip_addresses = %s
 
 			contact = {
 				name  = "Terraform Acceptance"
@@ -602,7 +626,7 @@ func ipsecGatewayConfig(name, region, tenantID, jamfSubnet, peerHost, encryption
 				}
 			}
 		}
-	`, name, region, tenantID,
+	`, name, region, tenantID, sourceAddresses,
 		encryption, integrity, dhGroup, lifetime,
 		encryption, integrity, dhGroup, lifetime,
 		jamfSubnet, woVersion, woVersion,
@@ -660,6 +684,7 @@ func TestAccDataSource_SecurityCloudZtnaGateway_NameNotFoundIsWritten(t *testing
 
 var (
 	regexpSourceAddressesNeedIPSec   = regexp.MustCompile(`IPsec source addresses require an IPsec gateway`)
+	regexpIPSecNeedsSourceAddresses  = regexp.MustCompile(`IPsec gateway needs source addresses`)
 	regexpSubnetNotPrivate           = regexp.MustCompile(`is not a private range`)
 	regexpInvalidAttributeValueMatch = regexp.MustCompile(`Invalid Attribute Value Match`)
 	regexpExactlyOneSelector         = regexp.MustCompile(`Exactly one of these attributes must be configured`)

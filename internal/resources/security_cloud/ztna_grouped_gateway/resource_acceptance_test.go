@@ -410,6 +410,7 @@ func mixedFormGatewaysConfig(suffix, tenantID string) string {
 			name       = "tf-acc-jsc-gg-ipsec-%s"
 			egress_region = "Europe - Germany"
 			tenant_ids = [%q]
+			ipsec_source_ip_addresses = ["3.66.107.208"]
 
 			contact = {
 				name  = "Terraform Acceptance"

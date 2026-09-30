@@ -148,11 +148,11 @@ Valid values: `Africa - Cape Town`, `Asia - Hong Kong`, `Asia - Japan`, `Asia - 
 
 - `enabled` (Boolean) Whether the deployment is active. A disabled gateway reports its status as `DISABLED` and carries no traffic. Defaults to `true`. Disabling a gateway reports `PENDING` for a few seconds before it settles, so an apply that disables one waits for `DISABLED` in the same way an apply that enables one waits for `UP`. Either way the status recorded is the settled one, not the transient.
 - `ipsec` (Attributes) IPsec tunnel configuration. Present on a dedicated IPsec gateway, absent on a dedicated internet gateway. Adding or removing the whole block replaces the gateway. (see [below for nested schema](#nestedatt--ipsec))
-- `ipsec_source_ip_addresses` (Set of String) **"Jamf Security Cloud IPsec source IP addresses"** in the Jamf Security Cloud admin UI: the addresses IPsec traffic from Jamf Security Cloud originates from, which your firewall must allow. Supply both addresses your egress region offers for dynamic addressing, or one to pin a single source address. Only valid on an IPsec gateway: a dedicated internet gateway must leave this unset.
+- `ipsec_source_ip_addresses` (Set of String) **"Jamf Security Cloud IPsec source IP addresses"** in the Jamf Security Cloud admin UI: the addresses IPsec traffic from Jamf Security Cloud originates from, which your firewall must allow. Supply both addresses your egress region offers for dynamic addressing, or one to pin a single source address. Required on an IPsec gateway: Jamf Security Cloud refuses to create one without an address. Leave it unset on a dedicated internet gateway.
 
-The accepted addresses are fixed per egress region and are the ones the admin UI lists when you pick the region. The provider does not check them at plan time because the accepted set is not published anywhere it can read.
+Each egress region accepts its own two addresses, the ones the admin UI lists when you pick the region. Jamf Security Cloud refuses an address from another region when you apply.
 
-Taking the attribute out of your configuration clears the addresses on the next update rather than leaving them alone.
+You can replace the addresses later but you cannot remove the attribute, because Jamf Security Cloud refuses to leave an IPsec gateway with none.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only

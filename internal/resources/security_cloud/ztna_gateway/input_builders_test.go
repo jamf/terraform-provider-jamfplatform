@@ -168,10 +168,12 @@ func TestSharedSecretRotated_NoPriorBlockCountsAsRotation(t *testing.T) {
 	}
 }
 
-// TestBuildGatewayPatchInput_ClearsAvailabilityZonesWhenUnset pins the one place a
-// merge-patch omission would be wrong: removing the zones from configuration has
-// to send an empty array, because omitting the field preserves what is stored.
-func TestBuildGatewayPatchInput_ClearsAvailabilityZonesWhenUnset(t *testing.T) {
+// TestBuildGatewayPatchInput_OmitsAvailabilityZonesWhenUnset pins that an update never sends
+// the source addresses empty. Wire-probed 2026-09-30, Jamf Security Cloud refuses both `[]` and
+// `null` on an IPsec gateway with `400 EMPTY_AVAILABILITY_ZONES_NOT_SUPPORTED`, while an update
+// omitting the field succeeds and preserves the stored addresses. The config validator keeps a null
+// out of a valid plan, so this is the builder's own guard behind it.
+func TestBuildGatewayPatchInput_OmitsAvailabilityZonesWhenUnset(t *testing.T) {
 	state := ipsecGatewayPlan(t, 1)
 	plan := ipsecGatewayPlan(t, 1)
 	plan.IPSecSourceIPAddresses = types.SetNull(types.StringType)
@@ -180,11 +182,23 @@ func TestBuildGatewayPatchInput_ClearsAvailabilityZonesWhenUnset(t *testing.T) {
 	if diags.HasError() {
 		t.Fatalf("diagnostics: %v", diags)
 	}
-	if got.AvailabilityZones == nil {
-		t.Fatal("removing availability zones must send an empty array, not omit the field")
+	if got.AvailabilityZones != nil {
+		t.Errorf("availabilityZones = %v, want the field omitted; the server refuses an empty list", *got.AvailabilityZones)
 	}
-	if len(*got.AvailabilityZones) != 0 {
-		t.Errorf("availabilityZones = %v, want empty", *got.AvailabilityZones)
+}
+
+// TestBuildGatewayPatchInput_SendsAvailabilityZonesWhenSet pins that planned source addresses are
+// written, which is how they are replaced.
+func TestBuildGatewayPatchInput_SendsAvailabilityZonesWhenSet(t *testing.T) {
+	state := ipsecGatewayPlan(t, 1)
+	plan := ipsecGatewayPlan(t, 1)
+
+	got, diags := buildGatewayPatchInput(context.Background(), plan, state, plan)
+	if diags.HasError() {
+		t.Fatalf("diagnostics: %v", diags)
+	}
+	if got.AvailabilityZones == nil || len(*got.AvailabilityZones) != 1 || (*got.AvailabilityZones)[0] != "3.9.67.90" {
+		t.Errorf("availabilityZones = %v, want [3.9.67.90]", got.AvailabilityZones)
 	}
 }
 

@@ -125,20 +125,30 @@ func (v privateCIDRValidator) ValidateString(_ context.Context, req validator.St
 	)
 }
 
-// ipsecSourceAddressesValidator enforces that ipsec_source_ip_addresses is only
-// set on an IPsec gateway.
+// ipsecSourceAddressesValidator enforces that ipsec_source_ip_addresses is set on
+// an IPsec gateway and only there.
 //
-// The server refuses the combination with `400 [INVALID_FIELD]
-// availabilityZones: availabilityZones must be empty when dedicatedIps.enabled is
-// true.` Because the provider derives that flag from the absence of the `ipsec`
-// block, the equivalent config-level rule is: source addresses require `ipsec`.
+// The server refuses addresses on a dedicated internet gateway with `400
+// [INVALID_FIELD] availabilityZones: availabilityZones must be empty when
+// dedicatedIps.enabled is true.` Because the provider derives that flag from the
+// absence of the `ipsec` block, the equivalent config-level rule is: source
+// addresses require `ipsec`.
+//
+// The converse holds too. Wire-probed on the EU gateway, 2026-09-30: an IPsec
+// create omitting availabilityZones, or sending `[]`, is refused `400
+// [INVALID_FIELD] availabilityZones must contain at least one address.`, and a
+// PATCH sending `[]` or `null` to an existing IPsec gateway is refused `400
+// EMPTY_AVAILABILITY_ZONES_NOT_SUPPORTED`. So an IPsec gateway can never be
+// without addresses, and an unknown value is let through for the apply to settle.
+// Earlier probing on 2026-08-27 had created IPsec gateways with none; that no
+// longer works, and nothing in the specification marked the change.
 type ipsecSourceAddressesValidator struct{}
 
 var _ resource.ConfigValidator = ipsecSourceAddressesValidator{}
 
 // Description returns a plain-text description of the validator.
 func (ipsecSourceAddressesValidator) Description(_ context.Context) string {
-	return "ipsec_source_ip_addresses may only be set when the ipsec block is present"
+	return "ipsec_source_ip_addresses is required with the ipsec block and not allowed without it"
 }
 
 // MarkdownDescription returns the markdown description of the validator.
@@ -153,10 +163,22 @@ func (v ipsecSourceAddressesValidator) ValidateResource(ctx context.Context, req
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if config.IPSec != nil {
+	if config.IPSecSourceIPAddresses.IsUnknown() {
 		return
 	}
-	if config.IPSecSourceIPAddresses.IsNull() || config.IPSecSourceIPAddresses.IsUnknown() {
+	if config.IPSec != nil {
+		if config.IPSecSourceIPAddresses.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("ipsec_source_ip_addresses"),
+				"An IPsec gateway needs source addresses",
+				"Jamf Security Cloud refuses an IPsec gateway without source addresses. Set "+
+					"`ipsec_source_ip_addresses` to one or both addresses the admin UI lists for this gateway's "+
+					"egress region.",
+			)
+		}
+		return
+	}
+	if config.IPSecSourceIPAddresses.IsNull() {
 		return
 	}
 	resp.Diagnostics.AddAttributeError(
