@@ -22,7 +22,7 @@ type DiskManagementPolicyComponent struct {
 
 // GetIdentifier returns the component identifier for disk management policy.
 func (c *DiskManagementPolicyComponent) GetIdentifier() string {
-	return "com.jamf.ddm.disk-management"
+	return blueprints.DiskManagementComponentIdentifierComJamfDdmDiskManagement
 }
 
 // DiskManagementPolicyComponentSchema returns the Terraform schema for disk management policy component.

@@ -186,7 +186,7 @@ func mapStepComponents(ctx context.Context, diags *diag.Diagnostics, step bluepr
 // updateStronglyTypedComponentsFromAPI updates all strongly-typed components of a block from the
 // API response.
 func updateStronglyTypedComponentsFromAPI(diags *diag.Diagnostics, block *ComponentBlockModel, apiComponentsByID map[string]blueprints.Component, rawIdentifiers map[string]struct{}) {
-	block.AudioAccessorySettings = buildTypedComponent[components.AudioAccessorySettingsComponent](diags, apiComponentsByID, rawIdentifiers, "com.jamf.ddm.audio-accessory-settings", func(raw json.RawMessage, target *components.AudioAccessorySettingsComponent) error {
+	block.AudioAccessorySettings = buildTypedComponent[components.AudioAccessorySettingsComponent](diags, apiComponentsByID, rawIdentifiers, blueprints.AudioAccessorySettingsComponentIdentifierComJamfDdmAudioAccessorySettings, func(raw json.RawMessage, target *components.AudioAccessorySettingsComponent) error {
 		return target.FromRawConfiguration(raw)
 	})
 
@@ -194,31 +194,31 @@ func updateStronglyTypedComponentsFromAPI(diags *diag.Diagnostics, block *Compon
 		return target.FromRawConfiguration(raw)
 	})
 
-	block.CustomDeclarations = buildTypedComponent[components.CustomDeclarationsComponent](diags, apiComponentsByID, rawIdentifiers, "com.jamf.ddm.custom-declarations", func(raw json.RawMessage, target *components.CustomDeclarationsComponent) error {
+	block.CustomDeclarations = buildTypedComponent[components.CustomDeclarationsComponent](diags, apiComponentsByID, rawIdentifiers, blueprints.CustomDeclarationsComponentIdentifierComJamfDdmCustomDeclarations, func(raw json.RawMessage, target *components.CustomDeclarationsComponent) error {
 		return target.FromRawConfiguration(raw)
 	})
 
-	block.DiskManagementSettings = buildTypedComponent[components.DiskManagementPolicyComponent](diags, apiComponentsByID, rawIdentifiers, "com.jamf.ddm.disk-management", func(raw json.RawMessage, target *components.DiskManagementPolicyComponent) error {
+	block.DiskManagementSettings = buildTypedComponent[components.DiskManagementPolicyComponent](diags, apiComponentsByID, rawIdentifiers, blueprints.DiskManagementComponentIdentifierComJamfDdmDiskManagement, func(raw json.RawMessage, target *components.DiskManagementPolicyComponent) error {
 		return target.FromRawConfiguration(raw)
 	})
 
-	block.MathSettings = buildTypedComponent[components.MathSettingsComponent](diags, apiComponentsByID, rawIdentifiers, "com.jamf.ddm.math-settings", func(raw json.RawMessage, target *components.MathSettingsComponent) error {
+	block.MathSettings = buildTypedComponent[components.MathSettingsComponent](diags, apiComponentsByID, rawIdentifiers, blueprints.MathSettingsComponentIdentifierComJamfDdmMathSettings, func(raw json.RawMessage, target *components.MathSettingsComponent) error {
 		return target.FromRawConfiguration(raw)
 	})
 
-	block.PasscodePolicy = buildTypedComponent[components.PasscodePolicyComponent](diags, apiComponentsByID, rawIdentifiers, "com.jamf.ddm.passcode-settings", func(raw json.RawMessage, target *components.PasscodePolicyComponent) error {
+	block.PasscodePolicy = buildTypedComponent[components.PasscodePolicyComponent](diags, apiComponentsByID, rawIdentifiers, blueprints.PasscodeSettingsComponentIdentifierComJamfDdmPasscodeSettings, func(raw json.RawMessage, target *components.PasscodePolicyComponent) error {
 		return target.FromRawConfiguration(raw)
 	})
 
-	block.SafariBookmarks = buildTypedComponent[components.SafariBookmarksComponent](diags, apiComponentsByID, rawIdentifiers, "com.jamf.ddm.safari-bookmarks", func(raw json.RawMessage, target *components.SafariBookmarksComponent) error {
+	block.SafariBookmarks = buildTypedComponent[components.SafariBookmarksComponent](diags, apiComponentsByID, rawIdentifiers, blueprints.SafariBookmarksComponentIdentifierComJamfDdmSafariBookmarks, func(raw json.RawMessage, target *components.SafariBookmarksComponent) error {
 		return target.FromRawConfiguration(raw)
 	})
 
-	block.SafariExtensions = buildTypedComponent[components.SafariExtensionsComponent](diags, apiComponentsByID, rawIdentifiers, "com.jamf.ddm.safari-extensions", func(raw json.RawMessage, target *components.SafariExtensionsComponent) error {
+	block.SafariExtensions = buildTypedComponent[components.SafariExtensionsComponent](diags, apiComponentsByID, rawIdentifiers, blueprints.SafariExtensionsComponentIdentifierComJamfDdmSafariExtensions, func(raw json.RawMessage, target *components.SafariExtensionsComponent) error {
 		return target.FromRawConfiguration(raw)
 	})
 
-	block.SafariSettings = buildTypedComponent[components.SafariSettingsComponent](diags, apiComponentsByID, rawIdentifiers, "com.jamf.ddm.safari-settings", func(raw json.RawMessage, target *components.SafariSettingsComponent) error {
+	block.SafariSettings = buildTypedComponent[components.SafariSettingsComponent](diags, apiComponentsByID, rawIdentifiers, blueprints.SafariSettingsComponentIdentifierComJamfDdmSafariSettings, func(raw json.RawMessage, target *components.SafariSettingsComponent) error {
 		return target.FromRawConfiguration(raw)
 	})
 
@@ -230,11 +230,11 @@ func updateStronglyTypedComponentsFromAPI(diags *diag.Diagnostics, block *Compon
 		return target.FromRawConfiguration(raw)
 	})
 
-	block.SoftwareUpdate = buildTypedComponent[components.SoftwareUpdateComponent](diags, apiComponentsByID, rawIdentifiers, "com.jamf.ddm.sw-updates", func(raw json.RawMessage, target *components.SoftwareUpdateComponent) error {
+	block.SoftwareUpdate = buildTypedComponent[components.SoftwareUpdateComponent](diags, apiComponentsByID, rawIdentifiers, blueprints.SwUpdateComponentIdentifierComJamfDdmSwUpdates, func(raw json.RawMessage, target *components.SoftwareUpdateComponent) error {
 		return target.FromRawConfiguration(raw)
 	})
 
-	block.SoftwareUpdateSettings = buildTypedComponent[components.SoftwareUpdateSettingsComponent](diags, apiComponentsByID, rawIdentifiers, "com.jamf.ddm.software-update-settings", func(raw json.RawMessage, target *components.SoftwareUpdateSettingsComponent) error {
+	block.SoftwareUpdateSettings = buildTypedComponent[components.SoftwareUpdateSettingsComponent](diags, apiComponentsByID, rawIdentifiers, blueprints.SoftwareUpdateSettingsComponentIdentifierComJamfDdmSoftwareUpdateSettings, func(raw json.RawMessage, target *components.SoftwareUpdateSettingsComponent) error {
 		return target.FromRawConfiguration(raw)
 	})
 }
@@ -302,7 +302,7 @@ func parseComponentConfiguration(apiComponentsByID map[string]blueprints.Compone
 // `payloadType` is lifted out into `payload_type` rather than masked, and the keys the service owns
 // outright come off whatever the author wrote (see providerMaskedPayloadKeys).
 func legacyPayloadItems(apiComponentsByID map[string]blueprints.Component, priorSettingsByIdentity map[string]map[string]any) []any {
-	rawJSON, ok := parseComponentConfiguration(apiComponentsByID, "com.jamf.ddm-configuration-profile")
+	rawJSON, ok := parseComponentConfiguration(apiComponentsByID, legacyConfigProfileIdentifier)
 	if !ok {
 		return nil
 	}
@@ -531,7 +531,7 @@ func pruneJSONNulls(value any) any {
 // when the server value is semantically identical to the prior value that prior value is preserved
 // (the dynamic null-typing reconcile — see dynamicPayloadsMatchJSON).
 func flattenFlatLegacyPayloads(prior types.Dynamic, apiComponentsByID map[string]blueprints.Component, rawIdentifiers map[string]struct{}) types.Dynamic {
-	if _, handledAsRaw := rawIdentifiers["com.jamf.ddm-configuration-profile"]; handledAsRaw {
+	if _, handledAsRaw := rawIdentifiers[legacyConfigProfileIdentifier]; handledAsRaw {
 		return prior
 	}
 
@@ -678,7 +678,7 @@ func flattenAppleDeclarations(diags *diag.Diagnostics, prior []AppleDeclarationM
 // several managed preferences payloads in one block each keep the JSON string the author wrote for
 // their own preference domain instead of all taking the first one's.
 func flattenBlockLegacyPayloads(prior []BlockLegacyPayloadModel, apiComponentsByID map[string]blueprints.Component, rawIdentifiers map[string]struct{}) []BlockLegacyPayloadModel {
-	if _, handledAsRaw := rawIdentifiers["com.jamf.ddm-configuration-profile"]; handledAsRaw {
+	if _, handledAsRaw := rawIdentifiers[legacyConfigProfileIdentifier]; handledAsRaw {
 		return prior
 	}
 

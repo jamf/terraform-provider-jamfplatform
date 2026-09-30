@@ -297,7 +297,7 @@ func (c *SoftwareUpdateComponent) FromRawConfiguration(raw json.RawMessage) erro
 
 // GetIdentifier returns the component identifier for software update.
 func (c *SoftwareUpdateComponent) GetIdentifier() string {
-	return "com.jamf.ddm.sw-updates"
+	return blueprints.SwUpdateComponentIdentifierComJamfDdmSwUpdates
 }
 
 // ToClientComponent converts the strongly-typed component to a blueprints.Component.

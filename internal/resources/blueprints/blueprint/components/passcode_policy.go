@@ -36,7 +36,7 @@ type PasscodePolicyComponent struct {
 
 // GetIdentifier returns the component identifier for passcode policy.
 func (c *PasscodePolicyComponent) GetIdentifier() string {
-	return "com.jamf.ddm.passcode-settings"
+	return blueprints.PasscodeSettingsComponentIdentifierComJamfDdmPasscodeSettings
 }
 
 // PasscodePolicyComponentSchema returns the Terraform schema for passcode policy component.

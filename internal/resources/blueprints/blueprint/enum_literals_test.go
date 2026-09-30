@@ -18,6 +18,19 @@ func TestEnumLiteralsComeFromTheSDK(t *testing.T) {
 	got, err := enumguard.Check(enumguard.Params{
 		Covered: enumguard.Union(
 			blueprints.DeploymentStateStateValues(),
+			blueprints.AudioAccessorySettingsComponentIdentifierValues(),
+			blueprints.ConfigurationProfileIdentifierValues(),
+			blueprints.CustomDeclarationsComponentIdentifierValues(),
+			blueprints.DeclarationsComponentIdentifierValues(),
+			blueprints.DiskManagementComponentIdentifierValues(),
+			blueprints.ManagedAppComponentIdentifierValues(),
+			blueprints.MathSettingsComponentIdentifierValues(),
+			blueprints.PasscodeSettingsComponentIdentifierValues(),
+			blueprints.SafariBookmarksComponentIdentifierValues(),
+			blueprints.SafariExtensionsComponentIdentifierValues(),
+			blueprints.SafariSettingsComponentIdentifierValues(),
+			blueprints.SoftwareUpdateSettingsComponentIdentifierValues(),
+			blueprints.SwUpdateComponentIdentifierValues(),
 		),
 	})
 	if err != nil {

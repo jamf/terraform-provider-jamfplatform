@@ -29,7 +29,7 @@ type MathSettingsComponent struct {
 
 // GetIdentifier returns the component identifier for math settings.
 func (c *MathSettingsComponent) GetIdentifier() string {
-	return "com.jamf.ddm.math-settings"
+	return blueprints.MathSettingsComponentIdentifierComJamfDdmMathSettings
 }
 
 // MathSettingsComponentSchema returns the Terraform schema for math settings component.

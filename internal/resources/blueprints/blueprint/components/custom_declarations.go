@@ -120,7 +120,7 @@ func (c *CustomDeclarationsComponent) FromRawConfiguration(raw json.RawMessage) 
 
 // GetIdentifier returns the component identifier for custom declarations.
 func (c *CustomDeclarationsComponent) GetIdentifier() string {
-	return "com.jamf.ddm.custom-declarations"
+	return blueprints.CustomDeclarationsComponentIdentifierComJamfDdmCustomDeclarations
 }
 
 // ToClientComponent converts the typed component to the format expected by the Blueprint API client.

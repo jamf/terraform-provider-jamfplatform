@@ -26,7 +26,7 @@ type AudioAccessorySettingsComponent struct {
 
 // GetIdentifier returns the component identifier for audio accessory settings.
 func (c *AudioAccessorySettingsComponent) GetIdentifier() string {
-	return "com.jamf.ddm.audio-accessory-settings"
+	return blueprints.AudioAccessorySettingsComponentIdentifierComJamfDdmAudioAccessorySettings
 }
 
 // AudioAccessorySettingsComponentSchema returns the Terraform schema for audio accessory settings component.

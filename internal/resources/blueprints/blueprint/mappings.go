@@ -16,13 +16,13 @@ const (
 // blueprint editor, which the apple_declarations attribute is named for. An identifier is API
 // plumbing and must not reach user-facing text (see STYLE_GUIDE §Attribute names mirror the Jamf
 // Pro admin UI).
-const appleDeclarationsIdentifier = "com.jamf.ddm-strict"
+const appleDeclarationsIdentifier = blueprints.DeclarationsComponentIdentifierComJamfDdmStrict
 
 // legacyConfigProfileIdentifier is the wire identifier of the component a block's legacy payloads
 // are folded into, which the legacy_payloads attribute writes. Like appleDeclarationsIdentifier it
 // is named here because no components/ converter owns it — the component is assembled in this
 // package — and it must not reach user-facing text.
-const legacyConfigProfileIdentifier = "com.jamf.ddm-configuration-profile"
+const legacyConfigProfileIdentifier = blueprints.ConfigurationProfileIdentifierComJamfDdmConfigurationProfile
 
 // mcxPayloadType is Apple's payload type for the managed preferences envelope the Jamf Pro profile
 // editor calls "Application & Custom Settings", and mcxPreferenceDomainsKey is Apple's spelling of
@@ -43,21 +43,21 @@ const (
 
 // stronglyTypedComponentIdentifiers lists all component identifiers that have strongly-typed representations.
 var stronglyTypedComponentIdentifiers = map[string]struct{}{
-	"com.jamf.ai-governance":                   {},
-	"com.jamf.ddm.audio-accessory-settings":    {},
-	"com.jamf.ddm.custom-declarations":         {},
-	"com.jamf.ddm.disk-management":             {},
-	"com.jamf.ddm.math-settings":               {},
-	"com.jamf.ddm.passcode-settings":           {},
-	"com.jamf.ddm.safari-bookmarks":            {},
-	"com.jamf.ddm.safari-extensions":           {},
-	"com.jamf.ddm.safari-settings":             {},
-	"com.jamf.ddm.service-background-tasks":    {},
-	"com.jamf.ddm.service-configuration-files": {},
-	"com.jamf.ddm.sw-updates":                  {},
-	"com.jamf.ddm.software-update-settings":    {},
-	"com.jamf.ddm-configuration-profile":       {},
-	"com.jamf.ddm-strict":                      {},
+	"com.jamf.ai-governance": {},
+	blueprints.AudioAccessorySettingsComponentIdentifierComJamfDdmAudioAccessorySettings: {},
+	blueprints.CustomDeclarationsComponentIdentifierComJamfDdmCustomDeclarations:         {},
+	blueprints.DiskManagementComponentIdentifierComJamfDdmDiskManagement:                 {},
+	blueprints.MathSettingsComponentIdentifierComJamfDdmMathSettings:                     {},
+	blueprints.PasscodeSettingsComponentIdentifierComJamfDdmPasscodeSettings:             {},
+	blueprints.SafariBookmarksComponentIdentifierComJamfDdmSafariBookmarks:               {},
+	blueprints.SafariExtensionsComponentIdentifierComJamfDdmSafariExtensions:             {},
+	blueprints.SafariSettingsComponentIdentifierComJamfDdmSafariSettings:                 {},
+	"com.jamf.ddm.service-background-tasks":                                              {},
+	"com.jamf.ddm.service-configuration-files":                                           {},
+	blueprints.SwUpdateComponentIdentifierComJamfDdmSwUpdates:                            {},
+	blueprints.SoftwareUpdateSettingsComponentIdentifierComJamfDdmSoftwareUpdateSettings: {},
+	legacyConfigProfileIdentifier:                                                        {},
+	appleDeclarationsIdentifier:                                                          {},
 }
 
 // blockOnlyComponentIdentifiers lists the strongly-typed components the provider offers only inside
@@ -69,8 +69,8 @@ var stronglyTypedComponentIdentifiers = map[string]struct{}{
 // stronglyTypedComponentIdentifiers, and state_builders_test.go pins that a typed component with no
 // BlueprintResourceModel field is registered here.
 var blockOnlyComponentIdentifiers = map[string]struct{}{
-	"com.jamf.ai-governance": {},
-	"com.jamf.ddm-strict":    {},
+	"com.jamf.ai-governance":    {},
+	appleDeclarationsIdentifier: {},
 }
 
 // legacyPayloadSettingsBehaviour documents how Jamf treats the settings written for a legacy payload,

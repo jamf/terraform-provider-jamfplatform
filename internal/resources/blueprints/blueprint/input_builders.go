@@ -163,6 +163,12 @@ func (r *BlueprintResource) collectBlockComponents(ctx context.Context, block Co
 // is nothing a component holding no declarations would express.
 //
 // kind and payloadKey are derived rather than authored — see AppleDeclarationModel.
+//
+// Each declaration is written as the generic blueprints.CustomDeclaration, not through the SDK's
+// typed blueprints.DeclarationsComponent union, and the same holds on read. The union covers only
+// the eleven types the spec lists, while the service stores any type (SDK wire facts, 2026-09-30),
+// and a type with no variant re-marshals through the union as `{"type": …}` alone, dropping its
+// payload.
 func (r *BlueprintResource) appendAppleDeclarations(allComponents *[]blueprints.Component, diags *diag.Diagnostics, declarations []AppleDeclarationModel) {
 	if len(declarations) == 0 {
 		return

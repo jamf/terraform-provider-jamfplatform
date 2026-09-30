@@ -26,17 +26,17 @@ type ComponentRegistry struct {
 
 // CommonComponentRegistries defines all supported strongly-typed components.
 var CommonComponentRegistries = []ComponentRegistry{
-	{"com.jamf.ddm.audio-accessory-settings", "Audio Accessory Settings"},
-	{"com.jamf.ddm.disk-management", "Disk Management Settings"},
-	{"com.jamf.ddm.math-settings", "Math Settings"},
-	{"com.jamf.ddm.passcode-settings", "Passcode Policy"},
-	{"com.jamf.ddm.safari-bookmarks", "Safari Bookmarks"},
-	{"com.jamf.ddm.safari-extensions", "Safari Extensions"},
-	{"com.jamf.ddm.safari-settings", "Safari Settings"},
+	{blueprints.AudioAccessorySettingsComponentIdentifierComJamfDdmAudioAccessorySettings, "Audio Accessory Settings"},
+	{blueprints.DiskManagementComponentIdentifierComJamfDdmDiskManagement, "Disk Management Settings"},
+	{blueprints.MathSettingsComponentIdentifierComJamfDdmMathSettings, "Math Settings"},
+	{blueprints.PasscodeSettingsComponentIdentifierComJamfDdmPasscodeSettings, "Passcode Policy"},
+	{blueprints.SafariBookmarksComponentIdentifierComJamfDdmSafariBookmarks, "Safari Bookmarks"},
+	{blueprints.SafariExtensionsComponentIdentifierComJamfDdmSafariExtensions, "Safari Extensions"},
+	{blueprints.SafariSettingsComponentIdentifierComJamfDdmSafariSettings, "Safari Settings"},
 	{"com.jamf.ddm.service-background-tasks", "Service Background Tasks"},
 	{"com.jamf.ddm.service-configuration-files", "Service Configuration Files"},
-	{"com.jamf.ddm.sw-updates", "Software Update"},
-	{"com.jamf.ddm.software-update-settings", "Software Update Settings"},
-	{"com.jamf.ddm-configuration-profile", "Legacy Payloads"},
+	{blueprints.SwUpdateComponentIdentifierComJamfDdmSwUpdates, "Software Update"},
+	{blueprints.SoftwareUpdateSettingsComponentIdentifierComJamfDdmSoftwareUpdateSettings, "Software Update Settings"},
+	{blueprints.ConfigurationProfileIdentifierComJamfDdmConfigurationProfile, "Legacy Payloads"},
 	{"com.jamf.ai-governance", "AI Governance"},
 }
