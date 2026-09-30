@@ -11,6 +11,7 @@ description: |-
   Jamf lists this under Platform environment scope (preferred for new integrations) or Tenant scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
   |---|---|---|---|
+  | Global settings | UEM Connect configuration | Read | `uem-connect` |
   | Secure enterprise access | Zero-Trust Network Access (ZTNA) | Create, Read, Update, Delete | `ztna` |
 ---
 
@@ -31,6 +32,7 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 
 | Category | Permission | Actions | API capability |
 |---|---|---|---|
+| Global settings | UEM Connect configuration | Read | `uem-connect` |
 | Secure enterprise access | Zero-Trust Network Access (ZTNA) | Create, Read, Update, Delete | `ztna` |
 
 ## Example Usage
@@ -44,7 +46,9 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 resource "jamfplatform_security_cloud_ztna_gateway" "internet" {
   name          = "London Internet Egress"
   egress_region = "Europe - UK"
-  tenant_ids    = [var.security_cloud_tenant_id]
+
+  # tenant_ids is left unset, so the gateway is granted to your own Security
+  # Cloud tenant. Set it to grant other tenants in your organization as well.
 
   contact = {
     name  = "Network Operations"
@@ -58,7 +62,6 @@ resource "jamfplatform_security_cloud_ztna_gateway" "internet" {
 resource "jamfplatform_security_cloud_ztna_gateway" "ipsec" {
   name          = "Frankfurt Private Apps"
   egress_region = "Europe - Germany"
-  tenant_ids    = [var.security_cloud_tenant_id]
 
   contact = {
     name  = "Network Operations"
@@ -116,11 +119,6 @@ resource "jamfplatform_security_cloud_ztna_gateway" "ipsec" {
   }
 }
 
-variable "security_cloud_tenant_id" {
-  description = "Tenant granted access to these gateways."
-  type        = string
-}
-
 variable "ipsec_authentication_secret" {
   description = "IPSec pre-shared key."
   type        = string
@@ -142,7 +140,6 @@ The published documentation states the egress region cannot be changed once a ga
 
 Valid values: `Africa - Cape Town`, `Asia - Hong Kong`, `Asia - Japan`, `Asia - Mumbai`, `Asia - Singapore`, `Australia`, `Europe - Germany`, `Europe - Ireland`, `Europe - UK`, `North America - Canada`, `North America - USA East`, `North America - USA West`, `South America - Brazil`.
 - `name` (String) **"Gateway name"** in the Jamf Security Cloud admin UI.
-- `tenant_ids` (Set of String) IDs of the tenants granted access to this gateway. At least one, and every one must belong to the same organization as the credentials the provider is configured with; a tenant outside it is refused.
 
 ### Optional
 
@@ -153,6 +150,9 @@ Valid values: `Africa - Cape Town`, `Asia - Hong Kong`, `Asia - Japan`, `Asia - 
 Each egress region accepts its own two addresses, the ones the admin UI lists when you pick the region. Jamf Security Cloud refuses an address from another region when you apply.
 
 You can replace the addresses later but you cannot remove the attribute, because Jamf Security Cloud refuses to leave an IPsec gateway with none.
+- `tenant_ids` (Set of String) IDs of the Jamf Security Cloud tenants granted access to this gateway. Every one must belong to the same organization as the provider's credentials.
+
+Leave it unset to grant access to your own Security Cloud tenant. The provider finds that ID when it plans the create: under a tenant-scoped integration it is the tenant you configured, and under an environment-scoped one it reads it from the environment's UEM Connect integration. If the environment has no UEM Connect integration, the plan fails and asks you to set it. Jamf Account shows the ID under Platform environments, on the environment's Jamf Security Cloud row. Taking the attribute out of your configuration later keeps the tenants already granted.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only

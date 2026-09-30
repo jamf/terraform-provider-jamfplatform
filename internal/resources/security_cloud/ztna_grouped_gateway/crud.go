@@ -7,6 +7,7 @@
 //   securitycloud.UpdateZtnaGroupedGatewayV1
 //   securitycloud.DeleteZtnaGroupedGatewayV1
 //   securitycloud.ListZtnaGroupedGatewaysV1 (data sources / list resource)
+//   securitycloud.ListUemConnectorsV1 (tenant_ids default, when unset)
 //   securitycloud.ResolveZtnaGroupedGatewayV1ByName (singular data source, name lookup)
 //
 // Status: current. Last reviewed 2026-08-27.
@@ -16,11 +17,15 @@ package ztna_grouped_gateway
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/securitycloudtenant"
 )
 
 // Create creates a new Jamf Security Cloud ZTNA grouped gateway.
@@ -37,6 +42,15 @@ func (r *GroupedGatewayResource) Create(ctx context.Context, req resource.Create
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if plan.TenantIDs.IsUnknown() {
+		tenantIDs, tenantDiags := r.resolveTenantIDs(ctx)
+		resp.Diagnostics.Append(tenantDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		plan.TenantIDs = tenantIDs
 	}
 
 	createTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, plan.Timeouts.IsNull(), plan.Timeouts.IsUnknown(), defaultCreateTimeout, plan.Timeouts.Create)
@@ -262,4 +276,24 @@ func (r *GroupedGatewayResource) Delete(ctx context.Context, req resource.Delete
 		}
 		resp.Diagnostics.AddError("Error deleting Jamf Security Cloud ZTNA grouped gateway", helpers.APIErrorDetail(err))
 	}
+}
+
+// resolveTenantIDs returns the tenant_ids default: the Security Cloud tenant the provider's
+// credentials act on, as a one-element set. See internal/common/securitycloudtenant for where the
+// ID comes from and why nothing else is consulted.
+//
+// ModifyPlan calls this so the plan shows the resolved ID. Create calls it again only when the
+// value is still unknown, which is when the provider was not yet configured at plan time.
+func (r *GroupedGatewayResource) resolveTenantIDs(ctx context.Context) (types.Set, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	tenantID, err := securitycloudtenant.Resolve(ctx, r.scopeTenantID, func(ctx context.Context) (*securitycloud.ConnectorPage, error) {
+		return r.client.ListUemConnectorsV1(ctx)
+	})
+	if err != nil {
+		securitycloudtenant.AppendUnresolved(&diags, path.Root("tenant_ids"), err)
+		return types.SetUnknown(types.StringType), diags
+	}
+	tenantIDs, setDiags := types.SetValueFrom(ctx, types.StringType, []string{tenantID})
+	diags.Append(setDiags...)
+	return tenantIDs, diags
 }

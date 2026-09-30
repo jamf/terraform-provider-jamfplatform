@@ -36,10 +36,15 @@ func TestGatewayResource_Schema(t *testing.T) {
 		}
 	}
 
-	for _, name := range []string{"name", "egress_region", "contact", "tenant_ids"} {
+	for _, name := range []string{"name", "egress_region", "contact"} {
 		if !s.Attributes[name].IsRequired() {
 			t.Errorf("%s must be required", name)
 		}
+	}
+
+	tenantIDs := s.Attributes["tenant_ids"]
+	if !tenantIDs.IsOptional() || !tenantIDs.IsComputed() {
+		t.Error("tenant_ids must be Optional and Computed: unset, it defaults to the provider's own Security Cloud tenant")
 	}
 
 	if id := s.Attributes["id"]; id.IsRequired() || !id.IsComputed() {

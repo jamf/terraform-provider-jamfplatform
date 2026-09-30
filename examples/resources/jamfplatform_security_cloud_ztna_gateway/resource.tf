@@ -6,7 +6,9 @@
 resource "jamfplatform_security_cloud_ztna_gateway" "internet" {
   name          = "London Internet Egress"
   egress_region = "Europe - UK"
-  tenant_ids    = [var.security_cloud_tenant_id]
+
+  # tenant_ids is left unset, so the gateway is granted to your own Security
+  # Cloud tenant. Set it to grant other tenants in your organization as well.
 
   contact = {
     name  = "Network Operations"
@@ -20,7 +22,6 @@ resource "jamfplatform_security_cloud_ztna_gateway" "internet" {
 resource "jamfplatform_security_cloud_ztna_gateway" "ipsec" {
   name          = "Frankfurt Private Apps"
   egress_region = "Europe - Germany"
-  tenant_ids    = [var.security_cloud_tenant_id]
 
   contact = {
     name  = "Network Operations"
@@ -76,11 +77,6 @@ resource "jamfplatform_security_cloud_ztna_gateway" "ipsec" {
       vendor = "strongSwan"
     }
   }
-}
-
-variable "security_cloud_tenant_id" {
-  description = "Tenant granted access to these gateways."
-  type        = string
 }
 
 variable "ipsec_authentication_secret" {

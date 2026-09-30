@@ -37,10 +37,15 @@ func TestGroupedGatewayResource_Schema(t *testing.T) {
 		}
 	}
 
-	for _, name := range []string{"name", "gateway_ids", "routing_strategy", "required_gateway_stability", "tenant_ids"} {
+	for _, name := range []string{"name", "gateway_ids", "routing_strategy", "required_gateway_stability"} {
 		if !s.Attributes[name].IsRequired() {
 			t.Errorf("%s must be required", name)
 		}
+	}
+
+	tenantIDs := s.Attributes["tenant_ids"]
+	if !tenantIDs.IsOptional() || !tenantIDs.IsComputed() {
+		t.Error("tenant_ids must be Optional and Computed: unset, it defaults to the provider's own Security Cloud tenant")
 	}
 
 	if id := s.Attributes["id"]; id.IsRequired() || !id.IsComputed() {

@@ -53,3 +53,22 @@ func ConfigureSecurityCloud(_ context.Context, providerData any, resourceType st
 	}
 	return securitycloud.New(pd.Client), diags
 }
+
+// SecurityCloudTenantScopeID returns the tenant ID the provider is scoped to when it runs under
+// tenant scope, and "" under any other scope or before Configure has supplied providerData.
+//
+// A Security Cloud construct configured under tenant scope is necessarily talking to a Security
+// Cloud tenant, so this is that tenant's ID: the value internal/common/securitycloudtenant
+// defaults a gateway's tenant_ids to. It is read off the built SDK client, like Data.scope, so it
+// can never disagree with the X-Tenant-Id the client sends.
+func SecurityCloudTenantScopeID(providerData any) string {
+	pd, ok := providerData.(*Data)
+	if !ok || pd == nil || pd.Client == nil {
+		return ""
+	}
+	kind, id := pd.Client.Scope()
+	if scopeKindFromClient(kind, id) != ScopeTenant {
+		return ""
+	}
+	return id
+}

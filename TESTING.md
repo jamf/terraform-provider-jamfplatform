@@ -495,7 +495,7 @@ and is commented where it happens.
 | Secret | Description |
 |---|---|
 | `JAMFPLATFORM_ACC_SECURITYCLOUD_ENVIRONMENT_ID` | Declares that the configured `JAMFPLATFORM_ENVIRONMENT_ID` belongs to a Jamf Security Cloud tenant. Must equal it. Part of the `securitycloud` lane's `require` token, so in that lane unset or mismatched **fails**; outside a lane it skips. A separate secret rather than a copy of the scope value on purpose — writing the scope inline would satisfy the equality check by construction and assert an entitlement nobody verified |
-| `JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_ID` | Same, for `JAMFPLATFORM_TENANT_ID`. Set at most one of these two. Also names the tenant a ZTNA gateway grants access to — the gateway tests skip without it, because `tenantIds` is required on every gateway and is validated against the caller's organization |
+| `JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_ID` | Same, for `JAMFPLATFORM_TENANT_ID`. Set at most one of these two |
 | `JAMFPLATFORM_ACC_AIGOVERNANCE_ENVIRONMENT_ID` | Declares that the configured environment holds Jamf AI Governance. Must equal `JAMFPLATFORM_ENVIRONMENT_ID`. Part of the `aigovernance` lane's `require` token, so in that lane an unset value **fails** rather than skipping — it was referenced by no workflow at all before this pipeline, and all 18 AI Governance tests skipped green on every run |
 | `JAMFPLATFORM_ACC_ORGANIZATION_DECLARED_ID` | Declares that the organization credentials really are organization-scoped. Nothing can be compared against it — an organization request sends no scope header, so no `JAMFPLATFORM_*` variable holds the organization — which is exactly why it is declared: without it, a Pro-only credential set with both scope variables blank looks identical to a real organization integration. Provider-only; the SDK's organization client needs no ID by design |
 | `JAMFPLATFORM_ACC_ORGANIZATION_SSO_VERIFIED_DOMAIN`, `JAMFPLATFORM_ACC_ORGANIZATION_SSO_UNVERIFIABLE_DOMAIN` | Optional Jamf Account SSO domain fixtures: a real, already-verified domain the operator owns, and a throwaway `.example` one that can never verify. Each covers a verification outcome the suite cannot manufacture. Unset → those two tests skip |
@@ -508,13 +508,10 @@ against the environment credential on 2026-09-03 (`/securitycloud` categories an
 `dns/zones` both answered 200), and it is part of the `securitycloud` lane's
 `require` token — so that lane can no longer skip green.
 
-The tenant form is still unset, and one family depends on it. A ZTNA gateway's
-create requires `tenantIds`, which is **fixture data** rather than a scope header —
-the list of tenants the gateway grants access to — and no API exposes an
-environment's tenants, so those tests skip under an environment-scoped lane. That
-is an honest skip, counted in the lane summary. `acceptance.yml` carries the four
-dedicated Security Cloud tenant credential lines **commented out**, so restoring
-that coverage is uncommenting four lines and adding the secrets.
+The tenant form is still unset, and nothing depends on it any more. A ZTNA gateway's
+create requires `tenantIds`, and the tests leave `tenant_ids` unset for the provider to
+default. `acceptance.yml` still carries the four dedicated Security Cloud tenant
+credential lines **commented out**, for covering the tenant-scope path itself.
 
 The same reading applies, on a much smaller scale, to `JAMFPLATFORM_ACC_PRO_ADCS_API_CLIENT_ID`:
 it is not set in CI either, so the two AD CS `OUTBOUND` tests skip there. They used to
@@ -525,19 +522,21 @@ Turning them on is just setting `JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_ID` to th
 value as `JAMFPLATFORM_TENANT_ID`. The gate requires the two to match, so a value
 left over from a different tenant skips rather than running against the wrong estate.
 
-**Under an environment-scoped integration the ZTNA gateway tests cannot run at all.**
-`tenantIds` is required on every gateway and grouped gateway and is validated against
-the caller's organization, and nothing in the API exposes the tenants belonging to an
-environment — so there is no id for a test to name. `RequireSecurityCloudTenantID`
-skips rather than guessing. Custom DNS zones and the shared-gateway catalogue have no
+**Under an environment-scoped integration the ZTNA gateway tests need a UEM Connect
+integration on the environment.** `tenantIds` is required on every gateway and grouped
+gateway, and the tests leave `tenant_ids` unset, so the provider defaults it to the Security
+Cloud tenant's own ID. Under environment scope the only place the Jamf API reports that ID is
+the UEM Connect connector's `customerId` (wire-probed 2026-09-30, with the connector deleted
+and recreated), so an environment without one fails the gateway tests with the provider's
+named `tenant_ids` error. The internet-gateway tests also need a dedicated IP entitlement: an
+environment allowed none answers every create with `409 DEDICATED_IPS_LIMIT` ("0 of 0"), and
+those tests fail rather than skip. Custom DNS zones and the shared-gateway catalogue have no
 such field and are unaffected.
 
-Also untested: the Security Cloud surface under `X-Environment-Id`. Every wire probe
-behind these resources used a tenant-scoped integration.
-`providerdata.ConfigureSecurityCloud` admits both scopes on the strength of the spec,
-not a probe. If `/securitycloud` turns out not to answer under an environment
-header, the fix is to drop `ScopeEnvironment` from that call — the same one-token
-narrowing the scope gate was built for.
+The whole Security Cloud surface also answers under `X-Environment-Id`: the lane ran
+green there on 2026-09-30 apart from the dedicated-IP entitlement above, so
+`providerdata.ConfigureSecurityCloud` admitting both scopes now rests on a run as well as
+the spec.
 
 ### Jamf Account needs an organization-scoped integration, and therefore its own lane
 
