@@ -17,7 +17,9 @@
 //   - Under tenant scope the configured `X-Tenant-Id` is the tenant, because a Security Cloud
 //     construct is only reachable there with a Security Cloud tenant's ID.
 //   - Under environment scope the UEM Connect connector's documented `customerId` is. A tenant
-//     holds at most one connector, and it may hold none.
+//     may hold none. It holds at most one, except that the spec lets a Jamf Pro and a Wizy
+//     connector coexist, and the US acceptance environment holds that pair, both reporting the
+//     same `customerId` (2026-09-30).
 //
 // Nothing else carries the ID. With the connector deleted, 2026-09-30, the connector list came
 // back empty and no documented Security Cloud read returned the ID in a body or a header. The one
@@ -55,9 +57,9 @@ type ConnectorLister func(ctx context.Context) (*securitycloud.ConnectorPage, er
 // Resolve returns the Security Cloud tenant ID for scopeTenantID, the configured tenant-scope ID
 // ("" under any other scope), falling back to the connectors list reports.
 //
-// More than one distinct `customerId` across the connectors is an error rather than a choice:
-// a tenant holds one connector, so disagreement means the assumption this package rests on no
-// longer holds, and picking one would grant a gateway to a tenant nobody named.
+// More than one distinct `customerId` across the connectors is an error rather than a choice.
+// Every connector on a tenant belongs to that tenant, so disagreement means the assumption this
+// package rests on no longer holds, and picking one would grant a gateway to a tenant nobody named.
 func Resolve(ctx context.Context, scopeTenantID string, list ConnectorLister) (string, error) {
 	if scopeTenantID != "" {
 		return scopeTenantID, nil

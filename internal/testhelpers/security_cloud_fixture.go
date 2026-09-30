@@ -213,10 +213,11 @@ func RequireSecurityCloudPredefinedApps(t *testing.T) []securitycloud.Predefined
 	return predefinedApps
 }
 
-// noDedicatedIPsEntitlement matches the provider's "Dedicated IP address limit reached"
-// diagnostic when the account's allotment is zero. Terraform wraps a diagnostic's detail at
-// about 80 columns, hence the \s+ between the words of Jamf Security Cloud's "(0 of 0)".
-var noDedicatedIPsEntitlement = regexp.MustCompile(`Dedicated IP address limit reached[\s\S]*\(0\s+of\s+0\)`)
+// noDedicatedIPsEntitlement matches the diagnostic the ztna_gateway resource raises when the
+// plan has no dedicated IP allotment, "Dedicated internet gateways are not in your plan". It keys
+// on the summary, which Terraform prints unwrapped; the \s+ allows for the line breaks Terraform
+// puts in a diagnostic's detail at about 80 columns all the same.
+var noDedicatedIPsEntitlement = regexp.MustCompile(`Dedicated\s+internet\s+gateways\s+are\s+not\s+in\s+your\s+plan`)
 
 // SkipWithoutDedicatedIPs is a TestCase ErrorCheck for tests that create a dedicated internet
 // gateway. It skips the test when the account holds no dedicated IP addresses at all, and passes
@@ -226,8 +227,10 @@ var noDedicatedIPsEntitlement = regexp.MustCompile(`Dedicated IP address limit r
 // without one answers every create with `409 DEDICATED_IPS_LIMIT` "(0 of 0)" (observed on the EU
 // acceptance environment, 2026-09-30). No API grants the allotment, so a test cannot provision it
 // as a fixture, and like NOT_ENTITLED the refusal states a fact about the account rather than a
-// fault in the provider. The skip is deliberately narrowed to a zero allotment: a spent one, such
-// as "(2 of 2)", can mean earlier runs leaked gateways, and that has to fail.
+// fault in the provider. The admin UI answers the same tenant "Dedicated internet gateway is not
+// included in your plan". The skip is deliberately narrowed to a zero allotment: a spent one, such
+// as "(2 of 2)", raises the provider's other DEDICATED_IPS_LIMIT diagnostic, can mean earlier runs
+// leaked gateways, and has to fail.
 //
 // The framework does not consult ErrorCheck on a step that sets ExpectError, so a test whose
 // refused step needs an internet gateway must create it in an earlier step.

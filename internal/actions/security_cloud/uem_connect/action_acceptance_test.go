@@ -38,8 +38,13 @@ func requireNoExistingIntegration(t *testing.T) {
 	if err != nil {
 		t.Skipf("could not check for an existing UEM Connect integration: %v", err)
 	}
-	if page != nil && len(page.Results) > 0 {
-		t.Skipf("this tenant already holds a UEM Connect integration (%s); remove it first to run this test", page.Results[0].ID)
+	if page == nil {
+		return
+	}
+	for _, connector := range page.Results {
+		if connector.Vendor == securitycloud.ConnectorConfigVendorJamfPro {
+			t.Skipf("this tenant already holds a UEM Connect integration (%s); remove it first to run this test", connector.ID)
+		}
 	}
 }
 

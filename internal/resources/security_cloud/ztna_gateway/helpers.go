@@ -6,6 +6,7 @@ package ztna_gateway
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -50,10 +51,26 @@ const (
 // exclusively about `tenant_ids`, and says nothing about which id or why.
 //
 // `DEDICATED_IPS_LIMIT` is the odd one out: nothing in the configuration is
-// wrong, the account has simply used every dedicated IP address it is allotted.
+// wrong. Either the account has used every dedicated IP address it is allotted,
+// or, with an allotment of zero, its plan lacks the add-on (dedicatedIPsNotInPlan).
 // It gets no attribute path because the addresses are provisioned by Jamf and
 // surface as the computed `dedicated_egress_ip_addresses` — there is no input to
 // point at, and pointing at one would imply an edit that cannot fix it.
+// dedicatedIPsAllotment matches the "(used of total)" suffix Jamf Security Cloud appends to a
+// DEDICATED_IPS_LIMIT description, "The dedicated IP address limit has been reached (0 of 0).".
+var dedicatedIPsAllotment = regexp.MustCompile(`\((\d+) of (\d+)\)`)
+
+// dedicatedIPsNotInPlan reports whether a DEDICATED_IPS_LIMIT description names an allotment of
+// zero, which means the plan lacks the dedicated internet gateway add-on rather than that its
+// addresses are spent. The admin UI answers the same tenant with "Dedicated internet gateway is not
+// included in your plan. This feature is available as a paid add-on." (observed 2026-09-30), and an
+// IPsec gateway on it still creates. A description in any other shape reads as spent, the
+// message that was here before the zero case was known.
+func dedicatedIPsNotInPlan(description string) bool {
+	match := dedicatedIPsAllotment.FindStringSubmatch(description)
+	return match != nil && match[2] == "0"
+}
+
 func appendWriteDiagnostics(diags *diag.Diagnostics, err error) bool {
 	apiErr := jamfplatform.AsAPIError(err)
 	if apiErr == nil {
@@ -77,6 +94,15 @@ func appendWriteDiagnostics(diags *diag.Diagnostics, err error) bool {
 					"Security Cloud: "+detail.Description,
 			)
 		case codeDedicatedIPsLimit:
+			if dedicatedIPsNotInPlan(detail.Description) {
+				diags.AddError(
+					"Dedicated internet gateways are not in your plan",
+					"They are a paid add-on to Jamf Security Cloud. Ask your Jamf representative to add them, and "+
+						"Jamf provisions them within 2 business days. An IPsec gateway, one with an `ipsec` block, "+
+						"works without the add-on. Reported by Jamf Security Cloud: "+detail.Description,
+				)
+				break
+			}
 			diags.AddError(
 				"Dedicated IP address limit reached",
 				"This account has no dedicated IP addresses left to assign, so Jamf Security Cloud cannot "+

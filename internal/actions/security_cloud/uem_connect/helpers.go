@@ -76,10 +76,13 @@ func (a *uemConnectAction) ensureClient(resp *action.InvokeResponse) bool {
 }
 
 // resolveIntegrationID returns the integration to act on: the configured ID when
-// one is given, otherwise the tenant's only integration.
+// one is given, otherwise the tenant's Jamf Pro connector.
 //
-// A tenant holds at most one UEM Connect integration, so requiring its opaque
-// identifier would be friction with nothing to disambiguate. The attribute stays
+// A tenant holds one UEM Connect integration. The one exception, a Wizy connector
+// alongside it (see jamfProConnectors in the resource package), is not configured
+// from the UEM Connect page, so requiring the opaque identifier would be friction
+// with nothing to disambiguate, and the unnamed case picks the Jamf Pro connector
+// rather than whichever the list happens to return first. The attribute stays
 // available because naming the resource's ID is how a configuration makes the
 // action depend on the integration existing.
 func (a *uemConnectAction) resolveIntegrationID(ctx context.Context, configured string, diags *diag.Diagnostics) string {
@@ -98,7 +101,16 @@ func (a *uemConnectAction) resolveIntegrationID(ctx context.Context, configured 
 		}
 		return ""
 	}
-	if page == nil || len(page.Results) == 0 {
+	var connectorID string
+	if page != nil {
+		for _, connector := range page.Results {
+			if connector.Vendor == securitycloud.ConnectorConfigVendorJamfPro {
+				connectorID = connector.ID
+				break
+			}
+		}
+	}
+	if connectorID == "" {
 		diags.AddError(
 			"No UEM Connect integration on this tenant",
 			"Jamf Security Cloud reports no UEM Connect integration for this tenant, so there is nothing to "+
@@ -107,7 +119,7 @@ func (a *uemConnectAction) resolveIntegrationID(ctx context.Context, configured 
 		)
 		return ""
 	}
-	return page.Results[0].ID
+	return connectorID
 }
 
 // appendInvokeDiagnostics turns a failure into the most specific diagnostic the

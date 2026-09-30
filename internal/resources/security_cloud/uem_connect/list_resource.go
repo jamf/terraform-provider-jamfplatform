@@ -101,21 +101,23 @@ func (r *UEMConnectListResource) List(ctx context.Context, req list.ListRequest,
 
 	// A tenant with no integration is an empty result, not an error. Unlike the
 	// data source — whose reference cannot be satisfied by nothing — a query that
-	// finds nothing has answered the question it was asked.
-	if page == nil || len(page.Results) == 0 {
+	// finds nothing has answered the question it was asked. Only Jamf Pro
+	// connectors are listed, since they are the only ones the resource can import.
+	connectors := jamfProConnectors(page)
+	if len(connectors) == 0 {
 		tflog.Debug(ctx, "No Jamf Security Cloud UEM Connect integration on this tenant")
 		stream.Results = list.NoListResults
 		return
 	}
 
 	maxResults := req.Limit
-	if maxResults <= 0 || maxResults > int64(len(page.Results)) {
-		maxResults = int64(len(page.Results))
+	if maxResults <= 0 || maxResults > int64(len(connectors)) {
+		maxResults = int64(len(connectors))
 	}
 
 	results := make([]list.ListResult, 0, maxResults)
 
-	for _, connector := range page.Results {
+	for _, connector := range connectors {
 		if int64(len(results)) >= maxResults {
 			break
 		}

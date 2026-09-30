@@ -178,18 +178,38 @@ func timePointerValue(v *time.Time) types.String {
 	return types.StringValue(v.Format(time.RFC3339))
 }
 
-// appendMissingIntegrationDiagnostics refuses a read of a tenant that holds no UEM
-// Connect integration.
+// jamfProConnectors returns the page's Jamf Pro connectors, the only vendor this package manages.
 //
-// This is the guard in front of `page.Results[0]`, so a regression here is a
+// A tenant holds one connector, with one exception the spec states: "Jamf Pro and Wizy may
+// coexist", and any other second connector is refused `409 CONNECTOR_CONFIG_ALREADY_EXISTS`. The US
+// acceptance environment holds exactly that pair (2026-09-30), and nothing orders the list, so
+// taking the first result could hand back the Wizy connector: a vendor the resource cannot
+// represent, configured outside the admin UI's UEM Connect page.
+func jamfProConnectors(page *securitycloud.ConnectorPage) []securitycloud.ConnectorConfig {
+	if page == nil {
+		return nil
+	}
+	var connectors []securitycloud.ConnectorConfig
+	for _, connector := range page.Results {
+		if connector.Vendor == securitycloud.ConnectorConfigVendorJamfPro {
+			connectors = append(connectors, connector)
+		}
+	}
+	return connectors
+}
+
+// appendMissingIntegrationDiagnostics refuses a read of a tenant that holds no Jamf Pro UEM
+// Connect integration, given the page's Jamf Pro connectors (see jamfProConnectors).
+//
+// This is the guard in front of `connectors[0]`, so a regression here is a
 // provider panic rather than a diagnostic — and unlike most of this package's
 // guards it is reachable in entirely ordinary use, by reading the data source
 // before creating an integration. It lives here rather than inline in the data
 // source so a unit test can drive it: the shape it guards is a plain SDK struct,
 // while the data source's Read needs a live client.
-func appendMissingIntegrationDiagnostics(page *securitycloud.ConnectorPage) diag.Diagnostics {
+func appendMissingIntegrationDiagnostics(connectors []securitycloud.ConnectorConfig) diag.Diagnostics {
 	var diags diag.Diagnostics
-	if page != nil && len(page.Results) > 0 {
+	if len(connectors) > 0 {
 		return diags
 	}
 	diags.AddError(

@@ -60,6 +60,13 @@ func TestAppendWriteDiagnostics_MapsCodes(t *testing.T) {
 			wantText: "no dedicated IP addresses left",
 		},
 		{
+			// An allotment of zero is the plan lacking the add-on, which the admin UI
+			// says in the same words, so there is nothing to destroy to make room.
+			name:     "zero dedicated IP allotment names the add-on",
+			err:      apiError(409, codeDedicatedIPsLimit, "The dedicated IP address limit has been reached (0 of 0)."),
+			wantText: "paid add-on",
+		},
+		{
 			name:     "not entitled names the entitlement",
 			err:      apiError(403, codeNotEntitled, "Not entitled."),
 			wantText: "does not have the ZTNA surface enabled",
