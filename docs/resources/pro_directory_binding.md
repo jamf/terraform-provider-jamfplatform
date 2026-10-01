@@ -177,7 +177,7 @@ Optional:
 - `forest` (String) Active Directory forest. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `gid_attribute_mapping` (String) **"Map Group GID to attribute"** in the Jamf Pro admin UI. Name of the AD attribute that supplies the group GID. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `multiple_domains` (Boolean) **"Allow authentication from any domain in the forest"** in the Jamf Pro admin UI. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `network_protocol` (String) **"Network Protocol"** in the Jamf Pro admin UI. Network protocol used to mount the user's home (e.g. `smb` or `afp`). Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
+- `network_protocol` (String) **"Network Protocol"** in the Jamf Pro admin UI. Protocol for mounting the user's home folder: `smb` or `afp`, in lower case. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `preferred_domain` (String) **"Preferred Domain Server"** in the Jamf Pro admin UI. Preferred AD domain controller hostname. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `require_confirmation` (Boolean) **"Require confirmation before creating a mobile account"** in the Jamf Pro admin UI. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `uid_attribute_mapping` (String) **"Map UID to attribute"** in the Jamf Pro admin UI. Name of the AD attribute that supplies the POSIX UID. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
@@ -198,7 +198,7 @@ Optional:
 - `groups_ou` (String) **"Groups OU"** in the Jamf Pro admin UI. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `home_location` (String) **"Home Location"** in the Jamf Pro admin UI. Where to create the user's home folder (e.g. `"Local"`). Free text. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `mount_network_home` (Boolean) **"Mount network home as sharepoint"** in the Jamf Pro admin UI. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `network_protocol` (String) **"Network Protocol"** in the Jamf Pro admin UI. Network protocol used to mount the user's home (e.g. `smb` or `afp`). Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
+- `network_protocol` (String) **"Network Protocol"** in the Jamf Pro admin UI. Protocol for mounting the user's home folder: `smb` or `afp`, in lower case. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `place_home_folders` (String) **"Place home folders in"** in the Jamf Pro admin UI. Filesystem path under which local home folders are placed. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `printers_ou` (String) **"Printers OU"** in the Jamf Pro admin UI. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `require_confirmation` (Boolean) **"Require confirmation"** in the Jamf Pro admin UI. Require admin confirmation when binding new computers to the directory. Omit to leave the current value untouched; set `true`/`false` to change it.

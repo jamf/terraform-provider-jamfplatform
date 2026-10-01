@@ -210,10 +210,10 @@ Optional:
 - `group_id` (String) Attribute mapped to group ID.
 - `group_name` (String) Attribute mapped to group name.
 - `group_uuid` (String) Attribute mapped to group UUID.
-- `object_class_limitation` (String) Object-class limitation (e.g. `ANY_OBJECT_CLASSES`).
+- `object_class_limitation` (String) Object-class limitation. One of `ANY_OBJECT_CLASSES`, `ALL_OBJECT_CLASSES`.
 - `object_classes` (String) Object classes (e.g. `groupOfNames`).
 - `search_base` (String) Group search base (e.g. `ou=Groups`).
-- `search_scope` (String) Group search scope (e.g. `ALL_SUBTREES`).
+- `search_scope` (String) Group search scope. One of `ALL_SUBTREES`, `FIRST_LEVEL_ONLY`.
 
 
 <a id="nestedatt--google--mappings--membership_mappings"></a>
@@ -233,14 +233,14 @@ Optional:
 - `building` (String) Attribute mapped to building.
 - `department` (String) Attribute mapped to department.
 - `email_address` (String) Attribute mapped to email address.
-- `object_class_limitation` (String) Object-class limitation (e.g. `ANY_OBJECT_CLASSES`).
+- `object_class_limitation` (String) Object-class limitation. One of `ANY_OBJECT_CLASSES`, `ALL_OBJECT_CLASSES`.
 - `object_classes` (String) Object classes (e.g. `inetOrgPerson`).
 - `phone` (String) Attribute mapped to phone.
 - `position` (String) Attribute mapped to position.
 - `real_name` (String) Attribute mapped to real name.
 - `room` (String) Attribute mapped to room.
 - `search_base` (String) User search base (e.g. `ou=Users`).
-- `search_scope` (String) User search scope (e.g. `ALL_SUBTREES`).
+- `search_scope` (String) User search scope. One of `ALL_SUBTREES`, `FIRST_LEVEL_ONLY`.
 - `user_id` (String) Attribute mapped to user ID.
 - `user_uuid` (String) Attribute mapped to user UUID.
 - `username` (String) Attribute mapped to username.

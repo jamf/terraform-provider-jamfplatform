@@ -64,6 +64,13 @@ func NewResource() resource.Resource {
 }
 
 // Metadata sets the Terraform type name.
+// redeployOnUpdateValues is the accepted general.redeploy_on_update set. Jamf
+// Pro enforces it itself, case-sensitively ("409 redeploy_on_update should be
+// All or Newly Assigned"); validating at plan time moves that failure out of
+// apply. The classic spec types the field as a plain string. Wire-probed
+// 2026-10-01 against 11.32.0.
+var redeployOnUpdateValues = []string{"Newly Assigned", "All"}
+
 func (r *Resource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_pro_macos_configuration_profile"
 }
@@ -141,6 +148,7 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 						Optional:            true,
 						Computed:            true,
 						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						Validators:          []validator.String{stringvalidator.OneOf(redeployOnUpdateValues...)},
 					},
 					"uuid": schema.StringAttribute{
 						MarkdownDescription: "Profile UUID assigned by Jamf Pro on creation. Also surfaces as the top-level `PayloadUUID` inside the `.mobileconfig` payload. Read-only.",

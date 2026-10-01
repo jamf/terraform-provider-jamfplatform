@@ -64,6 +64,12 @@ func NewDiskEncryptionConfigurationResource() resource.Resource {
 }
 
 // Metadata sets the resource type name.
+// certificateTypes is the accepted institutional_recovery_key.certificate_type
+// set. The classic spec types the field as a plain string; the values are the
+// ones a Jamf Pro tenant accepts for the three upload formats this resource
+// documents.
+var certificateTypes = []string{"PKCS12", "DER", "PEM"}
+
 func (r *DiskEncryptionConfigurationResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_pro_disk_encryption_configuration"
 }
@@ -127,6 +133,7 @@ func (r *DiskEncryptionConfigurationResource) Schema(ctx context.Context, req re
 					"certificate_type": schema.StringAttribute{
 						MarkdownDescription: "Certificate format. Required by Jamf Pro whenever a recovery key is supplied; Jamf Pro otherwise reports `Certificate type is required if a recovery key is specified`. Accepted values: `\"PKCS12\"` (private-key-containing .p12 upload), `\"DER\"` (public-cert binary), `\"PEM\"` (public-cert text). Use `\"PKCS12\"` (with `password` set) when `key_type` is `Institutional` or `Individual and Institutional`: only PKCS12 carries the private key Jamf needs to derive per-Mac recovery keys.",
 						Required:            true,
+						Validators:          []validator.String{stringvalidator.OneOf(certificateTypes...)},
 					},
 					"password": schema.StringAttribute{
 						MarkdownDescription: "PKCS12 import password. `WriteOnly`: sent to Jamf Pro on writes, never persisted in Terraform state. Required when uploading a `.p12` certificate (the `data` payload contains the private key wrapped by this password). Omit for `.cer` / `.pem` uploads. Pair with `password_wo_version` to rotate the stored password.",

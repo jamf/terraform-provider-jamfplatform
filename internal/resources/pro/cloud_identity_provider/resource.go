@@ -9,6 +9,7 @@ package cloud_identity_provider
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -173,10 +174,10 @@ func (r *CloudIdentityProviderResource) Schema(ctx context.Context, req resource
 								MarkdownDescription: "User attribute mappings.",
 								Optional:            true,
 								Attributes: map[string]schema.Attribute{
-									"object_class_limitation": nestedOptString("Object-class limitation (e.g. `ANY_OBJECT_CLASSES`)."),
+									"object_class_limitation": nestedOptEnum("Object-class limitation.", pro.UserMappingsObjectClassLimitationValues()),
 									"object_classes":          nestedOptString("Object classes (e.g. `inetOrgPerson`)."),
 									"search_base":             nestedOptString("User search base (e.g. `ou=Users`)."),
-									"search_scope":            nestedOptString("User search scope (e.g. `ALL_SUBTREES`)."),
+									"search_scope":            nestedOptEnum("User search scope.", pro.UserMappingsSearchScopeValues()),
 									"additional_search_base":  nestedOptString("Additional user search base. When `mappings` is supplied, this must be a valid LDAP distinguished name (e.g. `ou=Users`); Jamf Pro rejects an empty value."),
 									"user_id":                 nestedOptString("Attribute mapped to user ID."),
 									"username":                nestedOptString("Attribute mapped to username."),
@@ -194,10 +195,10 @@ func (r *CloudIdentityProviderResource) Schema(ctx context.Context, req resource
 								MarkdownDescription: "Group attribute mappings.",
 								Optional:            true,
 								Attributes: map[string]schema.Attribute{
-									"object_class_limitation": nestedOptString("Object-class limitation (e.g. `ANY_OBJECT_CLASSES`)."),
+									"object_class_limitation": nestedOptEnum("Object-class limitation.", pro.GroupMappingsObjectClassLimitationValues()),
 									"object_classes":          nestedOptString("Object classes (e.g. `groupOfNames`)."),
 									"search_base":             nestedOptString("Group search base (e.g. `ou=Groups`)."),
-									"search_scope":            nestedOptString("Group search scope (e.g. `ALL_SUBTREES`)."),
+									"search_scope":            nestedOptEnum("Group search scope.", pro.GroupMappingsSearchScopeValues()),
 									"group_id":                nestedOptString("Attribute mapped to group ID."),
 									"group_name":              nestedOptString("Attribute mapped to group name."),
 									"group_uuid":              nestedOptString("Attribute mapped to group UUID."),
@@ -322,6 +323,14 @@ func nestedOptString(desc string) schema.StringAttribute {
 			stringplanmodifier.UseNonNullStateForUnknown(),
 		},
 	}
+}
+
+// nestedOptEnum is nestedOptString restricted to an SDK vocabulary, with the
+// accepted values appended to the description so the two cannot drift.
+func nestedOptEnum(desc string, values []string) schema.StringAttribute {
+	a := nestedOptString(desc + " One of `" + strings.Join(values, "`, `") + "`.")
+	a.Validators = []validator.String{stringvalidator.OneOf(values...)}
+	return a
 }
 
 // computedString returns a Computed-only string echo attribute.

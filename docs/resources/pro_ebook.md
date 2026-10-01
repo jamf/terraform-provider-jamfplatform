@@ -101,7 +101,7 @@ Optional:
 - `category_id` (String) Jamf Pro category ID. Omit to leave the current value untouched; set `-1` to clear the category.
 - `deploy_as_managed` (Boolean) Make the ebook managed when possible (UI "Make eBook managed when possible"). Omit to leave the current value untouched; set `true`/`false` to change it.
 - `deployment_type` (String) Distribution Method. One of `Make Available in Self Service` or `Install Automatically/Prompt Users to Install`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
-- `file_type` (String) File Type. User-set for an in-house ebook (`PDF`, `EPUB`, `IBOOK`). For an App Store ebook, leave it unset: Jamf Pro resolves it from the Apple Books URL and returns it. No strict value validation is applied, because Jamf Pro canonicalises the casing. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
+- `file_type` (String) File Type. Set it for an in-house ebook: `PDF`, `EPUB` or `IBOOKS`, in any letter case. Jamf Pro reports an iBooks file as `IBOOK` but saves a configured `IBOOK` as `Unknown`, so set `IBOOKS`. For an App Store ebook, leave it unset: Jamf Pro resolves it from the Apple Books URL and returns it. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `free` (Boolean) Whether the ebook is free. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `site_id` (String) Jamf Pro site ID scoping the ebook. Omit to leave the current value untouched; set `-1` to clear the site.
 - `version` (String) Ebook version. User-set for an in-house ebook; returned by Jamf Pro for an App Store ebook. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
@@ -183,7 +183,7 @@ Optional:
 - `install_button_text` (String) Install-button label (UI "Button Name", macOS only). Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `notification_enabled` (Boolean) Whether Self Service surfaces a notification when the ebook becomes available (macOS only). Pair with `notification_method`. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `notification_message` (String) Notification body text. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
-- `notification_method` (String) Notification delivery method (e.g. `Self Service`). The server defaults a method when notifications are enabled. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
+- `notification_method` (String) Notification delivery method. The only value is `Self Service`. Jamf Pro saves `Self Service` for an ebook whenever notifications are on, whatever method you set. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `notification_subject` (String) Notification subject line. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `self_service_description` (String) Self Service description. Markdown supported. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 

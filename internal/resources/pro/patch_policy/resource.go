@@ -21,6 +21,7 @@ package patch_policy
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -306,8 +307,11 @@ func (r *PatchPolicyResource) Schema(ctx context.Context, req resource.SchemaReq
 								Optional:            true,
 							},
 							"type": schema.StringAttribute{
-								MarkdownDescription: "Notification type (e.g. `Self Service`). Write-only in practice: Jamf Pro does not return it.",
+								MarkdownDescription: "Notification type. One of `" + strings.Join(proclassic.PatchPolicyUserInteractionNotificationsNotificationTypeValues(), "`, `") + "`. Write-only in practice: Jamf Pro does not return it.",
 								Optional:            true,
+								Validators: []validator.String{
+									stringvalidator.OneOf(proclassic.PatchPolicyUserInteractionNotificationsNotificationTypeValues()...),
+								},
 							},
 							"reminders": schema.SingleNestedAttribute{
 								MarkdownDescription: "Reminder cadence for the notifications. Omit the block to leave any existing values untouched (they are not cleared on update).",

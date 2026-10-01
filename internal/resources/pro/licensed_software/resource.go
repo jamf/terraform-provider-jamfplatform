@@ -18,6 +18,7 @@ package licensed_software
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -200,8 +201,11 @@ func (r *LicensedSoftwareResource) Schema(ctx context.Context, req resource.Sche
 							Optional:            true,
 						},
 						"license_type": schema.StringAttribute{
-							MarkdownDescription: "**\"License Type\"** in the Jamf Pro admin UI. Type of licence obtained for the software, e.g. `Standard`, `Concurrent`, or `Site License`.",
+							MarkdownDescription: "**\"License Type\"** in the Jamf Pro admin UI. Type of licence obtained for the software. One of `" + strings.Join(proclassic.LicensedSoftwareLicensesLicenseItemLicenseTypeValues(), "`, `") + "`.",
 							Optional:            true,
+							Validators: []validator.String{
+								stringvalidator.OneOf(proclassic.LicensedSoftwareLicensesLicenseItemLicenseTypeValues()...),
+							},
 						},
 						"license_count": schema.Int64Attribute{
 							MarkdownDescription: "**\"License Count\"** in the Jamf Pro admin UI. Number of licences owned. Defaults to `0` (unlimited).",
