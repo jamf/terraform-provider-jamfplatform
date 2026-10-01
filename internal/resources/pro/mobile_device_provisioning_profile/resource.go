@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -111,6 +112,9 @@ func (r *ProvisioningProfileResource) Schema(ctx context.Context, req resource.S
 				Optional:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					commonvalidators.NotEmptyString("Jamf Pro accepts an empty profile and then discards it, so the create fails. Set profile_data to a base64-encoded .mobileprovision file, or omit it."),
 				},
 			},
 			"uuid": schema.StringAttribute{

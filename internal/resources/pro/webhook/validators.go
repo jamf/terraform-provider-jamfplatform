@@ -87,13 +87,14 @@ func checkHeaderRequiresHeaderAuth(d WebhookResourceModel) *ruleViolation {
 // wire-probed 2026-09-06 — and, because the input builder sends `username`
 // as configured under BASIC, a config that drops it would otherwise omit the
 // element, the classic merge would retain the old value, and Read would echo
-// it back as an inconsistent result. An unknown username is skipped: it will
-// be known at apply.
+// it back as an inconsistent result. An empty username counts as missing: the
+// server answers it with the same 409 (wire-probed 2026-10-01). An unknown
+// username is skipped: it will be known at apply.
 func checkBasicRequiresUsername(d WebhookResourceModel) *ruleViolation {
 	if !helpers.IsConfiguredValue(d.AuthenticationType) || d.AuthenticationType.ValueString() != authTypeBasic {
 		return nil
 	}
-	if !d.Username.IsNull() {
+	if d.Username.IsUnknown() || (!d.Username.IsNull() && d.Username.ValueString() != "") {
 		return nil
 	}
 	return &ruleViolation{
@@ -106,12 +107,13 @@ func checkBasicRequiresUsername(d WebhookResourceModel) *ruleViolation {
 // checkHeaderAuthRequiresHeader enforces authentication_type=HEADER ⇒ header.
 // The server refuses a HEADER webhook without one — `409 INVALID_REQUIRED`,
 // wire-probed 2026-09-06 — with the same retained-on-omission consequence
-// described on checkBasicRequiresUsername.
+// described on checkBasicRequiresUsername. An empty header counts as missing,
+// for the same reason.
 func checkHeaderAuthRequiresHeader(d WebhookResourceModel) *ruleViolation {
 	if !helpers.IsConfiguredValue(d.AuthenticationType) || d.AuthenticationType.ValueString() != authTypeHeader {
 		return nil
 	}
-	if !d.Header.IsNull() {
+	if d.Header.IsUnknown() || (!d.Header.IsNull() && d.Header.ValueString() != "") {
 		return nil
 	}
 	return &ruleViolation{

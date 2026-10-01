@@ -87,6 +87,7 @@ func TestCheckBasicRequiresUsername(t *testing.T) {
 		{"basic with username ok", types.StringValue("bob"), types.StringValue(authTypeBasic), false},
 		{"basic with unknown username ok", types.StringUnknown(), types.StringValue(authTypeBasic), false},
 		{"basic without username rejected", types.StringNull(), types.StringValue(authTypeBasic), true},
+		{"basic with empty username rejected", types.StringValue(""), types.StringValue(authTypeBasic), true},
 		{"none without username ok", types.StringNull(), types.StringValue(authTypeNone), false},
 		{"auth null skips", types.StringNull(), types.StringNull(), false},
 		{"auth unknown skips", types.StringNull(), types.StringUnknown(), false},
@@ -111,6 +112,7 @@ func TestCheckHeaderAuthRequiresHeader(t *testing.T) {
 		{"header-auth with header ok", types.StringValue("{}"), types.StringValue(authTypeHeader), false},
 		{"header-auth with unknown header ok", types.StringUnknown(), types.StringValue(authTypeHeader), false},
 		{"header-auth without header rejected", types.StringNull(), types.StringValue(authTypeHeader), true},
+		{"header-auth with empty header rejected", types.StringValue(""), types.StringValue(authTypeHeader), true},
 		{"none without header ok", types.StringNull(), types.StringValue(authTypeNone), false},
 		{"auth unknown skips", types.StringNull(), types.StringUnknown(), false},
 	}
