@@ -447,10 +447,11 @@ resource "jamfplatform_pro_account" "empty" {
 // TestAccResource_ProAccount_EmptyEmailRoundTrip is the email_address sibling
 // of TestAccResource_ProAccount_EmptyStringFieldsRoundTrip. Jamf Pro refuses an
 // empty email as "Duplicated user account" while any other account on the
-// tenant already has one, so this test needs a tenant where every other
-// account carries an email.
+// tenant already has one, so the test skips on such a tenant rather than
+// report the tenant's data as a provider fault.
 func TestAccResource_ProAccount_EmptyEmailRoundTrip(t *testing.T) {
 	testhelpers.AccPreCheck(t)
+	skipIfAnAccountHasNoEmail(t)
 	suffix := testhelpers.RunSuffix()
 	email := "tf-acc-empty-" + suffix + "@example.invalid"
 	nameLine := "  full_name     = \"TF Acc Empty\"\n"
@@ -476,6 +477,26 @@ func TestAccResource_ProAccount_EmptyEmailRoundTrip(t *testing.T) {
 			},
 		},
 	})
+}
+
+// skipIfAnAccountHasNoEmail skips when any Jamf Pro account on the tenant has
+// an empty email address, since Jamf Pro then refuses another one as a
+// duplicate. It names the accounts so the operator can add their addresses.
+func skipIfAnAccountHasNoEmail(t *testing.T) {
+	t.Helper()
+	accounts, err := pro.New(testhelpers.NewAcceptanceClient(t)).ListAccountsV1(context.Background(), nil, "")
+	if err != nil {
+		t.Fatalf("listing Jamf Pro accounts: %v", err)
+	}
+	var blank []string
+	for _, a := range accounts {
+		if helpers.DerefString(a.Email) == "" {
+			blank = append(blank, helpers.DerefString(a.Username))
+		}
+	}
+	if len(blank) > 0 {
+		t.Skipf("skipping: Jamf Pro refuses a second account with an empty email, and these accounts already have none: %s", strings.Join(blank, ", "))
+	}
 }
 
 // accountEmptyStringsChecks asserts full_name and email_address in state.
