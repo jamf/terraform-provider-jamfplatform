@@ -581,26 +581,45 @@ func flattenPolicyPackageConfiguration(pc *proclassic.PolicyPackageConfiguration
 	state.Packages = out
 }
 
+// flattenPolicyScripts maps the wire <scripts> block onto the model.
+//
+// Jamf Pro echoes an unset parameter and one written as "" identically, as an
+// empty element, so each parameter is reconciled against the prior element for
+// the same script: an authored "" survives the read rather than collapsing to
+// null, which the post-apply consistency check rejects. Prior elements are
+// paired by script id in order, since one script may be assigned more than
+// once.
 func flattenPolicyScripts(sc *proclassic.PolicyScripts, state *PolicyScriptsModel) {
 	if sc.Script == nil {
 		state.Scripts = nil
 		return
 	}
+	priorByID := make(map[string][]PolicyScriptItemModel, len(state.Scripts))
+	for _, prev := range state.Scripts {
+		if helpers.IsConfiguredValue(prev.ID) {
+			priorByID[prev.ID.ValueString()] = append(priorByID[prev.ID.ValueString()], prev)
+		}
+	}
 	items := *sc.Script
 	out := make([]PolicyScriptItemModel, 0, len(items))
 	for _, s := range items {
+		id := helpers.StringValueFromIntPtr(s.ID)
+		var prev PolicyScriptItemModel
+		if queue := priorByID[id.ValueString()]; len(queue) > 0 {
+			prev, priorByID[id.ValueString()] = queue[0], queue[1:]
+		}
 		out = append(out, PolicyScriptItemModel{
-			ID:          helpers.StringValueFromIntPtr(s.ID),
+			ID:          id,
 			Name:        helpers.StringPointerValueOrNull(s.Name),
 			Priority:    helpers.StringPointerValueOrNull(s.Priority),
-			Parameter4:  helpers.StringPointerValueOrNull(s.Parameter4),
-			Parameter5:  helpers.StringPointerValueOrNull(s.Parameter5),
-			Parameter6:  helpers.StringPointerValueOrNull(s.Parameter6),
-			Parameter7:  helpers.StringPointerValueOrNull(s.Parameter7),
-			Parameter8:  helpers.StringPointerValueOrNull(s.Parameter8),
-			Parameter9:  helpers.StringPointerValueOrNull(s.Parameter9),
-			Parameter10: helpers.StringPointerValueOrNull(s.Parameter10),
-			Parameter11: helpers.StringPointerValueOrNull(s.Parameter11),
+			Parameter4:  helpers.ReconcileOptionalStringPointer(s.Parameter4, prev.Parameter4),
+			Parameter5:  helpers.ReconcileOptionalStringPointer(s.Parameter5, prev.Parameter5),
+			Parameter6:  helpers.ReconcileOptionalStringPointer(s.Parameter6, prev.Parameter6),
+			Parameter7:  helpers.ReconcileOptionalStringPointer(s.Parameter7, prev.Parameter7),
+			Parameter8:  helpers.ReconcileOptionalStringPointer(s.Parameter8, prev.Parameter8),
+			Parameter9:  helpers.ReconcileOptionalStringPointer(s.Parameter9, prev.Parameter9),
+			Parameter10: helpers.ReconcileOptionalStringPointer(s.Parameter10, prev.Parameter10),
+			Parameter11: helpers.ReconcileOptionalStringPointer(s.Parameter11, prev.Parameter11),
 		})
 	}
 	state.Scripts = out
@@ -676,6 +695,13 @@ func flattenPolicyDockItems(d *proclassic.PolicyDockItems, state *PolicyDockItem
 // DirectoryBindings non-nil, ManagementAccount / EfiPassword non-nil) —
 // populating an unmanaged section would violate the framework's "produced
 // inconsistent result after apply" check.
+//
+// Jamf Pro echoes an empty account string field (hint, picture and the like)
+// as an empty element whether it was written as "" or never sent, so those
+// fields are reconciled against the prior element for the same username: an
+// authored "" survives the read. Collapsing it to null tripped the post-apply
+// consistency check, which Terraform reports against the whole local_accounts
+// list as a sensitive attribute because each element carries a password (#445).
 func flattenPolicyAccountMaintenance(am *proclassic.PolicyAccountMaintenance, state *PolicyResourceModel, includeUnmanaged bool) {
 	if includeUnmanaged {
 		if state.LocalAccounts == nil && am.Accounts != nil && am.Accounts.Account != nil {
@@ -721,30 +747,30 @@ func flattenPolicyAccountMaintenance(am *proclassic.PolicyAccountMaintenance, st
 			wireByUsername[*a.Username] = a
 			wireUsernameOrder = append(wireUsernameOrder, *a.Username)
 		}
-		woByUsername := make(map[string]types.Int64, len(state.LocalAccounts))
+		priorByUsername := make(map[string]PolicyAccountItemModel, len(state.LocalAccounts))
 		for _, prev := range state.LocalAccounts {
-			if !prev.Username.IsNull() && !prev.Username.IsUnknown() {
-				woByUsername[prev.Username.ValueString()] = prev.PasswordWoVersion
+			if helpers.IsConfiguredValue(prev.Username) {
+				priorByUsername[prev.Username.ValueString()] = prev
 			}
 		}
 		emit := func(a proclassic.PolicyAccountMaintenanceAccountsAccountItem) PolicyAccountItemModel {
-			currentWo := types.Int64Null()
+			prev := PolicyAccountItemModel{PasswordWoVersion: types.Int64Null()}
 			if a.Username != nil {
-				if w, ok := woByUsername[*a.Username]; ok {
-					currentWo = w
+				if p, ok := priorByUsername[*a.Username]; ok {
+					prev = p
 				}
 			}
 			return PolicyAccountItemModel{
 				Action:                         helpers.StringPointerValueOrNull(a.Action),
 				Username:                       helpers.StringPointerValueOrNull(a.Username),
-				Realname:                       helpers.StringPointerValueOrNull(a.Realname),
-				Password:                       types.StringNull(), // WriteOnly — framework strips from state
-				PasswordWoVersion:              currentWo,          // round-trip from prior state
+				Realname:                       helpers.ReconcileOptionalStringPointer(a.Realname, prev.Realname),
+				Password:                       types.StringNull(),     // WriteOnly — framework strips from state
+				PasswordWoVersion:              prev.PasswordWoVersion, // round-trip from prior state
 				PermanentlyDeleteHomeDirectory: invertBoolPointerValueOrNull(a.ArchiveHomeDirectory),
-				ArchiveHomeDirectoryTo:         helpers.StringPointerValueOrNull(a.ArchiveHomeDirectoryTo),
-				Home:                           helpers.StringPointerValueOrNull(a.Home),
-				Hint:                           helpers.StringPointerValueOrNull(a.Hint),
-				Picture:                        helpers.StringPointerValueOrNull(a.Picture),
+				ArchiveHomeDirectoryTo:         helpers.ReconcileOptionalStringPointer(a.ArchiveHomeDirectoryTo, prev.ArchiveHomeDirectoryTo),
+				Home:                           helpers.ReconcileOptionalStringPointer(a.Home, prev.Home),
+				Hint:                           helpers.ReconcileOptionalStringPointer(a.Hint, prev.Hint),
+				Picture:                        helpers.ReconcileOptionalStringPointer(a.Picture, prev.Picture),
 				Admin:                          helpers.BoolPointerValueOrNull(a.Admin),
 				FilevaultEnabled:               helpers.BoolPointerValueOrNull(a.FilevaultEnabled),
 				SecureTokenAllowed:             helpers.BoolPointerValueOrNull(a.SecureTokenAllowed),
