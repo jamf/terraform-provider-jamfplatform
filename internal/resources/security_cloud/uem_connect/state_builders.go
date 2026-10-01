@@ -126,7 +126,11 @@ func assignUEMConnectResourceModel(state *UEMConnectResourceModel, config *secur
 	state.DisableSyncOnAuthError = authError
 
 	if manageDataFieldMapping {
-		state.UserDataFieldMapping = dataFieldMappingToModel(config.DeviceFieldMappings, manageEmailMapping)
+		var priorEmail *EmailMappingModel
+		if state.UserDataFieldMapping != nil {
+			priorEmail = state.UserDataFieldMapping.Email
+		}
+		state.UserDataFieldMapping = dataFieldMappingToModel(config.DeviceFieldMappings, manageEmailMapping, priorEmail)
 	}
 	if manageGroupMapping {
 		state.GroupMembershipMapping = groupMappingToModel(config.GroupSettings, manageGroupMappings)
@@ -165,7 +169,13 @@ func syncConfigToState(cfg *securitycloud.SyncConfig) (behaviour types.String, d
 // The four scalars are Optional+Computed, so a value the user omitted arrives from
 // the server and is accepted. `email` is a nested block and Optional-only, so it is
 // populated only when the caller says it is managed — the same gate, one level down.
-func dataFieldMappingToModel(mappings *securitycloud.DeviceFieldMappings, manageEmail bool) *DataFieldMappingModel {
+//
+// priorEmail is the incoming email block (the plan on create and update, prior
+// state on refresh, nil on import). prefix and suffix are reconciled against it
+// with helpers.ReconcileOptionalStringPointer: Jamf Security Cloud stores an
+// authored "" and reports it back empty, and reading that as null failed the
+// post-apply consistency check (#445). An unset affix still reads as null.
+func dataFieldMappingToModel(mappings *securitycloud.DeviceFieldMappings, manageEmail bool, priorEmail *EmailMappingModel) *DataFieldMappingModel {
 	if mappings == nil {
 		return nil
 	}
@@ -177,10 +187,13 @@ func dataFieldMappingToModel(mappings *securitycloud.DeviceFieldMappings, manage
 		PhoneNumber: helpers.StringPointerValueOrNull(mappings.PhoneNumberMapping),
 	}
 	if manageEmail && mappings.UserEmailMapping != nil {
+		if priorEmail == nil {
+			priorEmail = &EmailMappingModel{}
+		}
 		out.Email = &EmailMappingModel{
 			Source:             types.StringValue(mappings.UserEmailMapping.Type),
-			Prefix:             helpers.StringPointerValueOrNull(mappings.UserEmailMapping.FieldPrefix),
-			Suffix:             helpers.StringPointerValueOrNull(mappings.UserEmailMapping.FieldSuffix),
+			Prefix:             helpers.ReconcileOptionalStringPointer(mappings.UserEmailMapping.FieldPrefix, priorEmail.Prefix),
+			Suffix:             helpers.ReconcileOptionalStringPointer(mappings.UserEmailMapping.FieldSuffix, priorEmail.Suffix),
 			OnlyIfEmailMissing: helpers.BoolPointerValueOrNull(mappings.UserEmailMapping.UseOnlyIfEmailMissing),
 		}
 	}

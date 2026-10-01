@@ -538,3 +538,33 @@ func TestAssignDataSourceModel_ReportsTheServerAddressOnEitherForm(t *testing.T)
 		})
 	}
 }
+
+// TestAssignResourceModel_PreservesAuthoredEmptyEmailAffixes pins #445 on the
+// email mapping: an authored prefix or suffix of "" survives a read that
+// reports it empty or absent, and an unset one stays null.
+func TestAssignResourceModel_PreservesAuthoredEmptyEmailAffixes(t *testing.T) {
+	empty := ""
+	for name, wire := range map[string]*string{"empty": &empty, "absent": nil} {
+		t.Run(name, func(t *testing.T) {
+			config := jamfProConnector()
+			config.DeviceFieldMappings = &securitycloud.DeviceFieldMappings{
+				UserEmailMapping: &securitycloud.EmailMapping{Type: "SERIAL_NUMBER", FieldPrefix: wire, FieldSuffix: wire},
+			}
+			state := UEMConnectResourceModel{
+				UserDataFieldMapping: &DataFieldMappingModel{
+					Email: &EmailMappingModel{Prefix: types.StringValue(""), Suffix: types.StringNull()},
+				},
+			}
+			if diags := assignUEMConnectResourceModel(&state, config, false); diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			email := state.UserDataFieldMapping.Email
+			if email.Prefix.IsNull() || email.Prefix.ValueString() != "" {
+				t.Errorf("prefix = %s, want \"\"", email.Prefix)
+			}
+			if !email.Suffix.IsNull() {
+				t.Errorf("suffix = %s, want null", email.Suffix)
+			}
+		})
+	}
+}
