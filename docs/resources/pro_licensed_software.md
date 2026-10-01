@@ -107,7 +107,7 @@ resource "jamfplatform_pro_licensed_software" "example" {
 Optional:
 
 - `license_count` (Number) **"License Count"** in the Jamf Pro admin UI. Number of licences owned. Defaults to `0` (unlimited).
-- `license_type` (String) **"License Type"** in the Jamf Pro admin UI. Type of licence obtained for the software, e.g. `Standard`, `Concurrent`, or `Site License`.
+- `license_type` (String) **"License Type"** in the Jamf Pro admin UI. Type of licence obtained for the software. One of `Standard`, `Concurrent`, `Site License`.
 - `notes` (String) Notes about this licence.
 - `organization_name` (String) **"Organization Name"** in the Jamf Pro admin UI. Name of the organization the licence is registered to.
 - `purchasing` (Attributes) **"Purchasing Information"** tab for the licence in the Jamf Pro admin UI. (see [below for nested schema](#nestedatt--licenses--purchasing))

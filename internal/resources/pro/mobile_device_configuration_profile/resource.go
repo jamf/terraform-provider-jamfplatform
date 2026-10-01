@@ -65,6 +65,13 @@ func NewResource() resource.Resource {
 }
 
 // Metadata sets the Terraform type name.
+// redeployOnUpdateValues is the accepted general.redeploy_on_update set. Jamf
+// Pro enforces it itself, case-sensitively ("409 redeploy_on_update should be
+// All or Newly Assigned"); validating at plan time moves that failure out of
+// apply. The classic spec types the field as a plain string. Wire-probed
+// 2026-10-01 against 11.32.0.
+var redeployOnUpdateValues = []string{"Newly Assigned", "All"}
+
 func (r *Resource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_pro_mobile_device_configuration_profile"
 }
@@ -131,6 +138,7 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 						Optional:            true,
 						Computed:            true,
 						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						Validators:          []validator.String{stringvalidator.OneOf(redeployOnUpdateValues...)},
 					},
 					"redeploy_days_before_certificate_expires": schema.Int64Attribute{
 						MarkdownDescription: "Number of days before a certificate in the profile expires that should trigger redeployment. `0` disables certificate-expiry redeployment. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.",

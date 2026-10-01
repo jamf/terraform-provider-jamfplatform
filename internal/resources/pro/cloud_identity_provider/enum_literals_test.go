@@ -19,6 +19,10 @@ func TestEnumLiteralsComeFromTheSDK(t *testing.T) {
 		Covered: enumguard.Union(
 			pro.CloudIDPCommonProviderNameValues(),
 			pro.CloudLdapServerRequestConnectionTypeValues(),
+			pro.UserMappingsObjectClassLimitationValues(),
+			pro.UserMappingsSearchScopeValues(),
+			pro.GroupMappingsObjectClassLimitationValues(),
+			pro.GroupMappingsSearchScopeValues(),
 		),
 	})
 	if err != nil {

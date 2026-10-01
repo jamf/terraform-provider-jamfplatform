@@ -151,7 +151,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 					"require_confirmation":       optBool("**\"Require confirmation before creating a mobile account\"** in the Jamf Pro admin UI."),
 					"force_local_home_directory": optBool("**\"Force local home directory on startup disk\"** in the Jamf Pro admin UI."),
 					"use_unc_path":               optBool("**\"Use UNC path from Active Directory to derive network home location\"** in the Jamf Pro admin UI."),
-					"network_protocol":           optString("**\"Network Protocol\"** in the Jamf Pro admin UI. Network protocol used to mount the user's home (e.g. `smb` or `afp`)."),
+					"network_protocol":           networkProtocolAttribute(),
 					"default_shell":              optString("**\"Default User Shell\"** in the Jamf Pro admin UI. Login shell assigned to bound directory users (e.g. `/bin/bash`)."),
 					"uid_attribute_mapping":      optString("**\"Map UID to attribute\"** in the Jamf Pro admin UI. Name of the AD attribute that supplies the POSIX UID."),
 					"user_gid_attribute_mapping": optString("**\"Map User GID to attribute\"** in the Jamf Pro admin UI. Name of the AD attribute that supplies the per-user primary group GID."),
@@ -179,7 +179,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 				Attributes: map[string]schema.Attribute{
 					"require_confirmation":       optBool("**\"Require confirmation\"** in the Jamf Pro admin UI. Require admin confirmation when binding new computers to the directory."),
 					"home_location":              optString("**\"Home Location\"** in the Jamf Pro admin UI. Where to create the user's home folder (e.g. `\"Local\"`). Free text."),
-					"network_protocol":           optString("**\"Network Protocol\"** in the Jamf Pro admin UI. Network protocol used to mount the user's home (e.g. `smb` or `afp`)."),
+					"network_protocol":           networkProtocolAttribute(),
 					"default_shell":              optString("**\"Default User Shell\"** in the Jamf Pro admin UI."),
 					"mount_network_home":         optBool("**\"Mount network home as sharepoint\"** in the Jamf Pro admin UI."),
 					"place_home_folders":         optString("**\"Place home folders in\"** in the Jamf Pro admin UI. Filesystem path under which local home folders are placed."),
@@ -279,6 +279,20 @@ const (
 // when omitted must be Optional+Computed. UseStateForUnknown keeps the
 // prior state value across plans so the framework does not surface
 // every refresh as a transient diff. Used only inside this file.
+// networkProtocols is the accepted <mount_style> set, shared by the Active
+// Directory and ADmitMac forms. Jamf Pro answers 201 for any other value,
+// upper-case "SMB" included, and keeps the previous one. The classic spec types
+// the field as a plain string. Wire-probed 2026-10-01 against 11.32.0 on the
+// Active Directory form.
+var networkProtocols = []string{"smb", "afp"}
+
+// networkProtocolAttribute is the network_protocol attribute of both forms.
+func networkProtocolAttribute() schema.StringAttribute {
+	a := optString("**\"Network Protocol\"** in the Jamf Pro admin UI. Protocol for mounting the user's home folder: `smb` or `afp`, in lower case.")
+	a.Validators = []validator.String{stringvalidator.OneOf(networkProtocols...)}
+	return a
+}
+
 func optString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc + " " + preserveOnOmitString,

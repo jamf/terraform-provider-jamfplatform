@@ -175,9 +175,13 @@ func (r *MacAppResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					"force_users_to_view_description": optComputedBool("Force users to view the description before installing. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"feature_on_main_page":            optComputedBool("Feature the app on the Self Service main page. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"notification_enabled":            optComputedBool("Whether Self Service surfaces a notification when the app becomes available. Pair with `notification_method`. Omit to leave the current value untouched; set `true`/`false` to change it."),
-					"notification_method":             optComputedString("Notification delivery method (e.g. `Self Service`). The server defaults a method when notifications are enabled. Omit to leave the current value untouched."),
-					"notification_subject":            optComputedString("Notification subject line. Omit to leave the current value untouched."),
-					"notification_message":            optComputedString("Notification body text. Omit to leave the current value untouched."),
+					"notification_method": func() schema.StringAttribute {
+						a := optComputedString("Notification delivery method. The only value is `Self Service`. Jamf Pro saves `Self Service` for a Mac App Store app whenever notifications are on, whatever method you set. Omit to leave the current value untouched.")
+						a.Validators = []validator.String{stringvalidator.OneOf(macAppNotificationMethodSelfService)}
+						return a
+					}(),
+					"notification_subject": optComputedString("Notification subject line. Omit to leave the current value untouched."),
+					"notification_message": optComputedString("Notification body text. Omit to leave the current value untouched."),
 					"self_service_icon": schema.SingleNestedAttribute{
 						MarkdownDescription: "Self Service icon. Set `id` to reference an already-uploaded icon; `uri` is returned by Jamf Pro. Uploading icon bytes inline is not supported, because Jamf Pro re-encodes PNGs and the result would diff forever. Open an issue if you need it.",
 						Optional:            true,
@@ -293,6 +297,13 @@ func (r *MacAppResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 // both at top level and inside SetNested list elements — see the policy
 // resource doc comment for why UseNonNullStateForUnknown (not UseStateForUnknown)
 // is required for nested-list growth.
+// macAppNotificationMethodSelfService is the only notification method Jamf Pro
+// keeps for a Mac App Store app. The classic API reads the method and the
+// enabled flag from two sibling <notification> elements into one field, last
+// element winning: a flag resets the method to "Self Service", and a method
+// turns notifications off. Wire-probed 2026-10-01 against 11.32.0.
+const macAppNotificationMethodSelfService = "Self Service"
+
 func optComputedString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,

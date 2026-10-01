@@ -202,7 +202,7 @@ Optional:
 - `install_button_text` (String) Install-button label shown on the app's Self Service page. Omit to leave the current value untouched.
 - `notification_enabled` (Boolean) Whether Self Service surfaces a notification when the app becomes available. Pair with `notification_method`. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `notification_message` (String) Notification body text. Omit to leave the current value untouched.
-- `notification_method` (String) Notification delivery method (e.g. `Self Service`). The server defaults a method when notifications are enabled. Omit to leave the current value untouched.
+- `notification_method` (String) Notification delivery method. The only value is `Self Service`. Jamf Pro saves `Self Service` for a Mac App Store app whenever notifications are on, whatever method you set. Omit to leave the current value untouched.
 - `notification_subject` (String) Notification subject line. Omit to leave the current value untouched.
 - `self_service_categories` (Attributes Set) Set of Self Service categories the app appears under. Each item identifies the category by `id`; `name` is returned by Jamf Pro. (see [below for nested schema](#nestedatt--self_service--self_service_categories))
 - `self_service_description` (String) Self Service description. Markdown supported. Omit to leave the current value untouched.

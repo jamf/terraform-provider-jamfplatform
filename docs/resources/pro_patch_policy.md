@@ -255,7 +255,7 @@ Optional:
 - `message` (String) Notification message body. Write-only in practice: Jamf Pro does not return it, so a configured value is preserved in state but never refreshed.
 - `reminders` (Attributes) Reminder cadence for the notifications. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--user_interaction--notifications--reminders))
 - `subject` (String) Notification subject. Omit to leave the current value untouched.
-- `type` (String) Notification type (e.g. `Self Service`). Write-only in practice: Jamf Pro does not return it.
+- `type` (String) Notification type. One of `Self Service`, `Self Service and Notification Center`. Write-only in practice: Jamf Pro does not return it.
 
 <a id="nestedatt--user_interaction--notifications--reminders"></a>
 ### Nested Schema for `user_interaction.notifications.reminders`

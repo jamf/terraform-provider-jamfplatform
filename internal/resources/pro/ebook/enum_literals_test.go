@@ -18,7 +18,11 @@ func TestEnumLiteralsComeFromTheSDK(t *testing.T) {
 	got, err := enumguard.Check(enumguard.Params{
 		Covered: enumguard.Union(
 			proclassic.EbookGeneralDeploymentTypeValues(),
+			proclassic.EbookPostGeneralFileTypeValues(),
 		),
+		Absent: map[string]string{
+			"IBOOKS": "general.file_type: the value Jamf Pro accepts on write; the classic spec lists only IBOOK, the value it reports back",
+		},
 	})
 	if err != nil {
 		t.Fatalf("enumguard.Check: %v", err)

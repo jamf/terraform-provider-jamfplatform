@@ -18,6 +18,7 @@ func TestEnumLiteralsComeFromTheSDK(t *testing.T) {
 	got, err := enumguard.Check(enumguard.Params{
 		Covered: enumguard.Union(
 			proclassic.PatchPolicyGeneralDistributionMethodValues(),
+			proclassic.PatchPolicyUserInteractionNotificationsNotificationTypeValues(),
 		),
 	})
 	if err != nil {

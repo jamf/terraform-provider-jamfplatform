@@ -146,9 +146,9 @@ func (r *EbookResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 					},
 					"deploy_as_managed": optComputedBool("Make the ebook managed when possible (UI \"Make eBook managed when possible\"). Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"free":              optComputedBool("Whether the ebook is free. Omit to leave the current value untouched; set `true`/`false` to change it."),
-					"file_type": optComputedString(
-						"File Type. User-set for an in-house ebook (`PDF`, `EPUB`, `IBOOK`). For an App Store ebook, leave it unset: Jamf Pro resolves it from the Apple Books URL and returns it. No strict value validation is applied, because Jamf Pro canonicalises the casing. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it.",
-					),
+					"file_type": withValidators(optComputedString(
+						"File Type. Set it for an in-house ebook: `PDF`, `EPUB` or `IBOOKS`, in any letter case. Jamf Pro reports an iBooks file as `IBOOK` but saves a configured `IBOOK` as `Unknown`, so set `IBOOKS`. For an App Store ebook, leave it unset: Jamf Pro resolves it from the Apple Books URL and returns it. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it.",
+					), stringvalidator.OneOfCaseInsensitive(ebookFileTypes...)),
 					"version":     optComputedString("Ebook version. User-set for an in-house ebook; returned by Jamf Pro for an App Store ebook. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it."),
 					"category_id": optComputedString("Jamf Pro category ID. Omit to leave the current value untouched; set `-1` to clear the category."),
 					"category_name": schema.StringAttribute{
@@ -181,7 +181,7 @@ func (r *EbookResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 					"force_users_to_view_description": optComputedBool("Force users to view the description before installing (macOS only). Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"feature_on_main_page":            optComputedBool("Feature the ebook on the Self Service main page. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"notification_enabled":            optComputedBool("Whether Self Service surfaces a notification when the ebook becomes available (macOS only). Pair with `notification_method`. Omit to leave the current value untouched; set `true`/`false` to change it."),
-					"notification_method":             optComputedString("Notification delivery method (e.g. `Self Service`). The server defaults a method when notifications are enabled. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it."),
+					"notification_method":             withValidators(optComputedString("Notification delivery method. The only value is `Self Service`. Jamf Pro saves `Self Service` for an ebook whenever notifications are on, whatever method you set. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it."), stringvalidator.OneOf("", ebookNotificationMethodSelfService)),
 					"notification_subject":            optComputedString("Notification subject line. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it."),
 					"notification_message":            optComputedString("Notification body text. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it."),
 					"icon_id":                         optComputedString("Self Service icon ID. Reference an already-uploaded icon (e.g. `jamfplatform_pro_icon.<x>.id`); App-Store ebooks auto-populate it from the store artwork. Uploading icon bytes inline is not supported. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it."),
@@ -388,6 +388,30 @@ func optComputedString(desc string) schema.StringAttribute {
 		Computed:            true,
 		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 	}
+}
+
+// ebookFileTypes is the accepted general.file_type set, matched case
+// insensitively. The SDK's EbookPostGeneralFileTypeValues lists IBOOK, the
+// value Jamf Pro reports, but a write must say IBOOKS: Jamf Pro folds the case
+// of PDF, EPUB and IBOOKS and stores every other value, IBOOK included, as
+// "Unknown" while answering 201. Wire-probed 2026-10-01 against 11.32.0. The
+// empty string clears the field.
+var ebookFileTypes = []string{"", proclassic.EbookPostGeneralFileTypePdf, proclassic.EbookPostGeneralFileTypeEpub, ebookFileTypeIBOOKS}
+
+const ebookFileTypeIBOOKS = "IBOOKS"
+
+// ebookNotificationMethodSelfService is the only notification method Jamf Pro
+// keeps for an ebook. The classic API reads the method and the enabled flag
+// from two sibling <notification> elements into one field, last element
+// winning: a flag resets the method to "Self Service", and a method turns
+// notifications off. Wire-probed 2026-10-01 against 11.32.0.
+const ebookNotificationMethodSelfService = "Self Service"
+
+// withValidators attaches validators to a string attribute built by one of the
+// helpers above.
+func withValidators(a schema.StringAttribute, v ...validator.String) schema.StringAttribute {
+	a.Validators = append(a.Validators, v...)
+	return a
 }
 
 // optComputedBool is the bool sibling of optComputedString.
