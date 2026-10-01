@@ -12,7 +12,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers"
@@ -237,6 +240,38 @@ resource "jamfplatform_pro_jamf_connect" "test" {
 }
 `,
 				ExpectError: regexp.MustCompile(`(?s)version must be set`),
+			},
+		},
+	})
+}
+
+// TestAccResource_ProJamfConnect_EmptyVersionRoundTrip covers the #445 shape:
+// the validator lets version = "" through when auto_deployment_type is NONE,
+// Jamf Connect echoes the version as "" in that mode, and reading that back as
+// null failed the post-apply consistency check. Step 2 drops the attribute and
+// expects null, since an unset version stays unset.
+func TestAccResource_ProJamfConnect_EmptyVersionRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	const rsrc = "jamfplatform_pro_jamf_connect.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testhelpers.AccPreCheck(t) },
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkProfileDestroyed(t),
+		Steps: []resource.TestStep{
+			{
+				Config: configWithResource("NONE", `  version = ""`),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(rsrc, tfjsonpath.New("version"), knownvalue.StringExact("")),
+					statecheck.ExpectKnownValue(rsrc, tfjsonpath.New("auto_deployment_type"), knownvalue.StringExact("NONE")),
+				},
+			},
+			{
+				Config: configWithResource("NONE", ""),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(rsrc, tfjsonpath.New("version"), knownvalue.Null()),
+				},
 			},
 		},
 	})

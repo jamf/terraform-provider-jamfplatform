@@ -21,7 +21,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
@@ -681,6 +684,109 @@ func TestAccResource_ProLdapServer_OmittedBlocksRetained(t *testing.T) {
 					resource.TestCheckNoResourceAttr(ldapServerResource, "mappings_for_users.user_mappings.username"),
 					ldapRetainedOnServer(t),
 				),
+			},
+		},
+	})
+}
+
+// ldapEmptyStringsConfig declares all three mapping sub-blocks with every
+// free-text field set to "", except user_uuid and group_uuid, which Jamf Pro
+// replaces with "objectGUID" when sent empty. building and omitPhone let the second step change
+// one field and drop another without touching the rest.
+func ldapEmptyStringsConfig(name, building string, omitPhone bool) string {
+	phone := `phone = ""`
+	if omitPhone {
+		phone = ""
+	}
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_ldap_server" "test" {
+			connection_settings = {
+				display_name        = %[1]q
+				directory_service   = "Active Directory"
+				hostname            = "ldap.acc-empty.example.com"
+				authentication_type = "none"
+			}
+			mappings_for_users = {
+				user_mappings = {
+					object_class_limitation = "any"
+					search_scope            = "All Subtrees"
+					object_classes          = ""
+					search_base             = ""
+					user_id                 = ""
+					username                = ""
+					real_name               = ""
+					email_address           = ""
+					append_to_email_results = ""
+					department              = ""
+					building                = %[2]q
+					room                    = ""
+					%[3]s
+					position                = ""
+				}
+				user_group_mappings = {
+					object_class_limitation = "any"
+					search_scope            = "All Subtrees"
+					object_classes          = ""
+					search_base             = ""
+					group_id                = ""
+					group_name              = ""
+				}
+				user_group_membership_mappings = {
+					membership_location      = "group object"
+					object_class_limitation  = "any"
+					search_scope             = "All Subtrees"
+					member_user_mapping      = ""
+					group_membership_mapping = ""
+					append_to_username       = ""
+					object_classes           = ""
+					search_base              = ""
+					username_mapping         = ""
+					group_id_mapping         = ""
+				}
+			}
+		}
+	`, name, building, phone)
+}
+
+// ldapEmptyStringChecks asserts each named attribute of one mapping sub-block
+// holds exactly "".
+func ldapEmptyStringChecks(block string, attrs ...string) []statecheck.StateCheck {
+	checks := make([]statecheck.StateCheck, 0, len(attrs))
+	for _, a := range attrs {
+		checks = append(checks, statecheck.ExpectKnownValue(ldapServerResource, tfjsonpath.New("mappings_for_users").AtMapKey(block).AtMapKey(a), knownvalue.StringExact("")))
+	}
+	return checks
+}
+
+// TestAccResource_ProLdapServer_EmptyStringFieldsRoundTrip covers the #445
+// shape on the mapping sub-blocks. Jamf Pro echoes each free-text mapping sent
+// as "" as an empty element, and reading that back as null failed the
+// post-apply consistency check. Step 2 sets building and drops phone from
+// config: the prior "" carries forward through UseNonNullStateForUnknown, is
+// re-sent empty, and the server keeps it empty.
+func TestAccResource_ProLdapServer_EmptyStringFieldsRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-ldap-empty-" + testhelpers.RunSuffix()
+	userFields := []string{"object_classes", "search_base", "user_id", "username", "real_name", "email_address", "append_to_email_results", "department", "room", "phone", "position"}
+	groupFields := []string{"object_classes", "search_base", "group_id", "group_name"}
+	membershipFields := []string{"member_user_mapping", "group_membership_mapping", "append_to_username", "object_classes", "search_base", "username_mapping", "group_id_mapping"}
+
+	step1 := append(ldapEmptyStringChecks("user_mappings", append([]string{"building"}, userFields...)...), ldapEmptyStringChecks("user_group_mappings", groupFields...)...)
+	step1 = append(step1, ldapEmptyStringChecks("user_group_membership_mappings", membershipFields...)...)
+	step2 := append(ldapEmptyStringChecks("user_mappings", userFields...),
+		statecheck.ExpectKnownValue(ldapServerResource, tfjsonpath.New("mappings_for_users").AtMapKey("user_mappings").AtMapKey("building"), knownvalue.StringExact("physicalDeliveryOfficeName")))
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckLdapServerDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:            ldapEmptyStringsConfig(name, "", false),
+				ConfigStateChecks: step1,
+			},
+			{
+				Config:            ldapEmptyStringsConfig(name, "physicalDeliveryOfficeName", true),
+				ConfigStateChecks: step2,
 			},
 		},
 	})

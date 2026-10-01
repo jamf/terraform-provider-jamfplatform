@@ -197,3 +197,53 @@ func TestAssignDirectoryBindingDataSourceModel_BasicRoundTrip(t *testing.T) {
 		t.Errorf("data source Name must round-trip; got %q", state.Name.ValueString())
 	}
 }
+
+// TestAssignDirectoryBindingResourceModel_NestedEmptyStringsReconciled pins
+// #445 on the nested blocks: Jamf Pro echoes a free-text field sent as "" as
+// an empty element, so an authored "" in the incoming block must survive,
+// while a field the incoming block left null or unknown stays null.
+func TestAssignDirectoryBindingResourceModel_NestedEmptyStringsReconciled(t *testing.T) {
+	state := DirectoryBindingResourceModel{
+		ActiveDirectory: &directoryBindingActiveDirectoryModel{
+			Forest:       types.StringValue(""),
+			AdminGroups:  types.StringValue(""),
+			DefaultShell: types.StringUnknown(),
+		},
+		Centrify: &directoryBindingCentrifyModel{
+			Zone: types.StringValue(""),
+		},
+	}
+	in := &proclassic.DirectoryBinding{
+		ID:   new(7),
+		Type: new("Active Directory"),
+		ActiveDirectory: &proclassic.DirectoryBindingActiveDirectory{
+			Forest:          new(""),
+			AdminGroups:     new(""),
+			DefaultShell:    new(""),
+			PreferredDomain: new(""),
+			MountStyle:      new("smb"),
+		},
+		Centrify: &proclassic.DirectoryBindingCentrify{
+			Zone:                  new(""),
+			PreferredDomainServer: new(""),
+		},
+	}
+
+	if diags := assignDirectoryBindingResourceModel(&state, in); diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	ad := state.ActiveDirectory
+	for name, v := range map[string]types.String{"forest": ad.Forest, "admin_groups": ad.AdminGroups, "centrify.zone": state.Centrify.Zone} {
+		if v.IsNull() || v.ValueString() != "" {
+			t.Errorf("%s: authored \"\" must stay \"\", got %s", name, v)
+		}
+	}
+	for name, v := range map[string]types.String{"default_shell": ad.DefaultShell, "preferred_domain": ad.PreferredDomain, "centrify.preferred_domain_server": state.Centrify.PreferredDomainServer} {
+		if !v.IsNull() {
+			t.Errorf("%s: unset field echoed empty must be null, got %s", name, v)
+		}
+	}
+	if ad.NetworkProtocol.ValueString() != "smb" {
+		t.Errorf("network_protocol: wire value must win, got %s", ad.NetworkProtocol)
+	}
+}

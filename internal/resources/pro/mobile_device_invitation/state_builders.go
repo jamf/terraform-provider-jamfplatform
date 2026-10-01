@@ -45,6 +45,12 @@ func siteNameValue(s *proclassic.MobileDeviceInvitationEnrollIntoSite) types.Str
 //     and the schema's `require_login` is read from the wire `login_required`
 //     field (c.LoginRequired).
 //   - The read-only <site> element is intentionally not surfaced.
+//   - Jamf Pro echoes an empty email field or username as an empty element
+//     whether it was written as "" or never sent, so those are reconciled
+//     against the incoming model (the plan on Create and Update, prior state on
+//     Read): an authored "" survives the read rather than collapsing to null,
+//     which the post-apply consistency check rejects. target_ios is not: the
+//     server replaces "" with its default.
 func assignMobileDeviceInvitationResourceModel(state *MobileDeviceInvitationResourceModel, m *proclassic.MobileDeviceInvitation) {
 	if m == nil {
 		return
@@ -62,12 +68,12 @@ func assignMobileDeviceInvitationResourceModel(state *MobileDeviceInvitationReso
 	state.KeepExistingSiteMembership = helpers.BoolPointerValueOrNull(m.KeepExistingSiteMembership)
 	state.MultipleUsesAllowed = helpers.BoolPointerValueOrNull(m.MultipleUsesAllowed)
 	state.RequireLogin = helpers.BoolPointerValueOrNull(m.LoginRequired)
-	state.Subject = helpers.StringPointerValueOrNull(m.Subject)
-	state.Message = helpers.StringPointerValueOrNull(m.Message)
-	state.ReplyTo = helpers.StringPointerValueOrNull(m.ReplyTo)
-	state.SentFrom = helpers.StringPointerValueOrNull(m.SentFrom)
-	state.SentTo = helpers.StringPointerValueOrNull(m.SentTo)
-	state.Username = helpers.StringPointerValueOrNull(m.Username)
+	state.Subject = helpers.ReconcileOptionalStringPointer(m.Subject, state.Subject)
+	state.Message = helpers.ReconcileOptionalStringPointer(m.Message, state.Message)
+	state.ReplyTo = helpers.ReconcileOptionalStringPointer(m.ReplyTo, state.ReplyTo)
+	state.SentFrom = helpers.ReconcileOptionalStringPointer(m.SentFrom, state.SentFrom)
+	state.SentTo = helpers.ReconcileOptionalStringPointer(m.SentTo, state.SentTo)
+	state.Username = helpers.ReconcileOptionalStringPointer(m.Username, state.Username)
 	state.TargetIos = helpers.StringPointerValueOrNull(m.TargetIos)
 	state.LastAction = helpers.StringPointerValueOrNull(m.LastAction)
 	state.DateSent = helpers.StringPointerValueOrNull(m.DateSent)

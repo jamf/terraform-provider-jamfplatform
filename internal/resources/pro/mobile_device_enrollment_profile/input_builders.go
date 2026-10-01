@@ -69,10 +69,9 @@ func buildEnrollmentProfileInput(plan EnrollmentProfileResourceModel) *proclassi
 // otherwise a pointer to the value (empty string for Null, which clears the
 // field under the server's merge semantics).
 //
-// Boundary: a user who sets a field to an explicit empty string ("") gets the
-// same wire send as null, and the server drops the field so GET returns null —
-// producing a plan(="")-vs-state(null) inconsistency. This is benign in practice
-// (to clear a field, omit it rather than assigning ""), but worth knowing.
+// An explicit empty string ("") sends the same empty element as null, so it
+// clears the field too. The server echoes both as an empty element; the read
+// reconciles that against the plan so an authored "" stays "" in state.
 func clearable(v types.String) *string {
 	if v.IsUnknown() {
 		return nil

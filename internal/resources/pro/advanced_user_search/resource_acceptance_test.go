@@ -33,6 +33,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck/queryfilter"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
@@ -226,6 +227,45 @@ func TestAccResource_ProAdvancedUserSearch_DateWindowOperatorRejected(t *testing
 					}
 				`,
 				ExpectError: regexp.MustCompile(`value\s+must\s+be\s+one\s+of`),
+			},
+		},
+	})
+}
+
+// TestAccResource_ProAdvancedUserSearch_EmptyCriterionValueRoundTrip proves a
+// criterion with `value = ""` survives the apply. Jamf Pro stores the criterion
+// and echoes `<value/>`, so state must hold "" rather than null.
+func TestAccResource_ProAdvancedUserSearch_EmptyCriterionValueRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-pro-aus-empty-value-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAUSDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+					resource "jamfplatform_pro_advanced_user_search" "test" {
+						name = %q
+
+						criteria = [
+							{
+								name        = "Username"
+								search_type = "is"
+								value       = ""
+							},
+						]
+					}
+				`, name),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(ausResource, tfjsonpath.New("criteria").AtSliceIndex(0).AtMapKey("value"), knownvalue.StringExact("")),
+				},
+			},
+			{
+				ResourceName:            ausResource,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"timeouts"},
 			},
 		},
 	})

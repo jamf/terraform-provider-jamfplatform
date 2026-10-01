@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck/queryfilter"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
@@ -62,8 +63,8 @@ func testAccCheckEnrollmentProfileDestroy(t *testing.T) resource.TestCheckFunc {
 // config builds a profile that references a managed site (tenant-agnostic).
 // An empty room omits the line entirely (clear-by-omission — the real Terraform
 // path); a merge write then clears the field on the server and state reconciles
-// to null. (Setting room = "" explicitly would be a known plan value the server
-// drops to null, which is an inconsistency — users omit to clear.)
+// to null. Setting room = "" clears it the same way and stays "" in state; see
+// TestAccResource_ProMobileDeviceEnrollmentProfile_EmptyStringFieldsRoundTrip.
 func config(name, desc, room string) string {
 	roomLine := ""
 	if room != "" {
@@ -539,6 +540,155 @@ func TestAccListResource_ProMobileDeviceEnrollmentProfile_HydratesBeyondTheSumma
 						},
 					),
 				},
+			},
+		},
+	})
+}
+
+// mdepEmptyStringsConfig declares description and every plain-Optional string
+// leaf of location and purchasing as "".
+func mdepEmptyStringsConfig(name string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_mobile_device_enrollment_profile" "test" {
+  name        = %q
+  description = ""
+
+  location = {
+    username      = ""
+    real_name     = ""
+    email_address = ""
+    phone_number  = ""
+    department    = ""
+    building      = ""
+    room          = ""
+    position      = ""
+  }
+
+  purchasing = {
+    po_number          = ""
+    po_date            = ""
+    vendor             = ""
+    warranty_expires   = ""
+    applecare_id       = ""
+    lease_expires      = ""
+    purchase_price     = ""
+    purchasing_account = ""
+    purchasing_contact = ""
+  }
+}
+`, name)
+}
+
+// mdepEmptyStringsValuedConfig gives a few of the same leaves a value and
+// leaves the rest unset.
+func mdepEmptyStringsValuedConfig(name string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_mobile_device_enrollment_profile" "test" {
+  name        = %q
+  description = "valued"
+
+  location = {
+    username = "tf-acc-empty"
+    room     = "R-empty"
+  }
+
+  purchasing = {
+    po_number = "PO-EMPTY-1"
+    vendor    = "Empty Vendor"
+  }
+}
+`, name)
+}
+
+// mdepEmptyStringPaths lists every leaf mdepEmptyStringsConfig sets to "".
+var mdepEmptyStringPaths = []tfjsonpath.Path{
+	tfjsonpath.New("description"),
+	tfjsonpath.New("location").AtMapKey("username"),
+	tfjsonpath.New("location").AtMapKey("real_name"),
+	tfjsonpath.New("location").AtMapKey("email_address"),
+	tfjsonpath.New("location").AtMapKey("phone_number"),
+	tfjsonpath.New("location").AtMapKey("department"),
+	tfjsonpath.New("location").AtMapKey("building"),
+	tfjsonpath.New("location").AtMapKey("room"),
+	tfjsonpath.New("location").AtMapKey("position"),
+	tfjsonpath.New("purchasing").AtMapKey("po_number"),
+	tfjsonpath.New("purchasing").AtMapKey("po_date"),
+	tfjsonpath.New("purchasing").AtMapKey("vendor"),
+	tfjsonpath.New("purchasing").AtMapKey("warranty_expires"),
+	tfjsonpath.New("purchasing").AtMapKey("applecare_id"),
+	tfjsonpath.New("purchasing").AtMapKey("lease_expires"),
+	tfjsonpath.New("purchasing").AtMapKey("purchase_price"),
+	tfjsonpath.New("purchasing").AtMapKey("purchasing_account"),
+	tfjsonpath.New("purchasing").AtMapKey("purchasing_contact"),
+}
+
+func mdepEmptyStringChecks() []statecheck.StateCheck {
+	checks := make([]statecheck.StateCheck, 0, len(mdepEmptyStringPaths))
+	for _, p := range mdepEmptyStringPaths {
+		checks = append(checks, statecheck.ExpectKnownValue(resAddr, p, knownvalue.StringExact("")))
+	}
+	return checks
+}
+
+// mdepClearedOnServer asserts the server holds no value for the leaves the
+// valued config sets, after a write that set them to "".
+func mdepClearedOnServer(t *testing.T) resource.TestCheckFunc {
+	c := proclassic.New(testhelpers.NewAcceptanceClient(t))
+	return testhelpers.CheckLiveObject(resAddr,
+		func(ctx context.Context, id string) (*proclassic.MobileDeviceEnrollmentProfile, error) {
+			return c.GetMobileDeviceEnrollmentProfileByID(ctx, id)
+		},
+		func(p *proclassic.MobileDeviceEnrollmentProfile) error {
+			if p.General == nil || p.Location == nil || p.Purchasing == nil {
+				return fmt.Errorf("general, location or purchasing absent")
+			}
+			for _, f := range []struct{ field, got string }{
+				{"description", testhelpers.Deref(p.General.Description)},
+				{"location.username", testhelpers.Deref(p.Location.Username)},
+				{"location.room", testhelpers.Deref(p.Location.Room)},
+				{"purchasing.po_number", testhelpers.Deref(p.Purchasing.PoNumber)},
+				{"purchasing.vendor", testhelpers.Deref(p.Purchasing.Vendor)},
+			} {
+				if err := testhelpers.RequireEqual(f.field, "", f.got); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+}
+
+// TestAccResource_ProMobileDeviceEnrollmentProfile_EmptyStringFieldsRoundTrip
+// pins that an authored "" survives the read on description and on every
+// plain-Optional string leaf of location and purchasing. Jamf Pro echoes each
+// as an empty value, and reading that back as null failed the post-apply
+// consistency check. Step 2 sets values, and step 3 sets them back to "", which
+// must clear them on the server the same way omitting them does.
+func TestAccResource_ProMobileDeviceEnrollmentProfile_EmptyStringFieldsRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-mdep-empty-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckEnrollmentProfileDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:            mdepEmptyStringsConfig(name),
+				ConfigStateChecks: mdepEmptyStringChecks(),
+			},
+			{
+				Config: mdepEmptyStringsValuedConfig(name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resAddr, "description", "valued"),
+					resource.TestCheckResourceAttr(resAddr, "location.room", "R-empty"),
+					resource.TestCheckResourceAttr(resAddr, "purchasing.vendor", "Empty Vendor"),
+					resource.TestCheckNoResourceAttr(resAddr, "location.real_name"),
+					resource.TestCheckNoResourceAttr(resAddr, "purchasing.po_date"),
+				),
+			},
+			{
+				Config:            mdepEmptyStringsConfig(name),
+				ConfigStateChecks: mdepEmptyStringChecks(),
+				Check:             mdepClearedOnServer(t),
 			},
 		},
 	})

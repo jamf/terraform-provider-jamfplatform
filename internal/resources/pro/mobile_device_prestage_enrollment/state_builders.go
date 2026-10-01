@@ -102,7 +102,7 @@ func assignGetToResource(_ context.Context, plan *MobileDevicePrestageEnrollment
 		plan.SkipSetupItems = nil
 	}
 	if manageNames {
-		plan.Names = flattenNames(got.Names)
+		plan.Names = flattenNames(got.Names, plan.Names)
 	} else {
 		plan.Names = nil
 	}
@@ -173,16 +173,29 @@ func flattenSkipSetupItems(m map[string]bool) *SkipSetupItemsModel {
 	}
 }
 
-func flattenNames(n *pro.MobileDevicePrestageNamesV3) *NamesModel {
+// flattenNames maps the wire names block onto the model. prior is the model
+// being written (the plan on Create and Update, prior state on Read), or nil.
+//
+// Jamf Pro echoes an unset device_name_prefix, device_name_suffix or
+// single_device_name as "", so each is reconciled against prior: an authored ""
+// survives the read rather than collapsing to null, which the post-apply
+// consistency check rejects, and an unset one stays null. A
+// prestage_device_names entry's device_name is reconciled the same way against
+// the prior entry at the same position, since the list is ordered and its ids
+// are server-assigned.
+func flattenNames(n *pro.MobileDevicePrestageNamesV3, prior *NamesModel) *NamesModel {
 	if n == nil {
 		return nil
+	}
+	if prior == nil {
+		prior = &NamesModel{}
 	}
 	out := &NamesModel{
 		AssignNamesUsing: helpers.StringPointerValueOrNull(n.AssignNamesUsing),
 		ManageNames:      helpers.BoolPointerValueOrNull(n.ManageNames),
-		DeviceNamePrefix: helpers.StringPointerValueOrNull(n.DeviceNamePrefix),
-		DeviceNameSuffix: helpers.StringPointerValueOrNull(n.DeviceNameSuffix),
-		SingleDeviceName: helpers.StringPointerValueOrNull(n.SingleDeviceName),
+		DeviceNamePrefix: helpers.ReconcileOptionalStringPointer(n.DeviceNamePrefix, prior.DeviceNamePrefix),
+		DeviceNameSuffix: helpers.ReconcileOptionalStringPointer(n.DeviceNameSuffix, prior.DeviceNameSuffix),
+		SingleDeviceName: helpers.ReconcileOptionalStringPointer(n.SingleDeviceName, prior.SingleDeviceName),
 	}
 	// prestage_device_names is Optional-only (no Computed) — mirror the
 	// enrollment_customization text_panes pattern: leave the slice nil when
@@ -190,9 +203,13 @@ func flattenNames(n *pro.MobileDevicePrestageNamesV3) *NamesModel {
 	// non-List naming modes) does not drift against a non-null empty list.
 	if n.PrestageDeviceNames != nil && len(*n.PrestageDeviceNames) > 0 {
 		elems := make([]PrestageDeviceNameModel, 0, len(*n.PrestageDeviceNames))
-		for _, el := range *n.PrestageDeviceNames {
+		for i, el := range *n.PrestageDeviceNames {
+			var prev PrestageDeviceNameModel
+			if i < len(prior.PrestageDeviceNames) {
+				prev = prior.PrestageDeviceNames[i]
+			}
 			elems = append(elems, PrestageDeviceNameModel{
-				DeviceName: helpers.StringPointerValueOrNull(el.DeviceName),
+				DeviceName: helpers.ReconcileOptionalStringPointer(el.DeviceName, prev.DeviceName),
 				ID:         helpers.StringPointerValueOrNull(el.ID),
 				Used:       helpers.BoolPointerValueOrNull(el.Used),
 			})

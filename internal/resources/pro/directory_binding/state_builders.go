@@ -32,7 +32,9 @@ import (
 // sent empty and echoed back as "", which
 // helpers.ReconcileOptionalStringPointer folds to null against the incoming
 // model (plan on write, prior state on refresh) while keeping an explicit ""
-// the user configured.
+// the user configured. The free-text fields of the nested per-type blocks are
+// reconciled the same way against the incoming block, because Jamf Pro echoes
+// each one sent as "" as an empty element (#445).
 func assignDirectoryBindingResourceModel(state *DirectoryBindingResourceModel, b *proclassic.DirectoryBinding) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if b == nil {
@@ -48,10 +50,10 @@ func assignDirectoryBindingResourceModel(state *DirectoryBindingResourceModel, b
 	state.ComputerOU = helpers.ReconcileOptionalStringPointer(b.ComputerOu, state.ComputerOU)
 	state.Priority = helpers.Int64FromIntPtr(b.Priority)
 
-	state.ActiveDirectory = assignActiveDirectoryModel(b.ActiveDirectory)
+	state.ActiveDirectory = assignActiveDirectoryModel(b.ActiveDirectory, state.ActiveDirectory)
 	state.OpenDirectory = assignOpenDirectoryModel(b.OpenDirectory)
-	state.Admitmac = assignAdmitmacModel(b.Admitmac)
-	state.Centrify = assignCentrifyModel(b.Centrify)
+	state.Admitmac = assignAdmitmacModel(b.Admitmac, state.Admitmac)
+	state.Centrify = assignCentrifyModel(b.Centrify, state.Centrify)
 
 	return diags
 }
@@ -75,10 +77,10 @@ func assignDirectoryBindingDataSourceModel(state *DirectoryBindingDataSourceMode
 	state.ComputerOU = helpers.StringPointerValueOrNull(b.ComputerOu)
 	state.Priority = helpers.Int64FromIntPtr(b.Priority)
 
-	state.ActiveDirectory = assignActiveDirectoryModel(b.ActiveDirectory)
+	state.ActiveDirectory = assignActiveDirectoryModel(b.ActiveDirectory, nil)
 	state.OpenDirectory = assignOpenDirectoryModel(b.OpenDirectory)
-	state.Admitmac = assignAdmitmacModel(b.Admitmac)
-	state.Centrify = assignCentrifyModel(b.Centrify)
+	state.Admitmac = assignAdmitmacModel(b.Admitmac, nil)
+	state.Centrify = assignCentrifyModel(b.Centrify, nil)
 
 	return diags
 }
@@ -87,24 +89,32 @@ func assignDirectoryBindingDataSourceModel(state *DirectoryBindingDataSourceMode
 // model, or returns nil when the API did not include the block. A nil
 // return tells the framework to omit the SingleNestedAttribute from state
 // entirely rather than surfacing it as a struct full of nulls.
-func assignActiveDirectoryModel(a *proclassic.DirectoryBindingActiveDirectory) *directoryBindingActiveDirectoryModel {
+//
+// prior is the incoming block (plan on write, prior state on refresh, nil for
+// a data source or an import). Each free-text field is reconciled against it
+// with helpers.ReconcileOptionalStringPointer, so an authored "" that Jamf Pro
+// echoes as an empty element stays "" rather than collapsing to null.
+func assignActiveDirectoryModel(a *proclassic.DirectoryBindingActiveDirectory, prior *directoryBindingActiveDirectoryModel) *directoryBindingActiveDirectoryModel {
 	if a == nil {
 		return nil
 	}
+	if prior == nil {
+		prior = &directoryBindingActiveDirectoryModel{}
+	}
 	return &directoryBindingActiveDirectoryModel{
-		Forest:                  helpers.StringPointerValueOrNull(a.Forest),
+		Forest:                  helpers.ReconcileOptionalStringPointer(a.Forest, prior.Forest),
 		CreateMobileAccount:     helpers.BoolPointerValueOrNull(a.CacheLastUser),
 		RequireConfirmation:     helpers.BoolPointerValueOrNull(a.RequireConfirmation),
 		ForceLocalHomeDirectory: helpers.BoolPointerValueOrNull(a.LocalHome),
 		UseUncPath:              helpers.BoolPointerValueOrNull(a.UseUncPath),
-		NetworkProtocol:         helpers.StringPointerValueOrNull(a.MountStyle),
-		DefaultShell:            helpers.StringPointerValueOrNull(a.DefaultShell),
-		UIDAttributeMapping:     helpers.StringPointerValueOrNull(a.Uid),
-		UserGIDAttributeMapping: helpers.StringPointerValueOrNull(a.UserGid),
-		GIDAttributeMapping:     helpers.StringPointerValueOrNull(a.Gid),
+		NetworkProtocol:         helpers.ReconcileOptionalStringPointer(a.MountStyle, prior.NetworkProtocol),
+		DefaultShell:            helpers.ReconcileOptionalStringPointer(a.DefaultShell, prior.DefaultShell),
+		UIDAttributeMapping:     helpers.ReconcileOptionalStringPointer(a.Uid, prior.UIDAttributeMapping),
+		UserGIDAttributeMapping: helpers.ReconcileOptionalStringPointer(a.UserGid, prior.UserGIDAttributeMapping),
+		GIDAttributeMapping:     helpers.ReconcileOptionalStringPointer(a.Gid, prior.GIDAttributeMapping),
 		MultipleDomains:         helpers.BoolPointerValueOrNull(a.MultipleDomains),
-		PreferredDomain:         helpers.StringPointerValueOrNull(a.PreferredDomain),
-		AdminGroups:             helpers.StringPointerValueOrNull(a.AdminGroups),
+		PreferredDomain:         helpers.ReconcileOptionalStringPointer(a.PreferredDomain, prior.PreferredDomain),
+		AdminGroups:             helpers.ReconcileOptionalStringPointer(a.AdminGroups, prior.AdminGroups),
 	}
 }
 
@@ -121,41 +131,49 @@ func assignOpenDirectoryModel(o *proclassic.DirectoryBindingOpenDirectory) *dire
 	}
 }
 
-// assignAdmitmacModel decodes the nested SDK block into the TF model.
-func assignAdmitmacModel(a *proclassic.DirectoryBindingAdmitmac) *directoryBindingAdmitmacModel {
+// assignAdmitmacModel decodes the nested SDK block into the TF model, with
+// the same prior-block reconciliation as assignActiveDirectoryModel.
+func assignAdmitmacModel(a *proclassic.DirectoryBindingAdmitmac, prior *directoryBindingAdmitmacModel) *directoryBindingAdmitmacModel {
 	if a == nil {
 		return nil
 	}
+	if prior == nil {
+		prior = &directoryBindingAdmitmacModel{}
+	}
 	return &directoryBindingAdmitmacModel{
 		RequireConfirmation:     helpers.BoolPointerValueOrNull(a.RequireConfirmation),
-		HomeLocation:            helpers.StringPointerValueOrNull(a.LocalHome),
-		NetworkProtocol:         helpers.StringPointerValueOrNull(a.MountStyle),
-		DefaultShell:            helpers.StringPointerValueOrNull(a.DefaultShell),
+		HomeLocation:            helpers.ReconcileOptionalStringPointer(a.LocalHome, prior.HomeLocation),
+		NetworkProtocol:         helpers.ReconcileOptionalStringPointer(a.MountStyle, prior.NetworkProtocol),
+		DefaultShell:            helpers.ReconcileOptionalStringPointer(a.DefaultShell, prior.DefaultShell),
 		MountNetworkHome:        helpers.BoolPointerValueOrNull(a.MountNetworkHome),
-		PlaceHomeFolders:        helpers.StringPointerValueOrNull(a.PlaceHomeFolders),
-		UIDAttributeMapping:     helpers.StringPointerValueOrNull(a.Uid),
-		UserGIDAttributeMapping: helpers.StringPointerValueOrNull(a.UserGid),
-		GIDAttributeMapping:     helpers.StringPointerValueOrNull(a.Gid),
-		AdminGroup:              helpers.StringPointerValueOrNull(a.AdminGroup),
+		PlaceHomeFolders:        helpers.ReconcileOptionalStringPointer(a.PlaceHomeFolders, prior.PlaceHomeFolders),
+		UIDAttributeMapping:     helpers.ReconcileOptionalStringPointer(a.Uid, prior.UIDAttributeMapping),
+		UserGIDAttributeMapping: helpers.ReconcileOptionalStringPointer(a.UserGid, prior.UserGIDAttributeMapping),
+		GIDAttributeMapping:     helpers.ReconcileOptionalStringPointer(a.Gid, prior.GIDAttributeMapping),
+		AdminGroup:              helpers.ReconcileOptionalStringPointer(a.AdminGroup, prior.AdminGroup),
 		CachedCredentials:       helpers.Int64FromIntPtr(a.CachedCredentials),
 		AddUserToLocal:          helpers.BoolPointerValueOrNull(a.AddUserToLocal),
-		UsersOU:                 helpers.StringPointerValueOrNull(a.UsersOu),
-		GroupsOU:                helpers.StringPointerValueOrNull(a.GroupsOu),
-		PrintersOU:              helpers.StringPointerValueOrNull(a.PrintersOu),
-		SharedFoldersOU:         helpers.StringPointerValueOrNull(a.SharedFoldersOu),
+		UsersOU:                 helpers.ReconcileOptionalStringPointer(a.UsersOu, prior.UsersOU),
+		GroupsOU:                helpers.ReconcileOptionalStringPointer(a.GroupsOu, prior.GroupsOU),
+		PrintersOU:              helpers.ReconcileOptionalStringPointer(a.PrintersOu, prior.PrintersOU),
+		SharedFoldersOU:         helpers.ReconcileOptionalStringPointer(a.SharedFoldersOu, prior.SharedFoldersOU),
 	}
 }
 
-// assignCentrifyModel decodes the nested SDK block into the TF model.
-func assignCentrifyModel(c *proclassic.DirectoryBindingCentrify) *directoryBindingCentrifyModel {
+// assignCentrifyModel decodes the nested SDK block into the TF model, with
+// the same prior-block reconciliation as assignActiveDirectoryModel.
+func assignCentrifyModel(c *proclassic.DirectoryBindingCentrify, prior *directoryBindingCentrifyModel) *directoryBindingCentrifyModel {
 	if c == nil {
 		return nil
+	}
+	if prior == nil {
+		prior = &directoryBindingCentrifyModel{}
 	}
 	return &directoryBindingCentrifyModel{
 		WorkstationMode:       helpers.BoolPointerValueOrNull(c.WorkstationMode),
 		OverwriteExisting:     helpers.BoolPointerValueOrNull(c.OverwriteExisting),
 		UpdatePAM:             helpers.BoolPointerValueOrNull(c.UpdatePAM),
-		Zone:                  helpers.StringPointerValueOrNull(c.Zone),
-		PreferredDomainServer: helpers.StringPointerValueOrNull(c.PreferredDomainServer),
+		Zone:                  helpers.ReconcileOptionalStringPointer(c.Zone, prior.Zone),
+		PreferredDomainServer: helpers.ReconcileOptionalStringPointer(c.PreferredDomainServer, prior.PreferredDomainServer),
 	}
 }

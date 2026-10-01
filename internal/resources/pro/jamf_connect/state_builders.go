@@ -16,9 +16,11 @@ import (
 // or echoed LinkedConnectProfile. The same shape serves the list-and-match
 // Read and the PUT echo (both Create and Update), so all three feed this.
 //
-// version is normalised to null when empty: Jamf Connect returns "" whenever
-// auto_deployment_type is NONE (and the user is forbidden from setting one),
-// so an empty wire value maps to a null attribute rather than "".
+// version is reconciled against the incoming model (plan on write, prior state
+// on refresh) with helpers.ReconcileOptionalStringPointer: Jamf Connect returns
+// "" whenever auto_deployment_type is NONE, so an empty wire value maps to null
+// unless the user wrote version = "", which the validator allows with NONE and
+// which must stay "" (#445).
 func assignJamfConnectResourceModel(state *JamfConnectResourceModel, p *pro.LinkedConnectProfile) {
 	profileID := derefInt(p.ProfileID)
 	state.ProfileID = types.Int64Value(int64(profileID))
@@ -26,7 +28,7 @@ func assignJamfConnectResourceModel(state *JamfConnectResourceModel, p *pro.Link
 	state.ConfigProfileUUID = helpers.StringPointerValueOrNull(p.UUID)
 
 	state.AutoDeploymentType = types.StringValue(helpers.DerefString(p.AutoDeploymentType))
-	state.Version = helpers.StringPointerValueOrNull(p.Version)
+	state.Version = helpers.ReconcileOptionalStringPointer(p.Version, state.Version)
 
 	state.ProfileName = helpers.StringPointerValueOrNull(p.ProfileName)
 	state.ScopeDescription = helpers.StringPointerValueOrNull(p.ScopeDescription)

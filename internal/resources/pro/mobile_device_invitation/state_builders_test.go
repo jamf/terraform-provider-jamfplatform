@@ -89,6 +89,46 @@ func TestAssignMobileDeviceInvitationResourceModel_EmptyEmailCollapsesToNull(t *
 	}
 }
 
+// TestAssignMobileDeviceInvitationResourceModel_PreservesAuthoredEmptyStrings
+// verifies the other half: an email field or username the user set to "" stays
+// "" when the server echoes it as an empty element, while an unset sibling
+// stays null.
+func TestAssignMobileDeviceInvitationResourceModel_PreservesAuthoredEmptyStrings(t *testing.T) {
+	state := MobileDeviceInvitationResourceModel{
+		Subject:  types.StringValue(""),
+		Message:  types.StringNull(),
+		ReplyTo:  types.StringValue(""),
+		SentFrom: types.StringValue(""),
+		SentTo:   types.StringValue(""),
+		Username: types.StringValue(""),
+	}
+	src := &proclassic.MobileDeviceInvitation{
+		ID:       new(260),
+		Subject:  new(""),
+		Message:  new(""),
+		ReplyTo:  new(""),
+		SentFrom: new(""),
+		SentTo:   new(""),
+		Username: new(""),
+	}
+	assignMobileDeviceInvitationResourceModel(&state, src)
+
+	for name, v := range map[string]types.String{
+		"subject":   state.Subject,
+		"reply_to":  state.ReplyTo,
+		"sent_from": state.SentFrom,
+		"sent_to":   state.SentTo,
+		"username":  state.Username,
+	} {
+		if v.IsNull() || v.ValueString() != "" {
+			t.Errorf("authored %s: expected \"\", got %s", name, v)
+		}
+	}
+	if !state.Message.IsNull() {
+		t.Errorf("unset message: expected null, got %s", state.Message)
+	}
+}
+
 func TestAssignMobileDeviceInvitationResourceModel_DriftAndSentinels(t *testing.T) {
 	state := MobileDeviceInvitationResourceModel{
 		// User-authored value that the server will echo back drifted.

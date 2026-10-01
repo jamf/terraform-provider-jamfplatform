@@ -14,7 +14,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers"
@@ -719,6 +722,41 @@ func TestAccDataSource_ProUserInitiatedEnrollmentSettings_Basic(t *testing.T) {
 					// the built-in English language is always present.
 					resource.TestCheckResourceAttrSet("data.jamfplatform_pro_user_initiated_enrollment_settings.ds", "messaging_languages.%"),
 				),
+			},
+		},
+	})
+}
+
+// TestAccResource_ProUserInitiatedEnrollmentSettings_EmptyManagementUsername
+// covers the #445 shape: Jamf Pro echoes management_username = "" as "", and
+// reading that back as null failed the post-apply consistency check. Step 2
+// drops the attribute from config: the prior "" carries forward through
+// UseStateForUnknown and the merged PUT sends "" again, so the server keeps it
+// empty.
+func TestAccResource_ProUserInitiatedEnrollmentSettings_EmptyManagementUsername(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	emptyUsername := statecheck.ExpectKnownValue(uieResourceAddr, tfjsonpath.New("management_username"), knownvalue.StringExact(""))
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkUIEStillExists(t),
+		Steps: []resource.TestStep{
+			{
+				Config: `
+					resource "jamfplatform_pro_user_initiated_enrollment_settings" "test" {
+						create_management_account = false
+						management_username       = ""
+					}
+				`,
+				ConfigStateChecks: []statecheck.StateCheck{emptyUsername},
+			},
+			{
+				Config: `
+					resource "jamfplatform_pro_user_initiated_enrollment_settings" "test" {
+						create_management_account = false
+					}
+				`,
+				ConfigStateChecks: []statecheck.StateCheck{emptyUsername},
 			},
 		},
 	})

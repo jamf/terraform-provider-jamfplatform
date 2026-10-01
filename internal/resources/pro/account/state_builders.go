@@ -18,6 +18,12 @@ import (
 // assignProBaseFields populates the base (Pro-owned) fields from a Pro v1
 // UserAccount response, translating Pro wire enum spellings back to the UI
 // values. Privileges are NOT touched here (they come from the classic side).
+//
+// full_name and email_address are reconciled against the incoming model (the
+// plan on create and update, prior state on refresh). Jamf Pro reports an
+// unset value and one written as "" identically, as "", so copying the echo
+// would null an authored "" and fail the post-apply consistency check. An
+// import or a list result carries no prior value and still lands null.
 func assignProBaseFields(state *AccountResourceModel, a *pro.UserAccount) {
 	if a == nil {
 		return
@@ -28,8 +34,8 @@ func assignProBaseFields(state *AccountResourceModel, a *pro.UserAccount) {
 	if a.Username != nil {
 		state.Username = helpers.StringPointerValueOrNull(a.Username)
 	}
-	state.FullName = helpers.StringPointerValueOrNull(a.Realname)
-	state.EmailAddress = helpers.StringPointerValueOrNull(a.Email)
+	state.FullName = helpers.ReconcileOptionalStringPointer(a.Realname, state.FullName)
+	state.EmailAddress = helpers.ReconcileOptionalStringPointer(a.Email, state.EmailAddress)
 	if a.AccessLevel != nil {
 		state.AccessLevel = types.StringValue(translate(accessLevelFromWire, *a.AccessLevel))
 	}
