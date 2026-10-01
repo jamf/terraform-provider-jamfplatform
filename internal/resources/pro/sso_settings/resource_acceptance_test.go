@@ -221,29 +221,22 @@ func TestAccResource_ProSsoSettings_CreateAdoptsTheTenantsSettings(t *testing.T)
 
 // setUsernameClaimMappingOutOfBand writes the OIDC username claim mapping the
 // way an administrator would, and registers the restore of the tenant's
-// original settings. It fails the test if the write did not take, since a value
-// that never landed would let the adoption test pass without proving anything.
+// original settings through restoreSsoSettingsOnCleanup. It fails the test if
+// the write did not take, since a value that never landed would let the
+// adoption test pass without proving anything.
+//
+// Both writes go through writableSsoSettings. Sending the GET snapshot back
+// as-is fails on an OIDC_WITH_SAML tenant with a URL metadata source, and the
+// restore used to log that failure and carry on, which could leave a shared
+// tenant switched to OIDC.
 func setUsernameClaimMappingOutOfBand(t *testing.T, want string) {
 	t.Helper()
 	c := pro.New(testhelpers.NewAcceptanceClient(t))
 	ctx := context.Background()
 
-	before, err := c.GetSsoSettingsV3(ctx)
-	if err != nil {
-		t.Fatalf("reading the tenant's SSO settings: %v", err)
-	}
-	if before == nil {
-		t.Fatal("reading the tenant's SSO settings: no settings returned")
-	}
+	before := restoreSsoSettingsOnCleanup(t)
 
-	restore := *before
-	t.Cleanup(func() {
-		if _, err := c.UpdateSsoSettingsV3(context.Background(), &restore); err != nil {
-			t.Logf("restoring the tenant's SSO settings: %v", err)
-		}
-	})
-
-	edited := *before
+	edited := writableSsoSettings(*before)
 	edited.OidcSettings.UsernameAttributeClaimMapping = &want
 	if _, err := c.UpdateSsoSettingsV3(ctx, &edited); err != nil {
 		t.Fatalf("setting the username claim mapping outside Terraform: %v", err)
@@ -702,11 +695,22 @@ func TestAccDataSource_ProSsoSpMetadata_SAML(t *testing.T) {
 	})
 }
 
-// restoreSsoSettingsOnCleanup snapshots the tenant's SSO settings, registers a
-// t.Cleanup that writes them back, and returns the snapshot. A GET reports an
+// writableSsoSettings returns s in a form a PUT accepts. A GET reports an
 // unused metadata_file_name as "", which a PUT in a SAML mode with
 // metadata_source = URL refuses ("SAML settings validation failed"), so the
-// restore sends it as null in that case.
+// file fields are sent as null in that case.
+func writableSsoSettings(s pro.SsoSettingsV3) pro.SsoSettingsV3 {
+	if s.SamlSettings.MetadataSource != nil && *s.SamlSettings.MetadataSource == pro.SamlSettingsMetadataSourceURL {
+		s.SamlSettings.MetadataFileName = nil
+		s.SamlSettings.FederationMetadataFile = nil
+	}
+	return s
+}
+
+// restoreSsoSettingsOnCleanup snapshots the tenant's SSO settings, registers a
+// t.Cleanup that writes them back through writableSsoSettings, and returns the
+// snapshot. A failed restore fails the test, since it leaves a shared tenant's
+// SSO changed.
 func restoreSsoSettingsOnCleanup(t *testing.T) *pro.SsoSettingsV3 {
 	t.Helper()
 	c := pro.New(testhelpers.NewAcceptanceClient(t))
@@ -717,11 +721,7 @@ func restoreSsoSettingsOnCleanup(t *testing.T) *pro.SsoSettingsV3 {
 	if before == nil {
 		t.Fatal("reading the tenant's SSO settings: no settings returned")
 	}
-	restore := *before
-	if restore.SamlSettings.MetadataSource != nil && *restore.SamlSettings.MetadataSource == pro.SamlSettingsMetadataSourceURL {
-		restore.SamlSettings.MetadataFileName = nil
-		restore.SamlSettings.FederationMetadataFile = nil
-	}
+	restore := writableSsoSettings(*before)
 	t.Cleanup(func() {
 		if _, err := c.UpdateSsoSettingsV3(context.Background(), &restore); err != nil {
 			t.Errorf("restoring the tenant's SSO settings: %v", err)
