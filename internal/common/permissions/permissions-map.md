@@ -1,8 +1,9 @@
 ---
 updatedAt: 2026-09-03T13:00:10.000Z
+agentTools:
+  siteIndex: https://developer.jamf.com/llms.txt
+  projectIndex: https://developer.jamf.com/platform-api/llms.txt
 ---
-
-Fetch the complete documentation index at: https://developer.jamf.com/platform-api/llms.txt. Use this file to discover all available pages before exploring further. Append .md to any documentation page URL to get its markdown version.
 
 # Permissions map
 
