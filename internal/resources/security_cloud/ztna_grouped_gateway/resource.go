@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -40,13 +41,15 @@ const minMemberGateways = 2
 // GroupedGatewayResource implements the Terraform resource for Jamf Security Cloud
 // ZTNA grouped gateways.
 type GroupedGatewayResource struct {
-	client *securitycloud.Client
+	client        *securitycloud.Client
+	scopeTenantID string
 }
 
 var (
 	_ resource.Resource                = &GroupedGatewayResource{}
 	_ resource.ResourceWithImportState = &GroupedGatewayResource{}
 	_ resource.ResourceWithIdentity    = &GroupedGatewayResource{}
+	_ resource.ResourceWithModifyPlan  = &GroupedGatewayResource{}
 )
 
 const (
@@ -140,10 +143,20 @@ func (r *GroupedGatewayResource) Schema(ctx context.Context, _ resource.SchemaRe
 				},
 			},
 			"tenant_ids": schema.SetAttribute{
-				MarkdownDescription: "IDs of the tenants granted access to this grouped gateway. At least one, and " +
-					"every one must belong to the same organization as the credentials the provider is configured " +
-					"with.",
-				Required:    true,
+				MarkdownDescription: "IDs of the Jamf Security Cloud tenants granted access to this grouped gateway. " +
+					"Every one must belong to the same organization as the provider's credentials.\n\n" +
+					"Leave it unset to grant access to your own Security Cloud tenant. The provider finds that " +
+					"ID when it plans the create: under a tenant-scoped integration it is the tenant you " +
+					"configured, and under an environment-scoped one it reads it from the environment's UEM " +
+					"Connect integration. If the environment has no UEM Connect integration, the plan fails and " +
+					"asks you to set it. Jamf Account shows the ID under Platform environments, on the " +
+					"environment's Jamf Security Cloud row. Taking the attribute out of your configuration later " +
+					"keeps the tenants already granted.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
+				},
 				ElementType: types.StringType,
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),
@@ -176,6 +189,7 @@ func (r *GroupedGatewayResource) Configure(ctx context.Context, req resource.Con
 		return
 	}
 	r.client = client
+	r.scopeTenantID = providerdata.SecurityCloudTenantScopeID(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Security Cloud grouped gateway ID.

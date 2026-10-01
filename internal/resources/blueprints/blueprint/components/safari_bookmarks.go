@@ -42,7 +42,7 @@ type UrlBookmarkModel struct {
 
 // GetIdentifier returns the component identifier for Safari bookmarks.
 func (c *SafariBookmarksComponent) GetIdentifier() string {
-	return "com.jamf.ddm.safari-bookmarks"
+	return blueprints.SafariBookmarksComponentIdentifierComJamfDdmSafariBookmarks
 }
 
 // SafariBookmarksComponentSchema returns the Terraform schema for Safari bookmarks component.

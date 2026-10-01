@@ -9,6 +9,7 @@ description: |-
   Jamf lists this under Platform environment scope (preferred for new integrations) or Tenant scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
   |---|---|---|---|
+  | Global settings | UEM Connect configuration | Read | `uem-connect` |
   | Secure enterprise access | Zero-Trust Network Access (ZTNA) | Create, Read, Update, Delete | `ztna` |
 ---
 
@@ -24,6 +25,7 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 
 | Category | Permission | Actions | API capability |
 |---|---|---|---|
+| Global settings | UEM Connect configuration | Read | `uem-connect` |
 | Secure enterprise access | Zero-Trust Network Access (ZTNA) | Create, Read, Update, Delete | `ztna` |
 
 ## Example Usage
@@ -47,14 +49,11 @@ resource "jamfplatform_security_cloud_ztna_grouped_gateway" "eu" {
 
   # Required whatever the strategy, even though only "First available" uses it.
   required_gateway_stability = "30 minutes"
-
-  tenant_ids = [var.security_cloud_tenant_id]
 }
 
 resource "jamfplatform_security_cloud_ztna_gateway" "london" {
   name          = "London Internet Egress"
   egress_region = "Europe - UK"
-  tenant_ids    = [var.security_cloud_tenant_id]
 
   contact = {
     name  = "Network Operations"
@@ -65,17 +64,11 @@ resource "jamfplatform_security_cloud_ztna_gateway" "london" {
 resource "jamfplatform_security_cloud_ztna_gateway" "frankfurt" {
   name          = "Frankfurt Internet Egress"
   egress_region = "Europe - Germany"
-  tenant_ids    = [var.security_cloud_tenant_id]
 
   contact = {
     name  = "Network Operations"
     email = "netops@example.com"
   }
-}
-
-variable "security_cloud_tenant_id" {
-  description = "Tenant granted access to these gateways."
-  type        = string
 }
 ```
 
@@ -94,10 +87,12 @@ Members must be your own dedicated gateways, all of the same form, so mixing an 
 - `Nearest`: the geographically closest available member.
 - `Random`: a random available member, for load balancing.
 - `First available`: the first available member in `gateway_ids` order, failing over to the next and back again after `required_gateway_stability`.
-- `tenant_ids` (Set of String) IDs of the tenants granted access to this grouped gateway. At least one, and every one must belong to the same organization as the credentials the provider is configured with.
 
 ### Optional
 
+- `tenant_ids` (Set of String) IDs of the Jamf Security Cloud tenants granted access to this grouped gateway. Every one must belong to the same organization as the provider's credentials.
+
+Leave it unset to grant access to your own Security Cloud tenant. The provider finds that ID when it plans the create: under a tenant-scoped integration it is the tenant you configured, and under an environment-scoped one it reads it from the environment's UEM Connect integration. If the environment has no UEM Connect integration, the plan fails and asks you to set it. Jamf Account shows the ID under Platform environments, on the environment's Jamf Security Cloud row. Taking the attribute out of your configuration later keeps the tenants already granted.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only

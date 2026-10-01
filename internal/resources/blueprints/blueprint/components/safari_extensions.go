@@ -35,7 +35,7 @@ type ManagedExtensionDomainModel struct {
 
 // GetIdentifier returns the component identifier for Safari extensions.
 func (c *SafariExtensionsComponent) GetIdentifier() string {
-	return "com.jamf.ddm.safari-extensions"
+	return blueprints.SafariExtensionsComponentIdentifierComJamfDdmSafariExtensions
 }
 
 // SafariExtensionsComponentSchema returns the Terraform schema for Safari extensions component.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck/queryfilter"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -59,7 +60,6 @@ func testAccCheckGroupedGatewayDestroy(t *testing.T) resource.TestCheckFunc {
 // a test that only ever wrote it in one order.
 func TestAccResource_SecurityCloudZtnaGroupedGateway_Basic(t *testing.T) {
 	testhelpers.AccPreCheckSecurityCloud(t)
-	tenantID := testhelpers.RequireSecurityCloudTenantID(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-jsc-gg-" + suffix
 	nameUpdated := "tf-acc-jsc-gg-updated-" + suffix
@@ -69,7 +69,7 @@ func TestAccResource_SecurityCloudZtnaGroupedGateway_Basic(t *testing.T) {
 		CheckDestroy:             testAccCheckGroupedGatewayDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: memberGatewaysConfig(suffix, tenantID) + fmt.Sprintf(`
+				Config: memberGatewaysConfig(suffix) + fmt.Sprintf(`
 					resource "jamfplatform_security_cloud_ztna_grouped_gateway" "test" {
 						name                   = %q
 						routing_strategy           = "First available"
@@ -80,11 +80,16 @@ func TestAccResource_SecurityCloudZtnaGroupedGateway_Basic(t *testing.T) {
 							jamfplatform_security_cloud_ztna_gateway.b.id,
 						]
 
-						tenant_ids = [%q]
+						tenant_ids = jamfplatform_security_cloud_ztna_gateway.a.tenant_ids
 					}
-				`, name, tenantID),
+				`, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("jamfplatform_security_cloud_ztna_grouped_gateway.test", "id"),
+					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_gateway.a", "tenant_ids.#", "1"),
+					resource.TestCheckResourceAttrPair(
+						"jamfplatform_security_cloud_ztna_grouped_gateway.test", "tenant_ids.0",
+						"jamfplatform_security_cloud_ztna_gateway.a", "tenant_ids.0",
+					),
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_grouped_gateway.test", "name", name),
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_grouped_gateway.test", "routing_strategy", "First available"),
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_grouped_gateway.test", "required_gateway_stability", "30 minutes"),
@@ -97,7 +102,7 @@ func TestAccResource_SecurityCloudZtnaGroupedGateway_Basic(t *testing.T) {
 				),
 			},
 			{
-				Config: memberGatewaysConfig(suffix, tenantID) + fmt.Sprintf(`
+				Config: memberGatewaysConfig(suffix) + fmt.Sprintf(`
 					resource "jamfplatform_security_cloud_ztna_grouped_gateway" "test" {
 						name                   = %q
 						routing_strategy           = "Nearest"
@@ -108,11 +113,20 @@ func TestAccResource_SecurityCloudZtnaGroupedGateway_Basic(t *testing.T) {
 							jamfplatform_security_cloud_ztna_gateway.a.id,
 						]
 
-						tenant_ids = [%q]
 					}
-				`, nameUpdated, tenantID),
+				`, nameUpdated),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("jamfplatform_security_cloud_ztna_grouped_gateway.test", plancheck.ResourceActionUpdate),
+						plancheck.ExpectKnownValue("jamfplatform_security_cloud_ztna_grouped_gateway.test", tfjsonpath.New("tenant_ids"), knownvalue.SetSizeExact(1)),
+					},
+				},
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_grouped_gateway.test", "name", nameUpdated),
+					resource.TestCheckResourceAttrPair(
+						"jamfplatform_security_cloud_ztna_grouped_gateway.test", "tenant_ids.0",
+						"jamfplatform_security_cloud_ztna_gateway.a", "tenant_ids.0",
+					),
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_grouped_gateway.test", "routing_strategy", "Nearest"),
 					resource.TestCheckResourceAttr("jamfplatform_security_cloud_ztna_grouped_gateway.test", "required_gateway_stability", "1 hour"),
 					resource.TestCheckResourceAttrPair(
@@ -141,17 +155,24 @@ func TestAccResource_SecurityCloudZtnaGroupedGateway_Basic(t *testing.T) {
 // membership rule that only the server can enforce. Grouping an IPsec gateway with
 // an internet one is refused, and the diagnostic has to name the member list
 // rather than the group.
+//
+// The members are created in a step of their own so that an account without dedicated IP
+// addresses skips here instead of failing: the framework does not consult ErrorCheck on a step
+// that sets ExpectError, and the internet member is the one that needs them.
 func TestAccResource_SecurityCloudZtnaGroupedGateway_MixedFormsRefused(t *testing.T) {
 	testhelpers.AccPreCheckSecurityCloud(t)
-	tenantID := testhelpers.RequireSecurityCloudTenantID(t)
 	suffix := testhelpers.RunSuffix()
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		ErrorCheck:               testhelpers.SkipWithoutDedicatedIPs(t),
 		CheckDestroy:             testAccCheckGroupedGatewayDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: mixedFormGatewaysConfig(suffix, tenantID) + fmt.Sprintf(`
+				Config: mixedFormGatewaysConfig(suffix),
+			},
+			{
+				Config: mixedFormGatewaysConfig(suffix) + fmt.Sprintf(`
 					resource "jamfplatform_security_cloud_ztna_grouped_gateway" "test" {
 						name                   = "tf-acc-jsc-gg-mixed-%s"
 						routing_strategy           = "Nearest"
@@ -162,9 +183,8 @@ func TestAccResource_SecurityCloudZtnaGroupedGateway_MixedFormsRefused(t *testin
 							jamfplatform_security_cloud_ztna_gateway.ipsec.id,
 						]
 
-						tenant_ids = [%q]
 					}
-				`, suffix, tenantID),
+				`, suffix),
 				ExpectError: regexpMixedForms,
 			},
 		},
@@ -177,7 +197,6 @@ func TestAccResource_SecurityCloudZtnaGroupedGateway_MixedFormsRefused(t *testin
 // send — is refused.
 func TestAccResource_SecurityCloudZtnaGroupedGateway_InvalidGatewayStabilityRejectedAtPlan(t *testing.T) {
 	testhelpers.AccPreCheckSecurityCloud(t)
-	tenantID := testhelpers.RequireSecurityCloudTenantID(t)
 	suffix := testhelpers.RunSuffix()
 
 	resource.Test(t, resource.TestCase{
@@ -190,9 +209,8 @@ func TestAccResource_SecurityCloudZtnaGroupedGateway_InvalidGatewayStabilityReje
 						routing_strategy           = "Nearest"
 						required_gateway_stability = "15 minutes"
 						gateway_ids            = ["a1b2", "c3d4"]
-						tenant_ids             = [%q]
 					}
-				`, suffix, tenantID),
+				`, suffix),
 				ExpectError: regexpInvalidAttributeValue,
 			},
 			{
@@ -202,9 +220,8 @@ func TestAccResource_SecurityCloudZtnaGroupedGateway_InvalidGatewayStabilityReje
 						routing_strategy           = "Nearest"
 						required_gateway_stability = "30 minutes"
 						gateway_ids            = ["a1b2"]
-						tenant_ids             = [%q]
 					}
-				`, suffix, tenantID),
+				`, suffix),
 				ExpectError: regexpTooFewMembers,
 			},
 		},
@@ -215,7 +232,6 @@ func TestAccResource_SecurityCloudZtnaGroupedGateway_InvalidGatewayStabilityReje
 // paths of the singular data source against one live group.
 func TestAccDataSource_SecurityCloudZtnaGroupedGateway_ByIDAndName(t *testing.T) {
 	testhelpers.AccPreCheckSecurityCloud(t)
-	tenantID := testhelpers.RequireSecurityCloudTenantID(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-jsc-gg-ds-" + suffix
 
@@ -224,7 +240,7 @@ func TestAccDataSource_SecurityCloudZtnaGroupedGateway_ByIDAndName(t *testing.T)
 		CheckDestroy:             testAccCheckGroupedGatewayDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: memberGatewaysConfig(suffix, tenantID) + fmt.Sprintf(`
+				Config: memberGatewaysConfig(suffix) + fmt.Sprintf(`
 					resource "jamfplatform_security_cloud_ztna_grouped_gateway" "src" {
 						name                   = %q
 						routing_strategy           = "Random"
@@ -235,7 +251,6 @@ func TestAccDataSource_SecurityCloudZtnaGroupedGateway_ByIDAndName(t *testing.T)
 							jamfplatform_security_cloud_ztna_gateway.b.id,
 						]
 
-						tenant_ids = [%q]
 					}
 
 					data "jamfplatform_security_cloud_ztna_grouped_gateway" "by_id" {
@@ -246,7 +261,7 @@ func TestAccDataSource_SecurityCloudZtnaGroupedGateway_ByIDAndName(t *testing.T)
 						name       = jamfplatform_security_cloud_ztna_grouped_gateway.src.name
 						depends_on = [jamfplatform_security_cloud_ztna_grouped_gateway.src]
 					}
-				`, name, tenantID),
+				`, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.jamfplatform_security_cloud_ztna_grouped_gateway.by_id", "routing_strategy", "Random"),
 					resource.TestCheckResourceAttr("data.jamfplatform_security_cloud_ztna_grouped_gateway.by_id", "required_gateway_stability", "5 minutes"),
@@ -262,7 +277,6 @@ func TestAccDataSource_SecurityCloudZtnaGroupedGateway_ByIDAndName(t *testing.T)
 // plural data source surfaces a group created in the same apply.
 func TestAccDataSource_SecurityCloudZtnaGroupedGateways_ListsCreatedGroup(t *testing.T) {
 	testhelpers.AccPreCheckSecurityCloud(t)
-	tenantID := testhelpers.RequireSecurityCloudTenantID(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-jsc-ggs-" + suffix
 
@@ -271,7 +285,7 @@ func TestAccDataSource_SecurityCloudZtnaGroupedGateways_ListsCreatedGroup(t *tes
 		CheckDestroy:             testAccCheckGroupedGatewayDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: memberGatewaysConfig(suffix, tenantID) + fmt.Sprintf(`
+				Config: memberGatewaysConfig(suffix) + fmt.Sprintf(`
 					resource "jamfplatform_security_cloud_ztna_grouped_gateway" "src" {
 						name                   = %q
 						routing_strategy           = "Nearest"
@@ -282,13 +296,12 @@ func TestAccDataSource_SecurityCloudZtnaGroupedGateways_ListsCreatedGroup(t *tes
 							jamfplatform_security_cloud_ztna_gateway.b.id,
 						]
 
-						tenant_ids = [%q]
 					}
 
 					data "jamfplatform_security_cloud_ztna_grouped_gateways" "all" {
 						depends_on = [jamfplatform_security_cloud_ztna_grouped_gateway.src]
 					}
-				`, name, tenantID),
+				`, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.jamfplatform_security_cloud_ztna_grouped_gateways.all", "id", "ztna_grouped_gateways"),
 					resource.TestCheckTypeSetElemNestedAttrs("data.jamfplatform_security_cloud_ztna_grouped_gateways.all", "grouped_gateways.*", map[string]string{
@@ -306,7 +319,6 @@ func TestAccDataSource_SecurityCloudZtnaGroupedGateways_ListsCreatedGroup(t *tes
 // Requires Terraform 1.14+ (list resources).
 func TestAccListResource_SecurityCloudZtnaGroupedGateway_Basic(t *testing.T) {
 	testhelpers.AccPreCheckSecurityCloud(t)
-	tenantID := testhelpers.RequireSecurityCloudTenantID(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-jsc-gg-list-" + suffix
 
@@ -318,7 +330,7 @@ func TestAccListResource_SecurityCloudZtnaGroupedGateway_Basic(t *testing.T) {
 		CheckDestroy:             testAccCheckGroupedGatewayDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: memberGatewaysConfig(suffix, tenantID) + fmt.Sprintf(`
+				Config: memberGatewaysConfig(suffix) + fmt.Sprintf(`
 					resource "jamfplatform_security_cloud_ztna_grouped_gateway" "src" {
 						name                   = %q
 						routing_strategy           = "Nearest"
@@ -329,9 +341,8 @@ func TestAccListResource_SecurityCloudZtnaGroupedGateway_Basic(t *testing.T) {
 							jamfplatform_security_cloud_ztna_gateway.b.id,
 						]
 
-						tenant_ids = [%q]
 					}
-				`, name, tenantID),
+				`, name),
 				Check: resource.TestCheckResourceAttrSet("jamfplatform_security_cloud_ztna_grouped_gateway.src", "id"),
 			},
 			{
@@ -361,44 +372,65 @@ func TestAccListResource_SecurityCloudZtnaGroupedGateway_Basic(t *testing.T) {
 	})
 }
 
-// memberGatewaysConfig renders two dedicated internet gateways to group. They are
-// the internet form rather than IPsec because a group needs its members to share a
-// form and internet gateways need no tunnel configuration, no distinct private
-// subnet per gateway, and no pre-shared key.
-func memberGatewaysConfig(suffix, tenantID string) string {
+// memberGatewaysConfig renders two dedicated IPsec gateways to group.
+//
+// A group needs its members to share a form, and IPsec is the form an acceptance account can be
+// relied on to have: an internet gateway takes a pair of dedicated IP addresses from a paid
+// allotment that the EU acceptance environment does not hold ("0 of 0", 2026-09-30), while the
+// same account is licensed for ten IPsec gateways. Each member gets its own egress region and its
+// own Jamf-side subnet, for the reason ztna_gateway's acceptance suite gives: a second IPsec
+// gateway beside one still provisioning in the same region was once refused 409 CONFLICT.
+func memberGatewaysConfig(suffix string) string {
+	return memberIPSecGateway("a", "tf-acc-jsc-gg-member-a-"+suffix, "Europe - Ireland", "54.220.161.57", "10.81.0.0/16") +
+		memberIPSecGateway("b", "tf-acc-jsc-gg-member-b-"+suffix, "Europe - UK", "3.9.67.90", "10.82.0.0/16")
+}
+
+// memberIPSecGateway renders one dedicated IPsec gateway under the given resource label, in
+// region, with sourceAddress as its one IPsec source address and jamfSubnet as its Jamf-side
+// subnet. tenant_ids is left unset for the provider to default.
+func memberIPSecGateway(label, name, region, sourceAddress, jamfSubnet string) string {
 	return fmt.Sprintf(`
-		resource "jamfplatform_security_cloud_ztna_gateway" "a" {
-			name       = "tf-acc-jsc-gg-member-a-%s"
-			egress_region = "Europe - UK"
-			tenant_ids = [%q]
+		resource "jamfplatform_security_cloud_ztna_gateway" %q {
+			name                      = %q
+			egress_region             = %q
+			ipsec_source_ip_addresses = [%q]
 
 			contact = {
 				name  = "Terraform Acceptance"
 				email = "tf-acc@example.com"
 			}
-		}
 
-		resource "jamfplatform_security_cloud_ztna_gateway" "b" {
-			name       = "tf-acc-jsc-gg-member-b-%s"
-			egress_region = "Europe - Germany"
-			tenant_ids = [%q]
+			ipsec = {
+				key_exchange_protocol = "IKEv2"
+				phase_1 = { encryption = "AES-256", integrity = "SHA-512", diffie_hellman_group = "Group 14 (modp2048)", sa_lifetime_seconds = 28800 }
+				phase_2 = { encryption = "AES-256", integrity = "SHA-512", diffie_hellman_group = "Group 14 (modp2048)", sa_lifetime_seconds = 28800 }
 
-			contact = {
-				name  = "Terraform Acceptance"
-				email = "tf-acc@example.com"
+				jamf_side = {
+					host                             = "%%any"
+					ike_domain_id                    = "wpa.wandera.com"
+					subnet                           = %q
+					authentication_secret            = "tf-acc-secret-member-%s"
+					authentication_secret_wo_version = 1
+				}
+
+				customer_side = {
+					host          = "198.51.100.9"
+					ike_domain_id = "peer.tf-acc.example.com"
+					subnets       = ["0.0.0.0/0"]
+					vendor        = "strongSwan"
+				}
 			}
 		}
-	`, suffix, tenantID, suffix, tenantID)
+	`, label, name, region, sourceAddress, jamfSubnet, label)
 }
 
 // mixedFormGatewaysConfig renders one gateway of each form, so a group over both is
 // refused for the reason the test is about.
-func mixedFormGatewaysConfig(suffix, tenantID string) string {
+func mixedFormGatewaysConfig(suffix string) string {
 	return fmt.Sprintf(`
 		resource "jamfplatform_security_cloud_ztna_gateway" "internet" {
 			name       = "tf-acc-jsc-gg-inet-%s"
 			egress_region = "Europe - UK"
-			tenant_ids = [%q]
 
 			contact = {
 				name  = "Terraform Acceptance"
@@ -409,7 +441,7 @@ func mixedFormGatewaysConfig(suffix, tenantID string) string {
 		resource "jamfplatform_security_cloud_ztna_gateway" "ipsec" {
 			name       = "tf-acc-jsc-gg-ipsec-%s"
 			egress_region = "Europe - Germany"
-			tenant_ids = [%q]
+			ipsec_source_ip_addresses = ["3.66.107.208"]
 
 			contact = {
 				name  = "Terraform Acceptance"
@@ -437,7 +469,7 @@ func mixedFormGatewaysConfig(suffix, tenantID string) string {
 				}
 			}
 		}
-	`, suffix, tenantID, suffix, tenantID)
+	`, suffix, suffix)
 }
 
 // Expected-error patterns for the plan- and apply-time refusals. Terraform wraps

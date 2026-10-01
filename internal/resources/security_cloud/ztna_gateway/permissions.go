@@ -15,6 +15,7 @@ import (
 // permissions_test.go asserts this list stays in sync with the actual
 // client.<Method> calls in crud.go and with the SDK privilege registry.
 var resourceSDKMethods = []string{
+	"ListUemConnectorsV1",
 	"CreateZtnaGatewayV1",
 	"GetZtnaGatewayV1",
 	"UpdateZtnaGatewayV1",

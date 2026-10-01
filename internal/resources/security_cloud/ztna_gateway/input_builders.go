@@ -69,6 +69,12 @@ func buildGatewayCreateInput(ctx context.Context, plan, config GatewayResourceMo
 // wire only when its rotation trigger changed, because it cannot be read back and
 // re-sending it on every update would mean the config, not Jamf, silently
 // deciding when the key rotates.
+//
+// The IPsec source addresses are sent whenever the plan holds them and omitted
+// otherwise, never sent empty: Jamf Security Cloud refuses an empty or null list
+// with `400 EMPTY_AVAILABILITY_ZONES_NOT_SUPPORTED` (see
+// ipsecSourceAddressesValidator), so the omission, which preserves the stored
+// addresses, is the only write that can succeed without them.
 func buildGatewayPatchInput(ctx context.Context, plan, state, config GatewayResourceModel) (*securitycloud.GatewayPatchRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
@@ -94,10 +100,7 @@ func buildGatewayPatchInput(ctx context.Context, plan, state, config GatewayReso
 		return req, diags
 	}
 
-	if plan.IPSecSourceIPAddresses.IsNull() || plan.IPSecSourceIPAddresses.IsUnknown() {
-		empty := []string{}
-		req.AvailabilityZones = &empty
-	} else {
+	if !plan.IPSecSourceIPAddresses.IsNull() && !plan.IPSecSourceIPAddresses.IsUnknown() {
 		zones := make([]string, 0, len(plan.IPSecSourceIPAddresses.Elements()))
 		diags.Append(plan.IPSecSourceIPAddresses.ElementsAs(ctx, &zones, false)...)
 		req.AvailabilityZones = &zones

@@ -79,6 +79,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -91,7 +92,8 @@ import (
 // GatewayResource implements the Terraform resource for Jamf Security Cloud ZTNA
 // gateways.
 type GatewayResource struct {
-	client *securitycloud.Client
+	client        *securitycloud.Client
+	scopeTenantID string
 }
 
 var (
@@ -99,6 +101,7 @@ var (
 	_ resource.ResourceWithImportState      = &GatewayResource{}
 	_ resource.ResourceWithIdentity         = &GatewayResource{}
 	_ resource.ResourceWithConfigValidators = &GatewayResource{}
+	_ resource.ResourceWithModifyPlan       = &GatewayResource{}
 )
 
 // Default operation budgets.
@@ -221,10 +224,20 @@ func (r *GatewayResource) Schema(ctx context.Context, _ resource.SchemaRequest, 
 				Default:  booldefault.StaticBool(true),
 			},
 			"tenant_ids": schema.SetAttribute{
-				MarkdownDescription: "IDs of the tenants granted access to this gateway. At least one, and every " +
-					"one must belong to the same organization as the credentials the provider is configured with; " +
-					"a tenant outside it is refused.",
-				Required:    true,
+				MarkdownDescription: "IDs of the Jamf Security Cloud tenants granted access to this gateway. " +
+					"Every one must belong to the same organization as the provider's credentials.\n\n" +
+					"Leave it unset to grant access to your own Security Cloud tenant. The provider finds that " +
+					"ID when it plans the create: under a tenant-scoped integration it is the tenant you " +
+					"configured, and under an environment-scoped one it reads it from the environment's UEM " +
+					"Connect integration. If the environment has no UEM Connect integration, the plan fails and " +
+					"asks you to set it. Jamf Account shows the ID under Platform environments, on the " +
+					"environment's Jamf Security Cloud row. Taking the attribute out of your configuration later " +
+					"keeps the tenants already granted.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
+				},
 				ElementType: types.StringType,
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),
@@ -235,13 +248,13 @@ func (r *GatewayResource) Schema(ctx context.Context, _ resource.SchemaRequest, 
 				MarkdownDescription: "**\"Jamf Security Cloud IPsec source IP addresses\"** in the Jamf Security " +
 					"Cloud admin UI: the addresses IPsec traffic from Jamf Security Cloud originates from, which " +
 					"your firewall must allow. Supply both addresses your egress region offers for dynamic " +
-					"addressing, or one to pin a single source address. Only valid on an IPsec gateway: a dedicated " +
-					"internet gateway must leave this unset.\n\n" +
-					"The accepted addresses are fixed per egress region and are the ones the admin UI lists when " +
-					"you pick the region. The provider does not check them at plan time because the accepted set " +
-					"is not published anywhere it can read.\n\n" +
-					"Taking the attribute out of your configuration clears the addresses on the next update " +
-					"rather than leaving them alone.",
+					"addressing, or one to pin a single source address. Required on an IPsec gateway: Jamf Security " +
+					"Cloud refuses to create one without an address. Leave it unset on a dedicated internet " +
+					"gateway.\n\n" +
+					"Each egress region accepts its own two addresses, the ones the admin UI lists when you pick " +
+					"the region. Jamf Security Cloud refuses an address from another region when you apply.\n\n" +
+					"You can replace the addresses later but you cannot remove the attribute, because Jamf " +
+					"Security Cloud refuses to leave an IPsec gateway with none.",
 				Optional:    true,
 				ElementType: types.StringType,
 				Validators: []validator.Set{
@@ -585,6 +598,7 @@ func (r *GatewayResource) Configure(ctx context.Context, req resource.ConfigureR
 		return
 	}
 	r.client = client
+	r.scopeTenantID = providerdata.SecurityCloudTenantScopeID(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Security Cloud gateway ID.

@@ -16,14 +16,11 @@ resource "jamfplatform_security_cloud_ztna_grouped_gateway" "eu" {
 
   # Required whatever the strategy, even though only "First available" uses it.
   required_gateway_stability = "30 minutes"
-
-  tenant_ids = [var.security_cloud_tenant_id]
 }
 
 resource "jamfplatform_security_cloud_ztna_gateway" "london" {
   name          = "London Internet Egress"
   egress_region = "Europe - UK"
-  tenant_ids    = [var.security_cloud_tenant_id]
 
   contact = {
     name  = "Network Operations"
@@ -34,15 +31,9 @@ resource "jamfplatform_security_cloud_ztna_gateway" "london" {
 resource "jamfplatform_security_cloud_ztna_gateway" "frankfurt" {
   name          = "Frankfurt Internet Egress"
   egress_region = "Europe - Germany"
-  tenant_ids    = [var.security_cloud_tenant_id]
 
   contact = {
     name  = "Network Operations"
     email = "netops@example.com"
   }
-}
-
-variable "security_cloud_tenant_id" {
-  description = "Tenant granted access to these gateways."
-  type        = string
 }

@@ -430,13 +430,11 @@ jobs:
           #
           # The environment credential reaches /securitycloud (wire-verified
           # 2026-09-03: categories and dns/zones both 200), so a dedicated
-          # credential is redundant for almost the whole lane. The exception is
-          # the ZTNA gateway family: its creates require tenantIds, which is
-          # FIXTURE DATA rather than a scope header — the list of tenants a
-          # gateway grants access to — and no API exposes an environment's
-          # tenants, so an environment-scoped run cannot supply one and those
-          # tests skip. Wiring these switches the securitycloud lane to that
-          # tenant, which is also the only way to restore that coverage.
+          # credential is redundant for the whole lane: the ZTNA gateway family,
+          # whose creates require tenantIds, lets the provider default it from
+          # the environment's UEM Connect integration. Wiring these switches the
+          # securitycloud lane to tenant scope, which is worth doing only to
+          # cover the ScopeTenant path itself.
           # JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_ID: ${{ secrets.JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_ID }}
           # JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_BASE_URL: ${{ secrets.JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_BASE_URL }}
           # JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_CLIENT_ID: ${{ secrets.JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_CLIENT_ID }}

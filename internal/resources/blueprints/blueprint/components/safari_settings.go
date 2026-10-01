@@ -30,7 +30,7 @@ type SafariSettingsComponent struct {
 
 // GetIdentifier returns the component identifier for Safari settings.
 func (c *SafariSettingsComponent) GetIdentifier() string {
-	return "com.jamf.ddm.safari-settings"
+	return blueprints.SafariSettingsComponentIdentifierComJamfDdmSafariSettings
 }
 
 // SafariSettingsComponentSchema returns the Terraform schema for Safari settings component.

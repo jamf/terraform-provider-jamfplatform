@@ -7,9 +7,11 @@ package testhelpers
 
 import (
 	"context"
+	"regexp"
 	"sync"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
@@ -127,29 +129,6 @@ func RequireSecurityCloudSharedGatewayIDs(t *testing.T, count int) []string {
 	return ids
 }
 
-// RequireSecurityCloudTenantID returns the tenant ID a Security Cloud gateway must
-// be granted access to.
-//
-// `tenantIds` is required on every gateway and grouped gateway, and Jamf Security
-// Cloud validates each entry against the caller's organization: an ID outside it
-// is refused with `400 BAD_REQUEST` ("No mapping found for one of the supplied
-// ids"). So the value cannot be invented — it has to be the tenant the provider is
-// scoped to, which AccPreCheckSecurityCloud has already established the operator
-// declared.
-//
-// Under an environment-scoped integration there is no single tenant ID to use, and
-// nothing readable to derive one from, so the test skips. That is the honest
-// outcome rather than guessing: a gateway test that cannot name a tenant has
-// nothing to assert.
-func RequireSecurityCloudTenantID(t *testing.T) string {
-	t.Helper()
-	tenantID := AccEnv("JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_ID")
-	if tenantID == "" {
-		t.Skip("Skipping: JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_ID must name the tenant a ZTNA gateway grants access to; an environment-scoped run has no single tenant ID to use")
-	}
-	return tenantID
-}
-
 // contentCategoriesOnce caches the content-category read so the acceptance suite
 // hits the endpoint at most once per run.
 var contentCategoriesOnce sync.Once
@@ -232,4 +211,35 @@ func RequireSecurityCloudPredefinedApps(t *testing.T) []securitycloud.Predefined
 		t.Skip("Skipping: tenant exposes no Jamf Security Cloud predefined ZTNA apps")
 	}
 	return predefinedApps
+}
+
+// noDedicatedIPsEntitlement matches the diagnostic the ztna_gateway resource raises when the
+// plan has no dedicated IP allotment, "Dedicated internet gateways are not in your plan". It keys
+// on the summary, which Terraform prints unwrapped; the \s+ allows for the line breaks Terraform
+// puts in a diagnostic's detail at about 80 columns all the same.
+var noDedicatedIPsEntitlement = regexp.MustCompile(`Dedicated\s+internet\s+gateways\s+are\s+not\s+in\s+your\s+plan`)
+
+// SkipWithoutDedicatedIPs is a TestCase ErrorCheck for tests that create a dedicated internet
+// gateway. It skips the test when the account holds no dedicated IP addresses at all, and passes
+// every other error through.
+//
+// A dedicated internet gateway takes a pair of addresses from a paid allotment, and an account
+// without one answers every create with `409 DEDICATED_IPS_LIMIT` "(0 of 0)" (observed on the EU
+// acceptance environment, 2026-09-30). No API grants the allotment, so a test cannot provision it
+// as a fixture, and like NOT_ENTITLED the refusal states a fact about the account rather than a
+// fault in the provider. The admin UI answers the same tenant "Dedicated internet gateway is not
+// included in your plan". The skip is deliberately narrowed to a zero allotment: a spent one, such
+// as "(2 of 2)", raises the provider's other DEDICATED_IPS_LIMIT diagnostic, can mean earlier runs
+// leaked gateways, and has to fail.
+//
+// The framework does not consult ErrorCheck on a step that sets ExpectError, so a test whose
+// refused step needs an internet gateway must create it in an earlier step.
+func SkipWithoutDedicatedIPs(t *testing.T) resource.ErrorCheckFunc {
+	t.Helper()
+	return func(err error) error {
+		if err != nil && noDedicatedIPsEntitlement.MatchString(err.Error()) {
+			t.Skipf("Skipping: this Jamf Security Cloud account has no dedicated IP addresses, which a dedicated internet gateway needs: %v", err)
+		}
+		return err
+	}
 }

@@ -227,7 +227,6 @@ yours to create:
 resource "jamfplatform_security_cloud_ztna_gateway" "frankfurt" {
   name          = "Frankfurt DC"
   egress_region = "Europe - Germany"
-  tenant_ids    = [var.security_cloud_tenant_id]
 
   contact = {
     name  = "Network Operations"
@@ -426,9 +425,9 @@ so this is scriptable if you have a backlog.
 `jamfplatform_pro_tenant_id` reaches the Jamf Pro namespace, so it works under a platform
 environment, resolving the Jamf Pro tenant in that environment, and under tenant scope pointed at
 the Jamf Pro tenant. It does **not** work under tenant scope pointed at the Security Cloud tenant,
-where Jamf Pro does not answer. Supply the identifier as an input there. This is not the same
-identifier as a gateway's `tenant_ids`, which names Security Cloud tenants and has no data source
-to read.
+where Jamf Pro does not answer. Supply the identifier as an input there. It is not the ID a
+gateway's `tenant_ids` wants, which names Security Cloud tenants. Leave `tenant_ids` unset and the
+provider reads your Security Cloud tenant ID from this integration.
 
 Jamf Security Cloud checks neither side of a mapping, so a wrong group number is accepted and simply never
 matches. **The group configuration is replaced wholesale on every apply, so there is no way to leave

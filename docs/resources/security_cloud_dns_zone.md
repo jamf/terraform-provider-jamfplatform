@@ -93,17 +93,11 @@ resource "jamfplatform_security_cloud_dns_zone" "private" {
 resource "jamfplatform_security_cloud_ztna_gateway" "private_apps" {
   name          = "Private Apps Egress"
   egress_region = "Europe - UK"
-  tenant_ids    = [var.security_cloud_tenant_id]
 
   contact = {
     name  = "Network Operations"
     email = "netops@example.com"
   }
-}
-
-variable "security_cloud_tenant_id" {
-  description = "Tenant granted access to the gateway."
-  type        = string
 }
 ```
 

@@ -189,6 +189,8 @@ func TestSortedMapKeys(t *testing.T) {
 // diagnostic, and it is reachable by reading the data source on a tenant that has
 // no integration yet.
 func TestAppendMissingIntegrationDiagnostics(t *testing.T) {
+	jamfPro := securitycloud.ConnectorConfig{ID: "abc", Vendor: securitycloud.ConnectorConfigVendorJamfPro}
+	wizy := securitycloud.ConnectorConfig{ID: "wzy", Vendor: securitycloud.ConnectorConfigVendorWizy}
 	tests := []struct {
 		name    string
 		page    *securitycloud.ConnectorPage
@@ -197,17 +199,32 @@ func TestAppendMissingIntegrationDiagnostics(t *testing.T) {
 		{"nil page", nil, true},
 		{"empty results", &securitycloud.ConnectorPage{Results: []securitycloud.ConnectorConfig{}}, true},
 		{"nil results slice", &securitycloud.ConnectorPage{}, true},
-		{"one integration", &securitycloud.ConnectorPage{Results: []securitycloud.ConnectorConfig{{ID: "abc"}}}, false},
+		{"one integration", &securitycloud.ConnectorPage{Results: []securitycloud.ConnectorConfig{jamfPro}}, false},
+		{"only a Wizy connector", &securitycloud.ConnectorPage{Results: []securitycloud.ConnectorConfig{wizy}}, true},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			diags := appendMissingIntegrationDiagnostics(tc.page)
+			diags := appendMissingIntegrationDiagnostics(jamfProConnectors(tc.page))
 
 			if diags.HasError() != tc.wantErr {
 				t.Fatalf("HasError() = %v, want %v (%v)", diags.HasError(), tc.wantErr, diags)
 			}
 		})
+	}
+}
+
+// TestJamfProConnectors_SkipsWizy pins the coexisting pair the spec allows, a Wizy connector
+// beside the Jamf Pro one, in the order that broke the data source: with the Wizy connector
+// listed first, `page.Results[0]` handed back a vendor the resource cannot represent.
+func TestJamfProConnectors_SkipsWizy(t *testing.T) {
+	page := &securitycloud.ConnectorPage{Results: []securitycloud.ConnectorConfig{
+		{ID: "wzy", Vendor: securitycloud.ConnectorConfigVendorWizy},
+		{ID: "abc", Vendor: securitycloud.ConnectorConfigVendorJamfPro},
+	}}
+	got := jamfProConnectors(page)
+	if len(got) != 1 || got[0].ID != "abc" {
+		t.Fatalf("jamfProConnectors = %+v, want only the Jamf Pro connector", got)
 	}
 }
 

@@ -212,12 +212,13 @@ func (d *UEMConnectDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		}
 		return
 	}
-	resp.Diagnostics.Append(appendMissingIntegrationDiagnostics(page)...)
+	connectors := jamfProConnectors(page)
+	resp.Diagnostics.Append(appendMissingIntegrationDiagnostics(connectors)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	connector := page.Results[0]
+	connector := connectors[0]
 	resp.Diagnostics.Append(assignUEMConnectDataSourceModel(ctx, &data, &connector)...)
 	if resp.Diagnostics.HasError() {
 		return
