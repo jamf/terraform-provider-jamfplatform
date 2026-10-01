@@ -509,7 +509,6 @@ resource "jamfplatform_pro_policy" "test" {
   general = {
     name                          = %q
     enabled                       = true
-    trigger                       = "EVENT"
     trigger_checkin               = true
     trigger_enrollment_complete   = true
     trigger_login                 = true
@@ -615,6 +614,11 @@ func TestAccPolicyResource_GeneralFullCoverage(t *testing.T) {
 						"jamfplatform_pro_policy.test",
 						tfjsonpath.New("general").AtMapKey("trigger_other"),
 						knownvalue.StringExact("tf-acc-event"),
+					),
+					statecheck.ExpectKnownValue(
+						"jamfplatform_pro_policy.test",
+						tfjsonpath.New("general").AtMapKey("trigger"),
+						knownvalue.StringExact("EVENT"),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",

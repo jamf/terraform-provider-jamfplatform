@@ -117,14 +117,14 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						Validators:          []validator.String{stringvalidator.LengthAtLeast(1)},
 					},
 					"enabled":                       optComputedBool("Whether the policy is enabled. Omit to leave the current value untouched; set `true`/`false` to change it."),
-					"trigger":                       optComputedString("Aggregate trigger label (`EVENT`, `USER_INITIATED`, etc.). Omit to leave the current value untouched."),
+					"trigger":                       serverProjectedString("Trigger summary that Jamf Pro derives from the `trigger_*` attributes and `self_service.use_for_self_service`. It reads `CHECKIN` when `trigger_checkin` is the only trigger (`trigger_other` counts as a trigger), `USER_INITIATED` when the policy has no trigger and appears in Self Service, and `EVENT` for any other combination. To change it, set the `trigger_*` attributes."),
 					"trigger_checkin":               optComputedBool("Fire on managed check-in. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"trigger_enrollment_complete":   optComputedBool("Fire when device enrollment completes. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"trigger_login":                 optComputedBool("Fire on user login. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"trigger_network_state_changed": optComputedBool("Fire when the device's network state changes. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"trigger_startup":               optComputedBool("Fire on device startup. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"trigger_other":                 optComputedString("Custom event name to trigger the policy. Omit to leave the current value untouched."),
-					"frequency":                     optComputedString("How often the policy runs. Valid values include `Once per computer`, `Once per user per computer`, `Once per user`, `Once every day`, `Once every week`, `Once every month`, `Ongoing`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it."),
+					"frequency":                     optComputedEnum("How often the policy runs. One of "+markdownValueList(proclassic.PolicyPostGeneralFrequencyValues())+". Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.", proclassic.PolicyPostGeneralFrequencyValues()),
 					"retry_event": schema.StringAttribute{
 						MarkdownDescription: "When to retry a failed run: `none`, `trigger` (the policy's own trigger), or `check-in`. Requires `frequency = \"Once per computer\"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
@@ -301,13 +301,13 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						},
 					},
 					"packages": schema.SetNestedAttribute{
-						MarkdownDescription: "Set of package assignments. Each item identifies the package by ID; `name` is returned by Jamf Pro. `action` is one of `Install`, `Cache`, `Install Cached`, `Uninstall`. Omit to leave any existing entries untouched; they are not cleared on update.",
+						MarkdownDescription: "Set of package assignments. Each item identifies the package by ID; `name` is returned by Jamf Pro. `action` is one of " + markdownValueList(packageActions) + ". Omit to leave any existing entries untouched; they are not cleared on update.",
 						Optional:            true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":             schema.StringAttribute{MarkdownDescription: "Package ID.", Required: true},
 								"name":           optComputedString("Package display name. Returned by Jamf Pro."),
-								"action":         optComputedString("Package action."),
+								"action":         optComputedEnum("Package action.", packageActions),
 								"fut":            optComputedBool("Fill user template at install time."),
 								"feu":            optComputedBool("Fill existing user accounts."),
 								"update_autorun": optComputedBool("Update autorun data."),
@@ -321,13 +321,13 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"scripts": schema.SetNestedAttribute{
-						MarkdownDescription: "Set of script assignments. `priority` is one of `Before`, `After`, `At Reboot`. Omit to leave any existing entries untouched; they are not cleared on update.",
+						MarkdownDescription: "Set of script assignments. `priority` is one of " + markdownValueList(proclassic.PolicyScriptsScriptItemPriorityValues()) + ". Omit to leave any existing entries untouched; they are not cleared on update.",
 						Optional:            true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":           schema.StringAttribute{MarkdownDescription: "Script ID.", Required: true},
 								"name":         optComputedString("Script display name. Returned by Jamf Pro."),
-								"priority":     optComputedString("Run order."),
+								"priority":     optComputedEnum("Run order relative to the policy's other tasks.", proclassic.PolicyScriptsScriptItemPriorityValues()),
 								"parameter_4":  optComputedString("Parameter 4 passed to the script."),
 								"parameter_5":  optComputedString("Parameter 5 passed to the script."),
 								"parameter_6":  optComputedString("Parameter 6 passed to the script."),
@@ -378,7 +378,7 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 							Attributes: map[string]schema.Attribute{
 								"id":     schema.StringAttribute{MarkdownDescription: "Dock item ID.", Required: true},
 								"name":   optComputedString("Dock item display name. Returned by Jamf Pro."),
-								"action": optComputedString("Action (`Add To Beginning`, `Add To End`, `Remove`)."),
+								"action": optComputedEnum("Dock item action. One of "+markdownValueList(proclassic.PolicyPostDockItemsDockItemItemActionValues())+".", proclassic.PolicyPostDockItemsDockItemItemActionValues()),
 							},
 						},
 					},
@@ -431,7 +431,7 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "Management account configuration (admin UI: Options ▸ Management Accounts). Omit the block to leave any existing values untouched (they are not cleared on update).",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
-					"action": optComputedString("Management account action (e.g. `doNotChange`, `rotate`). Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it."),
+					"action": optComputedEnum("Management account action. One of "+markdownValueList(proclassic.PolicyAccountMaintenanceManagementAccountActionValues())+". Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.", proclassic.PolicyAccountMaintenanceManagementAccountActionValues()),
 					"managed_password": schema.StringAttribute{
 						MarkdownDescription: "Plaintext managed password. `WriteOnly`: sent to Jamf Pro on writes, **never persisted in Terraform state**. Pair with `managed_password_wo_version` to rotate the stored password.",
 						Optional:            true,
@@ -494,10 +494,10 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 							stringvalidator.OneOf("", "Standard Restart", "MDM Restart with Kernel Cache Rebuild"),
 						},
 					},
-					"no_user_logged_in":              optComputedString("Action when no user is logged in. Omit to leave the current value untouched."),
-					"user_logged_in":                 optComputedString("Action when a user is logged in. Omit to leave the current value untouched."),
-					"delay_minutes":                  optComputedInt("Minutes to wait before forcing reboot. Mirrors the admin UI \"Delay\" input. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it."),
-					"start_reboot_timer_immediately": optComputedBool("Start the reboot countdown immediately. Omit to leave the current value untouched; set `true`/`false` to change it."),
+					"no_user_logged_in":              optComputedEnum("Action when no user is logged in. Mirrors the admin UI \"No User Logged In Action\" menu. One of "+markdownValueList(noUserLoggedInRestartActions)+". Omit to leave the current value untouched.", noUserLoggedInRestartActions),
+					"user_logged_in":                 optComputedEnum("Action when a user is logged in. Mirrors the admin UI \"User Logged In Action\" menu. One of "+markdownValueList(userLoggedInRestartActions)+". Omit to leave the current value untouched.", userLoggedInRestartActions),
+					"delay_minutes":                  optComputedInt("Minutes to wait before forcing reboot. Mirrors the admin UI \"Delay\" input. The admin UI hides that input while `user_logged_in` is `Do not restart` or `Restart immediately`, but Jamf Pro keeps the value you set. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it."),
+					"start_reboot_timer_immediately": optComputedBool("Start the reboot countdown without waiting for the user to acknowledge the restart message. Mirrors the admin UI \"Start the restart timer immediately\" checkbox. The admin UI hides that checkbox while `user_logged_in` is `Do not restart` or `Restart immediately`, but Jamf Pro keeps the value you set. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"file_vault_2_reboot":            optComputedBool("Trigger a FileVault 2 reboot. Omit to leave the current value untouched; set `true`/`false` to change it."),
 				},
 			},
@@ -574,10 +574,10 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "Disk encryption configuration to apply. Omit the block to leave any existing values untouched (they are not cleared on update).",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
-					"action":                           optComputedString("Disk encryption action (`apply`, `remediate`, `none`). Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it."),
+					"action":                           optComputedEnum("Disk encryption action. One of "+markdownValueList(diskEncryptionActions)+"; `none` turns the payload off. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.", diskEncryptionActions),
 					"disk_encryption_configuration_id": optComputedInt("Disk encryption configuration ID to apply. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it."),
 					"auth_restart":                     optComputedBool("Use authenticated restart. Omit to leave the current value untouched; set `true`/`false` to change it."),
-					"remediate_key_type":               optComputedString("Key type for remediation (`Individual`, `Institutional`, `Individual And Institutional`). Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it."),
+					"remediate_key_type":               optComputedEnum("Key type for remediation. One of "+markdownValueList(proclassic.PolicyPostDiskEncryptionRemediateKeyTypeValues())+". Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.", proclassic.PolicyPostDiskEncryptionRemediateKeyTypeValues()),
 					"remediate_disk_encryption_configuration_id": optComputedInt("Disk encryption configuration ID used to remediate. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it."),
 				},
 			},
@@ -749,6 +749,23 @@ func optComputedString(desc string) schema.StringAttribute {
 		Computed:            true,
 		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 	}
+}
+
+// optComputedEnum is optComputedString restricted to a closed vocabulary.
+//
+// Every caller's field is one Jamf Pro answers a 201 for whatever is sent:
+// frequency and management_account.action silently keep or coerce an unknown
+// value, packages[].action and scripts[].priority store it verbatim, and
+// disk_encryption.action stores it as "none", and the two restart_options
+// actions keep the previous value — wire-probed 2026-10-01 on
+// Jamf Pro 11.32. Matching is case-sensitive because the server's is not
+// consistently so: frequency folds "ongoing" to "Ongoing", which would be a
+// perpetual diff, while management_account.action turns "Rotate" into
+// "doNotChange".
+func optComputedEnum(desc string, values []string) schema.StringAttribute {
+	a := optComputedString(desc)
+	a.Validators = []validator.String{stringvalidator.OneOf(values...)}
+	return a
 }
 
 // optComputedBool is the bool sibling of optComputedString. Uses

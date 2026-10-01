@@ -215,7 +215,7 @@ Optional:
 - `category_id` (String) Jamf Pro category ID. Use `-1` to clear. Omit to leave the current value untouched.
 - `date_time_limitations` (Attributes) Optional schedule limitations for when the policy may run. Only the user-authored date/time inputs are surfaced. The derived epoch and UTC siblings Jamf Pro also stores are deterministic transforms of `activation_date` / `expiration_date`, reproducible client-side with Terraform stdlib functions such as `formatdate`. (see [below for nested schema](#nestedatt--general--date_time_limitations))
 - `enabled` (Boolean) Whether the policy is enabled. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `frequency` (String) How often the policy runs. Valid values include `Once per computer`, `Once per user per computer`, `Once per user`, `Once every day`, `Once every week`, `Once every month`, `Ongoing`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
+- `frequency` (String) How often the policy runs. One of `Once per computer`, `Once per user per computer`, `Once per user`, `Once every day`, `Once every week`, `Once every month`, `Ongoing`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `limit_to_jamf_pro_assigned_user` (Boolean) Restrict the policy to the Jamf Pro-assigned user only. Mirrors Options > General > Client-Side Limitations > Limit to Jamf Pro-assigned user. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `network_limitations` (Attributes) Read-only view of the network conditions under which the policy may run. Jamf Pro derives all three attributes from `general.network_requirements` and `scope.limitations.network_segment_ids`. Declare the block as `{}` to read the derived values into state. (see [below for nested schema](#nestedatt--general--network_limitations))
 - `network_requirements` (String) Network connection the policy requires. `Any` places no requirement; `Ethernet` restricts the policy to a wired connection. Shown in the admin UI as Options ▸ General ▸ Client-Side Limitations ▸ Network Requirements. Also drives the read-only `network_limitations.minimum_network_connection`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
@@ -226,7 +226,6 @@ Optional:
 - `retry_event` (String) When to retry a failed run: `none`, `trigger` (the policy's own trigger), or `check-in`. Requires `frequency = "Once per computer"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `site_id` (String) Jamf Pro site ID scoping the policy. Use `-1` for "no site". Omit to leave the current value untouched.
 - `target_drive` (String) Drive target (e.g. `/`). Omit to leave the current value untouched.
-- `trigger` (String) Aggregate trigger label (`EVENT`, `USER_INITIATED`, etc.). Omit to leave the current value untouched.
 - `trigger_checkin` (Boolean) Fire on managed check-in. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `trigger_enrollment_complete` (Boolean) Fire when device enrollment completes. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `trigger_login` (Boolean) Fire on user login. Omit to leave the current value untouched; set `true`/`false` to change it.
@@ -239,6 +238,7 @@ Read-Only:
 - `category_name` (String) Category display name. Returned by Jamf Pro; not user-settable.
 - `id` (String) Policy ID under `general`. Matches the top-level `id`. Returned by Jamf Pro.
 - `site_name` (String) Site display name. Returned by Jamf Pro; not user-settable.
+- `trigger` (String) Trigger summary that Jamf Pro derives from the `trigger_*` attributes and `self_service.use_for_self_service`. It reads `CHECKIN` when `trigger_checkin` is the only trigger (`trigger_other` counts as a trigger), `USER_INITIATED` when the policy has no trigger and appears in Self Service, and `EVENT` for any other combination. To change it, set the `trigger_*` attributes.
 
 <a id="nestedatt--general--date_time_limitations"></a>
 ### Nested Schema for `general.date_time_limitations`
@@ -291,11 +291,11 @@ Optional:
 
 Optional:
 
-- `action` (String) Disk encryption action (`apply`, `remediate`, `none`). Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
+- `action` (String) Disk encryption action. One of `apply`, `remediate`, `none`; `none` turns the payload off. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `auth_restart` (Boolean) Use authenticated restart. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `disk_encryption_configuration_id` (Number) Disk encryption configuration ID to apply. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
 - `remediate_disk_encryption_configuration_id` (Number) Disk encryption configuration ID used to remediate. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
-- `remediate_key_type` (String) Key type for remediation (`Individual`, `Institutional`, `Individual And Institutional`). Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
+- `remediate_key_type` (String) Key type for remediation. One of `Individual`, `Institutional`, `Individual And Institutional`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 
 
 <a id="nestedatt--dock_items"></a>
@@ -314,7 +314,7 @@ Required:
 
 Optional:
 
-- `action` (String) Action (`Add To Beginning`, `Add To End`, `Remove`).
+- `action` (String) Dock item action. One of `Add To Beginning`, `Add To End`, `Remove`.
 - `name` (String) Dock item display name. Returned by Jamf Pro.
 
 
@@ -384,7 +384,7 @@ Optional:
 
 Optional:
 
-- `action` (String) Management account action (e.g. `doNotChange`, `rotate`). Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
+- `action` (String) Management account action. One of `rotate`, `doNotChange`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `managed_password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Plaintext managed password. `WriteOnly`: sent to Jamf Pro on writes, **never persisted in Terraform state**. Pair with `managed_password_wo_version` to rotate the stored password.
 - `managed_password_wo_version` (Number) Rotation trigger for the `WriteOnly` `managed_password`. Bump this integer (any change) to force a new apply that re-sends `managed_password` to Jamf Pro. Set `managed_password_wo_version = 1` on create. Leaving it unset or unchanged signals "leave the stored password alone": the provider omits the password from the next update, so Jamf Pro retains the existing value.
 
@@ -441,14 +441,14 @@ Optional:
 
 Optional:
 
-- `delay_minutes` (Number) Minutes to wait before forcing reboot. Mirrors the admin UI "Delay" input. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
+- `delay_minutes` (Number) Minutes to wait before forcing reboot. Mirrors the admin UI "Delay" input. The admin UI hides that input while `user_logged_in` is `Do not restart` or `Restart immediately`, but Jamf Pro keeps the value you set. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
 - `file_vault_2_reboot` (Boolean) Trigger a FileVault 2 reboot. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `message` (String) Reboot prompt message. Omit to leave the current value untouched.
-- `no_user_logged_in` (String) Action when no user is logged in. Omit to leave the current value untouched.
+- `no_user_logged_in` (String) Action when no user is logged in. Mirrors the admin UI "No User Logged In Action" menu. One of `Do not restart`, `Restart immediately`, `Restart if a package or update requires it`. Omit to leave the current value untouched.
 - `specify_startup` (String) Reboot-method discriminator. Empty string is the default: a standard reboot with no explicit method. `Standard Restart` matches the admin UI radio option. `MDM Restart with Kernel Cache Rebuild` issues an MDM-driven restart that rebuilds the kernel cache. The admin UI surfaces a separate "KEXT PATH" text input alongside the radio, but Jamf Pro does not echo that value back, so it is not exposed here. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
-- `start_reboot_timer_immediately` (Boolean) Start the reboot countdown immediately. Omit to leave the current value untouched; set `true`/`false` to change it.
+- `start_reboot_timer_immediately` (Boolean) Start the reboot countdown without waiting for the user to acknowledge the restart message. Mirrors the admin UI "Start the restart timer immediately" checkbox. The admin UI hides that checkbox while `user_logged_in` is `Do not restart` or `Restart immediately`, but Jamf Pro keeps the value you set. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `startup_disk` (String) Startup disk label. Omit to leave the current value untouched.
-- `user_logged_in` (String) Action when a user is logged in. Omit to leave the current value untouched.
+- `user_logged_in` (String) Action when a user is logged in. Mirrors the admin UI "User Logged In Action" menu. One of `Do not restart`, `Restart`, `Restart if a package or update requires it`, `Restart immediately`. Omit to leave the current value untouched.
 
 
 <a id="nestedatt--scope"></a>
@@ -509,7 +509,7 @@ Optional:
 
 Optional:
 
-- `scripts` (Attributes Set) Set of script assignments. `priority` is one of `Before`, `After`, `At Reboot`. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--scripts--scripts))
+- `scripts` (Attributes Set) Set of script assignments. `priority` is one of `Before`, `After`. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--scripts--scripts))
 
 <a id="nestedatt--scripts--scripts"></a>
 ### Nested Schema for `scripts.scripts`
@@ -529,7 +529,7 @@ Optional:
 - `parameter_7` (String) Parameter 7 passed to the script.
 - `parameter_8` (String) Parameter 8 passed to the script.
 - `parameter_9` (String) Parameter 9 passed to the script.
-- `priority` (String) Run order.
+- `priority` (String) Run order relative to the policy's other tasks.
 
 
 

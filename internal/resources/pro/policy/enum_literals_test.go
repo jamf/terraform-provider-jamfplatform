@@ -14,7 +14,7 @@ import (
 // TestEnumLiteralsComeFromTheSDK pins STYLE_GUIDE.md §"Enum values and error
 // codes come from the SDK, not from literals" for this package.
 //
-// Two vocabularies the audit flagged here stay literals and are worth naming,
+// Three vocabularies the audit flagged here stay literals and are worth naming,
 // because both look like they have a constant and do not:
 //
 //   - self_service.notification_location ("Self Service", "Self Service and
@@ -23,8 +23,11 @@ import (
 //     field as a plain string.
 //   - deferral_type ("none", "date", "duration") is a provider-side
 //     discriminator over three wire fields, not a wire enum at all.
+//   - restart_options.no_user_logged_in / user_logged_in ("Do not restart",
+//     "Restart", …) are modelled by the classic spec as plain strings, so the
+//     SDK generates nothing for them; the values come from the admin UI.
 //
-// Neither appears in Covered, so neither needs an exemption — they are listed
+// None appears in Covered, so none needs an exemption — they are listed
 // here so a reader does not have to re-derive why.
 func TestEnumLiteralsComeFromTheSDK(t *testing.T) {
 	got, err := enumguard.Check(enumguard.Params{
@@ -33,7 +36,18 @@ func TestEnumLiteralsComeFromTheSDK(t *testing.T) {
 			proclassic.PolicyAccountMaintenanceAccountsAccountItemActionValues(),
 			proclassic.PolicyPrintersPrinterItemActionValues(),
 			proclassic.PolicyGeneralNetworkRequirementsValues(),
+			proclassic.PolicyPostGeneralFrequencyValues(),
+			proclassic.PolicyPackageConfigurationPackagesPackageItemActionValues(),
+			proclassic.PolicyScriptsScriptItemPriorityValues(),
+			proclassic.PolicyPostDockItemsDockItemItemActionValues(),
+			proclassic.PolicyAccountMaintenanceManagementAccountActionValues(),
+			proclassic.PolicyPostDiskEncryptionActionValues(),
+			proclassic.PolicyPostDiskEncryptionRemediateKeyTypeValues(),
 		),
+		Absent: map[string]string{
+			"Uninstall": "packages[].action: a documented Packages payload action; absent from the classic spec",
+			"none":      "disk_encryption.action: what a fresh policy reads back and the only value that turns the payload off; absent from the classic spec",
+		},
 	})
 	if err != nil {
 		t.Fatalf("enumguard.Check: %v", err)
