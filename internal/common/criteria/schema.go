@@ -11,6 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
+
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 )
 
 // CriterionAttributes returns the resource-schema attribute map for a single
@@ -47,6 +49,9 @@ func CriterionAttributes(operators []string) map[string]schema.Attribute {
 		"name": schema.StringAttribute{
 			MarkdownDescription: "Inventory attribute to evaluate (the criterion field name, e.g. `Username`, `Serial Number`, `Last Inventory Update`).",
 			Required:            true,
+			Validators: []validator.String{
+				commonvalidators.NotEmptyString("Jamf Pro refuses a criterion with an empty name. Set name to the inventory attribute to evaluate."),
+			},
 		},
 		"search_type": schema.StringAttribute{
 			MarkdownDescription: Description(operators),

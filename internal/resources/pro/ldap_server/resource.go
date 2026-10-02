@@ -152,7 +152,7 @@ func (r *LdapServerResource) Schema(ctx context.Context, req resource.SchemaRequ
 							"room":                    optString("**\"Room\"** mapping."),
 							"phone":                   optString("**\"Phone\"** mapping."),
 							"position":                optString("**\"Position\"** mapping."),
-							"user_uuid":               optString("**\"User UUID\"** mapping (e.g. `objectGUID`)."),
+							"user_uuid":               notEmpty(optString("**\"User UUID\"** mapping (e.g. `objectGUID`)."), "Jamf Pro stores `objectGUID` in place of an empty value. Omit user_uuid to accept that default, or set an attribute name."),
 						},
 					},
 					"user_group_mappings": schema.SingleNestedAttribute{
@@ -165,7 +165,7 @@ func (r *LdapServerResource) Schema(ctx context.Context, req resource.SchemaRequ
 							"search_scope":            optStringOneOf("**\"Search Scope\"** in the Jamf Pro admin UI. `All Subtrees` or `First Level Only`.", allSearchScopes),
 							"group_id":                optString("**\"Group ID\"** mapping."),
 							"group_name":              optString("**\"Group Name\"** mapping (e.g. `sAMAccountName`)."),
-							"group_uuid":              optString("**\"Group UUID\"** mapping (e.g. `objectGUID`)."),
+							"group_uuid":              notEmpty(optString("**\"Group UUID\"** mapping (e.g. `objectGUID`)."), "Jamf Pro stores `objectGUID` in place of an empty value. Omit group_uuid to accept that default, or set an attribute name."),
 						},
 					},
 					"user_group_membership_mappings": schema.SingleNestedAttribute{

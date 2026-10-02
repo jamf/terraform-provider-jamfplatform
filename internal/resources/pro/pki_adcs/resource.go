@@ -32,6 +32,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -172,6 +173,9 @@ func (r *AdcsResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+				Validators: []validator.String{
+					commonvalidators.NotEmptyString("Jamf Pro refuses an empty API client ID. Set the client_id of an existing Jamf Pro API client."),
 				},
 			},
 			"server_certificate": schema.SingleNestedAttribute{

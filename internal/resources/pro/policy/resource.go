@@ -30,6 +30,7 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -404,7 +405,15 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 								stringvalidator.OneOf(proclassic.PolicyAccountMaintenanceAccountsAccountItemActionValues()...),
 							},
 						},
-						"username": optComputedString("Account username."),
+						"username": schema.StringAttribute{
+							MarkdownDescription: "Account username.",
+							Optional:            true,
+							Computed:            true,
+							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+							Validators: []validator.String{
+								commonvalidators.NotEmptyString("Jamf Pro refuses a local account entry with an empty username. Set the account's username."),
+							},
+						},
 						"realname": optComputedString("Account real (full) name."),
 						"password": schema.StringAttribute{
 							MarkdownDescription: "Plaintext password used by `Create` and `Reset` actions. `WriteOnly`: sent to Jamf Pro on writes, **never persisted in Terraform state**. Pair with `password_wo_version` to rotate the stored password. `local_accounts` is a List, so bumping `password_wo_version` surfaces in `terraform plan` as an in-place change to the list element at the matching index. Jamf Pro matches accounts by `username`.",

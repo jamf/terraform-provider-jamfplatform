@@ -27,8 +27,11 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
@@ -1049,6 +1052,55 @@ func TestAccResource_ProMobileApp_OmittedBlocksRetained(t *testing.T) {
 					resource.TestCheckNoResourceAttr(mobileAppResourceAddr, "self_service.install_button_text"),
 					mobileAppRetainedOnServer(t),
 				),
+			},
+		},
+	})
+}
+
+// TestAccResource_ProMobileApp_EmptyPreferencesRoundTrip pins that
+// app_configuration.preferences = "" applies cleanly and stays "" in state,
+// both on create and after a step that set a value.
+func TestAccResource_ProMobileApp_EmptyPreferencesRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-pro-mobileapp-emptyprefs-" + testhelpers.RunSuffix()
+
+	cfg := func(prefs string) string {
+		return fmt.Sprintf(`
+			resource "jamfplatform_pro_mobile_device_app" "test" {
+				general = {
+					name      = %q
+					version   = "1.0"
+					bundle_id = "com.example.tfacc.mobileapp.emptyprefs"
+					os_type   = "iOS"
+				}
+				app_configuration = {
+					preferences = %q
+				}
+			}
+		`, name, prefs)
+	}
+
+	const lf = "<dict>\n  <key>Server</key>\n  <string>https://example.com</string>\n</dict>"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMobileAppDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg(""),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(mobileAppResourceAddr, tfjsonpath.New("app_configuration").AtMapKey("preferences"), knownvalue.StringExact("")),
+				},
+			},
+			{
+				Config: cfg(lf),
+				Check:  resource.TestCheckResourceAttr(mobileAppResourceAddr, "app_configuration.preferences", lf),
+			},
+			{
+				Config: cfg(""),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(mobileAppResourceAddr, tfjsonpath.New("app_configuration").AtMapKey("preferences"), knownvalue.StringExact("")),
+				},
 			},
 		},
 	})

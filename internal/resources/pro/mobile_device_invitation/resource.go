@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -224,6 +225,9 @@ func (r *MobileDeviceInvitationResource) Schema(ctx context.Context, req resourc
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					commonvalidators.NotEmptyString("Jamf Pro stores `iOS 4` in place of an empty value. Omit target_ios to accept that default, or set a version."),
 				},
 			},
 			"last_action": schema.StringAttribute{

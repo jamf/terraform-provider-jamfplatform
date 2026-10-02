@@ -26,6 +26,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -100,6 +101,9 @@ func (r *AdvancedMobileDeviceSearchResource) Schema(ctx context.Context, req res
 				Optional:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString(noSiteID),
+				Validators: []validator.String{
+					commonvalidators.NotEmptyString("Jamf Pro refuses an empty site ID. Omit site_id to leave the search unscoped, or set a site ID."),
+				},
 			},
 			"criteria": schema.ListNestedAttribute{
 				MarkdownDescription: "Ordered list of criteria Jamf Pro evaluates to populate the search. Order matters: Jamf Pro reads left to right, applying the supplied `and_or` joins and parentheses. Omitting the attribute leaves any existing criteria untouched; they are not cleared on an unrelated update. Set it to `[]` to remove all criteria.",

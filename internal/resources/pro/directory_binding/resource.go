@@ -25,6 +25,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -178,7 +179,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"require_confirmation":       optBool("**\"Require confirmation\"** in the Jamf Pro admin UI. Require admin confirmation when binding new computers to the directory."),
-					"home_location":              optString("**\"Home Location\"** in the Jamf Pro admin UI. Where to create the user's home folder (e.g. `\"Local\"`). Free text."),
+					"home_location":              notEmpty(optString("**\"Home Location\"** in the Jamf Pro admin UI. Where to create the user's home folder (e.g. `\"Local\"`). Free text."), "Jamf Pro stores `Network` in place of an empty value. Omit home_location to accept that default, or set a location."),
 					"network_protocol":           networkProtocolAttribute(),
 					"default_shell":              optString("**\"Default User Shell\"** in the Jamf Pro admin UI."),
 					"mount_network_home":         optBool("**\"Mount network home as sharepoint\"** in the Jamf Pro admin UI."),
@@ -316,4 +317,11 @@ func optBool(desc string) schema.BoolAttribute {
 			boolplanmodifier.UseStateForUnknown(),
 		},
 	}
+}
+
+// notEmpty adds validators.NotEmptyString to a, for an attribute Jamf Pro does
+// not store as "" (wire-probed 2026-10-01, #445).
+func notEmpty(a schema.StringAttribute, detail string) schema.StringAttribute {
+	a.Validators = append(a.Validators, commonvalidators.NotEmptyString(detail))
+	return a
 }

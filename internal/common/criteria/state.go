@@ -133,6 +133,9 @@ func BuildCriterionSlice(models []CriterionModel) []proclassic.Criterion {
 // is authoritative for every field, so values are copied directly (no Reconcile
 // helpers — those return null when the API value is empty and prior state was
 // null, which diverges between the import path and the post-apply refresh path).
+// value is Required, so an empty <value/> reads as "" rather than null: a
+// criterion compared against "" round-trips instead of failing the post-apply
+// consistency check.
 // Returns nil for an empty or absent slice (a null list in state).
 func FlattenCriterionSlice(src *[]proclassic.Criterion) []CriterionModel {
 	if src == nil || len(*src) == 0 {
@@ -149,7 +152,7 @@ func FlattenCriterionSlice(src *[]proclassic.Criterion) []CriterionModel {
 			Priority:              priority,
 			Name:                  helpers.StringPointerValueOrNull(c.Name),
 			SearchType:            helpers.StringPointerValueOrNull(c.SearchType),
-			Value:                 helpers.StringPointerValueOrNull(c.Value),
+			Value:                 helpers.StringPointerValueOrEmpty(c.Value),
 			AndOr:                 helpers.StringPointerValueOrNull(c.AndOr),
 			HasOpeningParenthesis: helpers.BoolPointerValueOrNull(c.OpeningParen),
 			HasClosingParenthesis: helpers.BoolPointerValueOrNull(c.ClosingParen),

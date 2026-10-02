@@ -144,3 +144,68 @@ func TestAssignSigningCertificateState_NeverHydratesAnUnauthoredBlock(t *testing
 		t.Fatalf("signing_certificate must stay nil for an unauthored block; hydrating it defeats the delete guard in applyCertificateOnUpdate. Got %+v", state.SigningCertificate)
 	}
 }
+
+// TestAssignEnrollmentSsoConfigModel_ManagementHintEmptyString pins #445:
+// Jamf Pro echoes an unset management hint as "", so an authored "" must
+// survive the read while an unset hint, or one with no prior block, stays null.
+func TestAssignEnrollmentSsoConfigModel_ManagementHintEmptyString(t *testing.T) {
+	wire := &pro.EnrollmentSsoConfig{ManagementHint: new(""), Hosts: &[]string{"idp.example.com"}}
+	for name, tc := range map[string]struct {
+		prev     *enrollmentSsoConfigModel
+		wantNull bool
+	}{
+		"authored empty": {prev: &enrollmentSsoConfigModel{ManagementHint: types.StringValue("")}, wantNull: false},
+		"unset":          {prev: &enrollmentSsoConfigModel{ManagementHint: types.StringNull()}, wantNull: true},
+		"no prior block": {prev: nil, wantNull: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, d := assignEnrollmentSsoConfigModel(context.Background(), wire, tc.prev)
+			if d.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", d)
+			}
+			if got.ManagementHint.IsNull() != tc.wantNull || got.ManagementHint.ValueString() != "" {
+				t.Errorf("management_hint = %s, want null=%t", got.ManagementHint, tc.wantNull)
+			}
+		})
+	}
+}
+
+// TestAssignSigningCertificateState_GeneratedEmptyKeystoreFileName pins #445 on
+// the certificate block: a generated certificate reports its keystore file name
+// as "", so an authored "" must survive the read, an unset one stays null, and
+// the alias Jamf Pro assigns still replaces an unknown key.
+func TestAssignSigningCertificateState_GeneratedEmptyKeystoreFileName(t *testing.T) {
+	cert := &pro.SsoKeystoreResponseWithDetails{
+		Keystore: &pro.SsoKeystoreResponse{
+			Key:               "saml",
+			KeystoreFileName:  "",
+			KeystoreSetupType: "GENERATED",
+			Type:              "PKCS12",
+		},
+	}
+	for name, tc := range map[string]struct {
+		incoming types.String
+		wantNull bool
+	}{
+		"authored empty": {incoming: types.StringValue(""), wantNull: false},
+		"unset":          {incoming: types.StringUnknown(), wantNull: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			state := &SsoSettingsResourceModel{SigningCertificate: &signingCertificateModel{
+				SetupType:        types.StringValue("GENERATED"),
+				Key:              types.StringUnknown(),
+				KeystoreFileName: tc.incoming,
+			}}
+			if d := assignSigningCertificateState(context.Background(), state, cert); d.HasError() {
+				t.Fatalf("diagnostics: %v", d)
+			}
+			got := state.SigningCertificate
+			if got.KeystoreFileName.IsNull() != tc.wantNull || got.KeystoreFileName.ValueString() != "" {
+				t.Errorf("keystore_file_name = %s, want null=%t", got.KeystoreFileName, tc.wantNull)
+			}
+			if got.Key.ValueString() != "saml" {
+				t.Errorf("key = %s, want the server-assigned alias", got.Key)
+			}
+		})
+	}
+}

@@ -18,8 +18,11 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
@@ -195,6 +198,42 @@ func TestAccResource_ProMobileDeviceInvitation_Unlimited(t *testing.T) {
 					resource.TestCheckResourceAttr(mobileDeviceInvitationResourceAddress, "expiration_date", "Unlimited"),
 					resource.TestCheckResourceAttr(mobileDeviceInvitationResourceAddress, "expiration_date_utc", "Unlimited"),
 				),
+			},
+		},
+	})
+}
+
+// TestAccResource_ProMobileDeviceInvitation_EmptyStringFieldsRoundTrip pins
+// that an authored "" on each email field and username survives the read.
+// Jamf Pro echoes each as an empty element, and reading that back as null
+// failed the post-apply consistency check. target_ios is left out: the server
+// replaces "" with its "iOS 4" default.
+func TestAccResource_ProMobileDeviceInvitation_EmptyStringFieldsRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	checks := make([]statecheck.StateCheck, 0, 6)
+	for _, attr := range []string{"subject", "message", "reply_to", "sent_from", "sent_to", "username"} {
+		checks = append(checks, statecheck.ExpectKnownValue(mobileDeviceInvitationResourceAddress, tfjsonpath.New(attr), knownvalue.StringExact("")))
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMobileDeviceInvitationDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: `
+					resource "jamfplatform_pro_mobile_device_invitation" "test" {
+						invitation_type = "USER_INITIATED_URL"
+						expiration_date = "Unlimited"
+						subject         = ""
+						message         = ""
+						reply_to        = ""
+						sent_from       = ""
+						sent_to         = ""
+						username        = ""
+					}
+				`,
+				ConfigStateChecks: checks,
 			},
 		},
 	})

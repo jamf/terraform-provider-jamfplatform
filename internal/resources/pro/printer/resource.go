@@ -22,6 +22,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -101,6 +102,7 @@ func (r *PrinterResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Optional:            true,
 				Validators: []validator.String{
 					noLiteralSentinelValidator{},
+					commonvalidators.NotEmptyString("Jamf Pro stores an empty category as no category. Omit category to leave the printer without one."),
 				},
 			},
 			"uri": schema.StringAttribute{

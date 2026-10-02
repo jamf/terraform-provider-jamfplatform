@@ -23,6 +23,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -149,6 +150,9 @@ func (r *DiskEncryptionConfigurationResource) Schema(ctx context.Context, req re
 						MarkdownDescription: "Base64-encoded recovery certificate payload. Required whenever the IRK block is supplied. Jamf Pro accepts `.p12` (PKCS12 with private key, required for the IRK to issue keys), `.cer` (DER binary), and `.pem` (PEM text). For PKCS12 uploads, also set `password`. Round-trips exactly on read. Marked sensitive because PKCS12 payloads contain the wrapped private key.",
 						Required:            true,
 						Sensitive:           true,
+						Validators: []validator.String{
+							commonvalidators.NotEmptyString("Jamf Pro refuses a recovery key with no certificate data. Set data to the base64-encoded certificate."),
+						},
 					},
 				},
 			},

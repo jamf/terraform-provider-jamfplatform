@@ -134,3 +134,19 @@ func TestFlattenCriterionSlice_CopiesFields(t *testing.T) {
 		t.Errorf("closing paren should be false")
 	}
 }
+
+func TestFlattenCriterionSlice_EmptyValueReadsAsEmptyString(t *testing.T) {
+	name := "Computer Name"
+	empty := ""
+	src := []proclassic.Criterion{
+		{Name: &name, Value: &empty},
+		{Name: &name},
+	}
+
+	out := FlattenCriterionSlice(&src)
+	for i, c := range out {
+		if c.Value.IsNull() || c.Value.ValueString() != "" {
+			t.Errorf("criterion %d: expected value \"\", got %s", i, c.Value)
+		}
+	}
+}

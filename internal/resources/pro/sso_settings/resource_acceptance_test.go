@@ -12,7 +12,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers"
@@ -218,29 +221,22 @@ func TestAccResource_ProSsoSettings_CreateAdoptsTheTenantsSettings(t *testing.T)
 
 // setUsernameClaimMappingOutOfBand writes the OIDC username claim mapping the
 // way an administrator would, and registers the restore of the tenant's
-// original settings. It fails the test if the write did not take, since a value
-// that never landed would let the adoption test pass without proving anything.
+// original settings through restoreSsoSettingsOnCleanup. It fails the test if
+// the write did not take, since a value that never landed would let the
+// adoption test pass without proving anything.
+//
+// Both writes go through writableSsoSettings. Sending the GET snapshot back
+// as-is fails on an OIDC_WITH_SAML tenant with a URL metadata source, and the
+// restore used to log that failure and carry on, which could leave a shared
+// tenant switched to OIDC.
 func setUsernameClaimMappingOutOfBand(t *testing.T, want string) {
 	t.Helper()
 	c := pro.New(testhelpers.NewAcceptanceClient(t))
 	ctx := context.Background()
 
-	before, err := c.GetSsoSettingsV3(ctx)
-	if err != nil {
-		t.Fatalf("reading the tenant's SSO settings: %v", err)
-	}
-	if before == nil {
-		t.Fatal("reading the tenant's SSO settings: no settings returned")
-	}
+	before := restoreSsoSettingsOnCleanup(t)
 
-	restore := *before
-	t.Cleanup(func() {
-		if _, err := c.UpdateSsoSettingsV3(context.Background(), &restore); err != nil {
-			t.Logf("restoring the tenant's SSO settings: %v", err)
-		}
-	})
-
-	edited := *before
+	edited := writableSsoSettings(*before)
 	edited.OidcSettings.UsernameAttributeClaimMapping = &want
 	if _, err := c.UpdateSsoSettingsV3(ctx, &edited); err != nil {
 		t.Fatalf("setting the username claim mapping outside Terraform: %v", err)
@@ -695,6 +691,138 @@ func TestAccDataSource_ProSsoSpMetadata_SAML(t *testing.T) {
 			},
 			// Restore baseline so the next test starts from a known state.
 			{Config: oidcEnabledConfig},
+		},
+	})
+}
+
+// writableSsoSettings returns s in a form a PUT accepts. A GET reports an
+// unused metadata_file_name as "", which a PUT in a SAML mode with
+// metadata_source = URL refuses ("SAML settings validation failed"), so the
+// file fields are sent as null in that case.
+func writableSsoSettings(s pro.SsoSettingsV3) pro.SsoSettingsV3 {
+	if s.SamlSettings.MetadataSource != nil && *s.SamlSettings.MetadataSource == pro.SamlSettingsMetadataSourceURL {
+		s.SamlSettings.MetadataFileName = nil
+		s.SamlSettings.FederationMetadataFile = nil
+	}
+	return s
+}
+
+// restoreSsoSettingsOnCleanup snapshots the tenant's SSO settings, registers a
+// t.Cleanup that writes them back through writableSsoSettings, and returns the
+// snapshot. A failed restore fails the test, since it leaves a shared tenant's
+// SSO changed.
+func restoreSsoSettingsOnCleanup(t *testing.T) *pro.SsoSettingsV3 {
+	t.Helper()
+	c := pro.New(testhelpers.NewAcceptanceClient(t))
+	before, err := c.GetSsoSettingsV3(context.Background())
+	if err != nil {
+		t.Fatalf("reading the tenant's SSO settings: %v", err)
+	}
+	if before == nil {
+		t.Fatal("reading the tenant's SSO settings: no settings returned")
+	}
+	restore := writableSsoSettings(*before)
+	t.Cleanup(func() {
+		if _, err := c.UpdateSsoSettingsV3(context.Background(), &restore); err != nil {
+			t.Errorf("restoring the tenant's SSO settings: %v", err)
+		}
+	})
+	return before
+}
+
+// tenantSamlConfig returns the OIDC_WITH_SAML settings block for the tenant's
+// own URL-mode SAML configuration, read at run time, plus extra attributes
+// appended inside the resource. It skips the test on a tenant without one,
+// since Jamf Pro stores enrollment_sso_config only while SAML is configured
+// and switching a shared tenant's SAML on or off takes its SSO down.
+func tenantSamlConfig(t *testing.T, before *pro.SsoSettingsV3, extra string) string {
+	t.Helper()
+	saml := before.SamlSettings
+	if before.ConfigurationType != "OIDC_WITH_SAML" || saml.MetadataSource == nil || *saml.MetadataSource != pro.SamlSettingsMetadataSourceURL ||
+		saml.IdpURL == nil || saml.EntityID == nil || saml.IdpProviderType == nil || saml.GroupAttributeName == nil {
+		t.Skip("skipping: needs a tenant already configured for OIDC_WITH_SAML with a URL metadata source")
+	}
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_sso_settings" "test" {
+			sso_enabled        = true
+			configuration_type = "OIDC_WITH_SAML"
+			oidc_settings = {
+				user_mapping                   = "EMAIL"
+				jamf_id_authentication_enabled = true
+			}
+			saml_settings = {
+				idp_provider_type    = %q
+				entity_id            = %q
+				metadata_source      = "URL"
+				idp_url              = %q
+				group_attribute_name = %q
+			}
+			%s
+		}
+	`, *saml.IdpProviderType, *saml.EntityID, *saml.IdpURL, *saml.GroupAttributeName, extra)
+}
+
+// TestAccResource_ProSsoSettings_EmptyManagementHintRoundTrip covers the #445
+// shape on enrollment_sso_config: Jamf Pro echoes management_hint = "" as "",
+// and reading that back as null failed the post-apply consistency check. It
+// re-applies the tenant's own SAML settings (see tenantSamlConfig).
+func TestAccResource_ProSsoSettings_EmptyManagementHintRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	config := tenantSamlConfig(t, restoreSsoSettingsOnCleanup(t), `
+			enrollment_sso_config = {
+				hosts           = ["tf-acc-idp.example.com"]
+				management_hint = ""
+			}`)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkSsoStillEnabledAfterDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("jamfplatform_pro_sso_settings.test", tfjsonpath.New("enrollment_sso_config").AtMapKey("management_hint"), knownvalue.StringExact("")),
+				},
+			},
+		},
+	})
+}
+
+// TestAccResource_ProSsoSettings_GeneratedCertEmptyKeystoreFileName covers the
+// #445 shape on signing_certificate: a generated certificate has no keystore
+// file name, Jamf Pro echoes it as "", and reading that back as null failed the
+// post-apply consistency check for an authored keystore_file_name = "". It runs
+// only where the tenant already holds a generated certificate, because
+// re-applying GENERATED over GENERATED is a no-op: the test never mints or
+// replaces a certificate.
+func TestAccResource_ProSsoSettings_GeneratedCertEmptyKeystoreFileName(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	cert, err := pro.New(testhelpers.NewAcceptanceClient(t)).GetSsoCertificateV2(context.Background())
+	if err != nil {
+		t.Fatalf("reading the tenant's SSO certificate: %v", err)
+	}
+	if cert == nil || cert.Keystore == nil || cert.Keystore.KeystoreSetupType != "GENERATED" {
+		t.Skip("skipping: needs a tenant whose SSO signing certificate is already GENERATED")
+	}
+	config := tenantSamlConfig(t, restoreSsoSettingsOnCleanup(t), `
+			signing_certificate = {
+				setup_type         = "GENERATED"
+				keystore_file_name = ""
+			}`)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy: resource.ComposeAggregateTestCheckFunc(
+			checkSsoStillEnabledAfterDestroy(t),
+			checkCertSetupType(t, "GENERATED"),
+		),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("jamfplatform_pro_sso_settings.test", tfjsonpath.New("signing_certificate").AtMapKey("keystore_file_name"), knownvalue.StringExact("")),
+				},
+			},
 		},
 	})
 }

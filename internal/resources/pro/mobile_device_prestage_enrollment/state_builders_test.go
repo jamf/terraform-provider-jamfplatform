@@ -68,7 +68,7 @@ func TestFlattenSkipSetupItems_RoundTripAndMissingKey(t *testing.T) {
 }
 
 func TestFlattenNames_NilIn(t *testing.T) {
-	if got := flattenNames(nil); got != nil {
+	if got := flattenNames(nil, nil); got != nil {
 		t.Errorf("nil → nil expected")
 	}
 }
@@ -79,7 +79,7 @@ func TestFlattenNames_PrestageDeviceNamesNilWhenServerEmpty(t *testing.T) {
 		ManageNames:      new(false),
 		// PrestageDeviceNames nil — the server returned no entries.
 	}
-	m := flattenNames(n)
+	m := flattenNames(n, nil)
 	if m == nil {
 		t.Fatalf("expected non-nil model")
 	}
@@ -98,7 +98,7 @@ func TestFlattenNames_PrestageDeviceNamesPopulated(t *testing.T) {
 			{DeviceName: new("iPad-1"), ID: new("42"), Used: new(true)},
 		},
 	}
-	m := flattenNames(n)
+	m := flattenNames(n, nil)
 	if m == nil || len(m.PrestageDeviceNames) != 1 {
 		t.Fatalf("expected 1 prestage device name, got %+v", m)
 	}
@@ -260,5 +260,50 @@ func TestEqualStringSlices(t *testing.T) {
 	}
 	if equalStringSlices([]string{"a"}, []string{"a", "b"}) {
 		t.Errorf("different lengths should differ")
+	}
+}
+
+// TestFlattenNames_PreservesAuthoredEmptyStrings pins that an authored "" on
+// the prefix, suffix, single name and a prestage_device_names entry survives
+// the read when Jamf Pro echoes "", while an unset field stays null.
+func TestFlattenNames_PreservesAuthoredEmptyStrings(t *testing.T) {
+	prior := &NamesModel{
+		DeviceNamePrefix: types.StringValue(""),
+		DeviceNameSuffix: types.StringUnknown(),
+		SingleDeviceName: types.StringValue(""),
+		PrestageDeviceNames: []PrestageDeviceNameModel{
+			{DeviceName: types.StringValue("")},
+			{DeviceName: types.StringValue("iPad-2")},
+		},
+	}
+	n := &pro.MobileDevicePrestageNamesV3{
+		AssignNamesUsing: new("List of Names"),
+		DeviceNamePrefix: new(""),
+		DeviceNameSuffix: new(""),
+		SingleDeviceName: new(""),
+		PrestageDeviceNames: &[]pro.MobileDevicePrestageNameV3{
+			{DeviceName: new(""), ID: new("3")},
+			{DeviceName: new("iPad-2"), ID: new("4")},
+			{DeviceName: new(""), ID: new("5")},
+		},
+	}
+	m := flattenNames(n, prior)
+	for name, got := range map[string]types.String{
+		"device_name_prefix":                   m.DeviceNamePrefix,
+		"single_device_name":                   m.SingleDeviceName,
+		"prestage_device_names[0].device_name": m.PrestageDeviceNames[0].DeviceName,
+	} {
+		if got.IsNull() || got.ValueString() != "" {
+			t.Errorf("%s: expected \"\", got %s", name, got)
+		}
+	}
+	if !m.DeviceNameSuffix.IsNull() {
+		t.Errorf("unset device_name_suffix: expected null, got %s", m.DeviceNameSuffix)
+	}
+	if got := m.PrestageDeviceNames[1].DeviceName.ValueString(); got != "iPad-2" {
+		t.Errorf("prestage_device_names[1].device_name: expected the wire value, got %q", got)
+	}
+	if !m.PrestageDeviceNames[2].DeviceName.IsNull() {
+		t.Errorf("prestage_device_names[2].device_name with no prior: expected null, got %s", m.PrestageDeviceNames[2].DeviceName)
 	}
 }

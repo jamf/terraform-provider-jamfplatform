@@ -13,6 +13,9 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
@@ -1069,4 +1072,90 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
   scope_serial_numbers = %s
 }
 `, name, adeFixtureRef, scope)
+}
+
+// mobilePrestageEmptyNamesConfig sets device_name_prefix, device_name_suffix,
+// single_device_name and the first prestage_device_names entry to "" unless
+// valued is set, in which case the prefix and the first entry carry a value.
+// instanceRef is the HCL expression for the ADE instance id.
+func mobilePrestageEmptyNamesConfig(name, instanceRef string, valued bool) string {
+	prefix, first := "", ""
+	if valued {
+		prefix, first = "iPad-", "iPad-1"
+	}
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
+  display_name                          = %q
+  device_enrollment_program_instance_id = %s
+  timezone                              = "UTC"
+
+  timeouts = {
+    create = "1m"
+    read   = "1m"
+    update = "1m"
+    delete = "1m"
+  }
+
+  location_information   = {}
+  purchasing_information = {}
+  names = {
+    assign_names_using = "List of Names"
+    device_name_prefix = %q
+    device_name_suffix = ""
+    single_device_name = ""
+    prestage_device_names = [
+      { device_name = %q },
+      { device_name = "iPad-2" },
+    ]
+  }
+  scope_serial_numbers = []
+}
+`, name, instanceRef, prefix, first)
+}
+
+// mobilePrestageEmptyNamesSteps is the step list shared by the empty-string
+// round-trip test: create with "" everywhere, set values, then set "" again,
+// which must clear them on the server (the post-apply refresh plan is empty
+// only if the server echoes "" back).
+func mobilePrestageEmptyNamesSteps(prefixHCL, name, instanceRef string) []resource.TestStep {
+	empty := []statecheck.StateCheck{
+		statecheck.ExpectKnownValue(resourceName, tfjsonpath.New("names").AtMapKey("device_name_prefix"), knownvalue.StringExact("")),
+		statecheck.ExpectKnownValue(resourceName, tfjsonpath.New("names").AtMapKey("device_name_suffix"), knownvalue.StringExact("")),
+		statecheck.ExpectKnownValue(resourceName, tfjsonpath.New("names").AtMapKey("single_device_name"), knownvalue.StringExact("")),
+		statecheck.ExpectKnownValue(resourceName, tfjsonpath.New("names").AtMapKey("prestage_device_names").AtSliceIndex(0).AtMapKey("device_name"), knownvalue.StringExact("")),
+		statecheck.ExpectKnownValue(resourceName, tfjsonpath.New("names").AtMapKey("prestage_device_names").AtSliceIndex(1).AtMapKey("device_name"), knownvalue.StringExact("iPad-2")),
+	}
+	return []resource.TestStep{
+		{
+			Config:            prefixHCL + mobilePrestageEmptyNamesConfig(name, instanceRef, false),
+			ConfigStateChecks: empty,
+		},
+		{
+			Config: prefixHCL + mobilePrestageEmptyNamesConfig(name, instanceRef, true),
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr(resourceName, "names.device_name_prefix", "iPad-"),
+				resource.TestCheckResourceAttr(resourceName, "names.prestage_device_names.0.device_name", "iPad-1"),
+			),
+		},
+		{
+			Config:            prefixHCL + mobilePrestageEmptyNamesConfig(name, instanceRef, false),
+			ConfigStateChecks: empty,
+		},
+	}
+}
+
+// TestAccResource_ProMobileDevicePrestageEnrollment_Names_EmptyStringFieldsRoundTrip
+// pins that an authored "" on the names prefix, suffix, single name and a
+// prestage_device_names entry survives the read. Jamf Pro echoes each as "",
+// and reading that back as null failed the post-apply consistency check.
+func TestAccResource_ProMobileDevicePrestageEnrollment_Names_EmptyStringFieldsRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	token := requireADETokenBlob(t)
+	suffix := testhelpers.RunSuffix()
+	accCleanupOrphans(t, suffix)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    mobilePrestageEmptyNamesSteps(adeFixtureBlock(suffix, token), "tf-acc-names-empty-"+suffix, adeFixtureRef),
+	})
 }

@@ -91,3 +91,25 @@ func TestAssignAccessGroupsState_BuildsSet(t *testing.T) {
 		t.Fatalf("expected 2 elements, got %d", len(set.Elements()))
 	}
 }
+
+// TestAssignSettingsResourceModel_ManagementUsernameEmptyString pins #445:
+// Jamf Pro echoes an empty management username as "", so an authored "" must
+// survive the read while an unset or unknown value stays null.
+func TestAssignSettingsResourceModel_ManagementUsernameEmptyString(t *testing.T) {
+	for name, tc := range map[string]struct {
+		incoming types.String
+		wantNull bool
+	}{
+		"authored empty": {incoming: types.StringValue(""), wantNull: false},
+		"unknown":        {incoming: types.StringUnknown(), wantNull: true},
+		"null":           {incoming: types.StringNull(), wantNull: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			state := &UserInitiatedEnrollmentSettingsResourceModel{ManagementUsername: tc.incoming}
+			assignSettingsResourceModel(state, &pro.EnrollmentSettingsV4{ManagementUsername: ""})
+			if got := state.ManagementUsername; got.IsNull() != tc.wantNull || got.ValueString() != "" {
+				t.Errorf("management_username = %s, want null=%t", got, tc.wantNull)
+			}
+		})
+	}
+}

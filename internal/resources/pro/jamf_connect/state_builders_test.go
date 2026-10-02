@@ -42,6 +42,21 @@ func TestAssignJamfConnectResourceModel_EmptyVersionToNull(t *testing.T) {
 	}
 }
 
+// TestAssignJamfConnectResourceModel_AuthoredEmptyVersionKept pins #445: with
+// NONE the wire version is "", and an authored version = "" must stay "" so
+// the post-apply consistency check holds.
+func TestAssignJamfConnectResourceModel_AuthoredEmptyVersionKept(t *testing.T) {
+	state := JamfConnectResourceModel{Version: types.StringValue("")}
+	assignJamfConnectResourceModel(&state, &pro.LinkedConnectProfile{
+		ProfileID:          new(47),
+		Version:            new(""),
+		AutoDeploymentType: new(autoDeploymentNone),
+	})
+	if state.Version.IsNull() || state.Version.ValueString() != "" {
+		t.Errorf("authored empty version must stay \"\", got %s", state.Version)
+	}
+}
+
 func TestAssignJamfConnectResourceModel_VersionPreserved(t *testing.T) {
 	var state JamfConnectResourceModel
 	assignJamfConnectResourceModel(&state, &pro.LinkedConnectProfile{

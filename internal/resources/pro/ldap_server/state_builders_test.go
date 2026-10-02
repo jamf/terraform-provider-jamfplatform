@@ -288,3 +288,57 @@ func TestAssignLdapServerDataSourceModel_SetsTopLevelNameAndID(t *testing.T) {
 		t.Errorf("ds connection hostname not populated")
 	}
 }
+
+// TestAssignMappingsModel_PreservesAuthoredEmptyStrings pins #445 on the
+// mapping sub-blocks: Jamf Pro echoes a mapping sent as "" as an empty
+// element, so an authored "" in the prior sub-block must survive, while a
+// field the prior left null or unknown stays null, and a non-empty wire value
+// still wins.
+func TestAssignMappingsModel_PreservesAuthoredEmptyStrings(t *testing.T) {
+	prior := &ldapMappingsModel{
+		UserMappings: &ldapUserMappingsModel{
+			Phone:    types.StringValue(""),
+			Building: types.StringUnknown(),
+			UserUUID: types.StringValue(""),
+		},
+		UserGroupMembershipMappings: &ldapMembershipMappingsModel{
+			AppendToUsername: types.StringValue(""),
+		},
+	}
+	in := &proclassic.LdapServerMappingsForUsers{
+		UserMappings: &proclassic.LdapServerMappingsForUsersUserMappings{
+			MapPhone:      new(""),
+			MapBuilding:   new(""),
+			MapRoom:       new(""),
+			MapUserUUID:   new("objectGUID"),
+			MapUsername:   new("uid"),
+			SearchScope:   new("All Subtrees"),
+			ObjectClasses: new(""),
+		},
+		UserGroupMappings: &proclassic.LdapServerMappingsForUsersUserGroupMappings{
+			MapGroupName: new(""),
+		},
+		UserGroupMembershipMappings: &proclassic.LdapServerMappingsForUsersUserGroupMembershipMappings{
+			AppendToUsername: new(""),
+		},
+	}
+
+	out := assignMappingsModel(in, prior)
+	if v := out.UserMappings.Phone; v.IsNull() || v.ValueString() != "" {
+		t.Errorf("phone: authored \"\" must stay \"\", got %s", v)
+	}
+	if v := out.UserGroupMembershipMappings.AppendToUsername; v.IsNull() || v.ValueString() != "" {
+		t.Errorf("append_to_username: authored \"\" must stay \"\", got %s", v)
+	}
+	for name, v := range map[string]types.String{"building": out.UserMappings.Building, "room": out.UserMappings.Room, "object_classes": out.UserMappings.ObjectClasses, "group_name": out.UserGroupMappings.GroupName} {
+		if !v.IsNull() {
+			t.Errorf("%s: unset field echoed empty must be null, got %s", name, v)
+		}
+	}
+	if v := out.UserMappings.UserUUID.ValueString(); v != "objectGUID" {
+		t.Errorf("user_uuid: wire value must win, got %q", v)
+	}
+	if v := assignMappingsModel(in, nil).UserMappings.Phone; !v.IsNull() {
+		t.Errorf("phone with no prior must be null, got %s", v)
+	}
+}

@@ -65,7 +65,7 @@ func assignSsoSettingsResourceModel(ctx context.Context, state *SsoSettingsResou
 
 	// EnrollmentSsoConfig — only populate when user authored OR server returns content.
 	if s.EnrollmentSsoConfig != nil && (state.EnrollmentSsoConfig != nil || hasEnrollmentSsoContent(s.EnrollmentSsoConfig)) {
-		ec, d := assignEnrollmentSsoConfigModel(ctx, s.EnrollmentSsoConfig)
+		ec, d := assignEnrollmentSsoConfigModel(ctx, s.EnrollmentSsoConfig, state.EnrollmentSsoConfig)
 		diags.Append(d...)
 		state.EnrollmentSsoConfig = ec
 	}
@@ -129,9 +129,18 @@ func hasEnrollmentSsoContent(c *pro.EnrollmentSsoConfig) bool {
 }
 
 // assignEnrollmentSsoConfigModel turns the SDK type into the TF model.
-func assignEnrollmentSsoConfigModel(ctx context.Context, c *pro.EnrollmentSsoConfig) (*enrollmentSsoConfigModel, diag.Diagnostics) {
+//
+// prev is the incoming block (plan on write, prior state on refresh, nil for
+// the data source or an import). management_hint is reconciled against it with
+// helpers.ReconcileOptionalStringPointer: Jamf Pro echoes an unset hint as "",
+// so an authored "" stays "" and an unset hint stays null (#445).
+func assignEnrollmentSsoConfigModel(ctx context.Context, c *pro.EnrollmentSsoConfig, prev *enrollmentSsoConfigModel) (*enrollmentSsoConfigModel, diag.Diagnostics) {
+	priorHint := types.StringNull()
+	if prev != nil {
+		priorHint = prev.ManagementHint
+	}
 	out := &enrollmentSsoConfigModel{
-		ManagementHint: helpers.StringPointerValueOrNull(c.ManagementHint),
+		ManagementHint: helpers.ReconcileOptionalStringPointer(c.ManagementHint, priorHint),
 	}
 	if c.Hosts == nil {
 		out.Hosts = types.SetNull(types.StringType)
@@ -151,6 +160,12 @@ func assignEnrollmentSsoConfigModel(ctx context.Context, c *pro.EnrollmentSsoCon
 // state nil. When the user configured the block, populate Computed siblings
 // from the response and leave WriteOnly inputs untouched (the framework
 // drops them from state regardless).
+//
+// key and keystore_file_name are reconciled against the incoming block with
+// helpers.ReconcileOptionalString: a generated certificate reports its keystore
+// file name as "", so an authored "" stays "" while an unset value stays null
+// (#445). A non-empty wire value, such as the alias Jamf Pro assigns a
+// generated certificate, still wins.
 func assignSigningCertificateState(ctx context.Context, state *SsoSettingsResourceModel, cert *pro.SsoKeystoreResponseWithDetails) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if cert == nil {
@@ -175,8 +190,8 @@ func assignSigningCertificateState(ctx context.Context, state *SsoSettingsResour
 			state.SigningCertificate.SetupType = types.StringValue(cert.Keystore.KeystoreSetupType)
 		}
 		state.SigningCertificate.Type = helpers.StringValueOrNull(cert.Keystore.Type)
-		state.SigningCertificate.Key = helpers.StringValueOrNull(cert.Keystore.Key)
-		state.SigningCertificate.KeystoreFileName = helpers.StringValueOrNull(cert.Keystore.KeystoreFileName)
+		state.SigningCertificate.Key = helpers.ReconcileOptionalString(cert.Keystore.Key, state.SigningCertificate.Key)
+		state.SigningCertificate.KeystoreFileName = helpers.ReconcileOptionalString(cert.Keystore.KeystoreFileName, state.SigningCertificate.KeystoreFileName)
 	}
 
 	if cert.KeystoreDetails != nil {
@@ -273,7 +288,7 @@ func assignSsoSettingsDataSourceModel(ctx context.Context, state *SsoSettingsDat
 	state.SamlSettings = assignSamlSettingsModel(nil, &s.SamlSettings)
 
 	if s.EnrollmentSsoConfig != nil && hasEnrollmentSsoContent(s.EnrollmentSsoConfig) {
-		ec, d := assignEnrollmentSsoConfigModel(ctx, s.EnrollmentSsoConfig)
+		ec, d := assignEnrollmentSsoConfigModel(ctx, s.EnrollmentSsoConfig, nil)
 		diags.Append(d...)
 		state.EnrollmentSsoConfig = ec
 	}

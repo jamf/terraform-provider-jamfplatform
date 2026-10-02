@@ -14,6 +14,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
+
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 )
 
 // Wire enum values for the Jamf ProClassic /ldapservers endpoint, captured by
@@ -233,4 +235,11 @@ func accountWoVersion(m LdapServerResourceModel) types.Int64 {
 		return types.Int64Null()
 	}
 	return m.Connection.Account.PasswordWoVersion
+}
+
+// notEmpty adds validators.NotEmptyString to a, for an attribute Jamf Pro does
+// not store as "" (wire-probed 2026-10-01, #445).
+func notEmpty(a schema.StringAttribute, detail string) schema.StringAttribute {
+	a.Validators = append(a.Validators, commonvalidators.NotEmptyString(detail))
+	return a
 }

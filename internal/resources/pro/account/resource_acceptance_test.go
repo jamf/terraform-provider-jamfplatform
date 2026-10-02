@@ -18,7 +18,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
@@ -417,6 +420,150 @@ func TestAccResource_ProAccount_OmittedBlocksRetained(t *testing.T) {
 					resource.TestCheckNoResourceAttr(accountOmitRetainsAddr, "privileges.jamf_pro_server_objects.#"),
 					accountRetainedOnServer(t),
 				),
+			},
+		},
+	})
+}
+
+const accountEmptyStringsAddr = "jamfplatform_pro_account.empty"
+
+// accountEmptyStringsConfig renders an Auditor account whose full_name and
+// email_address lines are supplied verbatim, so a step can set either to "",
+// to a value, or leave it out altogether.
+func accountEmptyStringsConfig(suffix, attrs string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_account" "empty" {
+  username      = "tf-acc-empty-%[1]s"
+%[2]s
+  access_level  = "Full Access"
+  privilege_set = "Auditor"
+
+  password            = "Pr0bePassw0rd-%[1]s"
+  password_wo_version = 1
+}
+`, suffix, attrs)
+}
+
+// TestAccResource_ProAccount_EmptyEmailRoundTrip is the email_address sibling
+// of TestAccResource_ProAccount_EmptyStringFieldsRoundTrip. Jamf Pro refuses an
+// empty email as "Duplicated user account" while any other account on the
+// tenant already has one, so the test skips on such a tenant rather than
+// report the tenant's data as a provider fault.
+func TestAccResource_ProAccount_EmptyEmailRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	skipIfAnAccountHasNoEmail(t)
+	suffix := testhelpers.RunSuffix()
+	email := "tf-acc-empty-" + suffix + "@example.invalid"
+	nameLine := "  full_name     = \"TF Acc Empty\"\n"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAccountDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:            accountEmptyStringsConfig(suffix, nameLine+"  email_address = \"\""),
+				ConfigStateChecks: accountEmptyStringsChecks("TF Acc Empty", ""),
+				Check:             accountBaseFieldsOnServer(t, "TF Acc Empty", ""),
+			},
+			{
+				Config:            accountEmptyStringsConfig(suffix, nameLine+fmt.Sprintf("  email_address = %q", email)),
+				ConfigStateChecks: accountEmptyStringsChecks("TF Acc Empty", email),
+				Check:             accountBaseFieldsOnServer(t, "TF Acc Empty", email),
+			},
+			{
+				Config:            accountEmptyStringsConfig(suffix, nameLine+"  email_address = \"\""),
+				ConfigStateChecks: accountEmptyStringsChecks("TF Acc Empty", ""),
+				Check:             accountBaseFieldsOnServer(t, "TF Acc Empty", ""),
+			},
+		},
+	})
+}
+
+// skipIfAnAccountHasNoEmail skips when any Jamf Pro account on the tenant has
+// an empty email address, since Jamf Pro then refuses another one as a
+// duplicate. It names the accounts so the operator can add their addresses.
+func skipIfAnAccountHasNoEmail(t *testing.T) {
+	t.Helper()
+	accounts, err := pro.New(testhelpers.NewAcceptanceClient(t)).ListAccountsV1(context.Background(), nil, "")
+	if err != nil {
+		t.Fatalf("listing Jamf Pro accounts: %v", err)
+	}
+	var blank []string
+	for _, a := range accounts {
+		if helpers.DerefString(a.Email) == "" {
+			blank = append(blank, helpers.DerefString(a.Username))
+		}
+	}
+	if len(blank) > 0 {
+		t.Skipf("skipping: Jamf Pro refuses a second account with an empty email, and these accounts already have none: %s", strings.Join(blank, ", "))
+	}
+}
+
+// accountEmptyStringsChecks asserts full_name and email_address in state.
+func accountEmptyStringsChecks(fullName, email string) []statecheck.StateCheck {
+	return []statecheck.StateCheck{
+		statecheck.ExpectKnownValue(accountEmptyStringsAddr, tfjsonpath.New("full_name"), knownvalue.StringExact(fullName)),
+		statecheck.ExpectKnownValue(accountEmptyStringsAddr, tfjsonpath.New("email_address"), knownvalue.StringExact(email)),
+	}
+}
+
+// accountBaseFieldsOnServer asserts the realname and email Jamf Pro holds for
+// the account, so a step proves what the server kept and not only what state says.
+func accountBaseFieldsOnServer(t *testing.T, fullName, email string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[accountEmptyStringsAddr]
+		if !ok {
+			return fmt.Errorf("%s not found in state", accountEmptyStringsAddr)
+		}
+		got, err := pro.New(testhelpers.NewAcceptanceClient(t)).GetAccountV1(context.Background(), rs.Primary.ID)
+		if err != nil {
+			return fmt.Errorf("reading account %s: %w", rs.Primary.ID, err)
+		}
+		if v := helpers.DerefString(got.Realname); v != fullName {
+			return fmt.Errorf("server realname = %q, want %q", v, fullName)
+		}
+		if v := helpers.DerefString(got.Email); v != email {
+			return fmt.Errorf("server email = %q, want %q", v, email)
+		}
+		return nil
+	}
+}
+
+// TestAccResource_ProAccount_EmptyStringFieldsRoundTrip proves full_name = ""
+// applies cleanly on create and on update. Jamf Pro echoes it as "", and
+// reading that back as null failed the post-apply consistency check. The last
+// step drops the attribute: the prior "" is carried forward, the plan is
+// empty, and the server keeps "". email_address keeps a value here and is
+// covered by TestAccResource_ProAccount_EmptyEmailRoundTrip.
+func TestAccResource_ProAccount_EmptyStringFieldsRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	email := "tf-acc-empty-" + suffix + "@example.invalid"
+	emailLine := fmt.Sprintf("  email_address = %q", email)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAccountDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:            accountEmptyStringsConfig(suffix, "  full_name     = \"\"\n"+emailLine),
+				ConfigStateChecks: accountEmptyStringsChecks("", email),
+				Check:             accountBaseFieldsOnServer(t, "", email),
+			},
+			{
+				Config:            accountEmptyStringsConfig(suffix, "  full_name     = \"TF Acc Empty\"\n"+emailLine),
+				ConfigStateChecks: accountEmptyStringsChecks("TF Acc Empty", email),
+				Check:             accountBaseFieldsOnServer(t, "TF Acc Empty", email),
+			},
+			{
+				Config:            accountEmptyStringsConfig(suffix, "  full_name     = \"\"\n"+emailLine),
+				ConfigStateChecks: accountEmptyStringsChecks("", email),
+				Check:             accountBaseFieldsOnServer(t, "", email),
+			},
+			{
+				Config:            accountEmptyStringsConfig(suffix, emailLine),
+				ConfigStateChecks: accountEmptyStringsChecks("", email),
+				Check:             accountBaseFieldsOnServer(t, "", email),
 			},
 		},
 	})

@@ -19,6 +19,12 @@ import (
 // arrives with every block nil and would otherwise keep them nil — leaving a
 // declared block planning as an addition on the first plan after import. See
 // importHydration for the signal.
+//
+// Jamf Pro echoes an empty string field as an empty element whether it was
+// written as "" or never sent, so description and the location and purchasing
+// string leaves are reconciled against the incoming model (the plan on Create
+// and Update, prior state on Read): an authored "" survives the read rather
+// than collapsing to null, which the post-apply consistency check rejects.
 func assignEnrollmentProfileResourceModel(state *EnrollmentProfileResourceModel, api *proclassic.MobileDeviceEnrollmentProfile, hydrating bool) {
 	if api == nil || api.General == nil {
 		return
@@ -28,7 +34,7 @@ func assignEnrollmentProfileResourceModel(state *EnrollmentProfileResourceModel,
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
 	state.Name = helpers.StringPointerValueOrNull(g.Name)
-	state.Description = helpers.StringPointerValueOrNull(g.Description)
+	state.Description = helpers.ReconcileOptionalStringPointer(g.Description, state.Description)
 	state.Invitation = bigIntStringOrNull(g.Invitation)
 	state.UUID = stringOrNull(g.UUID)
 	if g.Site != nil {
@@ -37,10 +43,10 @@ func assignEnrollmentProfileResourceModel(state *EnrollmentProfileResourceModel,
 	}
 
 	if hydrating || state.Location != nil {
-		state.Location = flattenLocationModel(api.Location)
+		state.Location = flattenLocationModel(api.Location, state.Location)
 	}
 	if hydrating || state.Purchasing != nil {
-		state.Purchasing = flattenPurchasingModel(api.Purchasing)
+		state.Purchasing = flattenPurchasingModel(api.Purchasing, state.Purchasing)
 	}
 	state.Attachments = flattenAttachments(api.Attachments)
 }
@@ -79,50 +85,63 @@ func assignEnrollmentProfileDataSourceModel(state *EnrollmentProfileDataSourceMo
 		state.SiteID = helpers.StringValueFromIntPtr(g.Site.ID)
 		state.SiteName = helpers.DerivedRefName(g.Site.ID, g.Site.Name)
 	}
-	state.Location = flattenLocationModel(api.Location)
-	state.Purchasing = flattenPurchasingModel(api.Purchasing)
+	state.Location = flattenLocationModel(api.Location, nil)
+	state.Purchasing = flattenPurchasingModel(api.Purchasing, nil)
 	state.Attachments = flattenAttachments(api.Attachments)
 }
 
-func flattenLocationModel(api *proclassic.Location) *LocationModel {
+// flattenLocationModel maps the wire <location> block onto the model. Each
+// string leaf is reconciled against prior so an authored "" survives the read;
+// a nil prior (data source, list resource, import) maps an empty value to null.
+func flattenLocationModel(api *proclassic.Location, prior *LocationModel) *LocationModel {
 	if api == nil {
 		return nil
 	}
+	if prior == nil {
+		prior = &LocationModel{}
+	}
 	return &LocationModel{
-		Username:     stringOrNull(api.Username),
-		RealName:     stringOrNull(firstNonNil(api.RealName, api.Realname)),
-		EmailAddress: stringOrNull(api.EmailAddress),
-		PhoneNumber:  stringOrNull(firstNonNil(api.PhoneNumber, api.Phone)),
-		Department:   stringOrNull(api.Department),
-		Building:     stringOrNull(api.Building),
-		Room:         stringOrNull(api.Room),
-		Position:     stringOrNull(api.Position),
+		Username:     helpers.ReconcileOptionalStringPointer(api.Username, prior.Username),
+		RealName:     helpers.ReconcileOptionalStringPointer(firstNonNil(api.RealName, api.Realname), prior.RealName),
+		EmailAddress: helpers.ReconcileOptionalStringPointer(api.EmailAddress, prior.EmailAddress),
+		PhoneNumber:  helpers.ReconcileOptionalStringPointer(firstNonNil(api.PhoneNumber, api.Phone), prior.PhoneNumber),
+		Department:   helpers.ReconcileOptionalStringPointer(api.Department, prior.Department),
+		Building:     helpers.ReconcileOptionalStringPointer(api.Building, prior.Building),
+		Room:         helpers.ReconcileOptionalStringPointer(api.Room, prior.Room),
+		Position:     helpers.ReconcileOptionalStringPointer(api.Position, prior.Position),
 	}
 }
 
-func flattenPurchasingModel(api *proclassic.Purchasing) *PurchasingModel {
+// flattenPurchasingModel maps the wire <purchasing> block onto the model. Each
+// writable string leaf is reconciled against prior so an authored "" survives
+// the read; a nil prior (data source, list resource, import) maps an empty
+// value to null.
+func flattenPurchasingModel(api *proclassic.Purchasing, prior *PurchasingModel) *PurchasingModel {
 	if api == nil {
 		return nil
+	}
+	if prior == nil {
+		prior = &PurchasingModel{}
 	}
 	return &PurchasingModel{
 		IsPurchased:       helpers.BoolPointerValueOrNull(api.IsPurchased),
 		IsLeased:          helpers.BoolPointerValueOrNull(api.IsLeased),
-		PONumber:          stringOrNull(api.PoNumber),
-		PODate:            stringOrNull(api.PoDate),
+		PONumber:          helpers.ReconcileOptionalStringPointer(api.PoNumber, prior.PONumber),
+		PODate:            helpers.ReconcileOptionalStringPointer(api.PoDate, prior.PODate),
 		PODateEpoch:       intStringOrNull(api.PoDateEpoch),
 		PODateUTC:         stringOrNull(api.PoDateUtc),
-		Vendor:            stringOrNull(api.Vendor),
-		WarrantyExpires:   stringOrNull(api.WarrantyExpires),
+		Vendor:            helpers.ReconcileOptionalStringPointer(api.Vendor, prior.Vendor),
+		WarrantyExpires:   helpers.ReconcileOptionalStringPointer(api.WarrantyExpires, prior.WarrantyExpires),
 		WarrantyEpoch:     intStringOrNull(api.WarrantyExpiresEpoch),
 		WarrantyUTC:       stringOrNull(api.WarrantyExpiresUtc),
-		AppleCareID:       stringOrNull(api.ApplecareID),
-		LeaseExpires:      stringOrNull(api.LeaseExpires),
+		AppleCareID:       helpers.ReconcileOptionalStringPointer(api.ApplecareID, prior.AppleCareID),
+		LeaseExpires:      helpers.ReconcileOptionalStringPointer(api.LeaseExpires, prior.LeaseExpires),
 		LeaseEpoch:        intStringOrNull(api.LeaseExpiresEpoch),
 		LeaseUTC:          stringOrNull(api.LeaseExpiresUtc),
-		PurchasePrice:     stringOrNull(api.PurchasePrice),
+		PurchasePrice:     helpers.ReconcileOptionalStringPointer(api.PurchasePrice, prior.PurchasePrice),
 		LifeExpectancy:    int64ValueOrNull(api.LifeExpectancy),
-		PurchasingAccount: stringOrNull(api.PurchasingAccount),
-		PurchasingContact: stringOrNull(api.PurchasingContact),
+		PurchasingAccount: helpers.ReconcileOptionalStringPointer(api.PurchasingAccount, prior.PurchasingAccount),
+		PurchasingContact: helpers.ReconcileOptionalStringPointer(api.PurchasingContact, prior.PurchasingContact),
 	}
 }
 

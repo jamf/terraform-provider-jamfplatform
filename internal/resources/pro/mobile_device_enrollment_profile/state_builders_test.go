@@ -140,3 +140,61 @@ func TestBigIntStringOrNull(t *testing.T) {
 		t.Errorf("big invitation = %q", got)
 	}
 }
+
+// TestAssignResourceModel_PreservesAuthoredEmptyStrings pins that an authored
+// "" on description, a location leaf or a purchasing leaf survives the read
+// when Jamf Pro echoes it as an empty element, while an unset leaf beside it
+// stays null.
+func TestAssignResourceModel_PreservesAuthoredEmptyStrings(t *testing.T) {
+	state := EnrollmentProfileResourceModel{
+		ID:          types.StringValue("4"),
+		Name:        types.StringValue("x"),
+		Description: types.StringValue(""),
+		Location:    &LocationModel{Username: types.StringValue(""), RealName: types.StringValue(""), Room: types.StringNull()},
+		Purchasing:  &PurchasingModel{PODate: types.StringValue(""), Vendor: types.StringNull(), PurchasingContact: types.StringValue("")},
+	}
+	api := &proclassic.MobileDeviceEnrollmentProfile{
+		General: &proclassic.MobileDeviceEnrollmentProfileGeneral{ID: new(4), Name: new("x"), Description: new("")},
+		Location: &proclassic.Location{
+			Username: new(""), RealName: new(""), Realname: new(""), Room: new(""),
+		},
+		Purchasing: &proclassic.Purchasing{PoDate: new(""), Vendor: new(""), PurchasingContact: new("")},
+	}
+	assignEnrollmentProfileResourceModel(&state, api, false)
+
+	for name, got := range map[string]types.String{
+		"description":                   state.Description,
+		"location.username":             state.Location.Username,
+		"location.real_name":            state.Location.RealName,
+		"purchasing.po_date":            state.Purchasing.PODate,
+		"purchasing.purchasing_contact": state.Purchasing.PurchasingContact,
+	} {
+		if got.IsNull() || got.ValueString() != "" {
+			t.Errorf("%s: expected \"\", got %s", name, got)
+		}
+	}
+	for name, got := range map[string]types.String{
+		"location.room":     state.Location.Room,
+		"location.building": state.Location.Building,
+		"purchasing.vendor": state.Purchasing.Vendor,
+	} {
+		if !got.IsNull() {
+			t.Errorf("%s: expected null, got %s", name, got)
+		}
+	}
+}
+
+// TestAssignDataSourceModel_EmptyStringsStayNull pins that the data source,
+// which has no prior to reconcile against, still reports an empty echo as null.
+func TestAssignDataSourceModel_EmptyStringsStayNull(t *testing.T) {
+	var state EnrollmentProfileDataSourceModel
+	api := &proclassic.MobileDeviceEnrollmentProfile{
+		General:    &proclassic.MobileDeviceEnrollmentProfileGeneral{ID: new(4), Name: new("x"), Description: new("")},
+		Location:   &proclassic.Location{Username: new("")},
+		Purchasing: &proclassic.Purchasing{Vendor: new("")},
+	}
+	assignEnrollmentProfileDataSourceModel(&state, api)
+	if !state.Description.IsNull() || !state.Location.Username.IsNull() || !state.Purchasing.Vendor.IsNull() {
+		t.Errorf("expected nulls, got description=%s username=%s vendor=%s", state.Description, state.Location.Username, state.Purchasing.Vendor)
+	}
+}

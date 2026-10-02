@@ -33,6 +33,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck/queryfilter"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
@@ -200,6 +201,45 @@ func TestAccResource_ProAdvancedComputerSearch_Lifecycle(t *testing.T) {
 					// automatic post-apply empty-plan check is the real assertion.
 					resource.TestCheckNoResourceAttr(acsResource, "criteria.0.name"),
 				),
+			},
+			{
+				ResourceName:            acsResource,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"timeouts"},
+			},
+		},
+	})
+}
+
+// TestAccResource_ProAdvancedComputerSearch_EmptyCriterionValueRoundTrip
+// proves a criterion with `value = ""` survives the apply. Jamf Pro stores the
+// criterion and echoes `<value/>`, so state must hold "" rather than null.
+func TestAccResource_ProAdvancedComputerSearch_EmptyCriterionValueRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-pro-acs-empty-value-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckACSDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+					resource "jamfplatform_pro_advanced_computer_search" "test" {
+						name = %q
+
+						criteria = [
+							{
+								name        = "Computer Name"
+								search_type = "is"
+								value       = ""
+							},
+						]
+					}
+				`, name),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(acsResource, tfjsonpath.New("criteria").AtSliceIndex(0).AtMapKey("value"), knownvalue.StringExact("")),
+				},
 			},
 			{
 				ResourceName:            acsResource,

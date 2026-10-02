@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck/queryfilter"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
@@ -414,6 +415,62 @@ func TestAccResource_SecurityCloudUEMConnect_PlatformTenant(t *testing.T) {
 				},
 			},
 			testhelpers.GenerateConfigStep(resourceName),
+		},
+	})
+}
+
+// emptyEmailAffixesConfig is the platform-tenant integration with an email
+// mapping whose prefix and suffix are set to the given values.
+func emptyEmailAffixesConfig(tenant, prefix, suffix string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_security_cloud_uem_connect" "test" {
+			uem_vendor = "JAMF_PRO"
+			platform_tenant = {
+				tenant_id = %q
+			}
+
+			user_data_field_mapping = {
+				email = {
+					source = "SERIAL_NUMBER"
+					prefix = %q
+					suffix = %q
+				}
+			}
+		}
+	`, tenant, prefix, suffix)
+}
+
+// TestAccResource_SecurityCloudUEMConnect_EmptyEmailAffixesRoundTrip covers
+// #445 on the email mapping: prefix = "" and suffix = "" must apply cleanly,
+// survive a change to real values, and apply again when set back to "".
+func TestAccResource_SecurityCloudUEMConnect_EmptyEmailAffixesRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheckSecurityCloud(t)
+	requireNoExistingIntegration(t)
+	tenant := platformTenantIDOrSkip(t)
+
+	affixes := func(prefix, suffix string) []statecheck.StateCheck {
+		return []statecheck.StateCheck{
+			statecheck.ExpectKnownValue(resourceName, tfjsonpath.New("user_data_field_mapping").AtMapKey("email").AtMapKey("prefix"), knownvalue.StringExact(prefix)),
+			statecheck.ExpectKnownValue(resourceName, tfjsonpath.New("user_data_field_mapping").AtMapKey("email").AtMapKey("suffix"), knownvalue.StringExact(suffix)),
+		}
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkIntegrationDestroyed(t),
+		Steps: []resource.TestStep{
+			{
+				Config:            emptyEmailAffixesConfig(tenant, "", ""),
+				ConfigStateChecks: affixes("", ""),
+			},
+			{
+				Config:            emptyEmailAffixesConfig(tenant, "dev-", "example.test"),
+				ConfigStateChecks: affixes("dev-", "example.test"),
+			},
+			{
+				Config:            emptyEmailAffixesConfig(tenant, "", ""),
+				ConfigStateChecks: affixes("", ""),
+			},
 		},
 	})
 }

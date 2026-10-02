@@ -17,7 +17,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
@@ -469,6 +472,117 @@ func TestAccResource_ProDirectoryBinding_TypeBlockMismatch_PowerBroker(t *testin
 					}
 				`, name),
 				ExpectError: regexp.MustCompile(`active_directory forbidden when type`),
+			},
+		},
+	})
+}
+
+// directoryBindingEmptyStringsConfig renders one binding of each type that
+// carries free-text nested fields, every such field set to "" except
+// admitmac.home_location, which Jamf Pro replaces with "Network" when sent
+// empty. adShell and adOmitForest let the second step change one field and
+// drop another without touching the rest.
+func directoryBindingEmptyStringsConfig(suffix, adShell string, adOmitForest bool) string {
+	forest := `forest = ""`
+	if adOmitForest {
+		forest = ""
+	}
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_directory_binding" "ad" {
+			name     = "tf-acc-directory-binding-empty-ad-%[1]s"
+			type     = "Active Directory"
+			domain   = "corp.example.com"
+			username = "joiner-svc"
+
+			active_directory = {
+				%[3]s
+				default_shell              = %[2]q
+				uid_attribute_mapping      = ""
+				user_gid_attribute_mapping = ""
+				gid_attribute_mapping      = ""
+				preferred_domain           = ""
+				admin_groups               = ""
+			}
+		}
+
+		resource "jamfplatform_pro_directory_binding" "admitmac" {
+			name     = "tf-acc-directory-binding-empty-admitmac-%[1]s"
+			type     = "ADmitMac"
+			domain   = "corp.example.com"
+			username = "joiner-svc"
+
+			admitmac = {
+				default_shell              = ""
+				place_home_folders         = ""
+				uid_attribute_mapping      = ""
+				user_gid_attribute_mapping = ""
+				gid_attribute_mapping      = ""
+				admin_group                = ""
+				users_ou                   = ""
+				groups_ou                  = ""
+				printers_ou                = ""
+				shared_folders_ou          = ""
+			}
+		}
+
+		resource "jamfplatform_pro_directory_binding" "centrify" {
+			name     = "tf-acc-directory-binding-empty-centrify-%[1]s"
+			type     = "Centrify"
+			domain   = "corp.example.com"
+			username = "joiner-svc"
+
+			centrify = {
+				zone                    = ""
+				preferred_domain_server = ""
+			}
+		}
+	`, suffix, adShell, forest)
+}
+
+// directoryBindingEmptyStringChecks asserts each named nested attribute of the
+// binding at addr holds exactly "".
+func directoryBindingEmptyStringChecks(addr, block string, attrs ...string) []statecheck.StateCheck {
+	checks := make([]statecheck.StateCheck, 0, len(attrs))
+	for _, a := range attrs {
+		checks = append(checks, statecheck.ExpectKnownValue(addr, tfjsonpath.New(block).AtMapKey(a), knownvalue.StringExact("")))
+	}
+	return checks
+}
+
+// TestAccResource_ProDirectoryBinding_EmptyStringFieldsRoundTrip covers the
+// #445 shape on the nested per-type blocks. Jamf Pro echoes each free-text
+// field sent as "" as an empty element, and reading that back as null failed
+// the post-apply consistency check. Step 2 changes default_shell and drops
+// forest from config: the prior "" carries forward through
+// UseStateForUnknown, is re-sent empty, and the server keeps it empty.
+func TestAccResource_ProDirectoryBinding_EmptyStringFieldsRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	const (
+		ad       = "jamfplatform_pro_directory_binding.ad"
+		admitmac = "jamfplatform_pro_directory_binding.admitmac"
+		centrify = "jamfplatform_pro_directory_binding.centrify"
+	)
+	adFields := []string{"uid_attribute_mapping", "user_gid_attribute_mapping", "gid_attribute_mapping", "preferred_domain", "admin_groups"}
+	admitmacFields := []string{"default_shell", "place_home_folders", "uid_attribute_mapping", "user_gid_attribute_mapping", "gid_attribute_mapping", "admin_group", "users_ou", "groups_ou", "printers_ou", "shared_folders_ou"}
+	centrifyFields := []string{"zone", "preferred_domain_server"}
+
+	step1 := append(directoryBindingEmptyStringChecks(ad, "active_directory", append([]string{"forest", "default_shell"}, adFields...)...), directoryBindingEmptyStringChecks(admitmac, "admitmac", admitmacFields...)...)
+	step1 = append(step1, directoryBindingEmptyStringChecks(centrify, "centrify", centrifyFields...)...)
+	step2 := append(directoryBindingEmptyStringChecks(ad, "active_directory", append([]string{"forest"}, adFields...)...),
+		statecheck.ExpectKnownValue(ad, tfjsonpath.New("active_directory").AtMapKey("default_shell"), knownvalue.StringExact("/bin/zsh")))
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckDirectoryBindingDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:            directoryBindingEmptyStringsConfig(suffix, "", false),
+				ConfigStateChecks: step1,
+			},
+			{
+				Config:            directoryBindingEmptyStringsConfig(suffix, "/bin/zsh", true),
+				ConfigStateChecks: step2,
 			},
 		},
 	})

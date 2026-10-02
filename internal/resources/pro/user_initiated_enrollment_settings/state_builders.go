@@ -20,6 +20,11 @@ import (
 // The cert identity object is null on GET, so keystore_file_name is preserved
 // from prior state rather than echoed. subject / serial_number come from the
 // matching *Details object and only populate while the toggle is enabled.
+//
+// management_username is reconciled against the incoming model (plan on write,
+// prior state on refresh) with helpers.ReconcileOptionalString: Jamf Pro echoes
+// an empty username as "", so an authored "" stays "" while an unset field
+// stays null (#445).
 func assignSettingsResourceModel(state *UserInitiatedEnrollmentSettingsResourceModel, s *pro.EnrollmentSettingsV4) {
 	if s == nil {
 		return
@@ -33,7 +38,7 @@ func assignSettingsResourceModel(state *UserInitiatedEnrollmentSettingsResourceM
 	// Computers tab.
 	state.EnableComputerEnrollment = helpers.BoolPointerValueOrNull(s.MacOsEnterpriseEnrollmentEnabled)
 	state.CreateManagementAccount = helpers.BoolPointerValueOrNull(s.CreateManagementAccount)
-	state.ManagementUsername = helpers.StringValueOrNull(s.ManagementUsername)
+	state.ManagementUsername = helpers.ReconcileOptionalString(s.ManagementUsername, state.ManagementUsername)
 	state.HideManagementAccount = helpers.BoolPointerValueOrNull(s.HideManagementAccount)
 	state.AllowSshOnlyManagementAccount = helpers.BoolPointerValueOrNull(s.AllowSshOnlyManagementAccount)
 	state.EnsureSshRunning = helpers.BoolPointerValueOrNull(s.EnsureSshRunning)
