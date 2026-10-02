@@ -512,7 +512,6 @@ func directoryBindingEmptyStringsConfig(suffix, adShell string, adOmitForest boo
 			username = "joiner-svc"
 
 			admitmac = {
-				network_protocol           = ""
 				default_shell              = ""
 				place_home_folders         = ""
 				uid_attribute_mapping      = ""
@@ -565,7 +564,7 @@ func TestAccResource_ProDirectoryBinding_EmptyStringFieldsRoundTrip(t *testing.T
 		centrify = "jamfplatform_pro_directory_binding.centrify"
 	)
 	adFields := []string{"uid_attribute_mapping", "user_gid_attribute_mapping", "gid_attribute_mapping", "preferred_domain", "admin_groups"}
-	admitmacFields := []string{"network_protocol", "default_shell", "place_home_folders", "uid_attribute_mapping", "user_gid_attribute_mapping", "gid_attribute_mapping", "admin_group", "users_ou", "groups_ou", "printers_ou", "shared_folders_ou"}
+	admitmacFields := []string{"default_shell", "place_home_folders", "uid_attribute_mapping", "user_gid_attribute_mapping", "gid_attribute_mapping", "admin_group", "users_ou", "groups_ou", "printers_ou", "shared_folders_ou"}
 	centrifyFields := []string{"zone", "preferred_domain_server"}
 
 	step1 := append(directoryBindingEmptyStringChecks(ad, "active_directory", append([]string{"forest", "default_shell"}, adFields...)...), directoryBindingEmptyStringChecks(admitmac, "admitmac", admitmacFields...)...)
