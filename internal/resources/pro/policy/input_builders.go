@@ -123,12 +123,19 @@ func buildPolicyInput(ctx context.Context, plan PolicyResourceModel, secrets *po
 // against 11.31.1 on two tenants, on create and update, including on a policy
 // that already held non-default values, and identically through raw XML and the
 // SDK. See the schema descriptions in resource.go and issue #387.
+//
+// trigger is never sent either, and for a worse reason: Jamf Pro derives it
+// from the trigger_* booleans and Self Service, but a written <trigger> is not
+// ignored — it resets every trigger_* boolean to what the label implies
+// (STARTUP sets trigger_startup and clears the rest; EVENT clears them all),
+// and only the boolean elements after it in the document survive. Which one
+// wins therefore depends on element order, and a value other than the derived
+// label never reads back as written. Wire-probed 2026-10-01 against 11.32.0.
 func buildPolicyGeneral(ctx context.Context, m *PolicyGeneralModel) (*proclassic.PolicyPostGeneral, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	g := &proclassic.PolicyPostGeneral{
 		Name:                       helpers.OptionalStringPointer(m.Name),
 		Enabled:                    helpers.OptionalBoolPointer(m.Enabled),
-		Trigger:                    helpers.OptionalStringPointer(m.Trigger),
 		TriggerCheckin:             helpers.OptionalBoolPointer(m.TriggerCheckin),
 		TriggerEnrollmentComplete:  helpers.OptionalBoolPointer(m.TriggerEnrollmentComplete),
 		TriggerLogin:               helpers.OptionalBoolPointer(m.TriggerLogin),

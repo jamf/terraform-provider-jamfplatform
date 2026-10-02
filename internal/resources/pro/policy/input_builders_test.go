@@ -230,3 +230,24 @@ func TestBuildPolicySelfService_CategoryIDOnlySendsDisplayIn(t *testing.T) {
 		t.Fatalf("display_in must be sent as true for an id-only category, got %+v", cats)
 	}
 }
+
+// TestBuildPolicyGeneral_NeverSendsTrigger pins the omission documented on
+// buildPolicyGeneral: a written <trigger> resets every trigger_* boolean, so
+// even a value carried in from state must stay off the wire.
+func TestBuildPolicyGeneral_NeverSendsTrigger(t *testing.T) {
+	t.Parallel()
+	g, diags := buildPolicyGeneral(context.Background(), &PolicyGeneralModel{
+		Name:           types.StringValue("p"),
+		Trigger:        types.StringValue("STARTUP"),
+		TriggerCheckin: types.BoolValue(true),
+	})
+	if diags.HasError() {
+		t.Fatalf("buildPolicyGeneral: %v", diags)
+	}
+	if g.Trigger != nil {
+		t.Errorf("Trigger = %q, want nil", *g.Trigger)
+	}
+	if g.TriggerCheckin == nil || !*g.TriggerCheckin {
+		t.Error("TriggerCheckin was not sent")
+	}
+}
