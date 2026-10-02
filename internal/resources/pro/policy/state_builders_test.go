@@ -514,3 +514,125 @@ func TestFlattenPolicySelfService_NotificationDriftWhenEchoed(t *testing.T) {
 		t.Error("display_notifications: wire false must win over state true")
 	}
 }
+
+// TestFlattenPolicyAccountMaintenance_PreservesAuthoredEmptyStrings pins #445:
+// Jamf Pro echoes hint = "" and picture = "" as empty elements, and the read
+// must keep an authored "" rather than collapse it to null, or the post-apply
+// consistency check fails against the whole local_accounts list. Prior
+// elements are paired by username, so a reordered wire response still matches.
+func TestFlattenPolicyAccountMaintenance_PreservesAuthoredEmptyStrings(t *testing.T) {
+	t.Parallel()
+	state := &PolicyResourceModel{
+		LocalAccounts: []PolicyAccountItemModel{
+			{
+				Username:               types.StringValue("authored"),
+				Realname:               types.StringValue(""),
+				Home:                   types.StringValue("/private/var/authored"),
+				Hint:                   types.StringValue(""),
+				Picture:                types.StringValue(""),
+				ArchiveHomeDirectoryTo: types.StringValue(""),
+				PasswordWoVersion:      types.Int64Value(3),
+			},
+			{
+				Username:               types.StringValue("unset"),
+				Realname:               types.StringUnknown(),
+				Home:                   types.StringValue("/private/var/unset"),
+				Hint:                   types.StringUnknown(),
+				Picture:                types.StringNull(),
+				ArchiveHomeDirectoryTo: types.StringUnknown(),
+				PasswordWoVersion:      types.Int64Null(),
+			},
+		},
+	}
+	am := &proclassic.PolicyAccountMaintenance{
+		Accounts: &proclassic.PolicyAccountMaintenanceAccounts{Account: &[]proclassic.PolicyAccountMaintenanceAccountsAccountItem{
+			{Username: new("unset"), Realname: new(""), Home: new("/private/var/unset"), Hint: new(""), Picture: new("")},
+			{Username: new("authored"), Realname: new(""), Home: new("/private/var/authored"), Hint: new(""), Picture: new("")},
+		}},
+	}
+
+	flattenPolicyAccountMaintenance(am, state, false)
+
+	if len(state.LocalAccounts) != 2 {
+		t.Fatalf("expected 2 accounts, got %d", len(state.LocalAccounts))
+	}
+	authored, unset := state.LocalAccounts[0], state.LocalAccounts[1]
+	if authored.Username.ValueString() != "authored" || unset.Username.ValueString() != "unset" {
+		t.Fatalf("accounts not in plan order: %q, %q", authored.Username.ValueString(), unset.Username.ValueString())
+	}
+	for name, got := range map[string]types.String{
+		"realname":                  authored.Realname,
+		"hint":                      authored.Hint,
+		"picture":                   authored.Picture,
+		"archive_home_directory_to": authored.ArchiveHomeDirectoryTo,
+	} {
+		if got.IsNull() || got.ValueString() != "" {
+			t.Errorf("authored %s: expected \"\", got %s", name, got)
+		}
+	}
+	if got := authored.Home.ValueString(); got != "/private/var/authored" {
+		t.Errorf("authored home: expected the wire value, got %q", got)
+	}
+	if got := authored.PasswordWoVersion.ValueInt64(); got != 3 {
+		t.Errorf("authored password_wo_version: expected 3 from prior state, got %d", got)
+	}
+	for name, got := range map[string]types.String{
+		"realname":                  unset.Realname,
+		"hint":                      unset.Hint,
+		"picture":                   unset.Picture,
+		"archive_home_directory_to": unset.ArchiveHomeDirectoryTo,
+	} {
+		if !got.IsNull() {
+			t.Errorf("unset %s: expected null, got %s", name, got)
+		}
+	}
+	if !unset.PasswordWoVersion.IsNull() {
+		t.Errorf("unset password_wo_version: expected null, got %s", unset.PasswordWoVersion)
+	}
+}
+
+// TestFlattenPolicyScripts_PreservesAuthoredEmptyParameters is the scripts
+// sibling of the #445 fix: an authored parameter = "" survives the read, an
+// unset one stays null, and a script assigned twice pairs with its prior
+// elements in order.
+func TestFlattenPolicyScripts_PreservesAuthoredEmptyParameters(t *testing.T) {
+	t.Parallel()
+	state := &PolicyScriptsModel{Scripts: []PolicyScriptItemModel{
+		{ID: types.StringValue("7"), Parameter4: types.StringValue(""), Parameter5: types.StringUnknown()},
+		{ID: types.StringValue("7"), Parameter4: types.StringUnknown(), Parameter5: types.StringValue("")},
+		{ID: types.StringValue("9"), Parameter11: types.StringValue("")},
+	}}
+	sc := &proclassic.PolicyScripts{Script: &[]proclassic.PolicyScriptsScriptItem{
+		{ID: new(7), Parameter4: new(""), Parameter5: new("")},
+		{ID: new(7), Parameter4: new(""), Parameter5: new("")},
+		{ID: new(9), Parameter4: new("value"), Parameter11: new("")},
+	}}
+
+	flattenPolicyScripts(sc, state)
+
+	if len(state.Scripts) != 3 {
+		t.Fatalf("expected 3 scripts, got %d", len(state.Scripts))
+	}
+	first, second, third := state.Scripts[0], state.Scripts[1], state.Scripts[2]
+	if first.Parameter4.IsNull() || first.Parameter4.ValueString() != "" {
+		t.Errorf("first parameter_4: expected \"\", got %s", first.Parameter4)
+	}
+	if !first.Parameter5.IsNull() {
+		t.Errorf("first parameter_5: expected null, got %s", first.Parameter5)
+	}
+	if !second.Parameter4.IsNull() {
+		t.Errorf("second parameter_4: expected null, got %s", second.Parameter4)
+	}
+	if second.Parameter5.IsNull() || second.Parameter5.ValueString() != "" {
+		t.Errorf("second parameter_5: expected \"\", got %s", second.Parameter5)
+	}
+	if got := third.Parameter4.ValueString(); got != "value" {
+		t.Errorf("third parameter_4: expected the wire value, got %q", got)
+	}
+	if third.Parameter11.IsNull() || third.Parameter11.ValueString() != "" {
+		t.Errorf("third parameter_11: expected \"\", got %s", third.Parameter11)
+	}
+	if !third.Parameter6.IsNull() {
+		t.Errorf("third parameter_6: expected null, got %s", third.Parameter6)
+	}
+}

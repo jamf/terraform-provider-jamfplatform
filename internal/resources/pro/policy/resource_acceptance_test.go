@@ -1040,6 +1040,94 @@ func TestAccPolicyResource_ScriptsFullCoverage(t *testing.T) {
 	})
 }
 
+func policyConfigEmptyStrings(policyName, scriptName string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_script" "fixture" {
+  name            = %q
+  priority        = "AFTER"
+  script_contents = <<-EOT
+    #!/bin/sh
+    echo "tf-acc-script"
+  EOT
+}
+
+resource "jamfplatform_pro_policy" "test" {
+  general = {
+    name = %q
+  }
+  scripts = {
+    scripts = [
+      {
+        id          = jamfplatform_pro_script.fixture.id
+        priority    = "Before"
+        parameter_4 = ""
+        parameter_5 = "tf-acc-p5"
+      },
+    ]
+  }
+  local_accounts = [
+    {
+      action               = "Create"
+      username             = "tf-acc-empty"
+      realname             = "tf-acc empty"
+      password             = "Sup3rS3cret!"
+      password_wo_version  = 1
+      home                 = "/private/var/tf-acc-empty"
+      hint                 = ""
+      picture              = ""
+      admin                = false
+      filevault_enabled    = false
+      secure_token_allowed = true
+    },
+  ]
+}
+`, scriptName, policyName)
+}
+
+// TestAccPolicyResource_EmptyStringFieldsRoundTrip is the regression test for
+// #445. A local account with hint = "" and picture = "", and a script with
+// parameter_4 = "", must apply cleanly: Jamf Pro echoes each as an empty
+// element, and reading that back as null failed the post-apply consistency
+// check. The framework's post-apply refresh plan asserts no drift on top.
+func TestAccPolicyResource_EmptyStringFieldsRoundTrip(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	policyName := "tf-acc-policy-empty-strings-" + suffix
+	scriptName := "tf-acc-script-empty-strings-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckPolicyDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: policyConfigEmptyStrings(policyName, scriptName),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(
+						"jamfplatform_pro_policy.test",
+						tfjsonpath.New("local_accounts").AtSliceIndex(0).AtMapKey("hint"),
+						knownvalue.StringExact(""),
+					),
+					statecheck.ExpectKnownValue(
+						"jamfplatform_pro_policy.test",
+						tfjsonpath.New("local_accounts").AtSliceIndex(0).AtMapKey("picture"),
+						knownvalue.StringExact(""),
+					),
+					statecheck.ExpectKnownValue(
+						"jamfplatform_pro_policy.test",
+						tfjsonpath.New("scripts").AtMapKey("scripts").AtSliceIndex(0).AtMapKey("parameter_4"),
+						knownvalue.StringExact(""),
+					),
+					statecheck.ExpectKnownValue(
+						"jamfplatform_pro_policy.test",
+						tfjsonpath.New("scripts").AtMapKey("scripts").AtSliceIndex(0).AtMapKey("parameter_5"),
+						knownvalue.StringExact("tf-acc-p5"),
+					),
+				},
+			},
+		},
+	})
+}
+
 func policyConfigPrinters(policyName, printerName, action string, makeDefault bool) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_printer" "fixture" {
