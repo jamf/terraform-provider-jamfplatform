@@ -435,13 +435,19 @@ resource "jamfplatform_pro_ebook" "test" {
 }
 
 // ebookOmitRetainsFixtures declares the tenant objects the omit-retains configs
-// reference: a department, building, static computer group and static mobile
-// device group for the targets tab, a network segment and a second department
-// and building for the exclusions tab, a network segment for the limitations
-// tab, and a category shared by general.category_id and the Self Service
-// category set. Every ID-keyed category the test covers therefore carries a
-// real, distinct member. The Platform device groups bridge to the classic
-// scope through jamf_pro_id. class_ids is covered separately, by
+// reference: a department and building for the targets tab, a network segment
+// and a second department and building for the exclusions tab, a network
+// segment for the limitations tab, and a category shared by
+// general.category_id and the Self Service category set. Every ID-keyed
+// category the test covers therefore carries a real, distinct member.
+//
+// The targets tab deliberately omits computer and mobile device groups. A group
+// fixture cannot be destroyed reliably here: the classic /ebooks DELETE is
+// asynchronous and cannot be polled (see CheckDestroy), so Jamf Pro can still
+// list the ebook as a dependent when the group's DELETE arrives, and refuses it
+// with 422 HAS_DEPENDENCIES. Group targets therefore have unit coverage only
+// (input_builders_test.go, state_builders_test.go), not a live wire test.
+// class_ids is covered separately, by
 // TestAccResource_ProEbook_ScopeClassesSurviveUpdate — it needs its own steps
 // because Jamf Pro will not overwrite a stored class list in a single write.
 func ebookOmitRetainsFixtures(suffix string) string {
@@ -478,20 +484,6 @@ func ebookOmitRetainsFixtures(suffix string) string {
 			starting_address = "10.98.1.0"
 			ending_address   = "10.98.1.255"
 		}
-
-		resource "jamfplatform_device_group" "computers" {
-			name        = "tf-acc-ebook-omit-computers-%[1]s"
-			description = "tf-acc omit-retains computer scope fixture"
-			group_type  = "static"
-			device_type = "computer"
-		}
-
-		resource "jamfplatform_device_group" "mobile" {
-			name        = "tf-acc-ebook-omit-mobile-%[1]s"
-			description = "tf-acc omit-retains mobile scope fixture"
-			group_type  = "static"
-			device_type = "mobile"
-		}
 	`, suffix)
 }
 
@@ -513,14 +505,11 @@ func ebookOmitRetainsGeneral(name string) string {
 }
 
 // ebookOmitRetainsTargets is the scope.targets sub-block every omit-retains
-// step that declares a scope shares: the computer and mobile halves of the
-// dual-target union each carry a real group, plus a department and a building.
+// step that declares a scope shares: a department and a building.
 const ebookOmitRetainsTargets = `
 				targets = {
 					department_ids          = [jamfplatform_pro_department.target.id]
 					building_ids            = [jamfplatform_pro_building.target.id]
-					computer_group_ids      = [jamfplatform_device_group.computers.jamf_pro_id]
-					mobile_device_group_ids = [jamfplatform_device_group.mobile.jamf_pro_id]
 				}
 `
 
@@ -584,14 +573,10 @@ func ebookOmitRetainsParentsOnlyConfig(name, suffix string) string {
 
 // ebookOmitRetainsGeneralOnlyConfig drops every optional block, so the PUT
 // carries <general> alone. The fixtures stay declared so the server's retained
-// scope and categories keep pointing at live objects, and depends_on keeps the
-// destroy order the dropped references no longer imply: the Platform
-// device-groups API refuses to delete a group the retained scope still names
-// (422 HAS_DEPENDENCIES), so the ebook must go before its groups.
+// scope and categories keep pointing at live objects.
 func ebookOmitRetainsGeneralOnlyConfig(name, suffix string) string {
 	return ebookOmitRetainsFixtures(suffix) + `
 		resource "jamfplatform_pro_ebook" "test" {
-			depends_on = [jamfplatform_device_group.computers, jamfplatform_device_group.mobile]
 ` + ebookOmitRetainsGeneral(name) + `
 		}
 	`
@@ -645,8 +630,6 @@ func ebookRetainedOnServer(t *testing.T) resource.TestCheckFunc {
 			{"building.excluded", "jamfplatform_pro_building.excluded", "id"},
 			{"segment.limited", "jamfplatform_pro_network_segment.limited", "id"},
 			{"segment.excluded", "jamfplatform_pro_network_segment.excluded", "id"},
-			{"group.computers", "jamfplatform_device_group.computers", "jamf_pro_id"},
-			{"group.mobile", "jamfplatform_device_group.mobile", "jamf_pro_id"},
 		} {
 			v, err := ebookStateAttr(s, f.addr, f.attr)
 			if err != nil {
@@ -682,19 +665,13 @@ func ebookScopeRetained(sc *proclassic.EbookScope, ids map[string]string) error 
 	if sc == nil {
 		return fmt.Errorf("scope: absent")
 	}
-	if sc.Departments == nil || sc.Buildings == nil || sc.ComputerGroups == nil || sc.MobileDeviceGroups == nil {
+	if sc.Departments == nil || sc.Buildings == nil {
 		return fmt.Errorf("scope.targets: a category is absent: %+v", sc)
 	}
 	if err := ebookRequireSingleIDName("scope.targets.departments", ids["department.target"], sc.Departments.Department); err != nil {
 		return err
 	}
 	if err := ebookRequireSingleIDName("scope.targets.buildings", ids["building.target"], sc.Buildings.Building); err != nil {
-		return err
-	}
-	if err := ebookRequireSingleIDName("scope.targets.computer_groups", ids["group.computers"], sc.ComputerGroups.ComputerGroup); err != nil {
-		return err
-	}
-	if err := ebookRequireSingleIDName("scope.targets.mobile_device_groups", ids["group.mobile"], sc.MobileDeviceGroups.MobileDeviceGroup); err != nil {
 		return err
 	}
 
