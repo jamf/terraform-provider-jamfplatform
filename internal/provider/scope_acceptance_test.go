@@ -136,3 +136,70 @@ func TestAccProviderBetaGateway_Rejected(t *testing.T) {
 		},
 	})
 }
+
+// TestAccProviderID_NonUUID4InBlockRejected pins the schema validators on
+// client_id, tenant_id and environment_id against a real Terraform run. The
+// rejection happens at validate time, so nothing reaches the wire.
+//
+// The regex matches only the framework's summary, since Terraform hard-wraps the
+// detail; the pattern itself is asserted by TestUUID4Regexp.
+func TestAccProviderID_NonUUID4InBlockRejected(t *testing.T) {
+	for _, attr := range []string{"client_id", "tenant_id", "environment_id"} {
+		t.Run(attr, func(t *testing.T) {
+			resource.Test(t, resource.TestCase{
+				PreCheck:                 func() { testhelpers.AccPreCheck(t) },
+				ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+				Steps: []resource.TestStep{
+					{
+						Config:      fmt.Sprintf(scopeProbeConfig, fmt.Sprintf("  %s = \"not-a-uuid\"", attr)),
+						ExpectError: regexp.MustCompile(`Invalid Attribute Value Match`),
+					},
+				},
+			})
+		})
+	}
+}
+
+// TestAccProviderID_NonUUID4FromEnvironmentRejected covers the path no schema
+// validator sees: a malformed JAMFPLATFORM_CLIENT_ID is caught in Configure.
+func TestAccProviderID_NonUUID4FromEnvironmentRejected(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	t.Setenv("JAMFPLATFORM_CLIENT_ID", "not-a-uuid")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      fmt.Sprintf(scopeProbeConfig, ""),
+				ExpectError: regexp.MustCompile(`Invalid client_id`),
+			},
+		},
+	})
+}
+
+// TestAccProviderID_NonUUID4ScopeFromEnvironmentRejected covers the scope half
+// of the environment path: a malformed JAMFPLATFORM_ENVIRONMENT_ID or
+// JAMFPLATFORM_TENANT_ID is caught in Configure. The other scope variable is
+// cleared so resolveScope reaches the ID check instead of the conflict error.
+func TestAccProviderID_NonUUID4ScopeFromEnvironmentRejected(t *testing.T) {
+	for _, tc := range []struct{ set, clear string }{
+		{"JAMFPLATFORM_ENVIRONMENT_ID", "JAMFPLATFORM_TENANT_ID"},
+		{"JAMFPLATFORM_TENANT_ID", "JAMFPLATFORM_ENVIRONMENT_ID"},
+	} {
+		t.Run(tc.set, func(t *testing.T) {
+			testhelpers.AccPreCheck(t)
+			t.Setenv(tc.clear, "")
+			t.Setenv(tc.set, "not-a-uuid")
+
+			resource.Test(t, resource.TestCase{
+				ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+				Steps: []resource.TestStep{
+					{
+						Config:      fmt.Sprintf(scopeProbeConfig, ""),
+						ExpectError: regexp.MustCompile(`Invalid API Integration Scope ID`),
+					},
+				},
+			})
+		})
+	}
+}

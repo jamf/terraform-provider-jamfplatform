@@ -58,16 +58,16 @@ terraform {
 
 provider "jamfplatform" {
   base_url      = "https://us.api.jamfcloud.com" # or "https://eu.api.jamfcloud.com", "https://apac.api.jamfcloud.com"
-  client_id     = "example-client-id"
+  client_id     = "11111111-1111-4111-8111-111111111111"
   client_secret = "example-client-secret"
   # The "Platform environment" your API integration targets. This is the
   # preferred scope for new integrations.
-  environment_id = "00000000-0000-0000-0000-000000000000"
+  environment_id = "22222222-2222-4222-8222-222222222222"
 
   # Legacy alternative: the single "Tenant" your API integration targets. Set
   # exactly one of environment_id or tenant_id, and set the one your integration
   # was actually created for.
-  # tenant_id = "00000000-0000-0000-0000-000000000000"
+  # tenant_id = "22222222-2222-4222-8222-222222222222"
 
   # Only needed when traffic reaches the Platform API through a reverse proxy
   # that authenticates callers itself. An ordinary forward proxy needs nothing
