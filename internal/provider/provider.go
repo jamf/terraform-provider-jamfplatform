@@ -215,13 +215,13 @@ func (p *JamfPlatformProvider) Metadata(ctx context.Context, req provider.Metada
 	resp.Version = p.version
 }
 
-// uuid4Regexp matches a canonical, hyphenated version 4 UUID. The schema
+// uuidRegexp matches a canonical, hyphenated UUID of any version. The schema
 // validators cover values written in the provider block; Configure applies the
 // same pattern to the resolved values so the JAMFPLATFORM_* environment
 // variables, which no schema validator sees, are held to it too.
-var uuid4Regexp = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
+var uuidRegexp = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-const uuid4Message = "must be a version 4 UUID, such as 11111111-1111-4111-8111-111111111111"
+const uuidMessage = "must be a UUID, such as 11111111-1111-1111-1111-111111111111"
 
 func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
@@ -251,7 +251,7 @@ func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRe
 			},
 			"client_id": schema.StringAttribute{
 				Optional:    true,
-				Validators:  []validator.String{stringvalidator.RegexMatches(uuid4Regexp, uuid4Message)},
+				Validators:  []validator.String{stringvalidator.RegexMatches(uuidRegexp, uuidMessage)},
 				Description: "Required. OAuth client ID for Jamf Platform API. Must be set either here or via the JAMFPLATFORM_CLIENT_ID environment variable. Marked Optional in the schema so it can be sourced from the environment; the provider errors at configure time if it is set in neither place.",
 			},
 			"client_secret": schema.StringAttribute{
@@ -261,7 +261,7 @@ func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRe
 			},
 			"environment_id": schema.StringAttribute{
 				Optional:   true,
-				Validators: []validator.String{stringvalidator.RegexMatches(uuid4Regexp, uuid4Message)},
+				Validators: []validator.String{stringvalidator.RegexMatches(uuidRegexp, uuidMessage)},
 				MarkdownDescription: "**Preferred.** ID of the **\"Platform environment\"** your API integration " +
 					"targets, a group of tenants across product types with interconnected capabilities. Can also " +
 					"be set via the `JAMFPLATFORM_ENVIRONMENT_ID` environment variable. This is the scope new " +
@@ -280,7 +280,7 @@ func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRe
 			},
 			"tenant_id": schema.StringAttribute{
 				Optional:   true,
-				Validators: []validator.String{stringvalidator.RegexMatches(uuid4Regexp, uuid4Message)},
+				Validators: []validator.String{stringvalidator.RegexMatches(uuidRegexp, uuidMessage)},
 				MarkdownDescription: "**Legacy.** Prefer `environment_id`. UUID of the single **\"Tenant\"** your API integration targets: one Jamf Pro, Jamf School, Jamf Protect or Jamf Security Cloud tenant. " +
 					"Can also be set via the `JAMFPLATFORM_TENANT_ID` environment variable. " +
 					"Tenant scope is the legacy method for targeting integrations without a platform environment. " +
@@ -387,10 +387,10 @@ func (p *JamfPlatformProvider) Configure(ctx context.Context, req provider.Confi
 		return
 	}
 
-	if !uuid4Regexp.MatchString(clientID) {
+	if !uuidRegexp.MatchString(clientID) {
 		resp.Diagnostics.AddError(
 			"Invalid client_id",
-			fmt.Sprintf("client_id must be a version 4 UUID, got %q. Check the provider block and JAMFPLATFORM_CLIENT_ID.", clientID),
+			fmt.Sprintf("client_id must be a UUID, got %q. Check the provider block and JAMFPLATFORM_CLIENT_ID.", clientID),
 		)
 		return
 	}
@@ -413,10 +413,10 @@ func (p *JamfPlatformProvider) Configure(ctx context.Context, req provider.Confi
 		return
 	}
 
-	if scopeKind != providerdata.ScopeOrganization && !uuid4Regexp.MatchString(scopeID) {
+	if scopeKind != providerdata.ScopeOrganization && !uuidRegexp.MatchString(scopeID) {
 		resp.Diagnostics.AddError(
 			"Invalid API Integration Scope ID",
-			fmt.Sprintf("The %s ID must be a version 4 UUID, got %q. Check the provider block and JAMFPLATFORM_ENVIRONMENT_ID / JAMFPLATFORM_TENANT_ID.", scopeKind, scopeID),
+			fmt.Sprintf("The %s ID must be a UUID, got %q. Check the provider block and JAMFPLATFORM_ENVIRONMENT_ID / JAMFPLATFORM_TENANT_ID.", scopeKind, scopeID),
 		)
 		return
 	}

@@ -14,25 +14,31 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func TestUUID4Regexp(t *testing.T) {
+func TestUUIDRegexp(t *testing.T) {
 	cases := map[string]bool{
 		"11111111-1111-4111-8111-111111111111":   true,
 		"AAAAAAAA-BBBB-4CCC-9DDD-EEEEEEEEEEEE":   true,
-		"11111111-1111-1111-8111-111111111111":   false,
-		"11111111-1111-4111-c111-111111111111":   false,
+		"11111111-1111-1111-8111-111111111111":   true,
+		"6ba7b810-9dad-11d1-80b4-00c04fd430c8":   true,
+		"018f4f2a-7c3e-7000-8000-000000000000":   true,
+		"00000000-0000-0000-0000-000000000000":   true,
+		"11111111-1111-4111-c111-111111111111":   true,
 		"11111111111141118111111111111111":       false,
+		"11111111-1111-4111-8111-11111111111":    false,
+		"11111111-1111-4111-8111-1111111111111":  false,
+		"11111111-1111-4111-8111-11111111111g":   false,
 		"11111111-1111-4111-8111-111111111111 ":  false,
 		"{11111111-1111-4111-8111-111111111111}": false,
 		"":                                       false,
 	}
 	for in, want := range cases {
-		if got := uuid4Regexp.MatchString(in); got != want {
+		if got := uuidRegexp.MatchString(in); got != want {
 			t.Errorf("%q: got %v, want %v", in, got, want)
 		}
 	}
 }
 
-func TestProviderSchemaRejectsNonUUID4(t *testing.T) {
+func TestProviderSchemaRejectsNonUUID(t *testing.T) {
 	var resp provider.SchemaResponse
 	New("test")().Schema(context.Background(), provider.SchemaRequest{}, &resp)
 
@@ -43,8 +49,9 @@ func TestProviderSchemaRejectsNonUUID4(t *testing.T) {
 		}
 		for value, wantErr := range map[string]bool{
 			"example-client-id":                    true,
-			"00000000-0000-0000-0000-000000000000": true,
 			"85f69825-dc92-4522-aa3c-34eea2f20bc5": false,
+			"6ba7b810-9dad-11d1-80b4-00c04fd430c8": false,
+			"018f4f2a-7c3e-7000-8000-000000000000": false,
 		} {
 			var vr validator.StringResponse
 			for _, v := range attr.Validators {

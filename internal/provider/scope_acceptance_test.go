@@ -137,13 +137,13 @@ func TestAccProviderBetaGateway_Rejected(t *testing.T) {
 	})
 }
 
-// TestAccProviderID_NonUUID4InBlockRejected pins the schema validators on
+// TestAccProviderID_NonUUIDInBlockRejected pins the schema validators on
 // client_id, tenant_id and environment_id against a real Terraform run. The
 // rejection happens at validate time, so nothing reaches the wire.
 //
 // The regex matches only the framework's summary, since Terraform hard-wraps the
-// detail; the pattern itself is asserted by TestUUID4Regexp.
-func TestAccProviderID_NonUUID4InBlockRejected(t *testing.T) {
+// detail; the pattern itself is asserted by TestUUIDRegexp.
+func TestAccProviderID_NonUUIDInBlockRejected(t *testing.T) {
 	for _, attr := range []string{"client_id", "tenant_id", "environment_id"} {
 		t.Run(attr, func(t *testing.T) {
 			resource.Test(t, resource.TestCase{
@@ -160,9 +160,9 @@ func TestAccProviderID_NonUUID4InBlockRejected(t *testing.T) {
 	}
 }
 
-// TestAccProviderID_NonUUID4FromEnvironmentRejected covers the path no schema
+// TestAccProviderID_NonUUIDFromEnvironmentRejected covers the path no schema
 // validator sees: a malformed JAMFPLATFORM_CLIENT_ID is caught in Configure.
-func TestAccProviderID_NonUUID4FromEnvironmentRejected(t *testing.T) {
+func TestAccProviderID_NonUUIDFromEnvironmentRejected(t *testing.T) {
 	testhelpers.AccPreCheck(t)
 	t.Setenv("JAMFPLATFORM_CLIENT_ID", "not-a-uuid")
 
@@ -177,11 +177,11 @@ func TestAccProviderID_NonUUID4FromEnvironmentRejected(t *testing.T) {
 	})
 }
 
-// TestAccProviderID_NonUUID4ScopeFromEnvironmentRejected covers the scope half
+// TestAccProviderID_NonUUIDScopeFromEnvironmentRejected covers the scope half
 // of the environment path: a malformed JAMFPLATFORM_ENVIRONMENT_ID or
 // JAMFPLATFORM_TENANT_ID is caught in Configure. The other scope variable is
 // cleared so resolveScope reaches the ID check instead of the conflict error.
-func TestAccProviderID_NonUUID4ScopeFromEnvironmentRejected(t *testing.T) {
+func TestAccProviderID_NonUUIDScopeFromEnvironmentRejected(t *testing.T) {
 	for _, tc := range []struct{ set, clear string }{
 		{"JAMFPLATFORM_ENVIRONMENT_ID", "JAMFPLATFORM_TENANT_ID"},
 		{"JAMFPLATFORM_TENANT_ID", "JAMFPLATFORM_ENVIRONMENT_ID"},
