@@ -28,6 +28,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -208,6 +209,236 @@ func TestAccResource_ProMobileApp_ScopeAndSelfService(t *testing.T) {
 				Config: mobileAppFullConfig(name, "1.0", "Get"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(mobileAppResourceAddr, "self_service.install_button_text", "Get"),
+				),
+			},
+		},
+	})
+}
+
+// expectDescriptionPlannedKnown fails when the plan leaves general.description
+// Unknown. plancheck.ExpectKnownValue reports an Unknown as "path not found",
+// which names a symptom; this check names the bug.
+type expectDescriptionPlannedKnown struct{}
+
+func (expectDescriptionPlannedKnown) CheckPlan(_ context.Context, req plancheck.CheckPlanRequest, resp *plancheck.CheckPlanResponse) {
+	for _, rc := range req.Plan.ResourceChanges {
+		if rc.Address != mobileAppResourceAddr || rc.Change == nil {
+			continue
+		}
+		unknown, _ := rc.Change.AfterUnknown.(map[string]any)
+		general, _ := unknown["general"].(map[string]any)
+		if planned, _ := general["description"].(bool); planned {
+			resp.Error = fmt.Errorf("general.description is planned Unknown although self_service.self_service_description did not change")
+		}
+		return
+	}
+	resp.Error = fmt.Errorf("no planned change for %s", mobileAppResourceAddr)
+}
+
+// mobileAppSelfServiceConfig is a general-only app plus a caller-supplied
+// self_service attribute body, so a test can declare the block while leaving
+// its Optional+Computed leaves unset.
+func mobileAppSelfServiceConfig(name, version, selfService string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_mobile_device_app" "test" {
+			general = {
+				name                 = %q
+				version              = %q
+				bundle_id            = "com.example.tfacc.mobileapp"
+				os_type              = "iOS"
+				deploy_automatically = false
+			}
+			self_service = {%s}
+		}
+	`, name, version, selfService)
+}
+
+// TestAccResource_ProMobileApp_DescriptionMirrorSettlesWithPartialSelfService
+// covers general.description, which mirrors self_service.self_service_description.
+// A declared self_service block with unset Optional+Computed leaves (null in
+// config, populated in state) used to push the mirror to Unknown in any plan
+// that changed another attribute. Each settled step ends with an empty plan, an
+// unrelated edit must keep description known, and a source edit must still
+// re-plan it.
+func TestAccResource_ProMobileApp_DescriptionMirrorSettlesWithPartialSelfService(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-pro-mobileapp-mirror-" + suffix
+
+	emptyPlan := resource.ConfigPlanChecks{
+		PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMobileAppDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				// Every leaf unset: the block is declared and empty.
+				Config: mobileAppSelfServiceConfig(name, "1.0", ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet(mobileAppResourceAddr, "id"),
+					resource.TestCheckResourceAttrSet(mobileAppResourceAddr, "self_service.install_button_text"),
+				),
+			},
+			{
+				// Same config against refreshed state. The plan must be empty.
+				Config:           mobileAppSelfServiceConfig(name, "1.0", ""),
+				ConfigPlanChecks: emptyPlan,
+			},
+			{
+				// An unrelated attribute changes. The framework marks Computed
+				// attributes Unknown only when the plan differs somewhere, so this
+				// edit is where the bug shows. description must stay known: its
+				// source did not move.
+				Config: mobileAppSelfServiceConfig(name, "2.0", ""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
+					expectDescriptionPlannedKnown{},
+				}},
+				Check: resource.TestCheckResourceAttr(mobileAppResourceAddr, "general.version", "2.0"),
+			},
+			{
+				// One leaf set, the source left unset.
+				Config: mobileAppSelfServiceConfig(name, "2.0", `install_button_text = "Get"`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
+					plancheck.ExpectNonEmptyPlan(),
+					expectDescriptionPlannedKnown{},
+				}},
+				Check: resource.TestCheckResourceAttr(mobileAppResourceAddr, "self_service.install_button_text", "Get"),
+			},
+			{
+				Config:           mobileAppSelfServiceConfig(name, "2.0", `install_button_text = "Get"`),
+				ConfigPlanChecks: emptyPlan,
+			},
+			{
+				// Set the source, which moves the mirror.
+				Config: mobileAppSelfServiceConfig(name, "2.0", `self_service_description = "First description."`),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(mobileAppResourceAddr, "self_service.self_service_description", "First description."),
+					resource.TestCheckResourceAttrPair(mobileAppResourceAddr, "general.description", mobileAppResourceAddr, "self_service.self_service_description"),
+				),
+			},
+			{
+				Config:           mobileAppSelfServiceConfig(name, "2.0", `self_service_description = "First description."`),
+				ConfigPlanChecks: emptyPlan,
+			},
+			{
+				// Editing the source must still re-plan the mirror. The fix
+				// narrows the watch; it does not remove it.
+				Config: mobileAppSelfServiceConfig(name, "2.0", `self_service_description = "Second description."`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
+					plancheck.ExpectUnknownValue(mobileAppResourceAddr, tfjsonpath.New("general").AtMapKey("description")),
+				}},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(mobileAppResourceAddr, "self_service.self_service_description", "Second description."),
+					resource.TestCheckResourceAttrPair(mobileAppResourceAddr, "general.description", mobileAppResourceAddr, "self_service.self_service_description"),
+				),
+			},
+		},
+	})
+}
+
+// TestAccResource_ProMobileApp_DeploymentTypeFollowsUnknownDeployAutomatically
+// covers general.deployment_type when deploy_automatically is Unknown at plan
+// time, here derived from a resource created in the same apply. The plan used to
+// carry the prior deployment_type forward, and the apply failed with "Provider
+// produced inconsistent final plan" once the source resolved.
+func TestAccResource_ProMobileApp_DeploymentTypeFollowsUnknownDeployAutomatically(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-pro-mobileapp-unk-" + suffix
+
+	config := func(flag string) string {
+		return fmt.Sprintf(`
+			resource "terraform_data" "flag" {
+				input = %q
+			}
+			resource "jamfplatform_pro_mobile_device_app" "test" {
+				general = {
+					name                 = %q
+					version              = "1.0"
+					bundle_id            = "com.example.tfacc.mobileapp"
+					os_type              = "iOS"
+					deploy_automatically = terraform_data.flag.output == "yes"
+				}
+			}
+		`, flag, name)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMobileAppDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: config("no"),
+				Check:  resource.TestCheckResourceAttr(mobileAppResourceAddr, "general.deployment_type", "Make Available in Self Service"),
+			},
+			{
+				Config: config("yes"),
+				Check:  resource.TestCheckResourceAttr(mobileAppResourceAddr, "general.deployment_type", "Install Automatically/Prompt Users to Install"),
+			},
+		},
+	})
+}
+
+// TestAccResource_ProMobileApp_CategoryAndSiteNamesFollowTheirIDs swaps
+// category_id and site_id between two objects. category_name and site_name are
+// derived from those ids, so they must plan Unknown when an id changes. Carrying
+// the prior name forward failed the apply with "Provider produced inconsistent
+// result after apply".
+func TestAccResource_ProMobileApp_CategoryAndSiteNamesFollowTheirIDs(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-pro-mobileapp-names-" + suffix
+	catA, catB := "tf-acc-mobileapp-cat-a-"+suffix, "tf-acc-mobileapp-cat-b-"+suffix
+	siteA, siteB := "tf-acc-mobileapp-site-a-"+suffix, "tf-acc-mobileapp-site-b-"+suffix
+
+	config := func(pick string) string {
+		return fmt.Sprintf(`
+			resource "jamfplatform_pro_category" "a" {
+				name     = %q
+				priority = 9
+			}
+			resource "jamfplatform_pro_category" "b" {
+				name     = %q
+				priority = 9
+			}
+			resource "jamfplatform_pro_site" "a" {
+				name = %q
+			}
+			resource "jamfplatform_pro_site" "b" {
+				name = %q
+			}
+			resource "jamfplatform_pro_mobile_device_app" "test" {
+				general = {
+					name                 = %q
+					version              = "1.0"
+					bundle_id            = "com.example.tfacc.mobileapp"
+					os_type              = "iOS"
+					deploy_automatically = false
+					category_id          = jamfplatform_pro_category.%[6]s.id
+					site_id              = jamfplatform_pro_site.%[6]s.id
+				}
+			}
+		`, catA, catB, siteA, siteB, name, pick)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMobileAppDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: config("a"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(mobileAppResourceAddr, "general.category_name", catA),
+					resource.TestCheckResourceAttr(mobileAppResourceAddr, "general.site_name", siteA),
+				),
+			},
+			{
+				Config: config("b"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(mobileAppResourceAddr, "general.category_name", catB),
+					resource.TestCheckResourceAttr(mobileAppResourceAddr, "general.site_name", siteB),
 				),
 			},
 		},

@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -141,16 +142,91 @@ func StringSource(p path.Expression) SourceComparer { return compareSource[types
 // BoolSource watches a bool attribute.
 func BoolSource(p path.Expression) SourceComparer { return compareSource[types.Bool](p) }
 
-// ObjectSource watches a whole single-nested block.
+// NestedStringSource watches one string attribute inside a single-nested block.
 //
-// Use it in preference to a path *into* an Optional block: when such a block is
-// null, PathMatches resolves the expression only as far as the block itself, so
-// a nested-attribute watcher is handed the object's path and fails with "Cannot
-// use attr.Value basetypes.StringValue, only basetypes.ObjectValue is
-// supported". Watching the block is coarser — any change inside it marks the
-// mirror Unknown — but a wider Unknown is only ever a slightly noisier plan,
-// whereas a carried-forward stale value is a broken apply.
-func ObjectSource(p path.Expression) SourceComparer { return compareSource[types.Object](p) }
+// Prefer it to a path into an Optional block. When the block is null,
+// PathMatches resolves the expression only as far as the block, so a leaf
+// watcher receives the object's path and fails with "Cannot use attr.Value
+// basetypes.StringValue, only basetypes.ObjectValue is supported". This reads
+// the block first and the leaf from it.
+//
+// Do not watch the whole block either. compareSource calls a block unchanged
+// only when it is null in config. A declared block with an unset
+// Optional+Computed leaf is null there and populated in state, so the two never
+// compare equal, and the mirror goes Unknown in every plan that changes
+// anything else in the resource, even when the leaf it mirrors did not move.
+//
+// The result per case:
+//   - A null block, or a null leaf, is unchanged. The practitioner is not
+//     moving the source, and an unset Optional+Computed leaf carries its prior
+//     value forward itself.
+//   - An Unknown block or leaf is changed. The value is not known until apply
+//     (interpolated from a resource still being created), so a prior mirror
+//     value may be stale by then and Terraform would reject the result.
+//   - A leaf set where state has no block or no value is changed.
+//   - A set leaf is unchanged exactly when it equals the state value.
+//   - A block that cannot be read, or a leaf the block does not have, cannot be
+//     judged, so the mirror stays Unknown.
+func NestedStringSource(block path.Expression, attribute string) SourceComparer {
+	return func(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) (bool, bool) {
+		configBlock, ok := readSourceObject(ctx, req.Config.PathMatches, req.Config.GetAttribute, block, resp)
+		if !ok {
+			return false, false
+		}
+		if configBlock.IsUnknown() {
+			return false, true
+		}
+		if configBlock.IsNull() {
+			return true, true
+		}
+
+		configLeaf, ok := configBlock.Attributes()[attribute].(types.String)
+		if !ok {
+			return false, false
+		}
+		if configLeaf.IsUnknown() {
+			return false, true
+		}
+		if configLeaf.IsNull() {
+			return true, true
+		}
+
+		stateBlock, ok := readSourceObject(ctx, req.State.PathMatches, req.State.GetAttribute, block, resp)
+		if !ok {
+			return false, false
+		}
+		if stateBlock.IsNull() || stateBlock.IsUnknown() {
+			return false, true
+		}
+		stateLeaf, ok := stateBlock.Attributes()[attribute].(types.String)
+		if !ok {
+			return false, false
+		}
+		return configLeaf.Equal(stateLeaf), true
+	}
+}
+
+// readSourceObject resolves a single-nested block from either the config or the
+// state, taking that side's PathMatches and GetAttribute so the two sides share
+// one read. ok is false when the block could not be read at all.
+func readSourceObject(
+	ctx context.Context,
+	pathMatches func(context.Context, path.Expression) (path.Paths, diag.Diagnostics),
+	getAttribute func(context.Context, path.Path, any) diag.Diagnostics,
+	block path.Expression,
+	resp *planmodifier.StringResponse,
+) (obj types.Object, ok bool) {
+	paths, diags := pathMatches(ctx, block)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() || len(paths) == 0 {
+		return obj, false
+	}
+	if diags := getAttribute(ctx, paths[0], &obj); diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return obj, false
+	}
+	return obj, true
+}
 
 // compareSource builds a SourceComparer for any framework value type. The type
 // parameter is what lets GetAttribute reflect into a concrete target: an
@@ -168,8 +244,11 @@ func ObjectSource(p path.Expression) SourceComparer { return compareSource[types
 // source the practitioner has not configured cannot be changing: its own
 // Optional+Computed handling carries the prior value forward. A source they
 // have configured is unchanged precisely when the configured value equals what
-// state holds. A null or unknown configured value therefore reports unchanged:
-// the practitioner is not moving it.
+// state holds. A null configured value therefore reports unchanged: the
+// practitioner is not moving it. An Unknown one reports changed: it resolves
+// during apply (interpolated from a resource still being created), the server
+// mirrors whatever it resolves to, and a carried-forward prior value would
+// reach apply as a stale plan that Terraform rejects.
 func compareSource[T attr.Value](p path.Expression) SourceComparer {
 	return func(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) (bool, bool) {
 		configPaths, diags := req.Config.PathMatches(ctx, p)
@@ -191,7 +270,10 @@ func compareSource[T attr.Value](p path.Expression) SourceComparer {
 			resp.Diagnostics.Append(diags...)
 			return false, false
 		}
-		if configSrc.IsNull() || configSrc.IsUnknown() {
+		if configSrc.IsUnknown() {
+			return false, true
+		}
+		if configSrc.IsNull() {
 			return true, true
 		}
 		return configSrc.Equal(stateSrc), true
