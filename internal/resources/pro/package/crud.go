@@ -760,7 +760,6 @@ func streamingURLEnabled(plan PackageResourceModel) bool {
 // Tradeoffs (versus the disk-staging path):
 //   - No 429 retry mid-upload — the upload reader is not seekable.
 //   - No pre-upload checksum validation — bytes leave before the hash is known.
-//   - No Content-Length precompute — SDK transport falls back to chunked TE.
 //   - Mid-stream origin failure aborts the upload; a retry forces a fresh GET.
 //
 // Trade is intentional: see schema description for the user-facing

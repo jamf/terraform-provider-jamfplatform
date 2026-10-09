@@ -30,8 +30,8 @@ import (
 // The source is hashed by streaming it once and then rewound for the upload, so
 // source_hash always describes what was actually sent without the bytes being
 // buffered. The rewound *os.File stays an io.Seeker, which is what lets the SDK
-// precompute Content-Length and retry a 429; handing it a plain reader would
-// forfeit both. Computing the hash at plan time instead meant reading the source
+// rewind it and retry a 429; handing it a plain reader would forfeit the
+// retry. Computing the hash at plan time instead meant reading the source
 // twice, and a source that answers two reads with different bytes — Apple's
 // iTunes artwork CDN does — then planned one hash and applied another, which
 // Terraform rejects as an inconsistent plan (issue #373).
