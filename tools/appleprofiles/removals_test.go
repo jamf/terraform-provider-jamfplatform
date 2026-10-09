@@ -132,7 +132,7 @@ func TestCompareTablesRefusesAnUnreadableBaseline(t *testing.T) {
 
 func TestRemovalReportElidesBeyondTheBound(t *testing.T) {
 	found := &removals{}
-	for i := 0; i < maxReportedRemovals+3; i++ {
+	for i := range maxReportedRemovals + 3 {
 		found.record("payload type com.apple.%d", i)
 	}
 	report := found.report()
