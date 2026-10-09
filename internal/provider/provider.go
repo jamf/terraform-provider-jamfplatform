@@ -7,10 +7,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
@@ -18,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -216,14 +219,21 @@ func (p *JamfPlatformProvider) Metadata(ctx context.Context, req provider.Metada
 	resp.Version = p.version
 }
 
+// uuidRegexp matches a canonical, hyphenated UUID of any version. The schema
+// validators cover values written in the provider block; Configure applies the
+// same pattern to the resolved values so the JAMFPLATFORM_* environment
+// variables, which no schema validator sees, are held to it too.
+var uuidRegexp = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+const uuidMessage = "must be a UUID, such as 11111111-1111-1111-1111-111111111111"
+
 func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: fmt.Sprintf(
-			"> **⚠️ This provider now publishes as `jamf/jamfplatform`.** Earlier releases carried `jamf-concepts/jamfplatform`, and Terraform records the namespace in state, so upgrading from one of them needs `terraform state replace-provider jamf-concepts/jamfplatform jamf/jamfplatform` in every workspace and state file before `terraform init -upgrade` will succeed. See [Moving to the jamf namespace](guides/namespace-migration).\n\n"+
-				"Provider for [Jamf Platform API Services](https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api). "+
+			"Provider for [Jamf Platform API Services](https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api). "+
 				"Configure `base_url` and credentials via the provider block, environment variables, or Terraform variables.\n\n"+
-				"**📘 New here? Start with the getting-started guide:** [Managing the Jamf Platform with Terraform: the Jamf Platform provider](https://concepts.jamf.com/en/guides/infrastructure-as-code/managing-the-jamf-platform-with-terraform-the-jamf-platform-provider/) on Jamf Concepts walks through installing Terraform, creating API credentials, configuring the provider, writing your first device groups, compliance benchmarks and blueprints, applying a configuration, and bringing an existing tenant under management.\n\n"+
-				"> **⚠️ Upgrading from any pre-GA version — `v0.28.1` or earlier, or a `v0.29.0` release candidate?** The Jamf Platform API has reached general availability, and this release targets the GA gateway. Beta API integration credentials are revoked whichever pre-GA version you are coming from, so register a replacement integration in Jamf Account and replace `tenant_id` with `environment_id`. On `v0.28.1` or earlier, set `base_url` to `https://{region}.api.jamfcloud.com` in the same change as the provider upgrade; a release candidate already points there. Earlier versions reach only the beta host, which no longer serves the API, and several constructs were removed along with the endpoints they called. See [Upgrading to the Platform API GA](guides/platform-api-ga).\n\n"+
+				"**📘 New here? Start with the getting-started guide:** [Managing the Jamf Platform with Terraform: the Jamf Platform provider](https://developer.jamf.com/platform-api/docs/managing-the-jamf-platform-with-terraform-the-jamf-platform-provider) on the Jamf Developer Portal walks through installing Terraform, creating API credentials, configuring the provider, writing your first device groups, compliance benchmarks and blueprints, applying a configuration, and bringing an existing tenant under management.\n\n"+
+				"Coming from `jamf-concepts/jamfplatform`: see [Moving to the jamf namespace](guides/namespace-migration). Coming from a pre-GA beta release: see [Upgrading to the Platform API GA](guides/platform-api-ga).\n\n"+
 				"**Supported Jamf products and tenant version targets**\n\n"+
 				"| Product | Resource namespace | Built against API as of |\n"+
 				"|---------|--------------------|--------------------------|\n"+
@@ -244,6 +254,7 @@ func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRe
 			},
 			"client_id": schema.StringAttribute{
 				Optional:    true,
+				Validators:  []validator.String{stringvalidator.RegexMatches(uuidRegexp, uuidMessage)},
 				Description: "Required. OAuth client ID for Jamf Platform API. Must be set either here or via the JAMFPLATFORM_CLIENT_ID environment variable. Marked Optional in the schema so it can be sourced from the environment; the provider errors at configure time if it is set in neither place.",
 			},
 			"client_secret": schema.StringAttribute{
@@ -252,7 +263,8 @@ func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRe
 				Description: "Required. OAuth client secret for Jamf Platform API. Must be set either here or via the JAMFPLATFORM_CLIENT_SECRET environment variable. Marked Optional in the schema so it can be sourced from the environment; the provider errors at configure time if it is set in neither place.",
 			},
 			"environment_id": schema.StringAttribute{
-				Optional: true,
+				Optional:   true,
+				Validators: []validator.String{stringvalidator.RegexMatches(uuidRegexp, uuidMessage)},
 				MarkdownDescription: "**Preferred.** ID of the **\"Platform environment\"** your API integration " +
 					"targets, a group of tenants across product types with interconnected capabilities. Can also " +
 					"be set via the `JAMFPLATFORM_ENVIRONMENT_ID` environment variable. This is the scope new " +
@@ -270,7 +282,8 @@ func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRe
 					"named at plan time rather than failing mid-apply.",
 			},
 			"tenant_id": schema.StringAttribute{
-				Optional: true,
+				Optional:   true,
+				Validators: []validator.String{stringvalidator.RegexMatches(uuidRegexp, uuidMessage)},
 				MarkdownDescription: "**Legacy.** Prefer `environment_id`. UUID of the single **\"Tenant\"** your API integration targets: one Jamf Pro, Jamf School, Jamf Protect or Jamf Security Cloud tenant. " +
 					"Can also be set via the `JAMFPLATFORM_TENANT_ID` environment variable. " +
 					"Tenant scope is the legacy method for targeting integrations without a platform environment. " +
@@ -377,6 +390,14 @@ func (p *JamfPlatformProvider) Configure(ctx context.Context, req provider.Confi
 		return
 	}
 
+	if !uuidRegexp.MatchString(clientID) {
+		resp.Diagnostics.AddError(
+			"Invalid client_id",
+			fmt.Sprintf("client_id must be a UUID, got %q. Check the provider block and JAMFPLATFORM_CLIENT_ID.", clientID),
+		)
+		return
+	}
+
 	clientSecret := data.ClientSecret.ValueString()
 	if clientSecret == "" {
 		clientSecret = getenv(envClientSecret)
@@ -392,6 +413,14 @@ func (p *JamfPlatformProvider) Configure(ctx context.Context, req provider.Confi
 	scopeKind, scopeID, scopeDiags := resolveScope(data.EnvironmentID, data.TenantID)
 	resp.Diagnostics.Append(scopeDiags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if scopeKind != providerdata.ScopeOrganization && !uuidRegexp.MatchString(scopeID) {
+		resp.Diagnostics.AddError(
+			"Invalid API Integration Scope ID",
+			fmt.Sprintf("The %s ID must be a UUID, got %q. Check the provider block and JAMFPLATFORM_ENVIRONMENT_ID / JAMFPLATFORM_TENANT_ID.", scopeKind, scopeID),
+		)
 		return
 	}
 

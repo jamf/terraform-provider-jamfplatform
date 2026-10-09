@@ -5,8 +5,10 @@ package main
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -219,9 +221,7 @@ func unionSchema(existing, incoming *schema, ref, path string) *schema {
 
 	if existing.Keys != nil || incoming.Keys != nil {
 		keys := make(map[string]*schema, len(existing.Keys)+len(incoming.Keys))
-		for name, sub := range existing.Keys {
-			keys[name] = sub
-		}
+		maps.Copy(keys, existing.Keys)
 		for name, sub := range incoming.Keys {
 			keys[name] = unionSchema(existing.Keys[name], sub, ref, path+"."+name)
 		}
@@ -306,10 +306,8 @@ func stampRefs(target *schema, ref string) {
 
 // appendRef adds a branch name once, preserving read order.
 func appendRef(refs []string, ref string) []string {
-	for _, existing := range refs {
-		if existing == ref {
-			return refs
-		}
+	if slices.Contains(refs, ref) {
+		return refs
 	}
 	return append(refs, ref)
 }
