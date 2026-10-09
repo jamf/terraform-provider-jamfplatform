@@ -299,8 +299,8 @@ func (r *EnrollmentCustomizationResource) Delete(ctx context.Context, req resour
 //
 // The source is hashed by streaming it once, then rewound and uploaded, so the
 // hash describes exactly what was sent without the bytes being buffered. The
-// rewound *os.File stays an io.Seeker, which is what lets the SDK precompute
-// Content-Length and retry a 429; handing it a plain reader would forfeit both.
+// rewound *os.File stays an io.Seeker, which is what lets the SDK rewind it
+// and retry a 429; handing it a plain reader would forfeit the retry.
 func uploadIconForPlan(ctx context.Context, client *pro.Client, source string) (string, string, error) {
 	file, filename, cleanup, err := files.OpenUploadSource(ctx, source, files.DefaultMaxBytes)
 	if err != nil {
