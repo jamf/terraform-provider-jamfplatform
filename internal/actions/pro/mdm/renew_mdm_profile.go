@@ -16,6 +16,7 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -28,7 +29,8 @@ type RenewMdmProfileAction struct {
 }
 
 type RenewMdmProfileActionModel struct {
-	Udids types.List `tfsdk:"udids"`
+	Udids    types.List           `tfsdk:"udids"`
+	Timeouts actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 func NewRenewMdmProfileAction() action.Action {
@@ -54,6 +56,7 @@ func (a *RenewMdmProfileAction) Schema(ctx context.Context, req action.SchemaReq
 			},
 		},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 func (a *RenewMdmProfileAction) Configure(ctx context.Context, req action.ConfigureRequest, resp *action.ConfigureResponse) {
@@ -61,6 +64,12 @@ func (a *RenewMdmProfileAction) Configure(ctx context.Context, req action.Config
 }
 
 func (a *RenewMdmProfileAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

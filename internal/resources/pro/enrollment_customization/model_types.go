@@ -4,6 +4,7 @@
 package enrollment_customization
 
 import (
+	datasourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -90,11 +91,12 @@ type EnrollmentCustomizationIdentityModel struct {
 // data source returns only the parent record (no panes, no icon_source) — the
 // panes belong to the managed resource lifecycle.
 type EnrollmentCustomizationDataSourceModel struct {
-	ID               types.String           `tfsdk:"id"`
-	DisplayName      types.String           `tfsdk:"display_name"`
-	Description      types.String           `tfsdk:"description"`
-	SiteID           types.String           `tfsdk:"site_id"`
-	BrandingSettings *brandingSettingsModel `tfsdk:"branding_settings"`
+	ID               types.String             `tfsdk:"id"`
+	DisplayName      types.String             `tfsdk:"display_name"`
+	Description      types.String             `tfsdk:"description"`
+	SiteID           types.String             `tfsdk:"site_id"`
+	BrandingSettings *brandingSettingsModel   `tfsdk:"branding_settings"`
+	Timeouts         datasourceTimeouts.Value `tfsdk:"timeouts"`
 }
 
 // EnrollmentCustomizationListResourceModel is the list resource config model.

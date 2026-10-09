@@ -631,3 +631,20 @@ func TestConfigureAppTitleCatalog_StableIdentity(t *testing.T) {
 		t.Error("the cache must hand its own Pro client to the read")
 	}
 }
+
+func TestGetJamfProVersion_FetchRunsUnderADeadline(t *testing.T) {
+	var sawDeadline bool
+	pd := &Data{Client: newFakeClient(), scope: ScopeTenant,
+		versionFetcher: func(ctx context.Context) (string, error) {
+			_, sawDeadline = ctx.Deadline()
+			return atFloorVersion, nil
+		},
+	}
+
+	if _, err := pd.GetJamfProVersion(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !sawDeadline {
+		t.Fatal("the version fetch ran on a context with no deadline; a stalled gateway would hang every Pro construct")
+	}
+}

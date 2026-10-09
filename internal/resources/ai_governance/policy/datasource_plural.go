@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -47,12 +48,13 @@ func (d *PoliciesDataSource) Metadata(_ context.Context, req datasource.Metadata
 // The list carries no settings: the platform's list items omit them, and fetching each policy in
 // full to fill the gap would turn one call into one per policy. Read a policy's settings from the
 // singular jamfplatform_ai_governance_policy data source.
-func (d *PoliciesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *PoliciesDataSource) Schema(ctx context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Reads every Jamf AI Governance policy. Archived policies are not included.\n\n" +
 			"Settings are not part of the listing. Read a policy's settings from the " +
 			"`jamfplatform_ai_governance_policy` data source." + pluralDataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
+			"timeouts": timeouts.Attributes(ctx),
 			"sort": schema.ListAttribute{
 				MarkdownDescription: "How to order the results, as `property:asc` or `property:desc` entries " +
 					"applied in order. Sortable properties: `name`, `createdAt`, `updatedAt`. Unset leaves the " +
@@ -136,11 +138,15 @@ func (d *PoliciesDataSource) Configure(_ context.Context, req datasource.Configu
 	d.client = aigovernance.New(pd.Client)
 }
 
+// defaultPluralReadTimeout bounds the whole policy listing.
+const defaultPluralReadTimeout = 90 * time.Second
+
 // policiesDataSourceModel is the Terraform model for the plural policies data source.
 type policiesDataSourceModel struct {
 	Sort            types.List          `tfsdk:"sort"`
 	SchemaDriftOnly types.Bool          `tfsdk:"schema_drift_only"`
 	Policies        []policySummaryItem `tfsdk:"policies"`
+	Timeouts        timeouts.Value      `tfsdk:"timeouts"`
 }
 
 // policySummaryItem is one entry in the plural data source's result list.
@@ -163,6 +169,15 @@ func (d *PoliciesDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
+	readTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, config.Timeouts.IsNull(), config.Timeouts.IsUnknown(), defaultPluralReadTimeout, config.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
 	var sort []string
 	if helpers.IsConfiguredValue(config.Sort) {
 		resp.Diagnostics.Append(config.Sort.ElementsAs(ctx, &sort, false)...)
@@ -171,7 +186,7 @@ func (d *PoliciesDataSource) Read(ctx context.Context, req datasource.ReadReques
 		}
 	}
 
-	summaries, err := d.client.ListPolicies(ctx, sort, config.SchemaDriftOnly.ValueBool())
+	summaries, err := d.client.ListPolicies(readCtx, sort, config.SchemaDriftOnly.ValueBool())
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to list AI policies", helpers.APIErrorDetail(err))
 		return

@@ -65,6 +65,7 @@ resource "jamfplatform_pro_app_installer" "composer" {
 
 ### Optional
 
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 - `version` (String) Title version to look up. Omit to read the title's current version, which is then returned here. Set it to read a historical version instead — the package hash, minimum OS version, availability date and signing identity all move between versions. Use the `jamfplatform_pro_app_installer_titles` data source to discover available titles; a version Jamf Pro no longer publishes is a not-found error.
 
 ### Read-Only
@@ -90,6 +91,14 @@ resource "jamfplatform_pro_app_installer" "composer" {
 - `suppress_auto_update` (Boolean) Whether the title suppresses its built-in auto-update mechanism when managed by Jamf.
 - `title_name` (String) Title display name.
 - `versions` (Attributes List) Versions of this title Jamf Pro still publishes, oldest first, each usable as the `version` argument. Empty for a title whose older builds are no longer installable, which is most of them — an empty list is not a failed read. (see [below for nested schema](#nestedatt--versions))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+
 
 <a id="nestedatt--original_media_sources"></a>
 ### Nested Schema for `original_media_sources`

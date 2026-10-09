@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -34,7 +35,8 @@ type SynchronizeAction struct {
 
 // SynchronizeActionModel is the action's configuration.
 type SynchronizeActionModel struct {
-	UEMConnectID types.String `tfsdk:"uem_connect_id"`
+	UEMConnectID types.String         `tfsdk:"uem_connect_id"`
+	Timeouts     actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 // NewSynchronizeAction returns a new instance of SynchronizeAction.
@@ -48,7 +50,7 @@ func (a *SynchronizeAction) Metadata(_ context.Context, req action.MetadataReque
 }
 
 // Schema returns the action schema.
-func (a *SynchronizeAction) Schema(_ context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
+func (a *SynchronizeAction) Schema(ctx context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
 	resp.Schema = actionschema.Schema{
 		MarkdownDescription: "**\"Synchronize\"** on the Jamf Security Cloud UEM Connect **Actions** menu. Starts a sync " +
 			"run immediately, rather than waiting for the next scheduled one.\n\n" +
@@ -71,6 +73,7 @@ func (a *SynchronizeAction) Schema(_ context.Context, _ action.SchemaRequest, re
 			},
 		},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // Configure wires the Jamf Security Cloud client into the action.
@@ -88,6 +91,12 @@ func (a *SynchronizeAction) Configure(ctx context.Context, req action.ConfigureR
 // Repeated invocations are safe: two triggers back to back are both accepted
 // (wire-verified 2026-08-28).
 func (a *SynchronizeAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

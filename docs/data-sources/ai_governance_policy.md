@@ -55,6 +55,10 @@ output "deployable_version" {
 
 - `id` (String) ID of the policy to read.
 
+### Optional
+
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
 ### Read-Only
 
 - `created_at` (String) When the policy was created, in RFC 3339 format.
@@ -67,3 +71,10 @@ output "deployable_version" {
 - `settings_json` (String) The policy's current settings as a JSON object string. Reflects the draft when one is unpublished, which `has_draft` reports.
 - `tool_id` (String) Identifier of the AI tool the policy configures, such as `com.anthropic.claudecode`.
 - `updated_at` (String) When the policy was last changed, in RFC 3339 format.
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).

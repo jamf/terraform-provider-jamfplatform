@@ -4,6 +4,7 @@
 package app_installer_title
 
 import (
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -40,6 +41,7 @@ type AppInstallerTitleDataSourceModel struct {
 	OriginalMediaSources       []OriginalMediaSourceModel `tfsdk:"original_media_sources"`
 	OriginalTermsAndConditions types.List                 `tfsdk:"original_terms_and_conditions"`
 	Versions                   []TitleVersionModel        `tfsdk:"versions"`
+	Timeouts                   timeouts.Value             `tfsdk:"timeouts"`
 }
 
 // TitleVersionModel models one version Jamf Pro still publishes for a title.

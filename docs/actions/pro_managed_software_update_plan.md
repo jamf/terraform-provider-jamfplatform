@@ -75,3 +75,11 @@ action "jamfplatform_pro_managed_software_update_plan" "enforce_latest" {
 - `force_install_local_date_time` (String) The local date and time by which the update must be installed, in `YYYY-MM-DDThh:mm:ss` form (for example `2026-12-25T21:09:31`). Applies when `update_action` is `DOWNLOAD_INSTALL_SCHEDULE`.
 - `max_deferrals` (Number) How many times a user may defer the update, from `0` to `99`. Applies when `update_action` is `DOWNLOAD_INSTALL_ALLOW_DEFERRAL`.
 - `specific_version` (String) The OS version to enforce. Required when `version_type` is `SPECIFIC_VERSION` or `CUSTOM_VERSION`; leave unset otherwise.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

@@ -4,6 +4,7 @@
 package component
 
 import (
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 )
@@ -15,9 +16,10 @@ type ComponentDataSource struct {
 
 // ComponentDataSourceModel defines the data source data model.
 type ComponentDataSourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	Identifier  types.String `tfsdk:"identifier"`
-	Name        types.String `tfsdk:"name"`
-	Description types.String `tfsdk:"description"`
-	SupportedOs types.Map    `tfsdk:"supported_os"`
+	ID          types.String   `tfsdk:"id"`
+	Identifier  types.String   `tfsdk:"identifier"`
+	Name        types.String   `tfsdk:"name"`
+	Description types.String   `tfsdk:"description"`
+	SupportedOs types.Map      `tfsdk:"supported_os"`
+	Timeouts    timeouts.Value `tfsdk:"timeouts"`
 }

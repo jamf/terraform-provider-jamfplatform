@@ -11,6 +11,7 @@ import (
 	actionschema "github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -24,8 +25,9 @@ type ShutdownAction struct {
 }
 
 type ShutdownActionModel struct {
-	DeviceID     types.String `tfsdk:"device_id"`
-	SerialNumber types.String `tfsdk:"serial_number"`
+	DeviceID     types.String         `tfsdk:"device_id"`
+	SerialNumber types.String         `tfsdk:"serial_number"`
+	Timeouts     actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 func NewShutdownAction() action.Action {
@@ -41,6 +43,7 @@ func (a *ShutdownAction) Schema(ctx context.Context, req action.SchemaRequest, r
 		MarkdownDescription: "Requests that a device shut down. Requires **Device Management Actions API** access." + shutdownDevicePrivileges,
 		Attributes:          deviceTargetAttributes(),
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 func (a *ShutdownAction) ConfigValidators(ctx context.Context) []action.ConfigValidator {
@@ -52,6 +55,12 @@ func (a *ShutdownAction) Configure(ctx context.Context, req action.ConfigureRequ
 }
 
 func (a *ShutdownAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

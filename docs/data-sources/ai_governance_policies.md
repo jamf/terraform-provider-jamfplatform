@@ -59,10 +59,19 @@ output "policies_on_an_older_schema" {
 
 - `schema_drift_only` (Boolean) When `true`, return only policies whose settings schema version is behind the one the platform now offers for their tool. These are the policies worth reviewing after a tool publishes a new schema.
 - `sort` (List of String) How to order the results, as `property:asc` or `property:desc` entries applied in order. Sortable properties: `name`, `createdAt`, `updatedAt`. Unset leaves the order to the platform.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only
 
 - `policies` (Attributes List) The policies found. (see [below for nested schema](#nestedatt--policies))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+
 
 <a id="nestedatt--policies"></a>
 ### Nested Schema for `policies`

@@ -46,11 +46,20 @@ output "first_jamf_title_name" {
 ### Optional
 
 - `name_substring` (String) Optional case-insensitive substring matched against each title's name. When omitted, the whole catalog is returned.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only
 
 - `id` (String) Internal identifier for this data source read.
 - `titles` (Attributes List) Catalog titles, optionally narrowed by `name_substring`. The catalog endpoint returns a summary of each title; read `jamfplatform_pro_app_installer_title` for a title's package metadata. (see [below for nested schema](#nestedatt--titles))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+
 
 <a id="nestedatt--titles"></a>
 ### Nested Schema for `titles`

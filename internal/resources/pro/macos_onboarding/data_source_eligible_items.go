@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -45,6 +46,7 @@ func (d *OnboardingEligibleItemsDataSource) Schema(ctx context.Context, req data
 		MarkdownDescription: "Returns the Self Service objects eligible to be referenced from `jamfplatform_pro_macos_onboarding.onboarding_items`, for the given `entity_type`. " +
 			"Use the returned `id` as `entity_id`, paired with the matching `self_service_entity_type` (`policies` → `OS_X_POLICY`, `configuration_profiles` → `OS_X_CONFIG_PROFILE`, `apps` → `OS_X_MAC_APP` / `OS_X_APP_INSTALLER`)." + pluralDataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
+			"timeouts": timeouts.Attributes(ctx),
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Internal identifier for this data source read (the queried `entity_type`).",
 				Computed:            true,
@@ -110,7 +112,13 @@ func (d *OnboardingEligibleItemsDataSource) Read(ctx context.Context, req dataso
 		return
 	}
 
-	readCtx, cancel := context.WithTimeout(ctx, defaultReadTimeout)
+	readTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, data.Timeouts.IsNull(), data.Timeouts.IsUnknown(), defaultReadTimeout, data.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
 	defer cancel()
 
 	entityType := data.EntityType.ValueString()
