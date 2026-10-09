@@ -17,13 +17,13 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
 // defaultListTimeout caps how long the list operation will wait on the v3
-// configurations list plus the two patch-source catalogue reads. The list
-// resource schema does not expose a user-overridable timeout, so this is a
-// fixed safety bound.
+// configurations list plus the two patch-source catalogue reads, when the list
+// config sets no `timeouts` value.
 const defaultListTimeout = 90 * time.Second
 
 var _ list.ListResource = &PatchSoftwareTitleListResource{}
@@ -75,6 +75,7 @@ func (r *PatchSoftwareTitleListResource) ListResourceConfigSchema(ctx context.Co
 			"filter": filters.ClassicListFilterAttribute(),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams patch software title identities back to
@@ -122,8 +123,12 @@ func (r *PatchSoftwareTitleListResource) List(ctx context.Context, req list.List
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	items, err := r.proClient.ListPatchSoftwareTitleConfigurationsV3(listCtx)
 	if err != nil {

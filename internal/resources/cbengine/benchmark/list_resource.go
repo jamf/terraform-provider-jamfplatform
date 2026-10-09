@@ -6,6 +6,7 @@ package benchmark
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -16,8 +17,20 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/compliancebenchmarks"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultListTimeout caps how long the list operation waits on the benchmark
+// list endpoint.
+const defaultListTimeout = 5 * time.Minute
+
+// defaultItemReadTimeout bounds each per-item benchmark read issued when
+// IncludeResource is set (config generation), giving every item its own
+// deadline independent of the list-fetch budget so one slow benchmark cannot
+// exhaust a shared deadline. A read that times out aborts the query with the
+// same diagnostic as any other per-item read failure.
+const defaultItemReadTimeout = 30 * time.Second
 
 var _ list.ListResource = &BenchmarkListResource{}
 var _ list.ListResourceWithConfigure = &BenchmarkListResource{}
@@ -71,6 +84,7 @@ func (r *BenchmarkListResource) ListResourceConfigSchema(ctx context.Context, re
 			},
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List fetches Jamf Compliance Benchmarks and streams them back to Terraform.
@@ -95,7 +109,13 @@ func (r *BenchmarkListResource) List(ctx context.Context, req list.ListRequest, 
 	searchTerm, hasSearch := helpers.NormalizedFilterString(config.Search)
 	searchLower := strings.ToLower(searchTerm)
 
-	resp, err := r.client.ListBenchmarks(ctx)
+	listCtx, cancelList := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+	resp, err := r.client.ListBenchmarks(listCtx)
+	cancelList()
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic(
@@ -154,7 +174,9 @@ func (r *BenchmarkListResource) List(ctx context.Context, req list.ListRequest, 
 		}
 
 		if req.IncludeResource {
-			detail, err := r.client.GetBenchmark(ctx, bench.ID)
+			itemCtx, cancelItem := context.WithTimeout(ctx, defaultItemReadTimeout)
+			detail, err := r.client.GetBenchmark(itemCtx, bench.ID)
+			cancelItem()
 			if err != nil {
 				stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 					diag.NewErrorDiagnostic(

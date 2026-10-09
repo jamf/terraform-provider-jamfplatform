@@ -5,6 +5,7 @@ package dns_zone
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -15,6 +16,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -23,6 +25,11 @@ import (
 // pinning it to ascending name order makes the streamed results deterministic
 // across runs instead of leaving the order to the server's default.
 const defaultZoneSort = "name:asc"
+
+// defaultListTimeout caps how long the list operation waits on the DNS zone list endpoint.
+// The call is made synchronously inside List, so the deadline is released when
+// List returns.
+const defaultListTimeout = 5 * time.Minute
 
 var (
 	_ list.ListResource              = &DNSZoneListResource{}
@@ -58,13 +65,14 @@ func (r *DNSZoneListResource) Configure(ctx context.Context, req resource.Config
 	r.client = client
 }
 
-// ListResourceConfigSchema describes the (empty) list configuration.
-func (r *DNSZoneListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
+// ListResourceConfigSchema describes the list configuration, which is the `timeouts` attribute alone.
+func (r *DNSZoneListResource) ListResourceConfigSchema(ctx context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
 	resp.Schema = listschema.Schema{
 		Description: "Lists every Jamf Security Cloud custom DNS zone on the tenant. Jamf Security Cloud exposes no " +
 			"filter parameters for zones, so this list resource takes no filter configuration." + listResourcePrivileges,
 		Attributes: map[string]listschema.Attribute{},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams DNS zone identities back to Terraform.
@@ -86,7 +94,14 @@ func (r *DNSZoneListResource) List(ctx context.Context, req list.ListRequest, st
 		return
 	}
 
-	zones, err := r.client.ListDnsZonesV1(ctx, defaultZoneSort)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+
+	zones, err := r.client.ListDnsZonesV1(listCtx, defaultZoneSort)
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic("Unable to list Jamf Security Cloud DNS zones", helpers.APIErrorDetail(err)),

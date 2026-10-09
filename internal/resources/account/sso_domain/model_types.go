@@ -7,6 +7,8 @@ import (
 	datasourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // DomainResourceModel represents the Terraform resource model for a Jamf Account
@@ -99,5 +101,7 @@ type AssignedConnectionModel struct {
 
 // DomainListResourceModel represents the config model for SSO domain list
 // queries. Jamf Account exposes no filter parameters on the domain collection,
-// so the model carries no fields.
-type DomainListResourceModel struct{}
+// so the model carries only the list-level timeouts.
+type DomainListResourceModel struct {
+	Timeouts listtimeouts.Value `tfsdk:"timeouts"`
+}

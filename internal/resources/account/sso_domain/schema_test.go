@@ -255,8 +255,8 @@ func TestDomainListResource_Metadata(t *testing.T) {
 	}
 }
 
-// TestDomainListResource_Schema asserts the config schema is empty. The domain
-// collection accepts neither a filter nor a sort expression, so an attribute
+// TestDomainListResource_Schema asserts the config schema holds nothing but the
+// shared timeouts attribute. The domain collection accepts neither a filter nor a sort expression, so an attribute
 // appearing here would mean a filter was added without wiring it.
 func TestDomainListResource_Schema(t *testing.T) {
 	r := NewDomainListResource()
@@ -266,8 +266,8 @@ func TestDomainListResource_Schema(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
 	}
-	if len(resp.Schema.Attributes) != 0 {
-		t.Errorf("list schema must take no configuration, got %v", resp.Schema.Attributes)
+	if _, ok := resp.Schema.Attributes["timeouts"]; !ok || len(resp.Schema.Attributes) != 1 {
+		t.Errorf("list schema must take only timeouts, got %v", resp.Schema.Attributes)
 	}
 }
 

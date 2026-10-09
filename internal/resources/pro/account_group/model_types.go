@@ -10,6 +10,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/accountprivileges"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // AccountGroupResourceModel is the Terraform model for a Jamf Pro administrator
@@ -59,5 +60,6 @@ type accountGroupIdentityModel struct {
 // list endpoint takes an RSQL filter; the shared classic substring filter is
 // used here for parity with sibling classic resources whose list is client-side.
 type AccountGroupListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

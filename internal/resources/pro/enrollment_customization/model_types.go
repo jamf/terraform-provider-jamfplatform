@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // EnrollmentCustomizationResourceModel is the Terraform resource model for a
@@ -103,5 +104,6 @@ type EnrollmentCustomizationDataSourceModel struct {
 // The Pro v2 list endpoint accepts no RSQL filter, so client-side substring
 // matching is provided via the shared classic-filter helper.
 type EnrollmentCustomizationListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

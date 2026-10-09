@@ -7,6 +7,8 @@ import (
 	datasourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // DeviceGroupResourceModel represents the Terraform resource model for a Jamf
@@ -54,5 +56,7 @@ type DeviceGroupsDataSourceResultModel struct {
 
 // DeviceGroupListResourceModel represents the config model for device group list
 // queries. Jamf Security Cloud exposes no filter parameters on the group list
-// endpoint, so the model carries no fields.
-type DeviceGroupListResourceModel struct{}
+// endpoint, so the model carries only the `timeouts` attribute.
+type DeviceGroupListResourceModel struct {
+	Timeouts listtimeouts.Value `tfsdk:"timeouts"`
+}

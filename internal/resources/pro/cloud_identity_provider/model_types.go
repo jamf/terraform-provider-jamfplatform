@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // CloudIdentityProviderResourceModel is the Terraform resource model for the
@@ -201,7 +202,8 @@ type CloudIdentityProviderDataSourceEntryModel struct {
 // resource. The Cloud Identity Provider list endpoint has no filter parameters,
 // so the filter shape reuses the shared client-side substring block.
 type CloudIdentityProviderListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }
 
 // CloudIdentityProviderDefaultsDataSourceModel is the defaults reference data

@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // AppRequestFormFieldResourceModel represents the Terraform resource model for a Jamf Pro
@@ -43,5 +44,6 @@ type appRequestFormFieldIdentityModel struct {
 // field list queries. The /app-request/form-input-fields endpoint accepts no query
 // parameters, so the optional `filter` block is the shared client-side substring block.
 type AppRequestFormFieldListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

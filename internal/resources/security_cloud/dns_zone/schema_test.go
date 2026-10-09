@@ -156,9 +156,9 @@ func TestDNSZoneListResource_Metadata(t *testing.T) {
 	}
 }
 
-// TestDNSZoneListResource_Schema asserts the config schema is empty. The zone
+// TestDNSZoneListResource_Schema asserts the config schema carries only the `timeouts` attribute. The zone
 // list endpoint takes only a sort expression, so there is nothing to configure —
-// an attribute appearing here would mean a filter was added without wiring it.
+// any other attribute appearing here would mean a filter was added without wiring it.
 func TestDNSZoneListResource_Schema(t *testing.T) {
 	r := NewDNSZoneListResource()
 	var resp list.ListResourceSchemaResponse
@@ -167,8 +167,8 @@ func TestDNSZoneListResource_Schema(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
 	}
-	if len(resp.Schema.Attributes) != 0 {
-		t.Errorf("list schema must take no configuration, got %v", resp.Schema.Attributes)
+	if _, ok := resp.Schema.Attributes["timeouts"]; !ok || len(resp.Schema.Attributes) != 1 {
+		t.Errorf("list schema must take only the timeouts attribute, got %v", resp.Schema.Attributes)
 	}
 }
 

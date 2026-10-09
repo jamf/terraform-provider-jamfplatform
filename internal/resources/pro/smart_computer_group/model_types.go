@@ -10,6 +10,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // SmartComputerGroupResourceModel is the Terraform resource model for a Jamf Pro
@@ -70,5 +71,6 @@ type SmartComputerGroupsDataSourceResultModel struct {
 
 // SmartComputerGroupListResourceModel is the config model for list queries.
 type SmartComputerGroupListResourceModel struct {
-	Filters []filters.FilterModel `tfsdk:"filter"`
+	Filters  []filters.FilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value    `tfsdk:"timeouts"`
 }

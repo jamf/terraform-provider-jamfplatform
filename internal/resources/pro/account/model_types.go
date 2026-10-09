@@ -10,6 +10,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/accountprivileges"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // AccountResourceModel is the Terraform model for a Jamf Pro administrator login
@@ -60,5 +61,6 @@ type accountIdentityModel struct {
 
 // AccountListResourceModel is the config model for list queries.
 type AccountListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

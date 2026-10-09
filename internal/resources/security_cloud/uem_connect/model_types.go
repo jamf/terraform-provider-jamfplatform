@@ -8,6 +8,8 @@ import (
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // UEMConnectResource implements the Terraform resource for the Jamf Security
@@ -131,5 +133,7 @@ type UEMConnectDataSourceModel struct {
 
 // UEMConnectListResourceModel represents the config model for UEM Connect list
 // queries. A tenant holds at most one integration and the list endpoint exposes no
-// parameters, so the model carries no fields.
-type UEMConnectListResourceModel struct{}
+// parameters, so the model carries only the `timeouts` attribute.
+type UEMConnectListResourceModel struct {
+	Timeouts listtimeouts.Value `tfsdk:"timeouts"`
+}

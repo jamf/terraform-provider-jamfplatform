@@ -116,7 +116,9 @@ func listConnectionsWith(t *testing.T, handle stubHandler, limit int64, includeR
 
 	var stream list.ListResultsStream
 	r.List(ctx, list.ListRequest{
-		Config:                 tfsdk.Config{Schema: configResp.Schema, Raw: tftypes.NewValue(configType, map[string]tftypes.Value{})},
+		Config: tfsdk.Config{Schema: configResp.Schema, Raw: tftypes.NewValue(configType, map[string]tftypes.Value{
+			"timeouts": tftypes.NewValue(configType.AttributeTypes["timeouts"], nil),
+		})},
 		IncludeResource:        includeResource,
 		Limit:                  limit,
 		ResourceSchema:         schemaResp.Schema,

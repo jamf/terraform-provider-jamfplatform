@@ -17,6 +17,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/progroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -95,6 +96,7 @@ func (r *SmartComputerGroupListResource) ListResourceConfigSchema(ctx context.Co
 			),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List runs the query and streams group identities back to Terraform.
@@ -120,13 +122,18 @@ func (r *SmartComputerGroupListResource) List(ctx context.Context, req list.List
 	}
 
 	var config SmartComputerGroupListResourceModel
-	if diags := req.Config.Get(ctx, &config); diags.HasError() {
+	diags := req.Config.Get(ctx, &config)
+	if diags.HasError() {
 		stream.Results = list.ListResultsStreamDiagnostics(diags)
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	filterExpression := filters.BuildRSQLExpression(config.Filters, filters.AllowList(SmartComputerGroupFilterSelectors))
 	tflog.Debug(ctx, "smart computer group list filters", map[string]any{"filter": filterExpression})

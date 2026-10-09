@@ -17,13 +17,13 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
 // defaultListTimeout caps how long the list operation will wait on the Jamf Pro
-// scripts endpoint. The list resource schema does not expose a user-overridable
-// timeout, so this is a fixed safety bound — large tenants returning many scripts
-// should still complete well inside this window.
+// scripts endpoint when the list config sets no `timeouts.list`. Large tenants
+// returning many scripts should still complete well inside this window.
 const defaultListTimeout = 90 * time.Second
 
 var _ list.ListResource = &ScriptListResource{}
@@ -66,6 +66,7 @@ func (r *ScriptListResource) ListResourceConfigSchema(ctx context.Context, req l
 			),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams script identities back to Terraform.
@@ -90,8 +91,12 @@ func (r *ScriptListResource) List(ctx context.Context, req list.ListRequest, str
 	filterExpression := filters.BuildRSQLExpression(config.Filters, filters.AllowList(ScriptFilterSelectors))
 	tflog.Debug(ctx, "script list filters", map[string]any{"filter": filterExpression})
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	items, err := r.client.ListScriptsV1(listCtx, nil, filterExpression)
 	if err != nil {

@@ -5,6 +5,7 @@ package category
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -16,8 +17,14 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultListTimeout caps how long the list operation waits on the categories
+// listing endpoint. The listing carries every field the list result needs, so
+// there is no per-item read.
+const defaultListTimeout = 5 * time.Minute
 
 var _ list.ListResource = &CategoryListResource{}
 var _ list.ListResourceWithConfigure = &CategoryListResource{}
@@ -59,6 +66,7 @@ func (r *CategoryListResource) ListResourceConfigSchema(ctx context.Context, req
 			),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams category identities back to Terraform.
@@ -83,7 +91,14 @@ func (r *CategoryListResource) List(ctx context.Context, req list.ListRequest, s
 	filterExpression := filters.BuildRSQLExpression(config.Filters, filters.AllowList(CategoryFilterSelectors))
 	tflog.Debug(ctx, "category list filters", map[string]any{"filter": filterExpression})
 
-	cats, err := r.client.ListCategoriesV1(ctx, nil, filterExpression)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+
+	cats, err := r.client.ListCategoriesV1(listCtx, nil, filterExpression)
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic("Unable to list Jamf Pro categories", helpers.APIErrorDetail(err)),

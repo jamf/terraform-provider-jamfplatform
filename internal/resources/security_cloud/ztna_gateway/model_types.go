@@ -7,6 +7,8 @@ import (
 	datasourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // GatewayResourceModel represents the Terraform resource model for a Jamf
@@ -119,5 +121,7 @@ type GatewaysDataSourceResultModel struct {
 
 // GatewayListResourceModel represents the config model for gateway list queries.
 // Jamf Security Cloud exposes no query parameters on the gateway list endpoint,
-// so the model carries no fields.
-type GatewayListResourceModel struct{}
+// so the model carries only the `timeouts` attribute.
+type GatewayListResourceModel struct {
+	Timeouts listtimeouts.Value `tfsdk:"timeouts"`
+}

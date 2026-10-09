@@ -5,6 +5,7 @@ package sso_connection
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -15,8 +16,19 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultListTimeout caps how long the list operation waits on the connection
+// collection endpoint.
+const defaultListTimeout = 5 * time.Minute
+
+// defaultItemReadTimeout bounds each per-connection read, giving every
+// connection its own deadline independent of the collection fetch so one slow
+// read cannot exhaust a shared budget. A connection whose read fails or times
+// out is dropped with a warning rather than aborting the query.
+const defaultItemReadTimeout = 30 * time.Second
 
 var (
 	_ list.ListResource              = &ConnectionListResource{}
@@ -76,8 +88,9 @@ func (r *ConnectionListResource) Configure(ctx context.Context, req resource.Con
 	r.client = client
 }
 
-// ListResourceConfigSchema describes the (empty) list configuration.
-func (r *ConnectionListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
+// ListResourceConfigSchema describes the list configuration, which holds only the
+// shared `timeouts` attribute.
+func (r *ConnectionListResource) ListResourceConfigSchema(ctx context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
 	resp.Schema = listschema.Schema{
 		Description: "Lists the SSO connections your Jamf Account organization holds, for `terraform query` and " +
 			"for importing existing connections in bulk. Jamf Account exposes no search arguments for " +
@@ -97,6 +110,7 @@ func (r *ConnectionListResource) ListResourceConfigSchema(_ context.Context, _ l
 			listResourcePrivileges,
 		Attributes: map[string]listschema.Attribute{},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams SSO connection identities back to
@@ -132,7 +146,13 @@ func (r *ConnectionListResource) List(ctx context.Context, req list.ListRequest,
 		return
 	}
 
-	summaries, err := r.client.ListConnections(ctx)
+	listCtx, cancelList := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+	summaries, err := r.client.ListConnections(listCtx)
+	cancelList()
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic("Unable to list Jamf Account SSO connections", helpers.APIErrorDetail(err)),
@@ -154,7 +174,9 @@ func (r *ConnectionListResource) List(ctx context.Context, req list.ListRequest,
 		}
 		summary := summaries[i]
 
-		found, readErr := r.client.GetConnection(ctx, summary.ID)
+		itemCtx, cancelItem := context.WithTimeout(ctx, defaultItemReadTimeout)
+		found, readErr := r.client.GetConnection(itemCtx, summary.ID)
+		cancelItem()
 		if readErr != nil {
 			if helpers.IsNotFoundError(readErr) {
 				skipped.AddWarning(

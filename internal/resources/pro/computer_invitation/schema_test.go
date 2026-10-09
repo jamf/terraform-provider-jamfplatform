@@ -10,6 +10,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/list"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 func TestComputerInvitationResource_Metadata(t *testing.T) {
@@ -166,7 +168,13 @@ func TestComputerInvitationListResource_Schema_NoFilter(t *testing.T) {
 		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
 	}
 	// Computer invitations carry no name, so there is deliberately no filter.
-	if len(resp.Schema.Attributes) != 0 {
-		t.Errorf("expected an empty list config schema, got %d attributes", len(resp.Schema.Attributes))
+	if _, ok := resp.Schema.Attributes["filter"]; ok {
+		t.Errorf("expected no filter attribute in the list config schema")
+	}
+	if _, ok := resp.Schema.Attributes[listtimeouts.AttributeName]; !ok {
+		t.Errorf("expected a %q attribute in the list config schema", listtimeouts.AttributeName)
+	}
+	if len(resp.Schema.Attributes) != 1 {
+		t.Errorf("expected only the timeouts attribute in the list config schema, got %d attributes", len(resp.Schema.Attributes))
 	}
 }

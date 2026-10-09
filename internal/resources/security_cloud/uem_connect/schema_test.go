@@ -289,8 +289,11 @@ func TestUEMConnectListResource_TakesNoConfiguration(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
 	}
-	if len(resp.Schema.Attributes) != 0 {
-		t.Errorf("expected no attributes, got %d", len(resp.Schema.Attributes))
+	if len(resp.Schema.Attributes) != 1 {
+		t.Errorf("expected only the timeouts attribute, got %d", len(resp.Schema.Attributes))
+	}
+	if _, ok := resp.Schema.Attributes["timeouts"]; !ok {
+		t.Errorf("expected the timeouts attribute, got %v", resp.Schema.Attributes)
 	}
 	if !strings.Contains(resp.Schema.Description, "import") {
 		t.Errorf("the description should say what the list resource is for:\n%s", resp.Schema.Description)

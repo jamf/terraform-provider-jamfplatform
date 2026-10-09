@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // LdapServerResourceModel is the Terraform resource model for a Jamf Pro
@@ -147,5 +148,6 @@ type ldapServerIdentityModel struct {
 // Classic /ldapservers has no RSQL, so the filter reuses the shared
 // client-side substring block.
 type LdapServerListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

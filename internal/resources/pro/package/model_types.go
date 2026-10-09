@@ -11,6 +11,7 @@ import (
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // PackageResourceModel represents the Terraform resource model for a Jamf
@@ -111,5 +112,6 @@ type packageIdentityModel struct {
 // PackageListResourceModel represents the config model for package list
 // queries.
 type PackageListResourceModel struct {
-	Filters []filters.FilterModel `tfsdk:"filter"`
+	Filters  []filters.FilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value    `tfsdk:"timeouts"`
 }

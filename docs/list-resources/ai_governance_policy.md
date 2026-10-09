@@ -31,3 +31,11 @@ Jamf lists this under **Platform environment** scope. You choose an integration'
 ### Optional
 
 - `schema_drift_only` (Boolean) When true, return only policies whose settings schema version is behind the one the platform now offers for their tool. These are the policies worth reviewing after a tool publishes a new schema.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `list` (String) How long the listing may run before it is cancelled, as a duration such as `30s` or `10m`. Reading an individual result, when a resource is generated for each one, has its own separate limit.
