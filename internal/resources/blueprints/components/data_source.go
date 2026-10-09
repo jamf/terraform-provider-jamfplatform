@@ -23,10 +23,10 @@ import (
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ datasource.DataSource = &ComponentsDataSource{}
 
-// NewComponentsDataSource returns a new instance of ComponentsDataSource.
 // defaultReadTimeout bounds the component listing.
 const defaultReadTimeout = 90 * time.Second
 
+// NewComponentsDataSource returns a new instance of ComponentsDataSource.
 func NewComponentsDataSource() datasource.DataSource {
 	return &ComponentsDataSource{}
 }

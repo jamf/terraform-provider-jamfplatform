@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
@@ -633,10 +634,15 @@ func TestConfigureAppTitleCatalog_StableIdentity(t *testing.T) {
 }
 
 func TestGetJamfProVersion_FetchRunsUnderADeadline(t *testing.T) {
-	var sawDeadline bool
+	var (
+		sawDeadline bool
+		remaining   time.Duration
+	)
 	pd := &Data{Client: newFakeClient(), scope: ScopeTenant,
 		versionFetcher: func(ctx context.Context) (string, error) {
-			_, sawDeadline = ctx.Deadline()
+			var deadline time.Time
+			deadline, sawDeadline = ctx.Deadline()
+			remaining = time.Until(deadline)
 			return atFloorVersion, nil
 		},
 	}
@@ -646,5 +652,8 @@ func TestGetJamfProVersion_FetchRunsUnderADeadline(t *testing.T) {
 	}
 	if !sawDeadline {
 		t.Fatal("the version fetch ran on a context with no deadline; a stalled gateway would hang every Pro construct")
+	}
+	if remaining > versionFetchTimeout || remaining < versionFetchTimeout-5*time.Second {
+		t.Fatalf("version fetch deadline in %s, want about %s", remaining, versionFetchTimeout)
 	}
 }

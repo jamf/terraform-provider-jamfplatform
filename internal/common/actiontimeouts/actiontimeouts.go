@@ -7,8 +7,8 @@
 // without this a stalled gateway holds `terraform apply` until the operator interrupts it. Resources
 // and data sources bound their SDK calls through helpers.ResolveTimeout and a timeouts block; actions
 // do the same through terraform-plugin-framework-timeouts/action/timeouts, wrapped here so each
-// action is two lines (Add in Schema, Bound at the top of Invoke) and none of them has to carry a
-// Timeouts field in its config model.
+// action is two lines (Add in Schema, Bound at the top of Invoke) plus a Timeouts field on its config
+// model, which the framework requires once the schema declares the attribute.
 package actiontimeouts
 
 import (
@@ -52,9 +52,10 @@ func Add(ctx context.Context, attrs map[string]actionschema.Attribute) map[strin
 // Bound derives a context that expires after the configured `invoke` timeout, or after
 // defaultTimeout when none is set. The returned cancel is never nil and must be deferred.
 //
-// The attribute is read by path rather than through the action's config model, so a model needs no
-// Timeouts field. A malformed duration is reported on diags and the context is returned unbounded,
-// so the caller must check diags.HasError() before using it.
+// The attribute is read by path rather than through the action's config model, so Bound itself does
+// not depend on the model; the model still needs the Timeouts field for every other decode of the
+// config. A malformed duration is reported on diags and the context is returned unbounded, so the
+// caller must check diags.HasError() before using it.
 func Bound(ctx context.Context, cfg tfsdk.Config, diags *diag.Diagnostics, defaultTimeout time.Duration) (context.Context, context.CancelFunc) {
 	// A zero Config has no schema to read from, which only a direct unit-test call produces: the
 	// framework always supplies one. Fall back to the default rather than panic.
