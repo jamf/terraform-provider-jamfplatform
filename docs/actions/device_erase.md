@@ -51,3 +51,11 @@ action "jamfplatform_device_erase" "return_device_to_service" {
 - `preserve_data_plan` (Boolean) Preserve the data plan on an iPhone or iPad with eSIM functionality, if one exists. Applies to mobile devices only.
 - `return_to_service` (Boolean) The device will be returned to service after the erase is complete. Applies to mobile devices only.
 - `serial_number` (String) Device serial number (case-sensitive). Requires **Device Inventory API** access when set. Set exactly one of this or `device_id`.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

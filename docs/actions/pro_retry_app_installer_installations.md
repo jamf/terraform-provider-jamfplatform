@@ -59,3 +59,11 @@ resource "terraform_data" "retry_on_change" {
 ### Optional
 
 - `computer_ids` (List of String) Jamf Pro computer IDs to retry, each retried individually. Omit to retry every failed installation in the deployment; an empty list is not a valid way to say that.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -26,8 +27,9 @@ type SendBlankPushAction struct {
 }
 
 type SendBlankPushActionModel struct {
-	ManagementIDs types.List `tfsdk:"management_ids"`
-	SerialNumbers types.List `tfsdk:"serial_numbers"`
+	ManagementIDs types.List           `tfsdk:"management_ids"`
+	SerialNumbers types.List           `tfsdk:"serial_numbers"`
+	Timeouts      actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 func NewSendBlankPushAction() action.Action {
@@ -43,6 +45,7 @@ func (a *SendBlankPushAction) Schema(ctx context.Context, req action.SchemaReque
 		MarkdownDescription: "Sends a blank push notification to one or more devices to prompt them to check in." + blankPushBatchNote + sendBlankPushPrivileges,
 		Attributes:          targetListAttributes("device"),
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 func (a *SendBlankPushAction) ConfigValidators(ctx context.Context) []action.ConfigValidator {
@@ -54,6 +57,12 @@ func (a *SendBlankPushAction) Configure(ctx context.Context, req action.Configur
 }
 
 func (a *SendBlankPushAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

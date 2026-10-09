@@ -1,10 +1,8 @@
 # terraform-provider-jamfplatform
 
-> **⚠️ This provider now publishes as `jamf/jamfplatform`.** Earlier releases carried `jamf-concepts/jamfplatform`, and Terraform records the namespace in state, so upgrading from one of them needs `terraform state replace-provider jamf-concepts/jamfplatform jamf/jamfplatform` in every workspace and state file before `terraform init -upgrade` will succeed. See [Moving to the jamf namespace](docs/guides/namespace-migration.md).
-
-> **📘 Start here — [Managing the Jamf Platform with Terraform: the Jamf Platform provider](https://concepts.jamf.com/en/guides/infrastructure-as-code/managing-the-jamf-platform-with-terraform-the-jamf-platform-provider/)**
+> **📘 Start here — [Managing the Jamf Platform with Terraform: the Jamf Platform provider](https://developer.jamf.com/platform-api/docs/managing-the-jamf-platform-with-terraform-the-jamf-platform-provider)**
 >
-> The official getting-started guide on Jamf Concepts. Covers installing Terraform, creating API credentials, configuring the provider, writing your first device groups / compliance benchmarks / blueprints, applying a configuration, and bringing an existing tenant under management. New to this provider or to Terraform? Read that first.
+> The official getting-started guide on the Jamf Developer Portal. Covers installing Terraform, creating API credentials, configuring the provider, writing your first device groups / compliance benchmarks / blueprints, applying a configuration, and bringing an existing tenant under management. New to this provider or to Terraform? Read that first.
 
 Provides resources and data sources for managing the products and services available through the [Jamf Platform API](https://developer.jamf.com/platform-api/):
 
@@ -26,11 +24,14 @@ It additionally provides resources and data sources for these products, each und
 
 Further Jamf products are expected to follow. See the **Supported Jamf products** section below for the per-product tenant version targets, and the [guides](./docs/guides/) for the families that carry behaviour worth reading first.
 
-The Jamf Platform API reached general availability on 3 September 2026. Upgrading a configuration written against the public beta takes a coordinated change to the gateway host, the credentials and the scope attribute — see the [Upgrading to the Platform API GA](docs/guides/platform-api-ga.md) guide.
-
 ## Acknowledgements
 
 This provider builds on a path charted by [Deployment Theory](https://github.com/deploymenttheory) and their [`terraform-provider-jamfpro`](https://github.com/deploymenttheory/terraform-provider-jamfpro) — first released in early 2024, it has grown into the most comprehensive community Terraform provider for Jamf and the one the community rallies behind. It proved the depth of demand for managing Jamf as code and sets the bar for what a Jamf provider could be; this provider would not exist in its current form without that groundwork. `terraform-provider-jamfpro` remains an independent, actively maintained project, and we're grateful to its maintainers for the example they set.
+
+## Upgrading from an earlier release
+
+* Coming from `jamf-concepts/jamfplatform`: [Moving to the jamf namespace](docs/guides/namespace-migration.md).
+* Coming from a pre-GA beta release: [Upgrading to the Platform API GA](docs/guides/platform-api-ga.md).
 
 ## Requirements
 
@@ -56,7 +57,7 @@ Further Jamf products are expected to be added; each will get its own row, names
 
 The jamfplatform provider is published in the [Hashicorp](https://registry.terraform.io/providers/jamf/jamfplatform) and [OpenTofu](https://search.opentofu.org/provider/jamf/jamfplatform) registries.
 
-For a step-by-step walkthrough — from installing Terraform through to applying your first configuration and importing an existing tenant — see the Jamf Concepts guide: [**Managing the Jamf Platform with Terraform: the Jamf Platform provider**](https://concepts.jamf.com/en/guides/infrastructure-as-code/managing-the-jamf-platform-with-terraform-the-jamf-platform-provider/).
+For a step-by-step walkthrough — from installing Terraform through to applying your first configuration and importing an existing tenant — see the Jamf Developer Portal guide: [**Managing the Jamf Platform with Terraform: the Jamf Platform provider**](https://developer.jamf.com/platform-api/docs/managing-the-jamf-platform-with-terraform-the-jamf-platform-provider).
 
 For provider block/variable reference, refer to the registry link above for your platform of choice.
 

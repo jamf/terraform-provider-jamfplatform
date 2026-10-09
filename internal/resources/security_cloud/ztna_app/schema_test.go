@@ -310,8 +310,11 @@ func TestZtnaAppListResource_ConfigSchema(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
 	}
-	if got := len(resp.Schema.Attributes); got != 0 {
-		t.Errorf("expected no filter attributes, got %d", got)
+	if got := len(resp.Schema.Attributes); got != 1 {
+		t.Errorf("expected only the timeouts attribute, got %d", got)
+	}
+	if _, ok := resp.Schema.Attributes["timeouts"]; !ok {
+		t.Errorf("expected the timeouts attribute, got %v", resp.Schema.Attributes)
 	}
 }
 

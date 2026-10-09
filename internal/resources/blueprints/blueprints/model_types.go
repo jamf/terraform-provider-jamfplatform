@@ -4,6 +4,7 @@
 package blueprints
 
 import (
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	bp "github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 )
@@ -18,6 +19,7 @@ type BlueprintsDataSourceModel struct {
 	ID         types.String        `tfsdk:"id"`
 	Search     types.String        `tfsdk:"search"`
 	Blueprints []BlueprintListItem `tfsdk:"blueprints"`
+	Timeouts   timeouts.Value      `tfsdk:"timeouts"`
 }
 
 // BlueprintListItem represents a single blueprint overview entry.

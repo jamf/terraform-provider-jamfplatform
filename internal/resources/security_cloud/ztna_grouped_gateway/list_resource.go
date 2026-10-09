@@ -5,6 +5,7 @@ package ztna_grouped_gateway
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -15,8 +16,14 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultListTimeout caps how long the list operation waits on the gateway
+// collection endpoint. The collection carries every field a generated
+// configuration needs, so there is no per-item read to bound.
+const defaultListTimeout = 5 * time.Minute
 
 var (
 	_ list.ListResource              = &GroupedGatewayListResource{}
@@ -53,13 +60,14 @@ func (r *GroupedGatewayListResource) Configure(ctx context.Context, req resource
 }
 
 // ListResourceConfigSchema describes the (empty) list configuration.
-func (r *GroupedGatewayListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
+func (r *GroupedGatewayListResource) ListResourceConfigSchema(ctx context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
 	resp.Schema = listschema.Schema{
 		Description: "Lists every Jamf Security Cloud ZTNA grouped gateway on the tenant. Jamf Security Cloud " +
 			"exposes no query parameters for grouped gateways, so this list resource takes no filter " +
 			"configuration." + listResourcePrivileges,
 		Attributes: map[string]listschema.Attribute{},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams grouped gateway identities back to
@@ -82,7 +90,14 @@ func (r *GroupedGatewayListResource) List(ctx context.Context, req list.ListRequ
 		return
 	}
 
-	groups, err := r.client.ListZtnaGroupedGatewaysV1(ctx)
+	listCtx, cancelList := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+
+	groups, err := r.client.ListZtnaGroupedGatewaysV1(listCtx)
+	cancelList()
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic("Unable to list Jamf Security Cloud ZTNA grouped gateways", helpers.APIErrorDetail(err)),

@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // DirectoryBindingResourceModel is the Terraform resource model for a Jamf
@@ -132,5 +133,6 @@ type directoryBindingIdentityModel struct {
 // resource. Classic /directorybindings has no RSQL, so the filter shape
 // reuses the shared client-side substring block.
 type DirectoryBindingListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // StaticMobileDeviceGroupResourceModel is the Terraform resource model for a
@@ -76,5 +77,6 @@ type StaticMobileDeviceGroupsDataSourceResultModel struct {
 
 // StaticMobileDeviceGroupListResourceModel is the config model for list queries.
 type StaticMobileDeviceGroupListResourceModel struct {
-	Filters []filters.FilterModel `tfsdk:"filter"`
+	Filters  []filters.FilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value    `tfsdk:"timeouts"`
 }

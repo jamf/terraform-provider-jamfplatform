@@ -40,3 +40,11 @@ action "jamfplatform_device_unmanage" "retire_device" {
 
 - `device_id` (String) Jamf Pro Management ID. Set exactly one of this or `serial_number`.
 - `serial_number` (String) Device serial number (case-sensitive). Requires **Device Inventory API** access when set. Set exactly one of this or `device_id`.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

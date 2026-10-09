@@ -16,6 +16,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/payloadhelpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -51,7 +52,8 @@ type ListResource struct {
 
 // ListResourceConfigModel is the config model for list queries.
 type ListResourceConfigModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }
 
 // Metadata sets the list resource type name.
@@ -70,13 +72,14 @@ func (r *ListResource) Configure(ctx context.Context, req resource.ConfigureRequ
 }
 
 // ListResourceConfigSchema describes the supported list filters.
-func (r *ListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
+func (r *ListResource) ListResourceConfigSchema(ctx context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
 	resp.Schema = listschema.Schema{
 		Description: "Lists macOS configuration profiles in the tenant. Supply an optional case-insensitive `name_substring` filter. Filtering happens in the provider, so every profile is fetched before the filter runs. List entries return identity only; use the `jamfplatform_pro_macos_configuration_profile` data source for per-profile detail." + listResourcePrivileges,
 		Attributes: map[string]listschema.Attribute{
 			"filter": filters.ClassicListFilterAttribute(),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams profile identities back to Terraform.
@@ -92,13 +95,18 @@ func (r *ListResource) List(ctx context.Context, req list.ListRequest, stream *l
 	}
 
 	var config ListResourceConfigModel
-	if diags := req.Config.Get(ctx, &config); diags.HasError() {
+	diags := req.Config.Get(ctx, &config)
+	if diags.HasError() {
 		stream.Results = list.ListResultsStreamDiagnostics(diags)
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	resp, err := r.client.ListOSXConfigurationProfiles(listCtx)
 	if err != nil {

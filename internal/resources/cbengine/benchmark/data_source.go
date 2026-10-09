@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -40,6 +41,7 @@ func (d *BenchmarkDataSource) Schema(ctx context.Context, req datasource.SchemaR
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Returns a benchmark by ID or title. Requires **Compliance Benchmarks API** access." + dataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
+			"timeouts": timeouts.Attributes(ctx),
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The benchmark ID to fetch. Optional if title is set.",
 				Optional:            true,
@@ -302,17 +304,26 @@ func (d *BenchmarkDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
+	readTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, data.Timeouts.IsNull(), data.Timeouts.IsUnknown(), defaultReadTimeout, data.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
 	var bench *compliancebenchmarks.BenchmarkResponseV2
 	var err error
 	if !data.ID.IsNull() && data.ID.ValueString() != "" {
-		bench, err = d.client.GetBenchmark(ctx, data.ID.ValueString())
+		bench, err = d.client.GetBenchmark(readCtx, data.ID.ValueString())
 	} else if !data.Title.IsNull() && data.Title.ValueString() != "" {
-		id, idErr := d.client.ResolveBenchmarkIDByName(ctx, data.Title.ValueString())
+		id, idErr := d.client.ResolveBenchmarkIDByName(readCtx, data.Title.ValueString())
 		if idErr != nil {
 			resp.Diagnostics.AddError("Unable to find benchmark", helpers.APIErrorDetail(idErr))
 			return
 		}
-		bench, err = d.client.GetBenchmark(ctx, id)
+		bench, err = d.client.GetBenchmark(readCtx, id)
 	} else {
 		resp.Diagnostics.AddError(
 			"Missing Required Attribute",

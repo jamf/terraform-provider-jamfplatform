@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/action"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 )
 
 func schemaOf(t *testing.T, a action.Action) action.SchemaResponse {
@@ -65,8 +67,8 @@ func TestRetryInstallationsAction_Schema(t *testing.T) {
 // narrowed, which it cannot.
 func TestRetryAllInstallationsAction_TakesNoArguments(t *testing.T) {
 	s := schemaOf(t, NewRetryAllInstallationsAction()).Schema
-	if len(s.Attributes) != 0 {
-		t.Errorf("expected no attributes, got %v", s.Attributes)
+	if _, ok := s.Attributes[actiontimeouts.AttributeName]; len(s.Attributes) != 1 || !ok {
+		t.Errorf("expected only the timeouts attribute, got %v", s.Attributes)
 	}
 }
 

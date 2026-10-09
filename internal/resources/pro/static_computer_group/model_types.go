@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // StaticComputerGroupResourceModel is the Terraform model for a Jamf Pro static
@@ -70,5 +71,6 @@ type StaticComputerGroupsDataSourceResultModel struct {
 
 // StaticComputerGroupListResourceModel is the config model for list queries.
 type StaticComputerGroupListResourceModel struct {
-	Filters []filters.FilterModel `tfsdk:"filter"`
+	Filters  []filters.FilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value    `tfsdk:"timeouts"`
 }

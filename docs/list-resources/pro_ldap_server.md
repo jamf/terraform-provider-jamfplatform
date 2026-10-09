@@ -48,6 +48,7 @@ list "jamfplatform_pro_ldap_server" "ad_servers" {
 ### Optional
 
 - `filter` (Attributes) Optional case-insensitive `name_substring` filter applied client-side after the full list is fetched. For exact-name lookup, use the singular `by name` data source instead. (see [below for nested schema](#nestedatt--filter))
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 <a id="nestedatt--filter"></a>
 ### Nested Schema for `filter`
@@ -55,3 +56,11 @@ list "jamfplatform_pro_ldap_server" "ad_servers" {
 Optional:
 
 - `name_substring` (String) Case-insensitive substring matched against the resource's display name. Empty or omitted returns every item.
+
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `list` (String) How long the listing may run before it is cancelled, as a duration such as `30s` or `10m`. Reading an individual result, when a resource is generated for each one, has its own separate limit.

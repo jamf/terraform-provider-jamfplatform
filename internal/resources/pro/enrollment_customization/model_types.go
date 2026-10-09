@@ -4,10 +4,12 @@
 package enrollment_customization
 
 import (
+	datasourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // EnrollmentCustomizationResourceModel is the Terraform resource model for a
@@ -90,16 +92,18 @@ type EnrollmentCustomizationIdentityModel struct {
 // data source returns only the parent record (no panes, no icon_source) — the
 // panes belong to the managed resource lifecycle.
 type EnrollmentCustomizationDataSourceModel struct {
-	ID               types.String           `tfsdk:"id"`
-	DisplayName      types.String           `tfsdk:"display_name"`
-	Description      types.String           `tfsdk:"description"`
-	SiteID           types.String           `tfsdk:"site_id"`
-	BrandingSettings *brandingSettingsModel `tfsdk:"branding_settings"`
+	ID               types.String             `tfsdk:"id"`
+	DisplayName      types.String             `tfsdk:"display_name"`
+	Description      types.String             `tfsdk:"description"`
+	SiteID           types.String             `tfsdk:"site_id"`
+	BrandingSettings *brandingSettingsModel   `tfsdk:"branding_settings"`
+	Timeouts         datasourceTimeouts.Value `tfsdk:"timeouts"`
 }
 
 // EnrollmentCustomizationListResourceModel is the list resource config model.
 // The Pro v2 list endpoint accepts no RSQL filter, so client-side substring
 // matching is provided via the shared classic-filter helper.
 type EnrollmentCustomizationListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

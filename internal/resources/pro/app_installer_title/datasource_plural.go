@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -27,6 +28,7 @@ type AppInstallerTitlesDataSourceModel struct {
 	ID            types.String                    `tfsdk:"id"`
 	NameSubstring types.String                    `tfsdk:"name_substring"`
 	Titles        []AppInstallerTitleSummaryModel `tfsdk:"titles"`
+	Timeouts      timeouts.Value                  `tfsdk:"timeouts"`
 }
 
 // AppInstallerTitlesDataSource implements the Terraform plural data source.
@@ -51,6 +53,7 @@ func (d *AppInstallerTitlesDataSource) Schema(ctx context.Context, req datasourc
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Returns the App Installer catalog — every title published to the tenant. Titles are managed by Jamf and cannot be created or modified. Use the optional `name_substring` to narrow the result; matching is case-insensitive and applied after the full catalog is fetched." + pluralDataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
+			"timeouts": timeouts.Attributes(ctx),
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Internal identifier for this data source read.",
 				Computed:            true,
@@ -96,7 +99,13 @@ func (d *AppInstallerTitlesDataSource) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	readCtx, cancel := context.WithTimeout(ctx, defaultPluralReadTimeout)
+	readTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, data.Timeouts.IsNull(), data.Timeouts.IsUnknown(), defaultPluralReadTimeout, data.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
 	defer cancel()
 
 	titles, err := d.client.ListAppInstallerTitlesV1(readCtx, nil, "")

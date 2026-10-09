@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // AutomatedDeviceEnrollmentResourceModel represents the Terraform resource
@@ -70,5 +71,6 @@ type AutomatedDeviceEnrollmentDataSourceModel struct {
 // filter, so the optional `filter` block reuses the shared client-side
 // substring matcher.
 type AutomatedDeviceEnrollmentListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

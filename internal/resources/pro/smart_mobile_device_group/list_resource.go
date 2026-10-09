@@ -19,6 +19,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/progroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -108,6 +109,7 @@ func (r *SmartMobileDeviceGroupListResource) ListResourceConfigSchema(ctx contex
 			),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams group identities back to Terraform.
@@ -129,8 +131,12 @@ func (r *SmartMobileDeviceGroupListResource) List(ctx context.Context, req list.
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	filterExpression := filters.BuildRSQLExpression(config.Filters, filters.AllowList(SmartMobileDeviceGroupFilterSelectors))
 	tflog.Debug(ctx, "smart mobile device group list filters", map[string]any{"filter": filterExpression})

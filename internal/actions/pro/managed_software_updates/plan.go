@@ -31,6 +31,7 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -71,14 +72,15 @@ type PlanAction struct {
 
 // PlanActionModel represents the action config schema.
 type PlanActionModel struct {
-	GroupID                   types.String `tfsdk:"group_id"`
-	ObjectType                types.String `tfsdk:"object_type"`
-	UpdateAction              types.String `tfsdk:"update_action"`
-	VersionType               types.String `tfsdk:"version_type"`
-	SpecificVersion           types.String `tfsdk:"specific_version"`
-	BuildVersion              types.String `tfsdk:"build_version"`
-	ForceInstallLocalDateTime types.String `tfsdk:"force_install_local_date_time"`
-	MaxDeferrals              types.Int64  `tfsdk:"max_deferrals"`
+	GroupID                   types.String         `tfsdk:"group_id"`
+	ObjectType                types.String         `tfsdk:"object_type"`
+	UpdateAction              types.String         `tfsdk:"update_action"`
+	VersionType               types.String         `tfsdk:"version_type"`
+	SpecificVersion           types.String         `tfsdk:"specific_version"`
+	BuildVersion              types.String         `tfsdk:"build_version"`
+	ForceInstallLocalDateTime types.String         `tfsdk:"force_install_local_date_time"`
+	MaxDeferrals              types.Int64          `tfsdk:"max_deferrals"`
+	Timeouts                  actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 // NewPlanAction constructs the action.
@@ -171,6 +173,7 @@ func (a *PlanAction) Schema(ctx context.Context, req action.SchemaRequest, resp 
 			},
 		},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 func (a *PlanAction) ConfigValidators(ctx context.Context) []action.ConfigValidator {
@@ -185,6 +188,12 @@ func (a *PlanAction) Configure(ctx context.Context, req action.ConfigureRequest,
 }
 
 func (a *PlanAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

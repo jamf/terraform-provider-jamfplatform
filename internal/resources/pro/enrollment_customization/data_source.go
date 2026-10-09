@@ -11,6 +11,7 @@ package enrollment_customization
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -52,6 +53,7 @@ func (d *EnrollmentCustomizationDataSource) Schema(ctx context.Context, req data
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Look up a Jamf Pro enrollment customization by ID or by exact display name. Exactly one of `id` or `display_name` must be supplied. Display names are not enforced unique by Jamf Pro; the lookup surfaces an error when more than one customization matches." + dataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
+			"timeouts": timeouts.Attributes(ctx),
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Enrollment customization ID. Mutually exclusive with `display_name`.",
 				Optional:            true,
@@ -126,15 +128,24 @@ func (d *EnrollmentCustomizationDataSource) Read(ctx context.Context, req dataso
 		return
 	}
 
+	readTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, data.Timeouts.IsNull(), data.Timeouts.IsUnknown(), defaultReadTimeout, data.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
 	var (
 		got *pro.EnrollmentCustomizationV2
 		err error
 	)
 	switch {
 	case !data.ID.IsNull() && data.ID.ValueString() != "":
-		got, err = d.client.GetEnrollmentCustomizationV2(ctx, data.ID.ValueString())
+		got, err = d.client.GetEnrollmentCustomizationV2(readCtx, data.ID.ValueString())
 	case !data.DisplayName.IsNull() && data.DisplayName.ValueString() != "":
-		got, err = d.client.ResolveEnrollmentCustomizationV2ByName(ctx, data.DisplayName.ValueString())
+		got, err = d.client.ResolveEnrollmentCustomizationV2ByName(readCtx, data.DisplayName.ValueString())
 	default:
 		resp.Diagnostics.AddError("Missing enrollment customization selector", "Exactly one of id or display_name must be supplied.")
 		return

@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
@@ -451,6 +452,10 @@ func scopeKindFromClient(kind jamfplatform.ScopeKind, id string) ScopeKind {
 		"the only scope the jamfplatform_account_* gate accepts", kind))
 }
 
+// versionFetchTimeout bounds the Jamf Pro version read. It runs while holding proMu, so an unbounded
+// stall would block every Pro construct configuring behind it, not just the one that asked.
+const versionFetchTimeout = 30 * time.Second
+
 // GetJamfProVersion fetches the tenant's Jamf Pro version. Successful results are
 // cached for the lifetime of the Data value. Errors are not cached — the next call
 // retries the fetch. Resources with empty minJamfProVersion should not call this —
@@ -465,7 +470,9 @@ func (d *Data) GetJamfProVersion(ctx context.Context) (string, error) {
 	if fetch == nil {
 		fetch = d.defaultVersionFetch
 	}
-	v, err := fetch(ctx)
+	fetchCtx, cancel := context.WithTimeout(ctx, versionFetchTimeout)
+	defer cancel()
+	v, err := fetch(fetchCtx)
 	if err != nil {
 		return "", err
 	}

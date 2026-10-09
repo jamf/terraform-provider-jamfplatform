@@ -8,6 +8,7 @@ import (
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // FileShareDistributionPointResourceModel represents the Terraform resource
@@ -87,5 +88,6 @@ type fileShareDistributionPointIdentityModel struct {
 // FileShareDistributionPointListResourceModel represents the config model for
 // list queries.
 type FileShareDistributionPointListResourceModel struct {
-	Filters []filters.FilterModel `tfsdk:"filter"`
+	Filters  []filters.FilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value    `tfsdk:"timeouts"`
 }

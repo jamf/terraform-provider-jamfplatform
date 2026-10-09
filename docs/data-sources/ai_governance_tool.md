@@ -57,6 +57,7 @@ output "claude_code_settings_keys" {
 ### Optional
 
 - `schema_version` (String) Which settings schema version `settings_schema_json` describes. Defaults to the tool's current version; set it to read an older one that policies are still written against.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only
 
@@ -64,3 +65,10 @@ output "claude_code_settings_keys" {
 - `display_name` (String) The tool's name as the Jamf Account admin UI shows it, such as `Claude Code`.
 - `schema_versions` (List of String) Every settings schema version the tool offers, newest first.
 - `settings_schema_json` (String) The JSON Schema document describing what a policy's `settings_json` may contain for this tool at `schema_version`. This is the tool vendor's own document, and it is large: tens to hundreds of kilobytes.
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).

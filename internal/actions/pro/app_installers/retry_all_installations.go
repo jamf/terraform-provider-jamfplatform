@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	actionschema "github.com/hashicorp/terraform-plugin-framework/action/schema"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -44,6 +45,7 @@ func (a *RetryAllInstallationsAction) Schema(ctx context.Context, req action.Sch
 			retryAllInstallationsPrivileges,
 		Attributes: map[string]actionschema.Attribute{},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // Configure wires the Jamf Pro client into the action.
@@ -55,6 +57,12 @@ func (a *RetryAllInstallationsAction) Configure(ctx context.Context, req action.
 // deployment had a failed installation, which is a warning; every other failure
 // fails the apply.
 func (a *RetryAllInstallationsAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

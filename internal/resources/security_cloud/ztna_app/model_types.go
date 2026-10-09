@@ -7,6 +7,8 @@ import (
 	datasourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // ZtnaAppResourceModel represents the Terraform resource model for a Jamf
@@ -117,5 +119,7 @@ type ZtnaAppsDataSourceResultModel struct {
 
 // ZtnaAppListResourceModel represents the config model for ZTNA app list queries.
 // Jamf Security Cloud exposes no filter parameters on the app list endpoint, so
-// the model carries no fields.
-type ZtnaAppListResourceModel struct{}
+// the model carries only the `timeouts` attribute.
+type ZtnaAppListResourceModel struct {
+	Timeouts listtimeouts.Value `tfsdk:"timeouts"`
+}

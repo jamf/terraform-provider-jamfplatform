@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -37,11 +38,12 @@ func (d *PolicyDataSource) Metadata(_ context.Context, req datasource.MetadataRe
 //
 // Lookup is by ID only. Policy names are not unique — two policies with the same name coexist
 // happily — so a name lookup would resolve arbitrarily.
-func (d *PolicyDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *PolicyDataSource) Schema(ctx context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Reads a single Jamf AI Governance policy by ID, including its current settings.\n\n" +
 			"Lookup is by ID because policy names are not required to be unique." + dataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
+			"timeouts": timeouts.Attributes(ctx),
 			"id": schema.StringAttribute{
 				MarkdownDescription: "ID of the policy to read.",
 				Required:            true,
@@ -114,17 +116,18 @@ func (d *PolicyDataSource) Configure(_ context.Context, req datasource.Configure
 
 // policyDataSourceModel is the Terraform model for the singular policy data source.
 type policyDataSourceModel struct {
-	ID               types.String `tfsdk:"id"`
-	Name             types.String `tfsdk:"name"`
-	Description      types.String `tfsdk:"description"`
-	ToolID           types.String `tfsdk:"tool_id"`
-	SchemaVersion    types.String `tfsdk:"schema_version"`
-	SettingsJSON     types.String `tfsdk:"settings_json"`
-	PublishedVersion types.Int64  `tfsdk:"published_version"`
-	HasDraft         types.Bool   `tfsdk:"has_draft"`
-	SchemaDrift      types.Bool   `tfsdk:"schema_drift"`
-	CreatedAt        types.String `tfsdk:"created_at"`
-	UpdatedAt        types.String `tfsdk:"updated_at"`
+	ID               types.String   `tfsdk:"id"`
+	Name             types.String   `tfsdk:"name"`
+	Description      types.String   `tfsdk:"description"`
+	ToolID           types.String   `tfsdk:"tool_id"`
+	SchemaVersion    types.String   `tfsdk:"schema_version"`
+	SettingsJSON     types.String   `tfsdk:"settings_json"`
+	PublishedVersion types.Int64    `tfsdk:"published_version"`
+	HasDraft         types.Bool     `tfsdk:"has_draft"`
+	SchemaDrift      types.Bool     `tfsdk:"schema_drift"`
+	CreatedAt        types.String   `tfsdk:"created_at"`
+	UpdatedAt        types.String   `tfsdk:"updated_at"`
+	Timeouts         timeouts.Value `tfsdk:"timeouts"`
 }
 
 // Read fetches the policy.
@@ -135,7 +138,16 @@ func (d *PolicyDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	detail, err := d.client.GetPolicy(ctx, config.ID.ValueString())
+	readTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, config.Timeouts.IsNull(), config.Timeouts.IsUnknown(), defaultReadTimeout, config.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
+	detail, err := d.client.GetPolicy(readCtx, config.ID.ValueString())
 	if err != nil {
 		if isNotFound(err) {
 			resp.Diagnostics.AddError(

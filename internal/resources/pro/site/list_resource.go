@@ -16,12 +16,12 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
 // defaultListTimeout caps how long the list operation will wait on the classic
-// /sites endpoint. The list resource schema does not expose a user-overridable
-// timeout, so this is a fixed safety bound.
+// /sites endpoint when the list config sets no `timeouts.list`.
 const defaultListTimeout = 90 * time.Second
 
 var _ list.ListResource = &SiteListResource{}
@@ -64,6 +64,7 @@ func (r *SiteListResource) ListResourceConfigSchema(ctx context.Context, req lis
 			"filter": filters.ClassicListFilterAttribute(),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams site identities back to Terraform.
@@ -85,8 +86,12 @@ func (r *SiteListResource) List(ctx context.Context, req list.ListRequest, strea
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	resp, err := r.client.ListSites(listCtx)
 	if err != nil {

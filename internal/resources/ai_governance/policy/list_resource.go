@@ -6,6 +6,7 @@ package policy
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -17,12 +18,23 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/aigovernance"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
 // defaultPolicySort is the sort expression every list read sends, so the streamed order is
 // deterministic across runs rather than left to the platform's default.
 const defaultPolicySort = "name:asc"
+
+// defaultListTimeout caps how long the list operation waits on the policies
+// listing endpoint.
+const defaultListTimeout = 5 * time.Minute
+
+// defaultItemReadTimeout bounds each per-item hydration GET issued when
+// IncludeResource is set (config generation), giving every item its own
+// deadline independent of the list-fetch budget so one slow item cannot
+// exhaust a shared deadline.
+const defaultItemReadTimeout = 30 * time.Second
 
 // policyTimeoutAttributeTypes defines the object attribute types for the resource's timeouts block,
 // needed to build a null value when a list result carries full resource state.
@@ -74,7 +86,7 @@ func (r *PolicyListResource) Configure(_ context.Context, req resource.Configure
 }
 
 // ListResourceConfigSchema describes the list configuration.
-func (r *PolicyListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
+func (r *PolicyListResource) ListResourceConfigSchema(ctx context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
 	resp.Schema = listschema.Schema{
 		Description: "Lists Jamf AI Governance policies, for `terraform query` and for importing existing policies " +
 			"in bulk. Archived policies are never returned." + listResourcePrivileges,
@@ -87,11 +99,13 @@ func (r *PolicyListResource) ListResourceConfigSchema(_ context.Context, _ list.
 			},
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // policyListConfigModel is the list resource's configuration.
 type policyListConfigModel struct {
-	SchemaDriftOnly types.Bool `tfsdk:"schema_drift_only"`
+	SchemaDriftOnly types.Bool         `tfsdk:"schema_drift_only"`
+	Timeouts        listtimeouts.Value `tfsdk:"timeouts"`
 }
 
 // List executes the query and streams policy identities back to Terraform.
@@ -119,7 +133,14 @@ func (r *PolicyListResource) List(ctx context.Context, req list.ListRequest, str
 		return
 	}
 
-	summaries, err := r.client.ListPolicies(ctx, []string{defaultPolicySort}, config.SchemaDriftOnly.ValueBool())
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+
+	summaries, err := r.client.ListPolicies(listCtx, []string{defaultPolicySort}, config.SchemaDriftOnly.ValueBool())
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic("Unable to list AI policies", helpers.APIErrorDetail(err)),
@@ -179,7 +200,9 @@ func (r *PolicyListResource) List(ctx context.Context, req list.ListRequest, str
 
 // appendResourceState fills one list result's resource state, reporting whether it succeeded.
 func (r *PolicyListResource) appendResourceState(ctx context.Context, result *list.ListResult, id string) bool {
-	detail, err := r.client.GetPolicy(ctx, id)
+	itemCtx, cancel := context.WithTimeout(ctx, defaultItemReadTimeout)
+	detail, err := r.client.GetPolicy(itemCtx, id)
+	cancel()
 	if err != nil {
 		result.Diagnostics.AddError("Unable to read AI policy "+id, helpers.APIErrorDetail(err))
 		return false

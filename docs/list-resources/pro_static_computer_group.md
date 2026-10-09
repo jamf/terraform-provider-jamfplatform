@@ -54,6 +54,7 @@ list "jamfplatform_pro_static_computer_group" "design" {
 ### Optional
 
 - `filter` (Attributes List) Declarative RSQL filter clauses. Each block represents one selector/operator/argument clause. (see [below for nested schema](#nestedatt--filter))
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 <a id="nestedatt--filter"></a>
 ### Nested Schema for `filter`
@@ -69,3 +70,11 @@ Optional:
 - `has_opening_parenthesis` (Boolean) Whether to prefix this clause with `(` to start a grouped expression.
 - `join_with` (String) Logical operator used to join this clause with the previous one. Valid values are `and` and `or`. Defaults to `and` when omitted or for the first clause.
 - `operator` (String) RSQL comparison operator. Valid values are `==`, `!=`, `>`, `<`, `>=`, and `<=`. Defaults to `==` when omitted.
+
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `list` (String) How long the listing may run before it is cancelled, as a duration such as `30s` or `10m`. Reading an individual result, when a resource is generated for each one, has its own separate limit.

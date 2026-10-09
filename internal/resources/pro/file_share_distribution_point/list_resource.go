@@ -5,6 +5,7 @@ package file_share_distribution_point
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -15,8 +16,14 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultListTimeout caps how long the list operation waits on the distribution points
+// list endpoint. The list fetch is the only SDK call the list resource makes;
+// items are built from the list response, so there is no per-item read.
+const defaultListTimeout = 5 * time.Minute
 
 // fileShareDistributionPointFilterSelectors enumerates the RSQL selectors
 // accepted by the distribution points endpoint. The endpoint rejects any other
@@ -69,6 +76,7 @@ func (r *FileShareDistributionPointListResource) ListResourceConfigSchema(ctx co
 			),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams distribution point identities back to
@@ -94,7 +102,14 @@ func (r *FileShareDistributionPointListResource) List(ctx context.Context, req l
 	filterExpression := filters.BuildRSQLExpression(config.Filters, filters.AllowList(fileShareDistributionPointFilterSelectors))
 	tflog.Debug(ctx, "file share distribution point list filters", map[string]any{"filter": filterExpression})
 
-	dps, err := r.client.ListDistributionPointsV1(ctx, nil, filterExpression)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+
+	dps, err := r.client.ListDistributionPointsV1(listCtx, nil, filterExpression)
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic("Unable to list Jamf Pro file share distribution points", helpers.APIErrorDetail(err)),

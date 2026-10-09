@@ -543,14 +543,15 @@ func TestConnectionListResource_Metadata(t *testing.T) {
 	}
 }
 
-// TestConnectionListResource_TakesNoFilter pins that the list configuration is
-// empty, because Jamf exposes no search arguments on the connection collection.
+// TestConnectionListResource_TakesNoFilter pins that the list configuration holds
+// nothing but the shared timeouts attribute, because Jamf exposes no search
+// arguments on the connection collection.
 func TestConnectionListResource_TakesNoFilter(t *testing.T) {
 	var resp list.ListResourceSchemaResponse
 	(&ConnectionListResource{}).ListResourceConfigSchema(context.Background(), list.ListResourceSchemaRequest{}, &resp)
 
-	if len(resp.Schema.Attributes) != 0 {
-		t.Errorf("the list configuration declares %d attributes, want none", len(resp.Schema.Attributes))
+	if _, ok := resp.Schema.Attributes["timeouts"]; !ok || len(resp.Schema.Attributes) != 1 {
+		t.Errorf("the list configuration declares %v, want only timeouts", resp.Schema.Attributes)
 	}
 	for _, want := range []string{"admin-consent", "one extra read per connection"} {
 		if !strings.Contains(resp.Schema.Description, want) {

@@ -20,6 +20,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -48,7 +49,8 @@ type AdvancedMobileDeviceSearchListResource struct {
 // AdvancedMobileDeviceSearchListResourceModel is the config model for list
 // queries.
 type AdvancedMobileDeviceSearchListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }
 
 // Metadata sets the list resource type name.
@@ -74,6 +76,7 @@ func (r *AdvancedMobileDeviceSearchListResource) ListResourceConfigSchema(ctx co
 			"filter": filters.ClassicListFilterAttribute(),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams advanced mobile device search identities
@@ -96,8 +99,12 @@ func (r *AdvancedMobileDeviceSearchListResource) List(ctx context.Context, req l
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	listResp, err := r.client.ListAdvancedMobileDeviceSearchesV1(listCtx)
 	if err != nil {

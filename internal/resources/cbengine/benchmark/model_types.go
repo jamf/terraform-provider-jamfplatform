@@ -7,6 +7,8 @@ import (
 	datasourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // SourceModel represents a source branch and revision for a benchmark.
@@ -85,5 +87,6 @@ type benchmarkIdentityModel struct {
 
 // BenchmarkListResourceModel represents the config model for benchmark list queries.
 type BenchmarkListResourceModel struct {
-	Search types.String `tfsdk:"search"`
+	Search   types.String       `tfsdk:"search"`
+	Timeouts listtimeouts.Value `tfsdk:"timeouts"`
 }

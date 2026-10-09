@@ -54,9 +54,20 @@ output "supported_operating_systems" {
 
 - `id` (String) The component identifier to fetch.
 
+### Optional
+
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
 ### Read-Only
 
 - `description` (String) Component description.
 - `identifier` (String) Component identifier.
 - `name` (String) Component name.
 - `supported_os` (Map of List of String) Supported operating systems with their versions.
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).

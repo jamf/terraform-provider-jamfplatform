@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -41,8 +42,9 @@ type VerifySSODomainAction struct {
 
 // VerifySSODomainActionModel is the action's configuration.
 type VerifySSODomainActionModel struct {
-	Domain   types.String `tfsdk:"domain"`
-	DomainID types.String `tfsdk:"domain_id"`
+	Domain   types.String         `tfsdk:"domain"`
+	DomainID types.String         `tfsdk:"domain_id"`
+	Timeouts actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 // NewVerifySSODomainAction returns a new instance of VerifySSODomainAction.
@@ -56,7 +58,7 @@ func (a *VerifySSODomainAction) Metadata(_ context.Context, req action.MetadataR
 }
 
 // Schema returns the action schema.
-func (a *VerifySSODomainAction) Schema(_ context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
+func (a *VerifySSODomainAction) Schema(ctx context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
 	resp.Schema = actionschema.Schema{
 		MarkdownDescription: "**\"Verify\"** beside a claimed domain on Jamf Account's **Single Sign-On > " +
 			"Domains** page. Asks Jamf Account to look up the DNS TXT record that proves your organization owns " +
@@ -111,6 +113,7 @@ func (a *VerifySSODomainAction) Schema(_ context.Context, _ action.SchemaRequest
 			},
 		},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // ConfigValidators enforces exactly one identifier.
@@ -140,6 +143,12 @@ func (a *VerifySSODomainAction) Configure(ctx context.Context, req action.Config
 // the status is classified and an unproven domain becomes an error. See the package
 // doc for the three wire facts behind that.
 func (a *VerifySSODomainAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

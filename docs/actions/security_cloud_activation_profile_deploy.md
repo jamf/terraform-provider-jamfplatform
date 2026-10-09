@@ -127,3 +127,11 @@ Valid values: `ios_byod`, `ios_supervised`, `ios_unsupervised`, `macos`.
 Computer groups when `os` is `macos`, mobile device groups otherwise. A group of the wrong kind for the chosen `os`, or one that does not exist, is refused.
 
 Read the warnings above before relying on this: scope accumulates and is never cleared here, and omitting the argument on a first deployment leaves the configuration profile scoped to nothing.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

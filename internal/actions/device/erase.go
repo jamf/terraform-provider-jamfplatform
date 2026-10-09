@@ -17,6 +17,7 @@ import (
 
 	daSDK "github.com/jamf/jamfplatform-go-sdk/jamfplatform/deviceactions"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -29,13 +30,14 @@ type EraseAction struct {
 }
 
 type EraseActionModel struct {
-	DeviceID               types.String `tfsdk:"device_id"`
-	SerialNumber           types.String `tfsdk:"serial_number"`
-	PreserveDataPlan       types.Bool   `tfsdk:"preserve_data_plan"`
-	DisallowProximitySetup types.Bool   `tfsdk:"disallow_proximity_setup"`
-	ClearActivationLock    types.Bool   `tfsdk:"clear_activation_lock"`
-	ReturnToService        types.Bool   `tfsdk:"return_to_service"`
-	Pin                    types.String `tfsdk:"pin"`
+	DeviceID               types.String         `tfsdk:"device_id"`
+	SerialNumber           types.String         `tfsdk:"serial_number"`
+	PreserveDataPlan       types.Bool           `tfsdk:"preserve_data_plan"`
+	DisallowProximitySetup types.Bool           `tfsdk:"disallow_proximity_setup"`
+	ClearActivationLock    types.Bool           `tfsdk:"clear_activation_lock"`
+	ReturnToService        types.Bool           `tfsdk:"return_to_service"`
+	Pin                    types.String         `tfsdk:"pin"`
+	Timeouts               actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 func NewEraseAction() action.Action {
@@ -90,6 +92,7 @@ func (a *EraseAction) Schema(ctx context.Context, req action.SchemaRequest, resp
 		MarkdownDescription: "Requests that a device erase its content and settings. Requires **Device Management Actions API** access." + eraseDevicePrivileges,
 		Attributes:          attrs,
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 func (a *EraseAction) ConfigValidators(ctx context.Context) []action.ConfigValidator {
@@ -101,6 +104,12 @@ func (a *EraseAction) Configure(ctx context.Context, req action.ConfigureRequest
 }
 
 func (a *EraseAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

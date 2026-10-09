@@ -48,6 +48,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -91,9 +92,10 @@ type FlushPolicyLogsAction struct {
 }
 
 type FlushPolicyLogsActionModel struct {
-	PolicyID types.String `tfsdk:"policy_id"`
-	Quantity types.String `tfsdk:"quantity"`
-	Period   types.String `tfsdk:"period"`
+	PolicyID types.String         `tfsdk:"policy_id"`
+	Quantity types.String         `tfsdk:"quantity"`
+	Period   types.String         `tfsdk:"period"`
+	Timeouts actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 func NewFlushPolicyLogsAction() action.Action {
@@ -139,6 +141,7 @@ func (a *FlushPolicyLogsAction) Schema(ctx context.Context, req action.SchemaReq
 			},
 		},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 func (a *FlushPolicyLogsAction) Configure(ctx context.Context, req action.ConfigureRequest, resp *action.ConfigureResponse) {
@@ -146,6 +149,12 @@ func (a *FlushPolicyLogsAction) Configure(ctx context.Context, req action.Config
 }
 
 func (a *FlushPolicyLogsAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClassicClient(resp) {
 		return
 	}

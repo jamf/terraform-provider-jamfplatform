@@ -6,7 +6,9 @@ package component
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -20,6 +22,9 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ datasource.DataSource = &ComponentDataSource{}
+
+// defaultReadTimeout bounds the component lookup.
+const defaultReadTimeout = 60 * time.Second
 
 // NewComponentDataSource returns a new instance of ComponentDataSource.
 func NewComponentDataSource() datasource.DataSource {
@@ -40,6 +45,7 @@ func (d *ComponentDataSource) Schema(ctx context.Context, req datasource.SchemaR
 				MarkdownDescription: "The component identifier to fetch.",
 				Required:            true,
 			},
+			"timeouts": timeouts.Attributes(ctx),
 			"identifier": schema.StringAttribute{
 				MarkdownDescription: "Component identifier.",
 				Computed:            true,
@@ -105,6 +111,15 @@ func (d *ComponentDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
+	readTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, data.Timeouts.IsNull(), data.Timeouts.IsUnknown(), defaultReadTimeout, data.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
 	if !helpers.IsConfiguredValue(data.ID) || data.ID.ValueString() == "" {
 		resp.Diagnostics.AddError(
 			"Missing Required Attribute",
@@ -113,7 +128,7 @@ func (d *ComponentDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	comp, err := d.client.GetBlueprintComponent(ctx, data.ID.ValueString())
+	comp, err := d.client.GetBlueprintComponent(readCtx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to get component",
@@ -148,6 +163,7 @@ func (d *ComponentDataSource) Read(ctx context.Context, req datasource.ReadReque
 		Name:        types.StringValue(comp.Name),
 		Description: helpers.StringPointerValueOrNull(comp.Description),
 		SupportedOs: supportedOsMap.(types.Map),
+		Timeouts:    data.Timeouts,
 	}
 
 	tflog.Trace(ctx, "read a data source")

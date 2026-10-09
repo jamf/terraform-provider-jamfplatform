@@ -11,6 +11,7 @@ import (
 	actionschema "github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -24,9 +25,10 @@ type RedeployManagementFrameworkAction struct {
 }
 
 type RedeployManagementFrameworkActionModel struct {
-	ManagementID types.String `tfsdk:"management_id"`
-	SerialNumber types.String `tfsdk:"serial_number"`
-	UDID         types.String `tfsdk:"udid"`
+	ManagementID types.String         `tfsdk:"management_id"`
+	SerialNumber types.String         `tfsdk:"serial_number"`
+	UDID         types.String         `tfsdk:"udid"`
+	Timeouts     actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 func NewRedeployManagementFrameworkAction() action.Action {
@@ -42,6 +44,7 @@ func (a *RedeployManagementFrameworkAction) Schema(ctx context.Context, req acti
 		MarkdownDescription: "Redeploys the Jamf management framework (binary and MDM management profile) to a computer." + redeployManagementFrameworkPrivileges,
 		Attributes:          computerTargetAttributes(),
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 func (a *RedeployManagementFrameworkAction) ConfigValidators(ctx context.Context) []action.ConfigValidator {
@@ -53,6 +56,12 @@ func (a *RedeployManagementFrameworkAction) Configure(ctx context.Context, req a
 }
 
 func (a *RedeployManagementFrameworkAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

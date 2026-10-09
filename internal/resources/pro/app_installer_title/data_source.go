@@ -12,6 +12,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -62,6 +63,7 @@ func (d *AppInstallerTitleDataSource) Schema(ctx context.Context, req datasource
 		Optional: true,
 		Computed: true,
 	}
+	attrs["timeouts"] = timeouts.Attributes(ctx)
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Looks up a single App Installer catalog title by ID. Titles are published by Jamf and cannot be created or modified; this data source surfaces a title's metadata so you can reference its `id` from `jamfplatform_pro_app_installer.app_title_id`." + dataSourcePrivileges,
 		Attributes:          attrs,
@@ -104,7 +106,13 @@ func (d *AppInstallerTitleDataSource) Read(ctx context.Context, req datasource.R
 		version = data.Version.ValueString()
 	}
 
-	readCtx, cancel := context.WithTimeout(ctx, defaultReadTimeout)
+	readTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, data.Timeouts.IsNull(), data.Timeouts.IsUnknown(), defaultReadTimeout, data.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
 	defer cancel()
 
 	got, err := d.client.GetAppInstallerTitleV1(readCtx, data.ID.ValueString(), version)
@@ -113,7 +121,9 @@ func (d *AppInstallerTitleDataSource) Read(ctx context.Context, req datasource.R
 		return
 	}
 
+	timeoutsValue := data.Timeouts
 	data = AssignTitleDataSource(got)
+	data.Timeouts = timeoutsValue
 
 	// The version list is a second endpoint; the per-title GET does not carry it.
 	// A failure here is surfaced rather than swallowed: the attribute is Computed,

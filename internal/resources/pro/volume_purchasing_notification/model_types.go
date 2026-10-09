@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // VolumePurchasingNotificationResourceModel is the Terraform resource model for a
@@ -81,5 +82,6 @@ type volumePurchasingNotificationIdentityModel struct {
 // list queries. The endpoint has no server-side name filter, so the shared
 // client-side substring block is applied locally.
 type VolumePurchasingNotificationListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

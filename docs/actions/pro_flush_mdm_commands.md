@@ -43,3 +43,14 @@ action "jamfplatform_pro_flush_mdm_commands" "clear_stuck" {
 - `id` (String) Jamf Pro ID of the device or group to flush commands for. Numeric.
 - `id_type` (String) Type of target: `computers`, `computergroups`, `mobiledevices`, or `mobiledevicegroups`.
 - `status` (String) Which commands to flush: `Pending`, `Failed`, or `Pending+Failed`.
+
+### Optional
+
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

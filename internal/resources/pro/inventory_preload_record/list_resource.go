@@ -16,6 +16,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -52,8 +53,8 @@ var inventoryPreloadRecordFilterSelectors = []string{
 }
 
 // defaultListTimeout caps how long the list operation will wait on the Jamf Pro
-// inventory preload records endpoint. The list resource schema does not expose a
-// user-overridable timeout, so this is a fixed safety bound.
+// inventory preload records endpoint. It applies when the query's
+// `timeouts.list` is unset.
 const defaultListTimeout = 90 * time.Second
 
 var _ list.ListResource = &InventoryPreloadRecordListResource{}
@@ -99,6 +100,7 @@ func (r *InventoryPreloadRecordListResource) ListResourceConfigSchema(ctx contex
 			),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams inventory preload record identities back to Terraform.
@@ -123,8 +125,12 @@ func (r *InventoryPreloadRecordListResource) List(ctx context.Context, req list.
 	filterExpression := filters.BuildRSQLExpression(config.Filters, filters.AllowList(inventoryPreloadRecordFilterSelectors))
 	tflog.Debug(ctx, "inventory preload record list filters", map[string]any{"filter": filterExpression})
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	items, err := r.client.ListInventoryPreloadRecordsV2(listCtx, nil, filterExpression)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // BuildingResourceModel represents the Terraform resource model for a Jamf Pro building.
@@ -44,7 +45,8 @@ type buildingIdentityModel struct {
 
 // BuildingListResourceModel represents the config model for building list queries.
 type BuildingListResourceModel struct {
-	Filters []filters.FilterModel `tfsdk:"filter"`
+	Filters  []filters.FilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value    `tfsdk:"timeouts"`
 }
 
 // BuildingsDataSourceModel represents the Terraform data source model for building searches.
