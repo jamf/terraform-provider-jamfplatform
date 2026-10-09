@@ -88,7 +88,9 @@ func listDomains(t *testing.T, body string, limit int64) []list.ListResult {
 
 	var stream list.ListResultsStream
 	r.List(ctx, list.ListRequest{
-		Config:                 tfsdk.Config{Schema: configResp.Schema, Raw: tftypes.NewValue(configType, map[string]tftypes.Value{})},
+		Config: tfsdk.Config{Schema: configResp.Schema, Raw: tftypes.NewValue(configType, map[string]tftypes.Value{
+			"timeouts": tftypes.NewValue(configType.AttributeTypes["timeouts"], nil),
+		})},
 		IncludeResource:        true,
 		Limit:                  limit,
 		ResourceSchema:         schemaResp.Schema,

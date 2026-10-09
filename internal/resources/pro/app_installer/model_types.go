@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // AppInstallerResourceModel is the Terraform resource model for an App Installer
@@ -102,7 +103,8 @@ type appInstallerIdentityModel struct {
 // The deployments endpoint has no server-side filter, so the shared client-side
 // substring block is applied locally.
 type AppInstallerListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }
 
 // AppInstallersDataSourceModel is the plural data source model. `deployments`

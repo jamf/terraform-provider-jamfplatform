@@ -5,13 +5,18 @@ package tool
 
 import (
 	"context"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/aigovernance"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
+
+// defaultListTimeout bounds the catalogue listing.
+const defaultListTimeout = 60 * time.Second
 
 // ToolsDataSource reads the whole catalogue of AI tools Jamf can govern.
 type ToolsDataSource struct {
@@ -31,7 +36,7 @@ func (d *ToolsDataSource) Metadata(_ context.Context, req datasource.MetadataReq
 }
 
 // Schema returns the Terraform schema for the AI tools data source.
-func (d *ToolsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *ToolsDataSource) Schema(ctx context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Reads every AI tool the platform can govern, with the settings schema versions each one offers. " +
 			"Use it to discover the `tool_id` and `schema_version` values a `jamfplatform_ai_governance_policy` " +
@@ -39,6 +44,7 @@ func (d *ToolsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 			"The settings schema documents themselves are not included. Read one from the " +
 			"`jamfplatform_ai_governance_tool` data source." + pluralDataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
+			"timeouts": timeouts.Attributes(ctx),
 			"tools": schema.ListNestedAttribute{
 				MarkdownDescription: "The AI tools the platform can govern.",
 				Computed:            true,
@@ -81,7 +87,8 @@ func (d *ToolsDataSource) Configure(_ context.Context, req datasource.ConfigureR
 
 // toolsDataSourceModel is the Terraform model for the plural tools data source.
 type toolsDataSourceModel struct {
-	Tools []toolSummaryItem `tfsdk:"tools"`
+	Tools    []toolSummaryItem `tfsdk:"tools"`
+	Timeouts timeouts.Value    `tfsdk:"timeouts"`
 }
 
 // toolSummaryItem is one entry in the catalogue listing.
@@ -93,14 +100,29 @@ type toolSummaryItem struct {
 }
 
 // Read fetches the catalogue.
-func (d *ToolsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	response, err := d.client.ListTools(ctx)
+func (d *ToolsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var config toolsDataSourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	listTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, config.Timeouts.IsNull(), config.Timeouts.IsUnknown(), defaultListTimeout, config.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	listCtx, cancel := context.WithTimeout(ctx, listTimeout)
+	defer cancel()
+
+	response, err := d.client.ListTools(listCtx)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to list AI tools", helpers.APIErrorDetail(err))
 		return
 	}
 
-	model := toolsDataSourceModel{Tools: make([]toolSummaryItem, 0, len(response.Results))}
+	model := toolsDataSourceModel{Tools: make([]toolSummaryItem, 0, len(response.Results)), Timeouts: config.Timeouts}
 	for _, summary := range response.Results {
 		versions, diags := types.ListValueFrom(ctx, types.StringType, summary.SchemaVersions)
 		resp.Diagnostics.Append(diags...)

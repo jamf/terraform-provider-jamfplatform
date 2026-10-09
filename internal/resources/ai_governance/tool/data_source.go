@@ -19,7 +19,9 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -30,6 +32,10 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultReadTimeout bounds the tool lookup and the schema document fetch together; the document
+// alone runs to 184 KB.
+const defaultReadTimeout = 90 * time.Second
 
 // ToolDataSource reads one AI tool from the catalogue.
 type ToolDataSource struct {
@@ -49,7 +55,7 @@ func (d *ToolDataSource) Metadata(_ context.Context, req datasource.MetadataRequ
 }
 
 // Schema returns the Terraform schema for the AI tool data source.
-func (d *ToolDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *ToolDataSource) Schema(ctx context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Reads one AI tool the platform can govern, and the schema describing what its settings may " +
 			"contain.\n\n" +
@@ -63,6 +69,7 @@ func (d *ToolDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 					"identifiers from the `jamfplatform_ai_governance_tools` data source.",
 				Required: true,
 			},
+			"timeouts": timeouts.Attributes(ctx),
 			"display_name": schema.StringAttribute{
 				MarkdownDescription: "The tool's name as the Jamf Account admin UI shows it, such as `Claude Code`.",
 				Computed:            true,
@@ -105,12 +112,13 @@ func (d *ToolDataSource) Configure(_ context.Context, req datasource.ConfigureRe
 
 // toolDataSourceModel is the Terraform model for the singular tool data source.
 type toolDataSourceModel struct {
-	ID                   types.String `tfsdk:"id"`
-	DisplayName          types.String `tfsdk:"display_name"`
-	SchemaVersion        types.String `tfsdk:"schema_version"`
-	CurrentSchemaVersion types.String `tfsdk:"current_schema_version"`
-	SchemaVersions       types.List   `tfsdk:"schema_versions"`
-	SettingsSchemaJSON   types.String `tfsdk:"settings_schema_json"`
+	ID                   types.String   `tfsdk:"id"`
+	DisplayName          types.String   `tfsdk:"display_name"`
+	SchemaVersion        types.String   `tfsdk:"schema_version"`
+	CurrentSchemaVersion types.String   `tfsdk:"current_schema_version"`
+	SchemaVersions       types.List     `tfsdk:"schema_versions"`
+	SettingsSchemaJSON   types.String   `tfsdk:"settings_schema_json"`
+	Timeouts             timeouts.Value `tfsdk:"timeouts"`
 }
 
 // Read fetches the tool and the schema document for the requested version.
@@ -125,7 +133,16 @@ func (d *ToolDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	summary, err := d.client.GetTool(ctx, config.ID.ValueString())
+	readTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, config.Timeouts.IsNull(), config.Timeouts.IsUnknown(), defaultReadTimeout, config.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
+	summary, err := d.client.GetTool(readCtx, config.ID.ValueString())
 	if err != nil {
 		if helpers.IsNotFoundError(err) {
 			resp.Diagnostics.AddAttributeError(
@@ -153,7 +170,7 @@ func (d *ToolDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		}
 	}
 
-	document, err := d.client.GetToolSchema(ctx, summary.ID, version)
+	document, err := d.client.GetToolSchema(readCtx, summary.ID, version)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read AI tool settings schema", helpers.APIErrorDetail(err))
 		return

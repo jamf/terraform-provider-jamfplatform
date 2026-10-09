@@ -7,6 +7,7 @@ import (
 	datasourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/blueprints/blueprint/components"
 )
 
@@ -212,5 +213,6 @@ type blueprintIdentityModel struct {
 
 // BlueprintListResourceModel captures supported list filters.
 type BlueprintListResourceModel struct {
-	Search types.String `tfsdk:"search"`
+	Search   types.String       `tfsdk:"search"`
+	Timeouts listtimeouts.Value `tfsdk:"timeouts"`
 }

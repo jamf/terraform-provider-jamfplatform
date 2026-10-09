@@ -6,6 +6,7 @@ package device_group
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -19,9 +20,21 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/device_groups"
 )
+
+// defaultListTimeout caps how long the list operation waits on the device
+// group list endpoint.
+const defaultListTimeout = 5 * time.Minute
+
+// defaultItemReadTimeout bounds each per-item hydration call issued when
+// IncludeResource is set (config generation), giving every call its own
+// deadline independent of the list-fetch budget so one slow group cannot
+// exhaust a shared deadline. A call that times out aborts the query with the
+// same diagnostic as any other per-item read failure.
+const defaultItemReadTimeout = 30 * time.Second
 
 var _ list.ListResource = &DeviceGroupListResource{}
 var _ list.ListResourceWithConfigure = &DeviceGroupListResource{}
@@ -81,6 +94,7 @@ func (r *DeviceGroupListResource) ListResourceConfigSchema(ctx context.Context, 
 			),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams device group identities back to Terraform.
@@ -108,7 +122,13 @@ func (r *DeviceGroupListResource) List(ctx context.Context, req list.ListRequest
 		"filter": filterExpression,
 	})
 
-	groups, err := r.client.ListDeviceGroups(ctx, nil, filterExpression)
+	listCtx, cancelList := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+	groups, err := r.client.ListDeviceGroups(listCtx, nil, filterExpression)
+	cancelList()
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic(
@@ -142,7 +162,9 @@ func (r *DeviceGroupListResource) List(ctx context.Context, req list.ListRequest
 		}
 
 		if req.IncludeResource {
-			detail, err := r.client.GetDeviceGroup(ctx, grp.ID)
+			getCtx, cancelGet := context.WithTimeout(ctx, defaultItemReadTimeout)
+			detail, err := r.client.GetDeviceGroup(getCtx, grp.ID)
+			cancelGet()
 			if err != nil {
 				stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 					diag.NewErrorDiagnostic(
@@ -156,7 +178,9 @@ func (r *DeviceGroupListResource) List(ctx context.Context, req list.ListRequest
 			manageMembers := strings.EqualFold(detail.GroupType, devicegroups.GroupTypeV1Static)
 			var members []string
 			if manageMembers {
-				members, err = r.client.ListDeviceGroupMembers(ctx, detail.ID)
+				membersCtx, cancelMembers := context.WithTimeout(ctx, defaultItemReadTimeout)
+				members, err = r.client.ListDeviceGroupMembers(membersCtx, detail.ID)
+				cancelMembers()
 				if err != nil {
 					stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 						diag.NewErrorDiagnostic(
@@ -180,9 +204,13 @@ func (r *DeviceGroupListResource) List(ctx context.Context, req list.ListRequest
 			// No prior state in a list/query result → reverse-resolve any Jamf-group
 			// "member of" criterion id back to the group name (11.29 read regression)
 			// so `terraform query -generate-config-out` emits names, not ids.
-			state.Criteria = readbackGroupRefCriteria(ctx, r.groupRef, dsObjectType(state.DeviceType.ValueString()), state.Criteria, nil)
+			groupRefCtx, cancelGroupRef := context.WithTimeout(ctx, defaultItemReadTimeout)
+			state.Criteria = readbackGroupRefCriteria(groupRefCtx, r.groupRef, dsObjectType(state.DeviceType.ValueString()), state.Criteria, nil)
+			cancelGroupRef()
 
-			jamfProID, jamfProDiags := resolveJamfProID(ctx, r.proClient, r.pd, detail.ID)
+			proIDCtx, cancelProID := context.WithTimeout(ctx, defaultItemReadTimeout)
+			jamfProID, jamfProDiags := resolveJamfProID(proIDCtx, r.proClient, r.pd, detail.ID)
+			cancelProID()
 			result.Diagnostics.Append(jamfProDiags...)
 			state.JamfProID = jamfProID
 

@@ -5,6 +5,7 @@ package uem_connect
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -15,8 +16,14 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultListTimeout caps how long the list operation waits on the UEM Connect connector list endpoint.
+// The call is made synchronously inside List, so the deadline is released when
+// List returns.
+const defaultListTimeout = 5 * time.Minute
 
 var (
 	_ list.ListResource              = &UEMConnectListResource{}
@@ -61,13 +68,14 @@ func (r *UEMConnectListResource) Configure(ctx context.Context, req resource.Con
 }
 
 // ListResourceConfigSchema describes the (empty) list configuration.
-func (r *UEMConnectListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
+func (r *UEMConnectListResource) ListResourceConfigSchema(ctx context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
 	resp.Schema = listschema.Schema{
 		Description: "Finds the Jamf Security Cloud UEM Connect integration on the tenant, for generating an " +
 			"import block with `terraform query`. A tenant holds at most one, so there is nothing to filter and " +
 			"this takes no configuration." + listResourcePrivileges,
 		Attributes: map[string]listschema.Attribute{},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List streams the integration's identity back to Terraform.
@@ -89,7 +97,14 @@ func (r *UEMConnectListResource) List(ctx context.Context, req list.ListRequest,
 		return
 	}
 
-	page, err := r.client.ListUemConnectorsV1(ctx)
+	listCtx, cancelList := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+	defer cancelList()
+
+	page, err := r.client.ListUemConnectorsV1(listCtx)
 	if err != nil {
 		var listDiags diag.Diagnostics
 		if !appendCreateDiagnostics(&listDiags, err) {

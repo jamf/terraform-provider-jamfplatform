@@ -91,4 +91,12 @@ action "jamfplatform_pro_jamf_protect_deployment_retry" "by_task_ids" {
 - `only_failed` (Boolean) Only meaningful with the computer selector. When `true` (the default), retries only the computer's failed task(s); when `false`, retries all of that computer's tasks regardless of status. Ignored for `task_ids` and `all_failed`.
 - `serial_number` (String) Serial number of the computer to retry (case-sensitive). Retries that computer's deployment task(s). Provide this, `management_id`, or `udid`.
 - `task_ids` (List of String) Explicit deployment task IDs to retry (the `id` values returned by the deployment's task search). Advanced escape hatch. Mutually exclusive with the computer selector and `all_failed`.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 - `udid` (String) Hardware UDID of the computer to retry. Retries that computer's deployment task(s). Provide this, `serial_number`, or `management_id`.
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

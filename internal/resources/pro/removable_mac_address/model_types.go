@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // RemovableMacAddressResourceModel represents the Terraform resource model for a
@@ -38,5 +39,6 @@ type removableMacAddressIdentityModel struct {
 // address list queries. Classic has no RSQL — the filter shape is the shared
 // client-side substring block.
 type RemovableMacAddressListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

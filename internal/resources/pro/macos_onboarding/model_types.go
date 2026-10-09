@@ -56,6 +56,7 @@ type OnboardingEligibleItemsDataSourceModel struct {
 	ID         types.String                  `tfsdk:"id"`
 	EntityType types.String                  `tfsdk:"entity_type"`
 	Items      []onboardingEligibleItemModel `tfsdk:"items"`
+	Timeouts   datasourceTimeouts.Value      `tfsdk:"timeouts"`
 }
 
 // onboardingEligibleItemModel is one eligible object returned by an eligible-*

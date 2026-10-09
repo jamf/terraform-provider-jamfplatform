@@ -42,3 +42,14 @@ action "jamfplatform_pro_renew_mdm_profile" "renew" {
 ### Required
 
 - `udids` (List of String) Hardware UDIDs of the mobile devices. Source these from the `jamfplatform_device` data source `hardware_udid` attribute.
+
+### Optional
+
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

@@ -64,4 +64,12 @@ output "last_sync" {
 
 ### Optional
 
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 - `uem_connect_id` (String) The UEM Connect integration to synchronize. A tenant holds at most one, so this can be omitted and the integration found automatically. Set it to the `id` of your `jamfplatform_security_cloud_uem_connect` resource to make the synchronize wait until that integration exists.
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

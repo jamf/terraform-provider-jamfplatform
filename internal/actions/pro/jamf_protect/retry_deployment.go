@@ -57,6 +57,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/computertarget"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
@@ -78,13 +79,14 @@ type RetryDeploymentAction struct {
 
 // RetryDeploymentActionModel is the action configuration.
 type RetryDeploymentActionModel struct {
-	DeploymentID types.String `tfsdk:"deployment_id"`
-	SerialNumber types.String `tfsdk:"serial_number"`
-	ManagementID types.String `tfsdk:"management_id"`
-	UDID         types.String `tfsdk:"udid"`
-	TaskIDs      types.List   `tfsdk:"task_ids"`
-	AllFailed    types.Bool   `tfsdk:"all_failed"`
-	OnlyFailed   types.Bool   `tfsdk:"only_failed"`
+	DeploymentID types.String         `tfsdk:"deployment_id"`
+	SerialNumber types.String         `tfsdk:"serial_number"`
+	ManagementID types.String         `tfsdk:"management_id"`
+	UDID         types.String         `tfsdk:"udid"`
+	TaskIDs      types.List           `tfsdk:"task_ids"`
+	AllFailed    types.Bool           `tfsdk:"all_failed"`
+	OnlyFailed   types.Bool           `tfsdk:"only_failed"`
+	Timeouts     actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 // NewRetryDeploymentAction constructs the action.
@@ -153,6 +155,7 @@ func (a *RetryDeploymentAction) Schema(ctx context.Context, req action.SchemaReq
 			},
 		},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 func (a *RetryDeploymentAction) Configure(ctx context.Context, req action.ConfigureRequest, resp *action.ConfigureResponse) {
@@ -165,6 +168,12 @@ func (a *RetryDeploymentAction) ConfigValidators(ctx context.Context) []action.C
 }
 
 func (a *RetryDeploymentAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

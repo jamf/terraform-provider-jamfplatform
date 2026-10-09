@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -28,8 +29,9 @@ type RetryInstallationsAction struct {
 
 // RetryInstallationsActionModel is the action's configuration.
 type RetryInstallationsActionModel struct {
-	DeploymentID types.String `tfsdk:"deployment_id"`
-	ComputerIDs  types.List   `tfsdk:"computer_ids"`
+	DeploymentID types.String         `tfsdk:"deployment_id"`
+	ComputerIDs  types.List           `tfsdk:"computer_ids"`
+	Timeouts     actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 // NewRetryInstallationsAction returns a new instance of RetryInstallationsAction.
@@ -68,6 +70,7 @@ func (a *RetryInstallationsAction) Schema(ctx context.Context, req action.Schema
 			},
 		},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // Configure wires the Jamf Pro client into the action.
@@ -82,6 +85,12 @@ func (a *RetryInstallationsAction) Configure(ctx context.Context, req action.Con
 // empty 404 on one computer is that computer having nothing to retry, which
 // must not abandon the rest of the list.
 func (a *RetryInstallationsAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

@@ -6,6 +6,7 @@ package blueprint
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -16,8 +17,19 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultListTimeout caps how long the list operation waits on the blueprints
+// listing endpoint.
+const defaultListTimeout = 5 * time.Minute
+
+// defaultItemReadTimeout bounds each per-item hydration GET issued when
+// IncludeResource is set (config generation), giving every item its own
+// deadline independent of the list-fetch budget so one slow item cannot
+// exhaust a shared deadline.
+const defaultItemReadTimeout = 30 * time.Second
 
 var _ list.ListResource = &BlueprintListResource{}
 var _ list.ListResourceWithConfigure = &BlueprintListResource{}
@@ -71,6 +83,7 @@ func (r *BlueprintListResource) ListResourceConfigSchema(ctx context.Context, re
 			},
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams blueprint identities back to Terraform.
@@ -95,7 +108,14 @@ func (r *BlueprintListResource) List(ctx context.Context, req list.ListRequest, 
 	searchTerm, hasSearch := helpers.NormalizedFilterString(config.Search)
 	searchLower := strings.ToLower(searchTerm)
 
-	blueprints, err := r.client.ListBlueprints(ctx, nil, "")
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+
+	blueprints, err := r.client.ListBlueprints(listCtx, nil, "")
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic(
@@ -136,7 +156,9 @@ func (r *BlueprintListResource) List(ctx context.Context, req list.ListRequest, 
 		result.Diagnostics.Append(helpers.SetIdentity(ctx, result.Identity, identity)...)
 
 		if req.IncludeResource {
-			detail, err := r.client.GetBlueprint(ctx, bp.ID)
+			itemCtx, cancelItem := context.WithTimeout(ctx, defaultItemReadTimeout)
+			detail, err := r.client.GetBlueprint(itemCtx, bp.ID)
+			cancelItem()
 			if err != nil {
 				stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 					diag.NewErrorDiagnostic(

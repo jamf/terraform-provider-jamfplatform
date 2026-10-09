@@ -54,10 +54,13 @@ var _ resource.ResourceWithImportState = &DeviceGroupResource{}
 var _ resource.ResourceWithIdentity = &DeviceGroupResource{}
 var _ resource.ResourceWithModifyPlan = &DeviceGroupResource{}
 
+// Create and update default to five minutes, matching the Jamf Pro smart groups: a write to a smart
+// group recalculates its membership, which on a large estate takes minutes. The SDK no longer caps a
+// request at 60s of response-header wait, so this deadline is the only bound on that recalculation.
 const (
-	defaultCreateTimeout = 120 * time.Second
+	defaultCreateTimeout = 5 * time.Minute
 	defaultReadTimeout   = 60 * time.Second
-	defaultUpdateTimeout = 60 * time.Second
+	defaultUpdateTimeout = 5 * time.Minute
 	defaultDeleteTimeout = 60 * time.Second
 )
 

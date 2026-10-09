@@ -61,12 +61,12 @@ func TestSynchronizeAction_IDIsOptional(t *testing.T) {
 func TestSynchronizeAction_NoOtherAttributes(t *testing.T) {
 	s := synchronizeSchema(t)
 
-	if len(s.Attributes) != 1 {
+	if len(s.Attributes) != 2 {
 		names := make([]string, 0, len(s.Attributes))
 		for name := range s.Attributes {
 			names = append(names, name)
 		}
-		t.Errorf("expected only uem_connect_id, got %v", names)
+		t.Errorf("expected only uem_connect_id and timeouts, got %v", names)
 	}
 }
 
@@ -154,13 +154,13 @@ func TestDeployActivationProfileAction_Attributes(t *testing.T) {
 		t.Error("jamf_pro_group_ids must be optional")
 	}
 
-	if len(s.Attributes) != 3 {
+	if len(s.Attributes) != 4 {
 		names := make([]string, 0, len(s.Attributes))
 		for name := range s.Attributes {
 			names = append(names, name)
 		}
 		sort.Strings(names)
-		t.Errorf("expected exactly the three documented attributes, got %v", names)
+		t.Errorf("expected exactly the three documented attributes and timeouts, got %v", names)
 	}
 }
 

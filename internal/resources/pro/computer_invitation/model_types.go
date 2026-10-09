@@ -7,6 +7,8 @@ import (
 	datasourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // ComputerInvitationResourceModel is the Terraform resource model for a Jamf Pro
@@ -88,4 +90,6 @@ type computerInvitationIdentityModel struct {
 // invitation_type / expiration), so there is no meaningful client-side
 // substring filter — the list resource takes no configuration and returns all
 // invitations.
-type ComputerInvitationListResourceModel struct{}
+type ComputerInvitationListResourceModel struct {
+	Timeouts listtimeouts.Value `tfsdk:"timeouts"`
+}

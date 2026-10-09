@@ -5,6 +5,7 @@ package device_group
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -15,8 +16,12 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultListTimeout caps how long the list operation waits on the group list endpoint.
+const defaultListTimeout = 5 * time.Minute
 
 var (
 	_ list.ListResource              = &DeviceGroupListResource{}
@@ -55,8 +60,8 @@ func (r *DeviceGroupListResource) Configure(ctx context.Context, req resource.Co
 	r.client = client
 }
 
-// ListResourceConfigSchema describes the (empty) list configuration.
-func (r *DeviceGroupListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
+// ListResourceConfigSchema describes the list configuration, which is the `timeouts` attribute alone.
+func (r *DeviceGroupListResource) ListResourceConfigSchema(ctx context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
 	resp.Schema = listschema.Schema{
 		Description: "Lists every Jamf Security Cloud device group on the tenant that Terraform can manage. Jamf " +
 			"Security Cloud exposes no filter parameters for groups, so this list resource takes no filter " +
@@ -65,6 +70,7 @@ func (r *DeviceGroupListResource) ListResourceConfigSchema(_ context.Context, _ 
 			"jamfplatform_security_cloud_device_groups data source to see it." + listResourcePrivileges,
 		Attributes: map[string]listschema.Attribute{},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams device group identities back to Terraform.
@@ -90,7 +96,13 @@ func (r *DeviceGroupListResource) List(ctx context.Context, req list.ListRequest
 		return
 	}
 
-	groups, err := r.client.ListDeviceGroupsV2(ctx)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+	groups, err := r.client.ListDeviceGroupsV2(listCtx)
+	cancel()
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic("Unable to list Jamf Security Cloud device groups", helpers.APIErrorDetail(err)),

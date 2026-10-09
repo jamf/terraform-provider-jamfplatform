@@ -7,6 +7,8 @@ import (
 	datasourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // DNSZoneResourceModel represents the Terraform resource model for a Jamf
@@ -61,5 +63,7 @@ type DNSZonesDataSourceResultModel struct {
 
 // DNSZoneListResourceModel represents the config model for DNS zone list
 // queries. Jamf Security Cloud exposes no filter parameters on the zone list
-// endpoint, so the model carries no fields.
-type DNSZoneListResourceModel struct{}
+// endpoint, so the model carries only the `timeouts` attribute.
+type DNSZoneListResourceModel struct {
+	Timeouts listtimeouts.Value `tfsdk:"timeouts"`
+}

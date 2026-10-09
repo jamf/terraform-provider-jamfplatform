@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -35,8 +36,9 @@ type UpdateVersionAction struct {
 
 // UpdateVersionActionModel is the action's configuration.
 type UpdateVersionActionModel struct {
-	DeploymentID types.String `tfsdk:"deployment_id"`
-	Version      types.String `tfsdk:"version"`
+	DeploymentID types.String         `tfsdk:"deployment_id"`
+	Version      types.String         `tfsdk:"version"`
+	Timeouts     actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 // NewUpdateVersionAction returns a new instance of UpdateVersionAction.
@@ -75,6 +77,7 @@ func (a *UpdateVersionAction) Schema(ctx context.Context, req action.SchemaReque
 			},
 		},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // Configure wires the Jamf Pro client into the action.
@@ -95,6 +98,12 @@ func (a *UpdateVersionAction) Configure(ctx context.Context, req action.Configur
 // for a malformed deployment ID, and a malformed ID and a missing one both point
 // the operator at the same attribute.
 func (a *UpdateVersionAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

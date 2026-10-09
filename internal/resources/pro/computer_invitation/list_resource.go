@@ -15,6 +15,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -74,6 +75,7 @@ func (r *ComputerInvitationListResource) ListResourceConfigSchema(ctx context.Co
 		Description: "Lists all Jamf Pro computer enrollment invitations. Invitations carry no name and Jamf Pro exposes no filter parameters for them, so this list resource takes no filter configuration." + listResourcePrivileges,
 		Attributes:  map[string]listschema.Attribute{},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams computer invitation identities back to
@@ -89,8 +91,13 @@ func (r *ComputerInvitationListResource) List(ctx context.Context, req list.List
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	var diags diag.Diagnostics
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	resp, err := r.client.ListComputerInvitations(listCtx)
 	if err != nil {

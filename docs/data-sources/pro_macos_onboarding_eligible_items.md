@@ -47,10 +47,22 @@ output "eligible_policy_ids" {
 
 - `entity_type` (String) Which eligible catalog to return. One of `policies`, `configuration_profiles`, `apps`.
 
+### Optional
+
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
 ### Read-Only
 
 - `id` (String) Internal identifier for this data source read (the queried `entity_type`).
 - `items` (Attributes List) Eligible objects of the requested type. (see [below for nested schema](#nestedatt--items))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+
 
 <a id="nestedatt--items"></a>
 ### Nested Schema for `items`

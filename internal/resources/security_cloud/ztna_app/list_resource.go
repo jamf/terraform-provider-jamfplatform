@@ -5,6 +5,7 @@ package ztna_app
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -15,8 +16,14 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultListTimeout caps how long the list operation waits on the ZTNA application list endpoint.
+// The call is made synchronously inside List, so the deadline is released when
+// List returns.
+const defaultListTimeout = 5 * time.Minute
 
 var (
 	_ list.ListResource              = &ZtnaAppListResource{}
@@ -54,13 +61,14 @@ func (r *ZtnaAppListResource) Configure(ctx context.Context, req resource.Config
 }
 
 // ListResourceConfigSchema describes the (empty) list configuration.
-func (r *ZtnaAppListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
+func (r *ZtnaAppListResource) ListResourceConfigSchema(ctx context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
 	resp.Schema = listschema.Schema{
 		Description: "Lists every Jamf Security Cloud access policy application on the tenant. Jamf Security " +
 			"Cloud exposes no filter parameters for applications, so this list resource takes no filter " +
 			"configuration." + listResourcePrivileges,
 		Attributes: map[string]listschema.Attribute{},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams application identities back to Terraform.
@@ -88,7 +96,14 @@ func (r *ZtnaAppListResource) List(ctx context.Context, req list.ListRequest, st
 		return
 	}
 
-	apps, err := r.client.ListZtnaAppsV1(ctx)
+	listCtx, cancelList := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+	defer cancelList()
+
+	apps, err := r.client.ListZtnaAppsV1(listCtx)
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic("Unable to list Jamf Security Cloud access policy applications", helpers.APIErrorDetail(err)),

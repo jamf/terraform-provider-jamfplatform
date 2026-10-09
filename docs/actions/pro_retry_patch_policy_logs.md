@@ -46,3 +46,11 @@ action "jamfplatform_pro_retry_patch_policy_logs" "retry" {
 ### Optional
 
 - `device_ids` (List of String) Jamf Pro computer IDs to retry. Omit to retry all failed devices; an empty list is not a valid way to say that.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

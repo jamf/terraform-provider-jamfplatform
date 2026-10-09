@@ -20,6 +20,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -49,7 +50,8 @@ type ComputerExtensionAttributeListResource struct {
 // ComputerExtensionAttributeListResourceModel is the config model for list
 // queries.
 type ComputerExtensionAttributeListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }
 
 // Metadata sets the list resource type name.
@@ -76,6 +78,7 @@ func (r *ComputerExtensionAttributeListResource) ListResourceConfigSchema(ctx co
 			"filter": filters.ClassicListFilterAttribute(),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams computer extension attribute identities
@@ -98,8 +101,12 @@ func (r *ComputerExtensionAttributeListResource) List(ctx context.Context, req l
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	items, err := r.client.ListComputerExtensionAttributesV1(listCtx, nil, "")
 	if err != nil {

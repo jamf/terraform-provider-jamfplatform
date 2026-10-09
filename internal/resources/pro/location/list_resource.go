@@ -21,12 +21,13 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
 // defaultListTimeout caps how long the list operation will wait on the
-// Pro /v1/volume-purchasing-locations endpoint. The list resource schema does
-// not expose a user-overridable timeout, so this is a fixed safety bound.
+// Pro /v1/volume-purchasing-locations endpoint. It applies when the
+// query's `timeouts.list` is unset.
 const defaultListTimeout = 90 * time.Second
 
 // defaultItemReadTimeout bounds each per-item hydration GET issued when
@@ -86,6 +87,7 @@ func (r *VolumePurchasingLocationListResource) ListResourceConfigSchema(ctx cont
 			"filter": filters.ClassicListFilterAttribute(),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams VPP location identities back to
@@ -108,8 +110,12 @@ func (r *VolumePurchasingLocationListResource) List(ctx context.Context, req lis
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	items, err := r.client.ListVolumePurchasingLocationsV1(listCtx, nil, "")
 	if err != nil {

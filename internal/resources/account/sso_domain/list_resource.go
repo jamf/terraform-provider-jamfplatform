@@ -5,6 +5,7 @@ package sso_domain
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -15,8 +16,14 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultListTimeout caps how long the list operation waits on the SSO domains
+// list endpoint. The list fetch is the only SDK call the list resource makes;
+// items are built from the list response, so there is no per-item read.
+const defaultListTimeout = 5 * time.Minute
 
 var (
 	_ list.ListResource              = &DomainListResource{}
@@ -66,8 +73,9 @@ func (r *DomainListResource) Configure(ctx context.Context, req resource.Configu
 	r.client = client
 }
 
-// ListResourceConfigSchema describes the (empty) list configuration.
-func (r *DomainListResource) ListResourceConfigSchema(_ context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
+// ListResourceConfigSchema describes the list configuration, which holds only the
+// shared `timeouts` attribute.
+func (r *DomainListResource) ListResourceConfigSchema(ctx context.Context, _ list.ListResourceSchemaRequest, resp *list.ListResourceSchemaResponse) {
 	resp.Schema = listschema.Schema{
 		Description: "Lists the DNS domains your Jamf Account organization has claimed, for `terraform query` and " +
 			"for importing existing claims in bulk. Jamf Account exposes no search arguments for domains, so this " +
@@ -79,6 +87,7 @@ func (r *DomainListResource) ListResourceConfigSchema(_ context.Context, _ list.
 			listResourcePrivileges,
 		Attributes: map[string]listschema.Attribute{},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams SSO domain identities back to Terraform.
@@ -100,7 +109,14 @@ func (r *DomainListResource) List(ctx context.Context, req list.ListRequest, str
 		return
 	}
 
-	domains, err := r.client.ListDomains(ctx)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+
+	domains, err := r.client.ListDomains(listCtx)
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic("Unable to list Jamf Account SSO domains", helpers.APIErrorDetail(err)),

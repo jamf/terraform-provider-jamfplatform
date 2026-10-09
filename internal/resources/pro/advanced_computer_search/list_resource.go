@@ -16,6 +16,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -47,7 +48,8 @@ type AdvancedComputerSearchListResource struct {
 
 // AdvancedComputerSearchListResourceModel is the config model for list queries.
 type AdvancedComputerSearchListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }
 
 // Metadata sets the list resource type name.
@@ -73,6 +75,7 @@ func (r *AdvancedComputerSearchListResource) ListResourceConfigSchema(ctx contex
 			"filter": filters.ClassicListFilterAttribute(),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams advanced computer search identities back
@@ -95,8 +98,12 @@ func (r *AdvancedComputerSearchListResource) List(ctx context.Context, req list.
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	resp, err := r.client.ListAdvancedComputerSearches(listCtx)
 	if err != nil {

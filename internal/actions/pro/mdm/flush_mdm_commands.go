@@ -16,6 +16,7 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -28,9 +29,10 @@ type FlushMdmCommandsAction struct {
 }
 
 type FlushMdmCommandsActionModel struct {
-	IDType types.String `tfsdk:"id_type"`
-	ID     types.String `tfsdk:"id"`
-	Status types.String `tfsdk:"status"`
+	IDType   types.String         `tfsdk:"id_type"`
+	ID       types.String         `tfsdk:"id"`
+	Status   types.String         `tfsdk:"status"`
+	Timeouts actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 func NewFlushMdmCommandsAction() action.Action {
@@ -71,6 +73,7 @@ func (a *FlushMdmCommandsAction) Schema(ctx context.Context, req action.SchemaRe
 			},
 		},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 func (a *FlushMdmCommandsAction) Configure(ctx context.Context, req action.ConfigureRequest, resp *action.ConfigureResponse) {
@@ -78,6 +81,12 @@ func (a *FlushMdmCommandsAction) Configure(ctx context.Context, req action.Confi
 }
 
 func (a *FlushMdmCommandsAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClassicClient(resp) {
 		return
 	}

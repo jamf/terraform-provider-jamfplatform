@@ -93,3 +93,11 @@ This is the identifier a practitioner holds. Do not trigger this action from the
 - `domain_id` (String) The identifier Jamf Account assigned the claimed domain, as exported by the `id` attribute of `jamfplatform_account_sso_domain`.
 
 Jamf Account never shows this identifier, so `domain` is usually the easier form. Naming the identifier skips the lookup that resolving a name needs, so it also needs one permission fewer; see the table below. A domain that is released and claimed again is issued a new identifier, so avoid hard-coding one. Set this or `domain`, never both.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

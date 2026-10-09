@@ -6,7 +6,9 @@ package components
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -20,6 +22,9 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ datasource.DataSource = &ComponentsDataSource{}
+
+// defaultReadTimeout bounds the component listing.
+const defaultReadTimeout = 90 * time.Second
 
 // NewComponentsDataSource returns a new instance of ComponentsDataSource.
 func NewComponentsDataSource() datasource.DataSource {
@@ -36,6 +41,7 @@ func (d *ComponentsDataSource) Schema(ctx context.Context, req datasource.Schema
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Returns all available blueprint components. Requires **Blueprints API** access." + dataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
+			"timeouts": timeouts.Attributes(ctx),
 			"components": schema.ListNestedAttribute{
 				MarkdownDescription: "List of all blueprint components.",
 				Computed:            true,
@@ -108,7 +114,16 @@ func (d *ComponentsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	components, err := d.client.ListBlueprintComponents(ctx)
+	readTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, data.Timeouts.IsNull(), data.Timeouts.IsUnknown(), defaultReadTimeout, data.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
+	components, err := d.client.ListBlueprintComponents(readCtx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to get components",
@@ -149,6 +164,7 @@ func (d *ComponentsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 
 	data = ComponentsDataSourceModel{
 		Components: componentsList,
+		Timeouts:   data.Timeouts,
 	}
 
 	tflog.Trace(ctx, "read a data source")

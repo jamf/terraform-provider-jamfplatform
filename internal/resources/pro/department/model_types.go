@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // DepartmentResourceModel represents the Terraform resource model for a Jamf Pro department.
@@ -32,7 +33,8 @@ type departmentIdentityModel struct {
 
 // DepartmentListResourceModel represents the config model for department list queries.
 type DepartmentListResourceModel struct {
-	Filters []filters.FilterModel `tfsdk:"filter"`
+	Filters  []filters.FilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value    `tfsdk:"timeouts"`
 }
 
 // DepartmentsDataSourceModel represents the Terraform data source model for department searches.

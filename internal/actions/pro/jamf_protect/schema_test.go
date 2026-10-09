@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/action"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	actionschema "github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 )
 
 func TestSyncPlansAction_Metadata(t *testing.T) {
@@ -34,8 +36,8 @@ func TestSyncPlansAction_Schema(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
 	}
-	if len(resp.Schema.Attributes) != 0 {
-		t.Errorf("sync plans action takes no input; expected 0 attributes, got %d", len(resp.Schema.Attributes))
+	if _, ok := resp.Schema.Attributes[actiontimeouts.AttributeName]; len(resp.Schema.Attributes) != 1 || !ok {
+		t.Errorf("sync plans action takes no input beyond timeouts; got %d attributes", len(resp.Schema.Attributes))
 	}
 }
 
@@ -84,15 +86,15 @@ func TestRetryDeploymentAction_ConfigValidatorsWired(t *testing.T) {
 
 // retryValidatorSchema is a minimal stand-in schema carrying the target-mode
 // attributes the validator reads, so a tfsdk.Config can be hand-built.
-var retryValidatorSchema = schema.Schema{Attributes: map[string]schema.Attribute{
-	"deployment_id": schema.StringAttribute{Optional: true},
-	"serial_number": schema.StringAttribute{Optional: true},
-	"management_id": schema.StringAttribute{Optional: true},
-	"udid":          schema.StringAttribute{Optional: true},
-	"task_ids":      schema.ListAttribute{ElementType: types.StringType, Optional: true},
-	"all_failed":    schema.BoolAttribute{Optional: true},
-	"only_failed":   schema.BoolAttribute{Optional: true},
-}}
+var retryValidatorSchema = actionschema.Schema{Attributes: actiontimeouts.Add(context.Background(), map[string]actionschema.Attribute{
+	"deployment_id": actionschema.StringAttribute{Optional: true},
+	"serial_number": actionschema.StringAttribute{Optional: true},
+	"management_id": actionschema.StringAttribute{Optional: true},
+	"udid":          actionschema.StringAttribute{Optional: true},
+	"task_ids":      actionschema.ListAttribute{ElementType: types.StringType, Optional: true},
+	"all_failed":    actionschema.BoolAttribute{Optional: true},
+	"only_failed":   actionschema.BoolAttribute{Optional: true},
+})}
 
 var retryObjType = tftypes.Object{AttributeTypes: map[string]tftypes.Type{
 	"deployment_id": tftypes.String,
@@ -102,6 +104,7 @@ var retryObjType = tftypes.Object{AttributeTypes: map[string]tftypes.Type{
 	"task_ids":      tftypes.List{ElementType: tftypes.String},
 	"all_failed":    tftypes.Bool,
 	"only_failed":   tftypes.Bool,
+	"timeouts":      tftypes.Object{AttributeTypes: map[string]tftypes.Type{"invoke": tftypes.String}},
 }}
 
 func strV(s string) tftypes.Value { return tftypes.NewValue(tftypes.String, s) }
@@ -130,6 +133,7 @@ func runRetryValidator(serial, management, udid, allFailed, taskIDs tftypes.Valu
 			"task_ids":      taskIDs,
 			"all_failed":    allFailed,
 			"only_failed":   boolN(),
+			"timeouts":      tftypes.NewValue(retryObjType.AttributeTypes["timeouts"], nil),
 		}),
 	}
 	var resp action.ValidateConfigResponse

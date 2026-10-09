@@ -173,7 +173,7 @@ func TestDeviceGroupListResource_Metadata(t *testing.T) {
 	}
 }
 
-// TestDeviceGroupListResource_Schema asserts the config schema is empty. The group
+// TestDeviceGroupListResource_Schema asserts the config schema carries only the `timeouts` attribute. The group
 // list endpoint accepts no query parameters at all — not even a sort — so an
 // attribute appearing here would mean a filter was added without wiring it.
 func TestDeviceGroupListResource_Schema(t *testing.T) {
@@ -184,8 +184,8 @@ func TestDeviceGroupListResource_Schema(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
 	}
-	if len(resp.Schema.Attributes) != 0 {
-		t.Errorf("list schema must take no configuration, got %v", resp.Schema.Attributes)
+	if _, ok := resp.Schema.Attributes["timeouts"]; !ok || len(resp.Schema.Attributes) != 1 {
+		t.Errorf("list schema must take only the timeouts attribute, got %v", resp.Schema.Attributes)
 	}
 }
 

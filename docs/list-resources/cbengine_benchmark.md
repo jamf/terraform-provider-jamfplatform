@@ -41,3 +41,11 @@ list "jamfplatform_cbengine_benchmark" "cis_benchmarks" {
 ### Optional
 
 - `search` (String) Optional substring to match (case-insensitive) against benchmark title or description.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `list` (String) How long the listing may run before it is cancelled, as a duration such as `30s` or `10m`. Reading an individual result, when a resource is generated for each one, has its own separate limit.

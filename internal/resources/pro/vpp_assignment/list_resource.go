@@ -16,6 +16,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -59,6 +60,7 @@ func (r *VPPAssignmentListResource) ListResourceConfigSchema(ctx context.Context
 			"filter": filters.ClassicListFilterAttribute(),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 func (r *VPPAssignmentListResource) List(ctx context.Context, req list.ListRequest, stream *list.ListResultsStream) {
@@ -76,8 +78,12 @@ func (r *VPPAssignmentListResource) List(ctx context.Context, req list.ListReque
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	apiResp, err := r.client.ListVPPAssignments(listCtx)
 	if err != nil {

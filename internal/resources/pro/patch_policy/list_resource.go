@@ -20,6 +20,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -30,8 +31,7 @@ import (
 // collection this replaced. The page size is 2000, so a tenant needs more than
 // 2000 patch policies before a second request is issued at all, and 90s stays
 // generous well past that; revisit the constant if that ceiling is ever crossed
-// in practice. The list resource schema does not expose a user-overridable
-// timeout, so this is a fixed safety bound.
+// in practice. It applies when the list config sets no `timeouts` value.
 const defaultListTimeout = 90 * time.Second
 
 // defaultItemReadTimeout bounds each per-item GET issued when IncludeResource is
@@ -93,6 +93,7 @@ func (r *PatchPolicyListResource) ListResourceConfigSchema(ctx context.Context, 
 			"filter": filters.ClassicListFilterAttribute(),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams patch policy identities back to Terraform.
@@ -133,8 +134,12 @@ func (r *PatchPolicyListResource) List(ctx context.Context, req list.ListRequest
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	items, err := r.proClient.ListPatchPoliciesV2(listCtx, nil, "")
 	if err != nil {

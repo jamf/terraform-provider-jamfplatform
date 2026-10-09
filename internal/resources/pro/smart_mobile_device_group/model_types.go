@@ -10,6 +10,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // SmartMobileDeviceGroupResourceModel is the Terraform model for a smart mobile
@@ -76,5 +77,6 @@ type SmartMobileDeviceGroupsDataSourceResultModel struct {
 
 // SmartMobileDeviceGroupListResourceModel is the config model for list queries.
 type SmartMobileDeviceGroupListResourceModel struct {
-	Filters []filters.FilterModel `tfsdk:"filter"`
+	Filters  []filters.FilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value    `tfsdk:"timeouts"`
 }

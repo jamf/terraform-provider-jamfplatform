@@ -16,6 +16,7 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -28,8 +29,9 @@ type RetryPatchPolicyLogsAction struct {
 }
 
 type RetryPatchPolicyLogsActionModel struct {
-	PatchPolicyID types.String `tfsdk:"patch_policy_id"`
-	DeviceIDs     types.List   `tfsdk:"device_ids"`
+	PatchPolicyID types.String         `tfsdk:"patch_policy_id"`
+	DeviceIDs     types.List           `tfsdk:"device_ids"`
+	Timeouts      actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 func NewRetryPatchPolicyLogsAction() action.Action {
@@ -62,6 +64,7 @@ func (a *RetryPatchPolicyLogsAction) Schema(ctx context.Context, req action.Sche
 			},
 		},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 func (a *RetryPatchPolicyLogsAction) Configure(ctx context.Context, req action.ConfigureRequest, resp *action.ConfigureResponse) {
@@ -69,6 +72,12 @@ func (a *RetryPatchPolicyLogsAction) Configure(ctx context.Context, req action.C
 }
 
 func (a *RetryPatchPolicyLogsAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

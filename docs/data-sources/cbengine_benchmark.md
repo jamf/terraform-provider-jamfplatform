@@ -61,6 +61,7 @@ output "benchmark_by_title_rules" {
 ### Optional
 
 - `id` (String) The benchmark ID to fetch. Optional if title is set.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 - `title` (String) The benchmark title to fetch. Optional if id is set.
 
 ### Read-Only
@@ -78,6 +79,14 @@ output "benchmark_by_title_rules" {
 - `target_device_groups` (Set of String) All device group Platform IDs targeted by this benchmark.
 - `tenant_id` (String) Tenant ID.
 - `update_available` (Boolean) Update available flag.
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+
 
 <a id="nestedatt--available_os_versions"></a>
 ### Nested Schema for `available_os_versions`

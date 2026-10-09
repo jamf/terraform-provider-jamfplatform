@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // MobileDevicePrestageEnrollmentResourceModel is the Terraform resource model
@@ -222,5 +223,6 @@ type MobileDevicePrestageEnrollmentDataSourceModel struct {
 // list resource. The `/v3/mobile-device-prestages` list endpoint accepts no
 // RSQL filter — exposes the shared client-side substring matcher.
 type MobileDevicePrestageEnrollmentListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

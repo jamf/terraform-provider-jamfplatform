@@ -55,12 +55,21 @@ output "welcome_icon_url" {
 
 - `display_name` (String) Customization display name (exact match). Mutually exclusive with `id`.
 - `id` (String) Enrollment customization ID. Mutually exclusive with `display_name`.
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only
 
 - `branding_settings` (Attributes) Branding palette plus icon URL returned by Jamf Pro. (see [below for nested schema](#nestedatt--branding_settings))
 - `description` (String) Administrator-visible description.
 - `site_id` (String) Jamf Pro site ID associated with the customization, or the sentinel `"-1"` when no site is set.
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+
 
 <a id="nestedatt--branding_settings"></a>
 ### Nested Schema for `branding_settings`

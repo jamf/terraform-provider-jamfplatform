@@ -49,3 +49,14 @@ action "jamfplatform_pro_update_app_installer_version" "move" {
 
 - `deployment_id` (String) App Installer deployment ID to move. Must be a positive numeric string; Jamf Pro rejects anything else before it looks the deployment up.
 - `version` (String) Version of the title to move to, which must be newer than the deployment's current version. Read the `versions` attribute of the `jamfplatform_pro_app_installer_title` data source for the versions Jamf Pro publishes.
+
+### Optional
+
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `invoke` (String) How long the action may run before it is cancelled, as a duration such as `30s` or `10m`. Defaults to 5 minutes.

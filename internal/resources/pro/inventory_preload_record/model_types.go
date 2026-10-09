@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // InventoryPreloadRecordResourceModel represents the Terraform resource model for a
@@ -91,5 +92,6 @@ type inventoryPreloadRecordIdentityModel struct {
 // InventoryPreloadRecordListResourceModel represents the config model for inventory
 // preload record list queries.
 type InventoryPreloadRecordListResourceModel struct {
-	Filters []filters.FilterModel `tfsdk:"filter"`
+	Filters  []filters.FilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value    `tfsdk:"timeouts"`
 }

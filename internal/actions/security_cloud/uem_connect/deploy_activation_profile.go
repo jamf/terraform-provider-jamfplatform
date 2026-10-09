@@ -25,6 +25,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -41,9 +42,10 @@ type DeployActivationProfileAction struct {
 
 // DeployActivationProfileActionModel is the action's configuration.
 type DeployActivationProfileActionModel struct {
-	ActivationProfileCode types.String `tfsdk:"activation_profile_code"`
-	OS                    types.String `tfsdk:"os"`
-	JamfProGroupIDs       types.Set    `tfsdk:"jamf_pro_group_ids"`
+	ActivationProfileCode types.String         `tfsdk:"activation_profile_code"`
+	OS                    types.String         `tfsdk:"os"`
+	JamfProGroupIDs       types.Set            `tfsdk:"jamf_pro_group_ids"`
+	Timeouts              actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
 // NewDeployActivationProfileAction returns a new instance of
@@ -58,7 +60,7 @@ func (a *DeployActivationProfileAction) Metadata(_ context.Context, req action.M
 }
 
 // Schema returns the action schema.
-func (a *DeployActivationProfileAction) Schema(_ context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
+func (a *DeployActivationProfileAction) Schema(ctx context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
 	resp.Schema = actionschema.Schema{
 		MarkdownDescription: "**\"Deploy to Jamf Pro\"** under **UEM actions** on a Jamf Security Cloud " +
 			"activation profile. Creates the activation profile's configuration profile in Jamf Pro for one " +
@@ -119,6 +121,7 @@ func (a *DeployActivationProfileAction) Schema(_ context.Context, _ action.Schem
 			},
 		},
 	}
+	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // Configure wires the Jamf Security Cloud client into the action.
@@ -139,6 +142,12 @@ func (a *DeployActivationProfileAction) Configure(ctx context.Context, req actio
 // profile rather than creating a second, and a repeat after the configuration
 // profile was deleted in Jamf Pro recreates it.
 func (a *DeployActivationProfileAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !a.ensureClient(resp) {
 		return
 	}

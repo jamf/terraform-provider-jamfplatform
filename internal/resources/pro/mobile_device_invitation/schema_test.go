@@ -152,8 +152,13 @@ func TestMobileDeviceInvitationListResource_Schema_NoFilter(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
 	}
-	// Mobile device invitations carry no name, so there is deliberately no filter.
-	if len(resp.Schema.Attributes) != 0 {
-		t.Errorf("expected an empty list config schema, got %d attributes", len(resp.Schema.Attributes))
+	if _, ok := resp.Schema.Attributes["filter"]; ok {
+		t.Error("mobile device invitations carry no name, so the list schema must not expose a filter")
+	}
+	if _, ok := resp.Schema.Attributes["timeouts"]; !ok {
+		t.Error("expected the list schema to expose a timeouts attribute")
+	}
+	if len(resp.Schema.Attributes) != 1 {
+		t.Errorf("expected only the timeouts attribute, got %d attributes", len(resp.Schema.Attributes))
 	}
 }

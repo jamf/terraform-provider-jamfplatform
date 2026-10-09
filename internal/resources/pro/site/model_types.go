@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // SiteResourceModel represents the Terraform resource model for a Jamf Pro site.
@@ -34,7 +35,8 @@ type siteIdentityModel struct {
 // SiteListResourceModel represents the config model for site list queries.
 // Classic has no RSQL — the filter shape is the shared client-side substring block.
 type SiteListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }
 
 // SitesDataSourceModel represents the Terraform data source model for site searches.

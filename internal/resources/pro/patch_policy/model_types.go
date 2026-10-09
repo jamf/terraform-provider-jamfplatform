@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // PatchPolicyResourceModel is the Terraform resource model for a Jamf Pro patch
@@ -178,5 +179,6 @@ type patchPolicyIdentityModel struct {
 // block. Unlike patch software titles, the patch policies list response carries
 // a display name, so the filter matches the policy name.
 type PatchPolicyListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

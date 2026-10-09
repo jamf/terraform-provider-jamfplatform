@@ -7,6 +7,8 @@ import (
 	datasourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // MobileDeviceInvitationResourceModel is the Terraform resource model for a Jamf
@@ -99,4 +101,6 @@ type mobileDeviceInvitationIdentityModel struct {
 // item exposes only id / invitation / invitation_type / expiration /
 // last_action), so there is no meaningful client-side substring filter — the
 // list resource takes no configuration and returns all invitations.
-type MobileDeviceInvitationListResourceModel struct{}
+type MobileDeviceInvitationListResourceModel struct {
+	Timeouts listtimeouts.Value `tfsdk:"timeouts"`
+}

@@ -11,6 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 )
 
 // --- Plan action ---
@@ -99,8 +101,8 @@ func TestAbandonFeatureToggleAction_Schema(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
 	}
-	if len(resp.Schema.Attributes) != 0 {
-		t.Errorf("abandon action takes no input; expected 0 attributes, got %d", len(resp.Schema.Attributes))
+	if _, ok := resp.Schema.Attributes[actiontimeouts.AttributeName]; len(resp.Schema.Attributes) != 1 || !ok {
+		t.Errorf("abandon action takes no input beyond timeouts; got %d attributes", len(resp.Schema.Attributes))
 	}
 }
 

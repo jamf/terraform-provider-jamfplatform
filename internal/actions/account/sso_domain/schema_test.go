@@ -64,13 +64,13 @@ func TestVerifySSODomainAction_Attributes(t *testing.T) {
 		}
 	}
 
-	if len(s.Attributes) != 2 {
+	if len(s.Attributes) != 3 {
 		names := make([]string, 0, len(s.Attributes))
 		for name := range s.Attributes {
 			names = append(names, name)
 		}
 		sort.Strings(names)
-		t.Errorf("expected exactly domain and domain_id, got %v", names)
+		t.Errorf("expected exactly domain, domain_id and timeouts, got %v", names)
 	}
 }
 

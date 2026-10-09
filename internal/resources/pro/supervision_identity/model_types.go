@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // SupervisionIdentityResourceModel represents the Terraform resource model for a
@@ -49,5 +50,6 @@ type supervisionIdentityIdentityModel struct {
 // queries. The endpoint accepts no server-side filter, so the optional filter is
 // the shared client-side substring block applied after the full list is fetched.
 type SupervisionIdentityListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

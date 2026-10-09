@@ -16,11 +16,12 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
 // defaultListTimeout caps how long the list operation will wait on the classic
-// endpoint. The list resource schema does not expose a user-overridable timeout.
+// endpoint when the list config sets no `timeouts` value.
 const defaultListTimeout = 90 * time.Second
 
 // defaultItemReadTimeout bounds each per-item hydration GET issued when
@@ -66,6 +67,7 @@ func (r *ProvisioningProfileListResource) ListResourceConfigSchema(ctx context.C
 			"filter": filters.ClassicListFilterAttribute(),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams profile identities back to Terraform.
@@ -87,8 +89,12 @@ func (r *ProvisioningProfileListResource) List(ctx context.Context, req list.Lis
 		return
 	}
 
-	listCtx, cancel := context.WithTimeout(ctx, defaultListTimeout)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
 	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
 
 	resp, err := r.client.ListMobileDeviceProvisioningProfiles(listCtx)
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -17,6 +18,9 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultReadTimeout bounds the whole blueprint listing, which pages through every blueprint.
+const defaultReadTimeout = 90 * time.Second
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ datasource.DataSource = &BlueprintsDataSource{}
@@ -44,6 +48,7 @@ func (d *BlueprintsDataSource) Schema(ctx context.Context, req datasource.Schema
 				MarkdownDescription: "Optional substring to match against blueprint name or description (case-insensitive).",
 				Optional:            true,
 			},
+			"timeouts": timeouts.Attributes(ctx),
 			"blueprints": schema.ListNestedAttribute{
 				MarkdownDescription: "Blueprints that matched the optional search filter.",
 				Computed:            true,
@@ -128,13 +133,22 @@ func (d *BlueprintsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
+	readTimeout, timeoutDiags := helpers.ResolveTimeout(ctx, data.Timeouts.IsNull(), data.Timeouts.IsUnknown(), defaultReadTimeout, data.Timeouts.Read)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	readCtx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
 	searchTerm := ""
 	if helpers.IsConfiguredValue(data.Search) {
 		searchTerm = strings.TrimSpace(data.Search.ValueString())
 	}
 	searchLower := strings.ToLower(searchTerm)
 
-	blueprints, err := d.client.ListBlueprints(ctx, nil, "")
+	blueprints, err := d.client.ListBlueprints(readCtx, nil, "")
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to list blueprints", helpers.APIErrorDetail(err))
 		return

@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 )
 
 // DiskEncryptionConfigurationResourceModel is the Terraform resource model
@@ -84,5 +85,6 @@ type diskEncryptionConfigurationIdentityModel struct {
 // list resource. Classic /diskencryptionconfigurations has no RSQL, so
 // the filter shape reuses the shared client-side substring block.
 type DiskEncryptionConfigurationListResourceModel struct {
-	Filter *filters.ClassicFilterModel `tfsdk:"filter"`
+	Filter   *filters.ClassicFilterModel `tfsdk:"filter"`
+	Timeouts listtimeouts.Value          `tfsdk:"timeouts"`
 }

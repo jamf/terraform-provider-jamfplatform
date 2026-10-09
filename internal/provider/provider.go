@@ -186,6 +186,10 @@ const (
 	envAuthorizationHeaderName = "JAMFPLATFORM_AUTHORIZATION_HEADER_NAME"
 )
 
+// credentialValidationTimeout bounds the token exchange and tenant check Configure performs. A
+// stalled gateway would otherwise hang `terraform plan` before any resource runs.
+const credentialValidationTimeout = 60 * time.Second
+
 // Ensure JamfPlatformProvider satisfies the various provider interfaces.
 var _ provider.Provider = &JamfPlatformProvider{}
 var _ provider.ProviderWithListResources = &JamfPlatformProvider{}
@@ -460,7 +464,9 @@ func (p *JamfPlatformProvider) Configure(ctx context.Context, req provider.Confi
 	}
 	apiClient := jamfplatform.NewClient(baseURL, clientID, clientSecret, opts...)
 
-	if err := apiClient.ValidateCredentials(ctx); err != nil {
+	validateCtx, cancelValidate := context.WithTimeout(ctx, credentialValidationTimeout)
+	defer cancelValidate()
+	if err := apiClient.ValidateCredentials(validateCtx); err != nil {
 		summary, detail := authFailureDiagnostic(baseURL, err)
 		resp.Diagnostics.AddError(summary, detail)
 		return

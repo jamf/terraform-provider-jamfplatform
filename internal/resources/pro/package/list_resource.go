@@ -5,6 +5,7 @@ package pkg
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -15,8 +16,14 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
+
+// defaultListTimeout caps how long the list operation waits on the packages
+// list endpoint. The list fetch is the only SDK call the list resource makes;
+// items are built from the list response, so there is no per-item read.
+const defaultListTimeout = 5 * time.Minute
 
 var _ list.ListResource = &PackageListResource{}
 var _ list.ListResourceWithConfigure = &PackageListResource{}
@@ -63,6 +70,7 @@ func (r *PackageListResource) ListResourceConfigSchema(ctx context.Context, req 
 			),
 		},
 	}
+	resp.Schema.Attributes = listtimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
 // List executes the query and streams package identities back to Terraform.
@@ -87,7 +95,14 @@ func (r *PackageListResource) List(ctx context.Context, req list.ListRequest, st
 	filterExpression := filters.BuildRSQLExpression(config.Filters, filters.AllowList(PackageFilterSelectors))
 	tflog.Debug(ctx, "package list filters", map[string]any{"filter": filterExpression})
 
-	pkgs, err := r.client.ListPackagesV1(ctx, nil, filterExpression)
+	listCtx, cancel := listtimeouts.Bound(ctx, req.Config, &diags, defaultListTimeout)
+	defer cancel()
+	if diags.HasError() {
+		stream.Results = list.ListResultsStreamDiagnostics(diags)
+		return
+	}
+
+	pkgs, err := r.client.ListPackagesV1(listCtx, nil, filterExpression)
 	if err != nil {
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic("Unable to list Jamf Pro packages", helpers.APIErrorDetail(err)),
