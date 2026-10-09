@@ -143,7 +143,7 @@ func (r *MobileAppResource) Schema(ctx context.Context, req resource.SchemaReque
 					},
 					"description": mirrorString(
 						"App description, which Jamf Pro keeps in step with `self_service.self_service_description`, and syncs from the App Store while `keep_description_and_icon_up_to_date = true`. Set `self_service.self_service_description` to change it.",
-						planmodifiers.ObjectSource(path.MatchRoot("self_service")),
+						planmodifiers.NestedStringSource(path.MatchRoot("self_service"), "self_service_description"),
 					),
 					"is_free": optComputedBool("Whether the app is free. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"deployment_type": mirrorString(
@@ -155,9 +155,9 @@ func (r *MobileAppResource) Schema(ctx context.Context, req resource.SchemaReque
 					"itunes_country_region":                  optComputedString("Two-letter App Store country/region code used to resolve store metadata. Omit to leave the current value untouched."),
 					"itunes_sync_time":                       optComputedInt64("App Store sync time as a Unix epoch. Maintained by Jamf Pro."),
 					"category_id":                            optComputedString("Jamf Pro category ID. Use `-1` for \"No category\". Omit to leave the current value untouched."),
-					"category_name":                          computedString("Category display name. Returned by Jamf Pro; not user-settable."),
+					"category_name":                          mirrorString("Category display name. Returned by Jamf Pro; not user-settable.", planmodifiers.StringSource(path.MatchRoot("general").AtName("category_id"))),
 					"site_id":                                optComputedString("Jamf Pro site ID scoping the app. Use `-1` for \"No site\". Omit to leave the current value untouched."),
-					"site_name":                              computedString("Site display name. Returned by Jamf Pro; not user-settable."),
+					"site_name":                              mirrorString("Site display name. Returned by Jamf Pro; not user-settable.", planmodifiers.StringSource(path.MatchRoot("general").AtName("site_id"))),
 					"make_available_after_install":           optComputedBool("Make the app available in Self Service after it is installed automatically. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"keep_description_and_icon_up_to_date":   optComputedBool("Keep the app description and icon in sync with the App Store listing. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"keep_app_updated_on_devices":            optComputedBool("Automatically update the app on managed devices when a new version ships. Omit to leave the current value untouched; set `true`/`false` to change it."),
@@ -376,30 +376,7 @@ func optComputedInt64(desc string) schema.Int64Attribute {
 	}
 }
 
-// computedString returns a Computed-only StringAttribute for server-managed
-// fields (description, category_name, site_name) with UseStateForUnknown so
-// no-op plans stay empty (the standard pattern shared with mac_app_store_app).
-//
-// These echo values the server derives from other inputs (category_name/
-// site_name from category_id/site_id, description from the App Store sync). If a
-// user changes the driving input, the plan shows the stale echo and the apply
-// recomputes it — the accepted ProClassic latent posture (mac_app carries the
-// same).
-//
-// NB: this is intentionally NOT used for display_name (deterministically ==
-// name) or internal_app (server-flips based on the store/hosting inputs) —
-// those echoes would trip "inconsistent result after apply" when their driving
-// input changes, so they are not modeled at all (callers read `name`, and
-// in-house status is derivable from whether a store/external URL is set).
-func computedString(desc string) schema.StringAttribute {
-	return schema.StringAttribute{
-		MarkdownDescription: desc,
-		Computed:            true,
-		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-	}
-}
-
-// mirrorString is computedString for an attribute Jamf Pro derives from a
+// mirrorString is a Computed string for an attribute Jamf Pro derives from a
 // SIBLING this resource manages, rather than assigns independently.
 //
 // UseStateForUnknown is wrong for a mirror: it promises the value cannot change
@@ -415,9 +392,18 @@ func computedString(desc string) schema.StringAttribute {
 // general.deployment_type mirrors general.deploy_automatically, both wire-proven
 // against Jamf Pro 11.31.1 on 2026-09-07 — see flattenMobileAppGeneral.
 //
-// description watches the whole self_service block rather than the description
-// within it: self_service is Optional, and a path into a null block resolves
-// only as far as the block. See planmodifiers.ObjectSource.
+// category_name and site_name mirror category_id and site_id. STYLE_GUIDE.md asks
+// for plain Computed on a derived name, but that leaves the plan non-empty
+// whenever another attribute differs only textually, such as CRLF against LF in
+// app_configuration.preferences: the framework marks every unset Computed value
+// Unknown and nothing restores it. Watching the id avoids both failures.
+//
+// description watches self_service.self_service_description through
+// planmodifiers.NestedStringSource. Watching the whole self_service block fails:
+// the block holds Optional+Computed leaves that are null in config and populated
+// in state, so it never compares equal and description goes Unknown in every
+// plan that changes anything else. self_service is Optional, and the watcher
+// reads it as a block, so a null one counts as unchanged.
 func mirrorString(desc string, sources ...planmodifiers.SourceComparer) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,

@@ -363,6 +363,42 @@ func TestMirrorOfString_PlanModifyString(t *testing.T) {
 	}
 }
 
+// TestMirrorOfString_UnknownSourceIsChanged covers a source that is Unknown in
+// config, such as deploy_automatically derived from a resource created in the
+// same apply. The server mirrors whatever it resolves to, so the prior mirror
+// value must not be carried forward.
+func TestMirrorOfString_UnknownSourceIsChanged(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	no := false
+
+	config, plan, state := buildMirrorPlanState(&no, &no, types.StringUnknown(), types.StringValue("carried"))
+	sch := mirrorSchema()
+	config.Raw = tftypes.NewValue(config.Raw.Type(), map[string]tftypes.Value{
+		"flag": tftypes.NewValue(tftypes.Bool, tftypes.UnknownValue), "mirror": tftypes.NewValue(tftypes.String, nil),
+	})
+	config.Schema = sch
+
+	req := planmodifier.StringRequest{
+		Path:       path.Root("mirror"),
+		Config:     config,
+		Plan:       plan,
+		State:      state,
+		StateValue: types.StringValue("carried"),
+		PlanValue:  types.StringUnknown(),
+	}
+	resp := &planmodifier.StringResponse{PlanValue: types.StringUnknown()}
+
+	MirrorOfString(BoolSource(path.MatchRoot("flag"))).PlanModifyString(ctx, req, resp)
+
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics)
+	}
+	if !resp.PlanValue.Equal(types.StringUnknown()) {
+		t.Errorf("plan value = %#v, want Unknown", resp.PlanValue)
+	}
+}
+
 // TestMirrorOfString_DescriptionsAreSet keeps the modifier self-describing: the
 // framework surfaces Description in plan output on some paths, and an empty one
 // is a papercut no other test would catch.
@@ -375,5 +411,259 @@ func TestMirrorOfString_DescriptionsAreSet(t *testing.T) {
 	}
 	if m.MarkdownDescription(context.Background()) == "" {
 		t.Error("MarkdownDescription must not be empty")
+	}
+}
+
+// nestedMirrorBlockType and nestedMirrorType model general.description in
+// jamfplatform_pro_mobile_device_app mirroring self_service.self_service_description:
+// an Optional block of Optional+Computed leaves, one of which is the source.
+var nestedMirrorBlockType = tftypes.Object{AttributeTypes: map[string]tftypes.Type{
+	"source": tftypes.String,
+	"other":  tftypes.String,
+}}
+
+var nestedMirrorType = tftypes.Object{AttributeTypes: map[string]tftypes.Type{
+	"block":  nestedMirrorBlockType,
+	"mirror": tftypes.String,
+}}
+
+func nestedMirrorSchema() schema.Schema {
+	return schema.Schema{Attributes: map[string]schema.Attribute{
+		"block": schema.SingleNestedAttribute{
+			Optional: true,
+			Attributes: map[string]schema.Attribute{
+				"source": schema.StringAttribute{Optional: true, Computed: true},
+				"other":  schema.StringAttribute{Optional: true, Computed: true},
+			},
+		},
+		"mirror": schema.StringAttribute{Computed: true},
+	}}
+}
+
+// nestedBlock builds the block value; a nil source or other is a null leaf.
+// Pass blockNull to get a null block rather than an object of null leaves.
+func nestedBlock(blockNull bool, source, other *string) tftypes.Value {
+	if blockNull {
+		return tftypes.NewValue(nestedMirrorBlockType, nil)
+	}
+	leaf := func(s *string) tftypes.Value {
+		if s == nil {
+			return tftypes.NewValue(tftypes.String, nil)
+		}
+		return tftypes.NewValue(tftypes.String, *s)
+	}
+	return tftypes.NewValue(nestedMirrorBlockType, map[string]tftypes.Value{
+		"source": leaf(source), "other": leaf(other),
+	})
+}
+
+// TestNestedStringSource covers a leaf inside an Optional block. The rows
+// follow the failure table in the bug report: a declared block whose unset
+// Optional+Computed leaves hold values in state must not read as a change.
+func TestNestedStringSource(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	str := func(s string) *string { return &s }
+
+	stateBlock := nestedBlock(false, str("Managed by Terraform."), str("Install"))
+
+	for _, tc := range []struct {
+		name        string
+		config      tftypes.Value // the block as configured
+		state       tftypes.Value // the block as stored
+		stateIsNull bool
+		planIsNull  bool
+		want        types.String
+	}{
+		{
+			name:   "block omitted → prior value carried",
+			config: nestedBlock(true, nil, nil),
+			state:  stateBlock,
+			want:   types.StringValue("carried"),
+		},
+		{
+			name:   "empty block, every leaf null → prior value carried",
+			config: nestedBlock(false, nil, nil),
+			state:  stateBlock,
+			want:   types.StringValue("carried"),
+		},
+		{
+			name:   "another leaf set, source unset → prior value carried",
+			config: nestedBlock(false, nil, str("Get")),
+			state:  stateBlock,
+			want:   types.StringValue("carried"),
+		},
+		{
+			name:   "source set and equal to state → prior value carried",
+			config: nestedBlock(false, str("Managed by Terraform."), nil),
+			state:  stateBlock,
+			want:   types.StringValue("carried"),
+		},
+		{
+			name:   "every leaf set and equal to state → prior value carried",
+			config: nestedBlock(false, str("Managed by Terraform."), str("Install")),
+			state:  stateBlock,
+			want:   types.StringValue("carried"),
+		},
+		{
+			name:   "source edited → Unknown, so apply returns the new mirrored value",
+			config: nestedBlock(false, str("Edited."), nil),
+			state:  stateBlock,
+			want:   types.StringUnknown(),
+		},
+		{
+			name:   "source set where state has none → Unknown",
+			config: nestedBlock(false, str("Managed by Terraform."), nil),
+			state:  nestedBlock(false, nil, str("Install")),
+			want:   types.StringUnknown(),
+		},
+		{
+			name:   "block declared where state has none → Unknown",
+			config: nestedBlock(false, str("Managed by Terraform."), nil),
+			state:  nestedBlock(true, nil, nil),
+			want:   types.StringUnknown(),
+		},
+		{
+			name:        "create (state null) → left Unknown",
+			config:      nestedBlock(false, nil, nil),
+			state:       stateBlock,
+			stateIsNull: true,
+			want:        types.StringUnknown(),
+		},
+		{
+			name:       "destroy (plan null) → left Unknown",
+			config:     nestedBlock(false, nil, nil),
+			state:      stateBlock,
+			planIsNull: true,
+			want:       types.StringUnknown(),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			sch := nestedMirrorSchema()
+			obj := func(block tftypes.Value, mirror tftypes.Value) tftypes.Value {
+				return tftypes.NewValue(nestedMirrorType, map[string]tftypes.Value{"block": block, "mirror": mirror})
+			}
+			unknown := tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+
+			config := tfsdk.Config{Schema: sch, Raw: obj(tc.config, tftypes.NewValue(tftypes.String, nil))}
+			plan := tfsdk.Plan{Schema: sch, Raw: obj(tc.config, unknown)}
+			state := tfsdk.State{Schema: sch, Raw: obj(tc.state, tftypes.NewValue(tftypes.String, "carried"))}
+			if tc.stateIsNull {
+				state.Raw = tftypes.NewValue(nestedMirrorType, nil)
+			}
+			if tc.planIsNull {
+				plan.Raw = tftypes.NewValue(nestedMirrorType, nil)
+			}
+
+			req := planmodifier.StringRequest{
+				Path:       path.Root("mirror"),
+				Config:     config,
+				Plan:       plan,
+				State:      state,
+				StateValue: types.StringValue("carried"),
+				PlanValue:  types.StringUnknown(),
+			}
+			resp := &planmodifier.StringResponse{PlanValue: types.StringUnknown()}
+
+			MirrorOfString(NestedStringSource(path.MatchRoot("block"), "source")).PlanModifyString(ctx, req, resp)
+
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics)
+			}
+			if !resp.PlanValue.Equal(tc.want) {
+				t.Errorf("plan value = %#v, want %#v", resp.PlanValue, tc.want)
+			}
+		})
+	}
+}
+
+// TestNestedStringSource_UnknownIsChanged covers a leaf or block that is Unknown
+// in config (interpolated from a resource not yet created). Its value arrives at
+// apply and the server mirrors it, so carrying the prior mirror value forward
+// would hand Terraform a stale plan and an "inconsistent result" error.
+func TestNestedStringSource_UnknownIsChanged(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	sch := nestedMirrorSchema()
+	unknownString := tftypes.NewValue(tftypes.String, tftypes.UnknownValue)
+	nullString := tftypes.NewValue(tftypes.String, nil)
+	obj := func(b, mirror tftypes.Value) tftypes.Value {
+		return tftypes.NewValue(nestedMirrorType, map[string]tftypes.Value{"block": b, "mirror": mirror})
+	}
+	stateBlock := tftypes.NewValue(nestedMirrorBlockType, map[string]tftypes.Value{
+		"source": tftypes.NewValue(tftypes.String, "v"), "other": nullString,
+	})
+
+	for _, tc := range []struct {
+		name   string
+		config tftypes.Value
+	}{
+		{
+			name: "unknown leaf",
+			config: tftypes.NewValue(nestedMirrorBlockType, map[string]tftypes.Value{
+				"source": unknownString, "other": nullString,
+			}),
+		},
+		{
+			name:   "unknown block",
+			config: tftypes.NewValue(nestedMirrorBlockType, tftypes.UnknownValue),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := planmodifier.StringRequest{
+				Path:       path.Root("mirror"),
+				Config:     tfsdk.Config{Schema: sch, Raw: obj(tc.config, nullString)},
+				Plan:       tfsdk.Plan{Schema: sch, Raw: obj(tc.config, unknownString)},
+				State:      tfsdk.State{Schema: sch, Raw: obj(stateBlock, tftypes.NewValue(tftypes.String, "carried"))},
+				StateValue: types.StringValue("carried"),
+				PlanValue:  types.StringUnknown(),
+			}
+			resp := &planmodifier.StringResponse{PlanValue: types.StringUnknown()}
+
+			MirrorOfString(NestedStringSource(path.MatchRoot("block"), "source")).PlanModifyString(ctx, req, resp)
+
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics)
+			}
+			if !resp.PlanValue.Equal(types.StringUnknown()) {
+				t.Errorf("plan value = %#v, want Unknown", resp.PlanValue)
+			}
+		})
+	}
+}
+
+// TestNestedStringSource_MissingAttributeIsUnreadable pins the fallback: a
+// watcher naming a leaf the block lacks cannot tell, so the mirror stays Unknown
+// rather than carrying a possibly stale value.
+func TestNestedStringSource_MissingAttributeIsUnreadable(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	sch := nestedMirrorSchema()
+	str := func(s string) *string { return &s }
+	obj := func(b, mirror tftypes.Value) tftypes.Value {
+		return tftypes.NewValue(nestedMirrorType, map[string]tftypes.Value{"block": b, "mirror": mirror})
+	}
+	b := nestedBlock(false, str("x"), str("y"))
+
+	req := planmodifier.StringRequest{
+		Path:       path.Root("mirror"),
+		Config:     tfsdk.Config{Schema: sch, Raw: obj(b, tftypes.NewValue(tftypes.String, nil))},
+		Plan:       tfsdk.Plan{Schema: sch, Raw: obj(b, tftypes.NewValue(tftypes.String, tftypes.UnknownValue))},
+		State:      tfsdk.State{Schema: sch, Raw: obj(b, tftypes.NewValue(tftypes.String, "carried"))},
+		StateValue: types.StringValue("carried"),
+		PlanValue:  types.StringUnknown(),
+	}
+	resp := &planmodifier.StringResponse{PlanValue: types.StringUnknown()}
+
+	MirrorOfString(NestedStringSource(path.MatchRoot("block"), "no_such_leaf")).PlanModifyString(ctx, req, resp)
+
+	if !resp.PlanValue.Equal(types.StringUnknown()) {
+		t.Errorf("plan value = %#v, want Unknown", resp.PlanValue)
 	}
 }
