@@ -1,6 +1,9 @@
 # CODEOWNERS
-# Specify code owners for this repository.
+
+# Specify code owners for this repository
+
 # Format: <pattern> <owner> (use @username for GitHub users)
 
 # Default owner for all files
-* @neilmartin83 @leggatron @jedda-jamf @shanembrown @hoarek @grahampugh
+
+* @neilmartin83 @leggatron @jedda-jamf @shanembrown @hoarek @grahampugh @wmehilos @red5coder
