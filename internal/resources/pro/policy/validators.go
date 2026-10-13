@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -371,3 +372,266 @@ func (createAccountRequiresHomeValidator) ValidateResource(ctx context.Context, 
 // accountActionCreate is the local_accounts action Jamf Pro gates on `home`,
 // aliased from the SDK enum so the two cannot drift.
 const accountActionCreate = string(proclassic.PolicyAccountMaintenanceAccountsAccountItemActionCreate)
+
+// diskEncryptionCompanionsValidator checks the disk_encryption block's fields
+// against the action that gives them meaning.
+//
+// Jamf Pro treats the block as a discriminated union on `action`, wire-probed
+// 2026-10-13 against /JSSResource/policies/id/0:
+//
+//   - `apply` needs disk_encryption_configuration_id, positive. Without it,
+//     with 0 or with -1, the answer is `409 Disk encryption id not provided`.
+//   - `remediate` with remediate_key_type `Institutional` or `Individual And
+//     Institutional` needs remediate_disk_encryption_configuration_id, positive:
+//     `409 Remediate disk encryption id not provided`. With `Individual`, or no
+//     key type (which reads back as `Individual`), the id is dropped.
+//   - disk_encryption_configuration_id and auth_restart are dropped unless the
+//     action is `apply`, and remediate_key_type and the remediate id unless it
+//     is `remediate`. The write returns 201 and the field is simply absent from
+//     the read, so a configuration naming one believes it took effect.
+//
+// The check reads CONFIGURATION and acts only when `action` is configured and
+// known: an omitted action may be carried from state, and a configuration that
+// names a companion without an action is not provably wrong on an update. The
+// same trade as createAccountRequiresHomeValidator, which describes it in full.
+type diskEncryptionCompanionsValidator struct{}
+
+// Description returns a plain-text description of the validator.
+func (diskEncryptionCompanionsValidator) Description(context.Context) string {
+	return "disk_encryption fields must match disk_encryption.action"
+}
+
+// MarkdownDescription returns the markdown description.
+func (v diskEncryptionCompanionsValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+// ValidateResource implements the plan-time check. Attributes are read one at a
+// time; see retryRequiresOncePerComputerValidator for why.
+func (diskEncryptionCompanionsValidator) ValidateResource(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	root := path.Root("disk_encryption")
+	var action types.String
+	if req.Config.GetAttribute(ctx, root.AtName("action"), &action).HasError() || !isStringSet(action) {
+		return
+	}
+
+	var (
+		configID, remediateID types.Int64
+		authRestart           types.Bool
+		keyType               types.String
+	)
+	for name, target := range map[string]any{
+		"disk_encryption_configuration_id":           &configID,
+		"remediate_disk_encryption_configuration_id": &remediateID,
+		"auth_restart":       &authRestart,
+		"remediate_key_type": &keyType,
+	} {
+		if req.Config.GetAttribute(ctx, root.AtName(name), target).HasError() {
+			return
+		}
+	}
+
+	absent := func(v types.Int64) bool { return v.IsNull() || (!v.IsUnknown() && v.ValueInt64() < 1) }
+	ignored := func(attr, needs string) {
+		resp.Diagnostics.AddAttributeError(root.AtName(attr), attr+" is ignored for this action",
+			"Jamf Pro discards `"+attr+"` unless `disk_encryption.action` is "+needs+". The setting would never apply. "+
+				"Remove it or change the action.")
+	}
+
+	switch action.ValueString() {
+	case string(proclassic.PolicyPostDiskEncryptionActionApply):
+		if absent(configID) {
+			resp.Diagnostics.AddAttributeError(root.AtName("disk_encryption_configuration_id"),
+				"disk_encryption_configuration_id required for the apply action",
+				"Jamf Pro refuses an `apply` with no configuration ID, or one below 1, and names no field. "+
+					"Set `disk_encryption_configuration_id` to the ID of a disk encryption configuration.")
+		}
+		if !keyType.IsNull() {
+			ignored("remediate_key_type", "`remediate`")
+		}
+		if !remediateID.IsNull() {
+			ignored("remediate_disk_encryption_configuration_id", "`remediate`")
+		}
+	case string(proclassic.PolicyPostDiskEncryptionActionRemediate):
+		if !configID.IsNull() {
+			ignored("disk_encryption_configuration_id", "`apply`")
+		}
+		if !authRestart.IsNull() && !authRestart.IsUnknown() && authRestart.ValueBool() {
+			ignored("auth_restart", "`apply`")
+		}
+		institutional := !keyType.IsNull() && !keyType.IsUnknown() && keyType.ValueString() != string(proclassic.PolicyDiskEncryptionRemediateKeyTypeIndividual)
+		switch {
+		case institutional && absent(remediateID):
+			resp.Diagnostics.AddAttributeError(root.AtName("remediate_disk_encryption_configuration_id"),
+				"remediate_disk_encryption_configuration_id required for this key type",
+				"Jamf Pro refuses a `remediate` with key type `"+keyType.ValueString()+
+					"` and no configuration ID, or one below 1. Set `remediate_disk_encryption_configuration_id`.")
+		case !institutional && !keyType.IsUnknown() && !remediateID.IsNull():
+			ignored("remediate_disk_encryption_configuration_id", "`remediate` with remediate_key_type `Institutional` or `Individual And Institutional`")
+		}
+	default:
+		if !configID.IsNull() {
+			ignored("disk_encryption_configuration_id", "`apply`")
+		}
+		if !authRestart.IsNull() && !authRestart.IsUnknown() && authRestart.ValueBool() {
+			ignored("auth_restart", "`apply`")
+		}
+		if !keyType.IsNull() {
+			ignored("remediate_key_type", "`remediate`")
+		}
+		if !remediateID.IsNull() {
+			ignored("remediate_disk_encryption_configuration_id", "`remediate`")
+		}
+	}
+}
+
+// validateEFIPasswordOnCreate refuses efi_password.of_mode = "command" on a
+// create when no password is configured.
+//
+// Jamf Pro accepts that write and stores a policy whose EFI password hash is
+// empty, wire-probed 2026-10-13: the payload reads back `of_mode: command` with a
+// blank `of_password_sha256`, which protects nothing while looking enforced.
+//
+// It runs on create only. `of_password` is WriteOnly, so a later update that
+// leaves it out is how the provider is told to retain the stored password (see
+// of_password_wo_version), and the config alone cannot tell that apart from a
+// create that forgot it.
+func validateEFIPasswordOnCreate(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if !req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+	root := path.Root("efi_password")
+	var mode types.String
+	if req.Config.GetAttribute(ctx, root.AtName("of_mode"), &mode).HasError() || !isStringSet(mode) ||
+		mode.ValueString() != string(proclassic.PolicyAccountMaintenanceOpenFirmwareEfiPasswordOfModeCommand) {
+		return
+	}
+	var password types.String
+	if req.Config.GetAttribute(ctx, root.AtName("of_password"), &password).HasError() || password.IsUnknown() || isStringSet(password) {
+		return
+	}
+	resp.Diagnostics.AddAttributeError(root.AtName("of_password"),
+		"of_password required for the command mode",
+		"Jamf Pro accepts `of_mode = \"command\"` without a password and stores an empty hash. The policy would "+
+			"report an EFI password it does not enforce. Set `of_password` and `of_password_wo_version = 1`.")
+}
+
+// retryAttemptsMin and retryAttemptsMax bound general.retry_attempts while a
+// retry event is set: Jamf Pro answers `409 Retry attempts value should be
+// between 1 and 10` outside them, -1 included. Wire-probed 2026-10-13.
+const (
+	retryAttemptsMin = 1
+	retryAttemptsMax = 10
+)
+
+// retryAttemptsMatchEventValidator checks general.retry_attempts against the
+// retry event that gives it meaning.
+//
+// Wire-probed 2026-10-13: under retry_event `none` Jamf Pro answers 201 for any
+// retry_attempts and stores -1, so a configured 5 reads back as -1 and the apply
+// ends in "Provider produced inconsistent result". Under `check-in` or `trigger`
+// the value must be 1 to 10, and -1 is refused with a 409 that says so.
+//
+// It acts only when both are configured and known. An omitted retry_event may
+// be carried from state, so a lone retry_attempts is not provably wrong; a create
+// that sets an event and no attempts is caught by validateRetryAttemptsOnCreate.
+type retryAttemptsMatchEventValidator struct{}
+
+// Description returns a plain-text description of the validator.
+func (retryAttemptsMatchEventValidator) Description(context.Context) string {
+	return "general.retry_attempts must match general.retry_event"
+}
+
+// MarkdownDescription returns the markdown description.
+func (v retryAttemptsMatchEventValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+// ValidateResource implements the plan-time cross-field check.
+func (retryAttemptsMatchEventValidator) ValidateResource(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	general := path.Root("general")
+	var event types.String
+	var attempts types.Int64
+	if req.Config.GetAttribute(ctx, general.AtName("retry_event"), &event).HasError() ||
+		req.Config.GetAttribute(ctx, general.AtName("retry_attempts"), &attempts).HasError() ||
+		!isStringSet(event) || attempts.IsNull() || attempts.IsUnknown() {
+		return
+	}
+	got := attempts.ValueInt64()
+	switch {
+	case event.ValueString() == retryEventNone && got != retryAttemptsNone:
+		resp.Diagnostics.AddAttributeError(general.AtName("retry_attempts"),
+			"general.retry_attempts is ignored when retry_event is none",
+			fmt.Sprintf("Jamf Pro stores -1 for retry_attempts while general.retry_event is %q, so %d would read back as -1 and fail the apply. "+
+				"Set general.retry_event to %q or %q, or set general.retry_attempts = -1.",
+				retryEventNone, got, proclassic.PolicyPostGeneralRetryEventCheckIn, proclassic.PolicyPostGeneralRetryEventTrigger))
+	case event.ValueString() != retryEventNone && (got < retryAttemptsMin || got > retryAttemptsMax):
+		resp.Diagnostics.AddAttributeError(general.AtName("retry_attempts"),
+			"general.retry_attempts must be 1 to 10 when retry_event is set",
+			fmt.Sprintf("general.retry_event is %q, and Jamf Pro refuses %d. "+
+				"Use a value from 1 to 10, or set general.retry_event = %q.", event.ValueString(), got, retryEventNone))
+	}
+}
+
+// validateRetryAttemptsOnCreate refuses a create that names a retry event and no
+// retry_attempts. Jamf Pro answers `409 Retry attempts value should be between 1
+// and 10` and names no attribute, wire-probed 2026-10-13. On an update the value
+// may legitimately be carried from state, so only a create is checked.
+func validateRetryAttemptsOnCreate(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if !req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+	general := path.Root("general")
+	var event types.String
+	var attempts types.Int64
+	if req.Config.GetAttribute(ctx, general.AtName("retry_event"), &event).HasError() ||
+		req.Config.GetAttribute(ctx, general.AtName("retry_attempts"), &attempts).HasError() ||
+		!isStringSet(event) || event.ValueString() == retryEventNone || !attempts.IsNull() {
+		return
+	}
+	resp.Diagnostics.AddAttributeError(general.AtName("retry_attempts"),
+		"general.retry_attempts required when retry_event is set",
+		fmt.Sprintf("general.retry_event is %q, and Jamf Pro refuses the policy when no retry_attempts is given. "+
+			"Set general.retry_attempts to a value from 1 to 10.", event.ValueString()))
+}
+
+// deferralUntilLayout is the wire form of user_interaction.deferral_until_utc,
+// the format deferralUntilUtcPattern matches.
+const deferralUntilLayout = "2006-01-02T15:04:05.000-0700"
+
+// validateDeferralDateIsFuture refuses a new or changed
+// user_interaction.deferral_until_utc that is already in the past.
+//
+// Jamf Pro refuses such a date with `409 allow_deferral_until_utc must be a date
+// in the future`, wire-probed 2026-10-13. Only a date this plan changes is
+// checked. A policy created before the date passed still holds it, and an update
+// that leaves it alone is legal: omitUnchangedDeferralDate keeps it off the wire.
+// Flagging it would fail every plan on that policy until someone edited the date.
+//
+// now is a parameter so the test does not depend on the clock.
+func validateDeferralDateIsFuture(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse, now time.Time) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	attr := path.Root("user_interaction").AtName("deferral_until_utc")
+	var planned, prior types.String
+	if req.Plan.GetAttribute(ctx, attr, &planned).HasError() || !isStringSet(planned) {
+		return
+	}
+	if !req.State.Raw.IsNull() {
+		if req.State.GetAttribute(ctx, attr, &prior).HasError() {
+			return
+		}
+		if prior.Equal(planned) {
+			return
+		}
+	}
+	until, err := time.Parse(deferralUntilLayout, planned.ValueString())
+	if err != nil || until.After(now) {
+		return
+	}
+	resp.Diagnostics.AddAttributeError(attr,
+		"user_interaction.deferral_until_utc is in the past",
+		"Jamf Pro refuses a deferral date that has already passed. Set a future date. "+
+			"A policy that already holds a date keeps working after it passes, provided you leave the date unchanged.")
+}

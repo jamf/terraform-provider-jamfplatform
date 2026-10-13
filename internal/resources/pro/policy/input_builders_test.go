@@ -251,3 +251,38 @@ func TestBuildPolicyGeneral_NeverSendsTrigger(t *testing.T) {
 		t.Error("TriggerCheckin was not sent")
 	}
 }
+
+// TestBuildPolicyInput_NeverSendsAssignmentNames pins that a known `name` on an
+// id-keyed assignment is not written. Jamf Pro looks these entries up by name
+// ahead of id, so a name that belongs to another id keeps the old object, and
+// an unknown one is refused 409 and empties the section. See issue #464.
+func TestBuildPolicyInput_NeverSendsAssignmentNames(t *testing.T) {
+	t.Parallel()
+	plan := PolicyResourceModel{
+		General:           &PolicyGeneralModel{Name: types.StringValue("tf-acc-names")},
+		Packages:          &PolicyPackagesModel{Packages: []PolicyPackageItemModel{{ID: types.StringValue("1"), Name: types.StringValue("stale.pkg")}}},
+		Scripts:           &PolicyScriptsModel{Scripts: []PolicyScriptItemModel{{ID: types.StringValue("2"), Name: types.StringValue("stale.sh")}}},
+		Printers:          &PolicyPrintersModel{Printers: []PolicyPrinterItemModel{{ID: types.StringValue("3"), Name: types.StringValue("stale printer")}}},
+		DockItems:         &PolicyDockItemsModel{DockItems: []PolicyDockItemModel{{ID: types.StringValue("4"), Name: types.StringValue("stale dock")}}},
+		DirectoryBindings: []PolicyDirectoryBindingItemModel{{ID: types.StringValue("5"), Name: types.StringValue("stale binding")}},
+	}
+	got, diags := buildPolicyInput(context.Background(), plan, noSecrets())
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if n := (*got.PackageConfiguration.Packages.Package)[0].Name; n != nil {
+		t.Errorf("package name sent: %q", *n)
+	}
+	if n := (*got.Scripts.Script)[0].Name; n != nil {
+		t.Errorf("script name sent: %q", *n)
+	}
+	if n := (*got.Printers.Printer)[0].Name; n != nil {
+		t.Errorf("printer name sent: %q", *n)
+	}
+	if n := (*got.DockItems.DockItem)[0].Name; n != nil {
+		t.Errorf("dock item name sent: %q", *n)
+	}
+	if n := (*got.AccountMaintenance.DirectoryBindings.Binding)[0].Name; n != nil {
+		t.Errorf("directory binding name sent: %q", *n)
+	}
+}

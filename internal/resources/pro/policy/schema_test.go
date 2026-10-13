@@ -15,6 +15,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 )
 
 func TestPolicyResource_Schema(t *testing.T) {
@@ -107,6 +109,8 @@ func policyResourceAttribute(t *testing.T, names ...string) rschema.Attribute {
 			attrs = n.Attributes
 		case rschema.SetNestedAttribute:
 			attrs = n.NestedObject.Attributes
+		case rschema.ListNestedAttribute:
+			attrs = n.NestedObject.Attributes
 		}
 	}
 	return a
@@ -131,6 +135,7 @@ func TestPolicyResource_EnumAttributesRejectUnknownValues(t *testing.T) {
 		{[]string{"disk_encryption", "remediate_key_type"}, proclassic.PolicyPostDiskEncryptionRemediateKeyTypeValues()},
 		{[]string{"restart_options", "no_user_logged_in"}, noUserLoggedInRestartActions},
 		{[]string{"restart_options", "user_logged_in"}, userLoggedInRestartActions},
+		{[]string{"restart_options", "startup_disk"}, restartStartupDisks},
 	}
 	validate := func(validators []validator.String, v string) bool {
 		resp := &validator.StringResponse{}
@@ -188,5 +193,138 @@ func TestPolicyResource_TriggerIsComputedOnly(t *testing.T) {
 	}
 	if !a.Computed || a.Optional || a.Required {
 		t.Errorf("general.trigger: Computed=%v Optional=%v Required=%v, want Computed only", a.Computed, a.Optional, a.Required)
+	}
+}
+
+// TestPolicyResource_AssignmentNamesAreComputedOnly pins `name` on every
+// id-keyed assignment as Computed only with no plan modifier. Jamf Pro resolves
+// these entries by name ahead of id, so a name authored or carried over from
+// state for a re-keyed element defeats the change. See serverDerivedName and
+// issue #464.
+func TestPolicyResource_AssignmentNamesAreComputedOnly(t *testing.T) {
+	t.Parallel()
+	for _, path := range [][]string{
+		{"packages", "packages", "name"},
+		{"scripts", "scripts", "name"},
+		{"printers", "printers", "name"},
+		{"dock_items", "dock_items", "name"},
+		{"directory_bindings", "name"},
+		{"self_service", "categories", "name"},
+	} {
+		a, ok := policyResourceAttribute(t, path...).(rschema.StringAttribute)
+		if !ok {
+			t.Errorf("%v is not a string attribute", path)
+			continue
+		}
+		if !a.Computed || a.Optional || a.Required {
+			t.Errorf("%v: Computed=%v Optional=%v Required=%v, want Computed only", path, a.Computed, a.Optional, a.Required)
+		}
+		if len(a.PlanModifiers) != 0 {
+			t.Errorf("%v: has %d plan modifiers, want none: a carried-over name names the previous object", path, len(a.PlanModifiers))
+		}
+	}
+}
+
+// TestPolicyResource_AssignmentActionsAreRequired pins the action / priority of
+// every id-keyed assignment as Required. Jamf Pro refuses an entry that carries
+// only an id (409 "Problem with <kind>") and has no default, so an Optional
+// attribute only moved the failure from plan to apply. See requiredEnum and
+// issue #464.
+func TestPolicyResource_AssignmentActionsAreRequired(t *testing.T) {
+	t.Parallel()
+	for _, path := range [][]string{
+		{"packages", "packages", "action"},
+		{"scripts", "scripts", "priority"},
+		{"printers", "printers", "action"},
+		{"dock_items", "dock_items", "action"},
+		{"local_accounts", "action"},
+		{"local_accounts", "username"},
+	} {
+		a, ok := policyResourceAttribute(t, path...).(rschema.StringAttribute)
+		if !ok {
+			t.Errorf("%v is not a string attribute", path)
+			continue
+		}
+		if !a.Required || a.Optional || a.Computed {
+			t.Errorf("%v: Required=%v Optional=%v Computed=%v, want Required only", path, a.Required, a.Optional, a.Computed)
+		}
+		if len(a.Validators) == 0 {
+			t.Errorf("%v: no enum validator", path)
+		}
+	}
+}
+
+// TestPolicyResource_KeyedAssignmentAttributesCarryByID pins that the
+// Optional+Computed attributes of id-keyed set elements carry prior state by id
+// rather than by position (the framework pairs set elements by index). See
+// planmodifiers.UseKeyedStateForUnknownString and issue #464.
+func TestPolicyResource_KeyedAssignmentAttributesCarryByID(t *testing.T) {
+	t.Parallel()
+	check := func(path ...string) {
+		t.Helper()
+		switch a := policyResourceAttribute(t, path...).(type) {
+		case rschema.StringAttribute:
+			if len(a.PlanModifiers) != 1 || a.PlanModifiers[0].Description(context.Background()) != planmodifiers.UseKeyedStateForUnknownString("id").Description(context.Background()) {
+				t.Errorf("%v: want exactly the keyed string modifier, got %v", path, a.PlanModifiers)
+			}
+		case rschema.BoolAttribute:
+			if len(a.PlanModifiers) != 1 || a.PlanModifiers[0].Description(context.Background()) != planmodifiers.UseKeyedStateForUnknownBool("id").Description(context.Background()) {
+				t.Errorf("%v: want exactly the keyed bool modifier, got %v", path, a.PlanModifiers)
+			}
+		default:
+			t.Errorf("%v: unexpected attribute type %T", path, a)
+		}
+	}
+	for _, f := range []string{"fut", "feu", "update_autorun"} {
+		check("packages", "packages", f)
+	}
+	for _, f := range []string{"parameter_4", "parameter_11"} {
+		check("scripts", "scripts", f)
+	}
+	check("printers", "printers", "make_default")
+	check("self_service", "categories", "display_in")
+	check("self_service", "categories", "feature_in")
+	for _, f := range []string{"realname", "home", "hint", "picture", "archive_home_directory_to"} {
+		check("local_accounts", f)
+	}
+	for _, f := range []string{"admin", "filevault_enabled", "secure_token_allowed", "permanently_delete_home_directory"} {
+		check("local_accounts", f)
+	}
+}
+
+// TestPolicyResource_IntegerRangesMatchTheWire pins the bounds Jamf Pro enforces
+// on two integers: restart_options.delay_minutes (an int32; 2147483648 is a 409)
+// and user_interaction.deferral_days (1 to 1000; 0 and 1001 are a 409). See
+// maxRestartDelayMinutes and maxDeferralDays.
+func TestPolicyResource_IntegerRangesMatchTheWire(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		path      []string
+		ok, notOK []int64
+	}{
+		{[]string{"restart_options", "delay_minutes"}, []int64{0, 5, 2147483647}, []int64{-1, 2147483648}},
+		{[]string{"user_interaction", "deferral_days"}, []int64{1, 1000}, []int64{0, 1001, -1}},
+	} {
+		a, ok := policyResourceAttribute(t, tc.path...).(rschema.Int64Attribute)
+		if !ok {
+			t.Fatalf("%v is not an int64 attribute", tc.path)
+		}
+		check := func(v int64) bool {
+			resp := &validator.Int64Response{}
+			for _, val := range a.Validators {
+				val.ValidateInt64(context.Background(), validator.Int64Request{Path: path.Root("x"), ConfigValue: types.Int64Value(v)}, resp)
+			}
+			return !resp.Diagnostics.HasError()
+		}
+		for _, v := range tc.ok {
+			if !check(v) {
+				t.Errorf("%v rejected %d", tc.path, v)
+			}
+		}
+		for _, v := range tc.notOK {
+			if check(v) {
+				t.Errorf("%v accepted %d", tc.path, v)
+			}
+		}
 	}
 }
