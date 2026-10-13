@@ -446,7 +446,6 @@ func buildPolicySelfService(m *PolicySelfServiceModel) *proclassic.PolicyPostSel
 		for _, c := range m.Categories {
 			cats = append(cats, proclassic.PolicySelfServiceSelfServiceCategoriesCategoryItem{
 				ID:        helpers.StringIDPtr(c.ID),
-				Name:      helpers.OptionalStringPointer(c.Name),
 				DisplayIn: helpers.SelfServiceCategoryDisplayIn(c.DisplayIn),
 				FeatureIn: helpers.OptionalBoolPointer(c.FeatureIn),
 			})
@@ -470,7 +469,6 @@ func buildPolicyPackageConfiguration(m *PolicyPackagesModel) *proclassic.PolicyP
 		for _, p := range m.Packages {
 			items = append(items, proclassic.PolicyPackageConfigurationPackagesPackageItem{
 				ID:            helpers.StringIDPtr(p.ID),
-				Name:          helpers.OptionalStringPointer(p.Name),
 				Action:        helpers.OptionalStringPointer(p.Action),
 				Fut:           helpers.OptionalBoolPointer(p.Fut),
 				Feu:           helpers.OptionalBoolPointer(p.Feu),
@@ -490,7 +488,6 @@ func buildPolicyScripts(m *PolicyScriptsModel) *proclassic.PolicyPostScripts {
 	for _, s := range m.Scripts {
 		items = append(items, proclassic.PolicyScriptsScriptItem{
 			ID:          helpers.StringIDPtr(s.ID),
-			Name:        helpers.OptionalStringPointer(s.Name),
 			Priority:    helpers.OptionalStringPointer(s.Priority),
 			Parameter4:  helpers.OptionalStringPointer(s.Parameter4),
 			Parameter5:  helpers.OptionalStringPointer(s.Parameter5),
@@ -530,7 +527,6 @@ func buildPolicyPrinters(m *PolicyPrintersModel) *proclassic.PolicyPostPrinters 
 		for _, pr := range m.Printers {
 			items = append(items, proclassic.PolicyPrintersPrinterItem{
 				ID:          helpers.StringIDPtr(pr.ID),
-				Name:        helpers.OptionalStringPointer(pr.Name),
 				Action:      printerActionToWire(pr.Action),
 				MakeDefault: helpers.OptionalBoolPointer(pr.MakeDefault),
 			})
@@ -572,7 +568,6 @@ func buildPolicyDockItems(m *PolicyDockItemsModel) *proclassic.PolicyPostDockIte
 	for _, di := range m.DockItems {
 		items = append(items, proclassic.PolicyPostDockItemsDockItemItem{
 			ID:     helpers.StringIDPtr(di.ID),
-			Name:   helpers.OptionalStringPointer(di.Name),
 			Action: helpers.OptionalStringPointer(di.Action),
 		})
 	}
@@ -618,8 +613,7 @@ func buildPolicyAccountMaintenance(plan PolicyResourceModel, secrets *policyAcco
 		items := make([]proclassic.IDName, 0, len(plan.DirectoryBindings))
 		for _, b := range plan.DirectoryBindings {
 			items = append(items, proclassic.IDName{
-				ID:   helpers.StringIDPtr(b.ID),
-				Name: helpers.OptionalStringPointer(b.Name),
+				ID: helpers.StringIDPtr(b.ID),
 			})
 		}
 		am.DirectoryBindings = &proclassic.PolicyAccountMaintenanceDirectoryBindings{Binding: &items}
@@ -738,6 +732,32 @@ func buildPolicyUserInteraction(m *PolicyUserInteractionModel) *proclassic.Polic
 		out.AllowDeferralMinutes = &mins
 	}
 	return out
+}
+
+// omitUnchangedDeferralDate drops the deferral trio from an update when the
+// policy's deferral date has not changed.
+//
+// Jamf Pro refuses a date in the past, on every write that carries one: it
+// answers `409 allow_deferral_until_utc must be a date in the future`, wire-probed
+// 2026-10-13. A policy keeps working after its date passes, and any update that
+// re-sent the stored date, a rename or an enabled toggle included, would fail
+// until someone edited the date. An update that leaves the trio out keeps the
+// stored values, so an unchanged date is not sent. A changed date is, and Jamf
+// Pro then judges it as new.
+func omitUnchangedDeferralDate(input *proclassic.PolicyPost, plan, state *PolicyResourceModel) {
+	if input == nil || input.UserInteraction == nil || plan.UserInteraction == nil || state.UserInteraction == nil {
+		return
+	}
+	p, s := plan.UserInteraction, state.UserInteraction
+	if !helpers.IsConfiguredValue(p.DeferralType) || p.DeferralType.ValueString() != "date" {
+		return
+	}
+	if !p.DeferralType.Equal(s.DeferralType) || !p.DeferralUntilUtc.Equal(s.DeferralUntilUtc) {
+		return
+	}
+	input.UserInteraction.AllowUsersToDefer = nil
+	input.UserInteraction.AllowDeferralUntilUtc = nil
+	input.UserInteraction.AllowDeferralMinutes = nil
 }
 
 func buildPolicyDiskEncryption(m *PolicyDiskEncryptionModel) *proclassic.PolicyPostDiskEncryption {

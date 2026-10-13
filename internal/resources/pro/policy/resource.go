@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
 	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -135,7 +137,7 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 							stringvalidator.OneOf(proclassic.PolicyPostGeneralRetryEventValues()...),
 						},
 					},
-					"retry_attempts":                  optComputedInt("Maximum number of retry attempts; `-1` means no retries. Requires `frequency = \"Once per computer\"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it."),
+					"retry_attempts":                  optComputedIntRetryAttempts("Maximum retry attempts, 1–10, or `-1` for none. Any value above `-1` needs a `retry_event` other than `none`. Requires `frequency = \"Once per computer\"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it."),
 					"notify_on_each_failed_retry":     optComputedBool("Notify the administrator on each failed retry. Requires `frequency = \"Once per computer\"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"limit_to_jamf_pro_assigned_user": optComputedBool("Restrict the policy to the Jamf Pro-assigned user only. Mirrors Options > General > Client-Side Limitations > Limit to Jamf Pro-assigned user. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"target_drive":                    optComputedString("Drive target (e.g. `/`). Omit to leave the current value untouched."),
@@ -273,17 +275,10 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						Optional:            true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
-								"id": schema.StringAttribute{MarkdownDescription: "Category ID.", Required: true},
-								// `name` is server-derived from the (mutable) `id`. It MUST be
-								// plain Computed — NOT Optional+Computed+UseNonNullStateForUnknown.
-								// In a Set, flipping a sibling element's flag changes that
-								// element's hash, so the framework can't pair it to prior state;
-								// a USFU-carried known `name` then mis-correlates and trips
-								// "produced an inconsistent result after apply … does not correlate".
-								// Leaving `name` Unknown at plan defers Set correlation cleanly.
-								"name":       schema.StringAttribute{MarkdownDescription: "Category display name. Returned by Jamf Pro.", Computed: true},
-								"display_in": optComputedBool("Display the policy in this category."),
-								"feature_in": optComputedBool("Feature the policy in this category."),
+								"id":         schema.StringAttribute{MarkdownDescription: "Category ID.", Required: true},
+								"name":       serverDerivedName("Category display name. Returned by Jamf Pro."),
+								"display_in": optComputedBoolKeyed("Display the policy in this category."),
+								"feature_in": optComputedBoolKeyed("Feature the policy in this category."),
 							},
 						},
 					},
@@ -307,11 +302,11 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":             schema.StringAttribute{MarkdownDescription: "Package ID.", Required: true},
-								"name":           optComputedString("Package display name. Returned by Jamf Pro."),
-								"action":         optComputedEnum("Package action.", packageActions),
-								"fut":            optComputedBool("Fill user template at install time."),
-								"feu":            optComputedBool("Fill existing user accounts."),
-								"update_autorun": optComputedBool("Update autorun data."),
+								"name":           serverDerivedName("Package display name. Returned by Jamf Pro."),
+								"action":         requiredEnum("Package action.", packageActions),
+								"fut":            optComputedBoolKeyed("Fill user template at install time."),
+								"feu":            optComputedBoolKeyed("Fill existing user accounts."),
+								"update_autorun": optComputedBoolKeyed("Update autorun data."),
 							},
 						},
 					},
@@ -327,16 +322,16 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":           schema.StringAttribute{MarkdownDescription: "Script ID.", Required: true},
-								"name":         optComputedString("Script display name. Returned by Jamf Pro."),
-								"priority":     optComputedEnum("Run order relative to the policy's other tasks.", proclassic.PolicyScriptsScriptItemPriorityValues()),
-								"parameter_4":  optComputedString("Parameter 4 passed to the script."),
-								"parameter_5":  optComputedString("Parameter 5 passed to the script."),
-								"parameter_6":  optComputedString("Parameter 6 passed to the script."),
-								"parameter_7":  optComputedString("Parameter 7 passed to the script."),
-								"parameter_8":  optComputedString("Parameter 8 passed to the script."),
-								"parameter_9":  optComputedString("Parameter 9 passed to the script."),
-								"parameter_10": optComputedString("Parameter 10 passed to the script."),
-								"parameter_11": optComputedString("Parameter 11 passed to the script."),
+								"name":         serverDerivedName("Script display name. Returned by Jamf Pro."),
+								"priority":     requiredEnum("Run order relative to the policy's other tasks.", proclassic.PolicyScriptsScriptItemPriorityValues()),
+								"parameter_4":  optComputedStringKeyed("Parameter 4 passed to the script."),
+								"parameter_5":  optComputedStringKeyed("Parameter 5 passed to the script."),
+								"parameter_6":  optComputedStringKeyed("Parameter 6 passed to the script."),
+								"parameter_7":  optComputedStringKeyed("Parameter 7 passed to the script."),
+								"parameter_8":  optComputedStringKeyed("Parameter 8 passed to the script."),
+								"parameter_9":  optComputedStringKeyed("Parameter 9 passed to the script."),
+								"parameter_10": optComputedStringKeyed("Parameter 10 passed to the script."),
+								"parameter_11": optComputedStringKeyed("Parameter 11 passed to the script."),
 							},
 						},
 					},
@@ -351,18 +346,10 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						Optional:            true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
-								"id":   schema.StringAttribute{MarkdownDescription: "Printer ID.", Required: true},
-								"name": optComputedString("Printer display name. Returned by Jamf Pro."),
-								"action": schema.StringAttribute{
-									MarkdownDescription: "Action. Mirrors the admin UI dropdown: `Map` (install printer) or `Unmap` (uninstall printer).",
-									Optional:            true,
-									Computed:            true,
-									PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
-									Validators: []validator.String{
-										stringvalidator.OneOf("Map", "Unmap"),
-									},
-								},
-								"make_default": optComputedBool("Make this printer the device's default."),
+								"id":           schema.StringAttribute{MarkdownDescription: "Printer ID.", Required: true},
+								"name":         serverDerivedName("Printer display name. Returned by Jamf Pro."),
+								"action":       requiredEnum("Printer action. `Map` installs the printer and `Unmap` removes it.", []string{"Map", "Unmap"}),
+								"make_default": optComputedBoolKeyed("Make this printer the device's default."),
 							},
 						},
 					},
@@ -378,8 +365,8 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":     schema.StringAttribute{MarkdownDescription: "Dock item ID.", Required: true},
-								"name":   optComputedString("Dock item display name. Returned by Jamf Pro."),
-								"action": optComputedEnum("Dock item action. One of "+markdownValueList(proclassic.PolicyPostDockItemsDockItemItemActionValues())+".", proclassic.PolicyPostDockItemsDockItemItemActionValues()),
+								"name":   serverDerivedName("Dock item display name. Returned by Jamf Pro."),
+								"action": requiredEnum("Dock item action.", proclassic.PolicyPostDockItemsDockItemItemActionValues()),
 							},
 						},
 					},
@@ -397,24 +384,20 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"action": schema.StringAttribute{
-							MarkdownDescription: "Account action. Valid values: `Create`, `Reset`, `Delete`, `DisableFileVault`. The admin UI labels the last action \"Disable FileVault\"; supply `DisableFileVault` here, with no trailing `2`. Jamf Pro silently strips `DisableFileVault` account entries on both create and update: they do not round-trip, and the policy reports no such account afterwards. That holds regardless of whether the username exists, which sibling accounts are present, or what extra fields are sent. Only the Jamf Pro web UI can persist this action. Avoid `DisableFileVault` in Terraform-managed policies; it produces a perpetual diff.",
-							Optional:            true,
-							Computed:            true,
-							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+							MarkdownDescription: "Account action. Required. Valid values: `Create`, `Reset`, `Delete`, `DisableFileVault`. The admin UI labels the last action \"Disable FileVault\"; supply `DisableFileVault` here, with no trailing `2`. Jamf Pro silently strips `DisableFileVault` account entries on both create and update: they do not round-trip, and the policy reports no such account afterwards. That holds regardless of whether the username exists, which sibling accounts are present, or what extra fields are sent. Only the Jamf Pro web UI can persist this action. Avoid `DisableFileVault` in Terraform-managed policies; it produces a perpetual diff.",
+							Required:            true,
 							Validators: []validator.String{
 								stringvalidator.OneOf(proclassic.PolicyAccountMaintenanceAccountsAccountItemActionValues()...),
 							},
 						},
 						"username": schema.StringAttribute{
-							MarkdownDescription: "Account username.",
-							Optional:            true,
-							Computed:            true,
-							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+							MarkdownDescription: "Account username. Required.",
+							Required:            true,
 							Validators: []validator.String{
 								commonvalidators.NotEmptyString("Jamf Pro refuses a local account entry with an empty username. Set the account's username."),
 							},
 						},
-						"realname": optComputedString("Account real (full) name."),
+						"realname": optComputedStringKeyedBy("username", "Account real (full) name."),
 						"password": schema.StringAttribute{
 							MarkdownDescription: "Plaintext password used by `Create` and `Reset` actions. `WriteOnly`: sent to Jamf Pro on writes, **never persisted in Terraform state**. Pair with `password_wo_version` to rotate the stored password. `local_accounts` is a List, so bumping `password_wo_version` surfaces in `terraform plan` as an in-place change to the list element at the matching index. Jamf Pro matches accounts by `username`.",
 							Optional:            true,
@@ -425,14 +408,14 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 							MarkdownDescription: "Rotation trigger for the `WriteOnly` `password`. Bump this integer (any change) to force a new apply that re-sends `password` to Jamf Pro for this account. Set `password_wo_version = 1` on create. Leaving it unset or unchanged signals \"leave the stored password alone\": the provider omits the password from the next update, so Jamf Pro retains the existing value.",
 							Optional:            true,
 						},
-						"permanently_delete_home_directory": optComputedBool("Permanently delete the home directory when `action = \"Delete\"`. When true, the home is removed; when false (or unset), the home is archived to `archive_home_directory_to`. Mirrors the admin UI checkbox \"Permanently delete home directory\"."),
-						"archive_home_directory_to":         optComputedString("Destination for the archived home directory. Only meaningful when `permanently_delete_home_directory = false`."),
-						"home":                              optComputedString("Home directory path. **Required in configuration when `action = \"Create\"`**: Jamf Pro refuses a create-account entry without one, answering `409 Problem with create account fields` and naming no field, so the provider checks for it when you plan. The check reads configuration rather than state, so `home` cannot be dropped from a `Create` entry and left to the Computed carry-over, even on a policy that already applied."),
-						"hint":                              optComputedString("Password hint."),
-						"picture":                           optComputedString("Account picture path."),
-						"admin":                             optComputedBool("Whether the account is an admin."),
-						"filevault_enabled":                 optComputedBool("Whether FileVault 2 is enabled for the account."),
-						"secure_token_allowed":              optComputedBool("Whether the account is allowed to hold a Secure Token."),
+						"permanently_delete_home_directory": optComputedBoolKeyedBy("username", "Permanently delete the home directory when `action = \"Delete\"`. When true, the home is removed; when false (or unset), the home is archived to `archive_home_directory_to`. Mirrors the admin UI checkbox \"Permanently delete home directory\"."),
+						"archive_home_directory_to":         optComputedStringKeyedBy("username", "Destination for the archived home directory. Only meaningful when `permanently_delete_home_directory = false`."),
+						"home":                              optComputedStringKeyedBy("username", "Home directory path. **Required in configuration when `action = \"Create\"`**: Jamf Pro refuses a create-account entry without one, answering `409 Problem with create account fields` and naming no field, so the provider checks for it when you plan. The check reads configuration rather than state, so `home` cannot be dropped from a `Create` entry and left to the Computed carry-over, even on a policy that already applied."),
+						"hint":                              optComputedStringKeyedBy("username", "Password hint."),
+						"picture":                           optComputedStringKeyedBy("username", "Account picture path."),
+						"admin":                             optComputedBoolKeyedBy("username", "Whether the account is an admin."),
+						"filevault_enabled":                 optComputedBoolKeyedBy("username", "Whether FileVault 2 is enabled for the account."),
+						"secure_token_allowed":              optComputedBoolKeyedBy("username", "Whether the account is allowed to hold a Secure Token."),
 					},
 				},
 			},
@@ -459,7 +442,7 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id":   schema.StringAttribute{MarkdownDescription: "Directory binding ID.", Required: true},
-						"name": optComputedString("Directory binding display name. Returned by Jamf Pro."),
+						"name": serverDerivedName("Directory binding display name. Returned by Jamf Pro."),
 					},
 				},
 			},
@@ -493,7 +476,7 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"message":      optComputedString("Reboot prompt message. Omit to leave the current value untouched."),
-					"startup_disk": optComputedString("Startup disk label. Omit to leave the current value untouched."),
+					"startup_disk": optComputedEnum("Startup disk. One of "+markdownValueList(restartStartupDisks)+". Omit to leave the current value untouched.", restartStartupDisks),
 					"specify_startup": schema.StringAttribute{
 						MarkdownDescription: "Reboot-method discriminator. Empty string is the default: a standard reboot with no explicit method. `Standard Restart` matches the admin UI radio option. `MDM Restart with Kernel Cache Rebuild` issues an MDM-driven restart that rebuilds the kernel cache. The admin UI surfaces a separate \"KEXT PATH\" text input alongside the radio, but Jamf Pro does not echo that value back, so it is not exposed here. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
@@ -505,7 +488,7 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					},
 					"no_user_logged_in":              optComputedEnum("Action when no user is logged in. Mirrors the admin UI \"No User Logged In Action\" menu. One of "+markdownValueList(noUserLoggedInRestartActions)+". Omit to leave the current value untouched.", noUserLoggedInRestartActions),
 					"user_logged_in":                 optComputedEnum("Action when a user is logged in. Mirrors the admin UI \"User Logged In Action\" menu. One of "+markdownValueList(userLoggedInRestartActions)+". Omit to leave the current value untouched.", userLoggedInRestartActions),
-					"delay_minutes":                  optComputedInt("Minutes to wait before forcing reboot. Mirrors the admin UI \"Delay\" input. The admin UI hides that input while `user_logged_in` is `Do not restart` or `Restart immediately`, but Jamf Pro keeps the value you set. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it."),
+					"delay_minutes":                  optComputedIntBetween("Minutes to wait before forcing a restart, 0–2147483647. Mirrors the admin UI \"Delay\" input. The admin UI hides that input while `user_logged_in` is `Do not restart` or `Restart immediately`, but Jamf Pro keeps the value you set. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.", 0, maxRestartDelayMinutes),
 					"start_reboot_timer_immediately": optComputedBool("Start the reboot countdown without waiting for the user to acknowledge the restart message. Mirrors the admin UI \"Start the restart timer immediately\" checkbox. The admin UI hides that checkbox while `user_logged_in` is `Do not restart` or `Restart immediately`, but Jamf Pro keeps the value you set. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"file_vault_2_reboot":            optComputedBool("Trigger a FileVault 2 reboot. Omit to leave the current value untouched; set `true`/`false` to change it."),
 				},
@@ -573,8 +556,9 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						},
 					},
 					"deferral_days": schema.Int64Attribute{
-						MarkdownDescription: "Number of days the user may defer the policy after the first prompt. Mirrors the admin UI \"Duration\" input (in days). Required when `deferral_type = \"duration\"`; forbidden otherwise.",
+						MarkdownDescription: "Days the user may defer the policy after the first prompt, 1–1000. Mirrors the admin UI \"Duration\" input (in days). Required when `deferral_type = \"duration\"`; forbidden otherwise.",
 						Optional:            true,
+						Validators:          []validator.Int64{int64validator.Between(1, maxDeferralDays)},
 					},
 					"complete_message": optComputedString("Message displayed after the policy completes. Mirrors the admin UI \"Complete Message\" input."),
 				},
@@ -635,6 +619,8 @@ func (r *PolicyResource) ConfigValidators(context.Context) []resource.ConfigVali
 	return []resource.ConfigValidator{
 		retryRequiresOncePerComputerValidator{},
 		createAccountRequiresHomeValidator{},
+		diskEncryptionCompanionsValidator{},
+		retryAttemptsMatchEventValidator{},
 	}
 }
 
@@ -645,6 +631,9 @@ func (r *PolicyResource) ConfigValidators(context.Context) []resource.ConfigVali
 // warning. No-op on destroy and when no scope groups are declared.
 func (r *PolicyResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	r.reportScopeImpact(ctx, req, resp)
+	validateEFIPasswordOnCreate(ctx, req, resp)
+	validateRetryAttemptsOnCreate(ctx, req, resp)
+	validateDeferralDateIsFuture(ctx, req, resp, time.Now())
 
 	if r.ldapSearcher == nil || req.Plan.Raw.IsNull() {
 		return
@@ -751,6 +740,32 @@ func serverProjectedBool(desc string) schema.BoolAttribute {
 	}
 }
 
+// serverDerivedName is the `name` of an id-keyed set element (package, script,
+// printer, dock item, directory binding, self-service category): plain
+// Computed, no plan modifier.
+//
+// Jamf Pro resolves these entries by name ahead of id — wire-probed 2026-10-13
+// on a PUT to an existing policy: id B sent with the name of A keeps A (name
+// wins, the id is ignored); id A with an unknown name is refused 409 and the
+// section is left empty; id alone resolves cleanly. So `name` is a lookup key,
+// never an echo, and an entry carrying a name that belongs to another id
+// silently fails to change. Carrying the prior element's name onto a new id
+// through UseNonNullStateForUnknown therefore both mis-plans (the planned set
+// element names the old object) and, if sent, reverts the change. Left plain
+// Computed it is Unknown for a re-keyed element and Jamf Pro's answer is
+// accepted; for an unchanged element Terraform core carries it from state.
+// A self-service category is the exception on the wire — wire-probed the same
+// day, id wins and an authored name is ignored — so it is a pure echo, but the
+// schema shape is shared and flipping a sibling flag changes the element's hash
+// in a Set, so the framework cannot pair it to prior state either. See issue
+// #464.
+func serverDerivedName(desc string) schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: desc,
+		Computed:            true,
+	}
+}
+
 func optComputedString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
@@ -777,6 +792,56 @@ func optComputedEnum(desc string, values []string) schema.StringAttribute {
 	return a
 }
 
+// keyedElementID is the attribute that identifies an element of an id-keyed
+// policy assignment set.
+const keyedElementID = "id"
+
+// requiredEnum is the `action` / `priority` of an id-keyed assignment (package,
+// script, printer, dock item): Required, restricted to a closed vocabulary.
+//
+// Jamf Pro refuses an entry that carries only an id — wire-probed 2026-10-13 on
+// a policy POST for each of the four, 409 "Problem with <kind>" — and there is
+// no default to fall back on, so leaving it Optional only moved the failure
+// from plan to an opaque apply error. See issue #464.
+func requiredEnum(desc string, values []string) schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: desc + " One of " + markdownValueList(values) + ". Required.",
+		Required:            true,
+		Validators:          []validator.String{stringvalidator.OneOf(values...)},
+	}
+}
+
+// optComputedStringKeyed is optComputedString for an attribute of an id-keyed
+// set element (packages, scripts, printers, dock items, self-service
+// categories). The framework pairs a planned set element with prior state by
+// position, so the stock modifier lends a re-keyed or reordered element
+// another element's values; this one carries only from the prior element with
+// the same id. See planmodifiers.UseKeyedStateForUnknownString and issue #464.
+func optComputedStringKeyed(desc string) schema.StringAttribute {
+	return optComputedStringKeyedBy(keyedElementID, desc)
+}
+
+// optComputedStringKeyedBy is optComputedStringKeyed for an element identified
+// by an attribute other than id (local accounts, by username).
+func optComputedStringKeyedBy(key, desc string) schema.StringAttribute {
+	a := optComputedString(desc)
+	a.PlanModifiers = []planmodifier.String{planmodifiers.UseKeyedStateForUnknownString(key)}
+	return a
+}
+
+// optComputedBoolKeyed is optComputedBool for an id-keyed set element.
+func optComputedBoolKeyed(desc string) schema.BoolAttribute {
+	return optComputedBoolKeyedBy(keyedElementID, desc)
+}
+
+// optComputedBoolKeyedBy is optComputedBoolKeyed for an element identified by
+// an attribute other than id.
+func optComputedBoolKeyedBy(key, desc string) schema.BoolAttribute {
+	a := optComputedBool(desc)
+	a.PlanModifiers = []planmodifier.Bool{planmodifiers.UseKeyedStateForUnknownBool(key)}
+	return a
+}
+
 // optComputedBool is the bool sibling of optComputedString. Uses
 // UseNonNullStateForUnknown for the same nested-list-growth reason —
 // see the optComputedString doc comment.
@@ -787,6 +852,25 @@ func optComputedBool(desc string) schema.BoolAttribute {
 		Computed:            true,
 		PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseNonNullStateForUnknown()},
 	}
+}
+
+// optComputedIntRetryAttempts is optComputedInt for general.retry_attempts:
+// -1 (no retries) or 1 to 10, the only values Jamf Pro stores. See
+// retryAttemptsMatchEventValidator.
+func optComputedIntRetryAttempts(desc string) schema.Int64Attribute {
+	a := optComputedInt(desc)
+	a.Validators = []validator.Int64{int64validator.Any(
+		int64validator.OneOf(retryAttemptsNone),
+		int64validator.Between(retryAttemptsMin, retryAttemptsMax),
+	)}
+	return a
+}
+
+// optComputedIntBetween is optComputedInt restricted to an inclusive range.
+func optComputedIntBetween(desc string, lo, hi int64) schema.Int64Attribute {
+	a := optComputedInt(desc)
+	a.Validators = []validator.Int64{int64validator.Between(lo, hi)}
+	return a
 }
 
 // optComputedInt is the int64 sibling of optComputedString. Uses

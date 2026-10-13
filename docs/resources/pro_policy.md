@@ -222,7 +222,7 @@ Optional:
 - `notify_on_each_failed_retry` (Boolean) Notify the administrator on each failed retry. Requires `frequency = "Once per computer"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `offline` (Boolean) Allow execution while the device is offline. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `override_default_settings` (Attributes) Read-only view of the per-policy overrides of tenant-wide defaults, matching the admin UI's "Override Default Settings" panel. Jamf Pro derives each attribute from a setting that lives elsewhere. Declare the block as `{}` to read the derived values into state. (see [below for nested schema](#nestedatt--general--override_default_settings))
-- `retry_attempts` (Number) Maximum number of retry attempts; `-1` means no retries. Requires `frequency = "Once per computer"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
+- `retry_attempts` (Number) Maximum retry attempts, 1–10, or `-1` for none. Any value above `-1` needs a `retry_event` other than `none`. Requires `frequency = "Once per computer"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
 - `retry_event` (String) When to retry a failed run: `none`, `trigger` (the policy's own trigger), or `check-in`. Requires `frequency = "Once per computer"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `site_id` (String) Jamf Pro site ID scoping the policy. Use `-1` for "no site". Omit to leave the current value untouched.
 - `target_drive` (String) Drive target (e.g. `/`). Omit to leave the current value untouched.
@@ -281,7 +281,7 @@ Required:
 
 - `id` (String) Directory binding ID.
 
-Optional:
+Read-Only:
 
 - `name` (String) Directory binding display name. Returned by Jamf Pro.
 
@@ -310,11 +310,11 @@ Optional:
 
 Required:
 
+- `action` (String) Dock item action. One of `Add To Beginning`, `Add To End`, `Remove`. Required.
 - `id` (String) Dock item ID.
 
-Optional:
+Read-Only:
 
-- `action` (String) Dock item action. One of `Add To Beginning`, `Add To End`, `Remove`.
 - `name` (String) Dock item display name. Returned by Jamf Pro.
 
 
@@ -347,9 +347,13 @@ Optional:
 <a id="nestedatt--local_accounts"></a>
 ### Nested Schema for `local_accounts`
 
+Required:
+
+- `action` (String) Account action. Required. Valid values: `Create`, `Reset`, `Delete`, `DisableFileVault`. The admin UI labels the last action "Disable FileVault"; supply `DisableFileVault` here, with no trailing `2`. Jamf Pro silently strips `DisableFileVault` account entries on both create and update: they do not round-trip, and the policy reports no such account afterwards. That holds regardless of whether the username exists, which sibling accounts are present, or what extra fields are sent. Only the Jamf Pro web UI can persist this action. Avoid `DisableFileVault` in Terraform-managed policies; it produces a perpetual diff.
+- `username` (String) Account username. Required.
+
 Optional:
 
-- `action` (String) Account action. Valid values: `Create`, `Reset`, `Delete`, `DisableFileVault`. The admin UI labels the last action "Disable FileVault"; supply `DisableFileVault` here, with no trailing `2`. Jamf Pro silently strips `DisableFileVault` account entries on both create and update: they do not round-trip, and the policy reports no such account afterwards. That holds regardless of whether the username exists, which sibling accounts are present, or what extra fields are sent. Only the Jamf Pro web UI can persist this action. Avoid `DisableFileVault` in Terraform-managed policies; it produces a perpetual diff.
 - `admin` (Boolean) Whether the account is an admin.
 - `archive_home_directory_to` (String) Destination for the archived home directory. Only meaningful when `permanently_delete_home_directory = false`.
 - `filevault_enabled` (Boolean) Whether FileVault 2 is enabled for the account.
@@ -361,7 +365,6 @@ Optional:
 - `picture` (String) Account picture path.
 - `realname` (String) Account real (full) name.
 - `secure_token_allowed` (Boolean) Whether the account is allowed to hold a Secure Token.
-- `username` (String) Account username.
 
 
 <a id="nestedatt--maintenance"></a>
@@ -402,15 +405,18 @@ Optional:
 
 Required:
 
+- `action` (String) Package action. One of `Install`, `Cache`, `Install Cached`, `Uninstall`. Required.
 - `id` (String) Package ID.
 
 Optional:
 
-- `action` (String) Package action.
 - `feu` (Boolean) Fill existing user accounts.
 - `fut` (Boolean) Fill user template at install time.
-- `name` (String) Package display name. Returned by Jamf Pro.
 - `update_autorun` (Boolean) Update autorun data.
+
+Read-Only:
+
+- `name` (String) Package display name. Returned by Jamf Pro.
 
 
 
@@ -426,12 +432,15 @@ Optional:
 
 Required:
 
+- `action` (String) Printer action. `Map` installs the printer and `Unmap` removes it. One of `Map`, `Unmap`. Required.
 - `id` (String) Printer ID.
 
 Optional:
 
-- `action` (String) Action. Mirrors the admin UI dropdown: `Map` (install printer) or `Unmap` (uninstall printer).
 - `make_default` (Boolean) Make this printer the device's default.
+
+Read-Only:
+
 - `name` (String) Printer display name. Returned by Jamf Pro.
 
 
@@ -441,13 +450,13 @@ Optional:
 
 Optional:
 
-- `delay_minutes` (Number) Minutes to wait before forcing reboot. Mirrors the admin UI "Delay" input. The admin UI hides that input while `user_logged_in` is `Do not restart` or `Restart immediately`, but Jamf Pro keeps the value you set. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
+- `delay_minutes` (Number) Minutes to wait before forcing a restart, 0–2147483647. Mirrors the admin UI "Delay" input. The admin UI hides that input while `user_logged_in` is `Do not restart` or `Restart immediately`, but Jamf Pro keeps the value you set. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
 - `file_vault_2_reboot` (Boolean) Trigger a FileVault 2 reboot. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `message` (String) Reboot prompt message. Omit to leave the current value untouched.
 - `no_user_logged_in` (String) Action when no user is logged in. Mirrors the admin UI "No User Logged In Action" menu. One of `Do not restart`, `Restart immediately`, `Restart if a package or update requires it`. Omit to leave the current value untouched.
 - `specify_startup` (String) Reboot-method discriminator. Empty string is the default: a standard reboot with no explicit method. `Standard Restart` matches the admin UI radio option. `MDM Restart with Kernel Cache Rebuild` issues an MDM-driven restart that rebuilds the kernel cache. The admin UI surfaces a separate "KEXT PATH" text input alongside the radio, but Jamf Pro does not echo that value back, so it is not exposed here. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `start_reboot_timer_immediately` (Boolean) Start the reboot countdown without waiting for the user to acknowledge the restart message. Mirrors the admin UI "Start the restart timer immediately" checkbox. The admin UI hides that checkbox while `user_logged_in` is `Do not restart` or `Restart immediately`, but Jamf Pro keeps the value you set. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `startup_disk` (String) Startup disk label. Omit to leave the current value untouched.
+- `startup_disk` (String) Startup disk. One of `Current Startup Disk`, `Specify Local Startup Disk`, `Currently Selected Startup Disk (No Bless)`, `macOS Installer`. Omit to leave the current value untouched.
 - `user_logged_in` (String) Action when a user is logged in. Mirrors the admin UI "User Logged In Action" menu. One of `Do not restart`, `Restart`, `Restart if a package or update requires it`, `Restart immediately`. Omit to leave the current value untouched.
 
 
@@ -517,10 +526,10 @@ Optional:
 Required:
 
 - `id` (String) Script ID.
+- `priority` (String) Run order relative to the policy's other tasks. One of `Before`, `After`. Required.
 
 Optional:
 
-- `name` (String) Script display name. Returned by Jamf Pro.
 - `parameter_10` (String) Parameter 10 passed to the script.
 - `parameter_11` (String) Parameter 11 passed to the script.
 - `parameter_4` (String) Parameter 4 passed to the script.
@@ -529,7 +538,10 @@ Optional:
 - `parameter_7` (String) Parameter 7 passed to the script.
 - `parameter_8` (String) Parameter 8 passed to the script.
 - `parameter_9` (String) Parameter 9 passed to the script.
-- `priority` (String) Run order relative to the policy's other tasks.
+
+Read-Only:
+
+- `name` (String) Script display name. Returned by Jamf Pro.
 
 
 
@@ -597,7 +609,7 @@ Optional:
 Optional:
 
 - `complete_message` (String) Message displayed after the policy completes. Mirrors the admin UI "Complete Message" input.
-- `deferral_days` (Number) Number of days the user may defer the policy after the first prompt. Mirrors the admin UI "Duration" input (in days). Required when `deferral_type = "duration"`; forbidden otherwise.
+- `deferral_days` (Number) Days the user may defer the policy after the first prompt, 1–1000. Mirrors the admin UI "Duration" input (in days). Required when `deferral_type = "duration"`; forbidden otherwise.
 - `deferral_type` (String) User deferral mode. Mirrors the admin UI "Deferral Type" dropdown. One of:
   - `none`: no deferral allowed, and the policy runs without prompting.
   - `date`: deferral allowed until `deferral_until_utc`; the policy runs after that cut-off regardless.

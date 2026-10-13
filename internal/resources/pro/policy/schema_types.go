@@ -4,6 +4,7 @@
 package policy
 
 import (
+	"math"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -39,6 +40,30 @@ const packageActionUninstall = "Uninstall"
 var diskEncryptionActions = append(proclassic.PolicyPostDiskEncryptionActionValues(), diskEncryptionActionNone)
 
 const diskEncryptionActionNone = "none"
+
+// maxDeferralDays is the longest user_interaction.deferral_days Jamf Pro stores.
+// It answers 1000 days (1440000 minutes) with 201 and 1001 with 409
+// "allow_deferral_minutes must be a number between 1 and 1000"; 0 is refused too,
+// wire-probed 2026-10-13.
+const maxDeferralDays = 1000
+
+// restartStartupDisks is the accepted restart_options.startup_disk set. Jamf
+// Pro refuses any other value, the empty string included, with 409 "Wrong value
+// of startup_disk, correct values: ..." naming exactly these four, wire-probed
+// 2026-10-13. The classic spec models the field as a plain string, so the SDK
+// generates no constant for it.
+var restartStartupDisks = []string{
+	"Current Startup Disk",
+	"Specify Local Startup Disk",
+	"Currently Selected Startup Disk (No Bless)",
+	"macOS Installer",
+}
+
+// maxRestartDelayMinutes is the largest restart_options.delay_minutes Jamf Pro
+// stores: it answers 2147483647 with 201 and 2147483648 with 409 "Problem with
+// reboot", wire-probed 2026-10-13. A negative value is stored verbatim, which no
+// admin UI input can produce, so the lower bound is the provider's.
+const maxRestartDelayMinutes = math.MaxInt32
 
 // Restart actions the admin UI offers under Options ▸ Restart Options. The
 // classic spec models both fields as plain strings, so the SDK has no constant

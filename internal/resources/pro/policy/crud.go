@@ -248,6 +248,7 @@ func (r *PolicyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	omitUnchangedDeferralDate(input, &plan, &state)
 
 	if err := helpers.RetryOnDirectoryGroupMatchConflict(updateCtx, func() error {
 		return r.client.UpdatePolicyByID(updateCtx, plan.ID.ValueString(), input)

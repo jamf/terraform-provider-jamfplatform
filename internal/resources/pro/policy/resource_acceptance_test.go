@@ -892,6 +892,78 @@ func TestAccPolicyResource_PackageConfigurationPackages(t *testing.T) {
 	})
 }
 
+func policyConfigPackageSwap(name, suffix, which string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_package" "a" {
+  display_name = "tf-acc-pkg-swap-a-%[2]s"
+  file_name    = "tf-acc-pkg-swap-a-%[2]s.pkg"
+  category_id  = "-1"
+}
+
+resource "jamfplatform_pro_package" "b" {
+  display_name = "tf-acc-pkg-swap-b-%[2]s"
+  file_name    = "tf-acc-pkg-swap-b-%[2]s.pkg"
+  category_id  = "-1"
+}
+
+resource "jamfplatform_pro_policy" "test" {
+  general = {
+    name = %[1]q
+  }
+  packages = {
+    packages = [
+      {
+        id     = jamfplatform_pro_package.%[3]s.id
+        action = "Install"
+      },
+    ]
+  }
+}
+`, name, suffix, which)
+}
+
+// TestAccPolicyResource_PackageConfigurationPackagesSwap re-points a policy at
+// a different package. The packages are metadata-only, so the test needs no
+// JCDS upload. Jamf Pro resolves an entry by name ahead of id, so a planned
+// element naming the previous package (the prior element's `name` carried onto
+// the new id) kept the old package and failed the apply with "planned set
+// element ... does not correlate with any element in actual". See issue #464.
+func TestAccPolicyResource_PackageConfigurationPackagesSwap(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	policyName := "tf-acc-policy-pkgswap-" + suffix
+	pkgName := func(which string) knownvalue.Check {
+		return knownvalue.StringExact("tf-acc-pkg-swap-" + which + "-" + suffix)
+	}
+	const policy = "jamfplatform_pro_policy.test"
+	element := tfjsonpath.New("packages").AtMapKey("packages").AtSliceIndex(0)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckPolicyDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: policyConfigPackageSwap(policyName, suffix, "a"),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(policy, element.AtMapKey("name"), pkgName("a")),
+				},
+			},
+			{
+				Config: policyConfigPackageSwap(policyName, suffix, "b"),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(policy, element.AtMapKey("name"), pkgName("b")),
+				},
+			},
+			{
+				Config: policyConfigPackageSwap(policyName, suffix, "a"),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(policy, element.AtMapKey("name"), pkgName("a")),
+				},
+			},
+		},
+	})
+}
+
 func TestAccPolicyResource_RebootFullCoverage(t *testing.T) {
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
@@ -3472,4 +3544,289 @@ resource "jamfplatform_pro_policy" "test" {
 			},
 		},
 	})
+}
+
+// assignmentSwapFixtures holds one kind of id-keyed policy assignment for the
+// swap tests: the HCL for fixtures "a" and "b", the policy block that
+// references one of them, and the state path to the entry's `name`.
+type assignmentSwapFixtures struct {
+	kind     string
+	fixtures func(suffix string) string
+	block    func(which string) string
+	name     tfjsonpath.Path
+	nameOf   func(which, suffix string) string
+}
+
+// runAssignmentSwap re-points a policy at the other fixture, a → b → a, and
+// asserts the server-derived `name` follows the id each time. Jamf Pro
+// resolves these entries by name ahead of id, so a name carried over from the
+// previous element kept the old object. See issue #464.
+func runAssignmentSwap(t *testing.T, f assignmentSwapFixtures) {
+	t.Helper()
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	policyName := "tf-acc-policy-swap-" + f.kind + "-" + suffix
+	const policy = "jamfplatform_pro_policy.test"
+	cfg := func(which string) string {
+		return f.fixtures(suffix) + fmt.Sprintf(`
+resource "jamfplatform_pro_policy" "test" {
+  general = {
+    name = %q
+  }
+%s
+}
+`, policyName, f.block(which))
+	}
+	step := func(which string) resource.TestStep {
+		return resource.TestStep{
+			Config: cfg(which),
+			ConfigStateChecks: []statecheck.StateCheck{
+				statecheck.ExpectKnownValue(policy, f.name, knownvalue.StringExact(f.nameOf(which, suffix))),
+			},
+		}
+	}
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckPolicyDestroy(t),
+		Steps:                    []resource.TestStep{step("a"), step("b"), step("a")},
+	})
+}
+
+func TestAccPolicyResource_ScriptsSwap(t *testing.T) {
+	runAssignmentSwap(t, assignmentSwapFixtures{
+		kind: "scripts",
+		fixtures: func(suffix string) string {
+			var out string
+			for _, w := range []string{"a", "b"} {
+				out += fmt.Sprintf(`
+resource "jamfplatform_pro_script" %q {
+  name            = "tf-acc-script-swap-%s-%s"
+  priority        = "AFTER"
+  script_contents = "#!/bin/sh\necho tf-acc-swap"
+}
+`, w, w, suffix)
+			}
+			return out
+		},
+		block: func(which string) string {
+			return fmt.Sprintf(`  scripts = {
+    scripts = [{
+      id       = jamfplatform_pro_script.%s.id
+      priority = "After"
+    }]
+  }`, which)
+		},
+		name:   tfjsonpath.New("scripts").AtMapKey("scripts").AtSliceIndex(0).AtMapKey("name"),
+		nameOf: func(w, s string) string { return "tf-acc-script-swap-" + w + "-" + s },
+	})
+}
+
+func TestAccPolicyResource_PrintersSwap(t *testing.T) {
+	runAssignmentSwap(t, assignmentSwapFixtures{
+		kind: "printers",
+		fixtures: func(suffix string) string {
+			var out string
+			for i, w := range []string{"a", "b"} {
+				out += fmt.Sprintf(`
+resource "jamfplatform_pro_printer" %q {
+  name = "tf-acc-printer-swap-%s-%s"
+  uri  = "ipp://10.1.20.%d/"
+}
+`, w, w, suffix, 120+i)
+			}
+			return out
+		},
+		block: func(which string) string {
+			return fmt.Sprintf(`  printers = {
+    printers = [{
+      id     = jamfplatform_pro_printer.%s.id
+      action = "Map"
+    }]
+  }`, which)
+		},
+		name:   tfjsonpath.New("printers").AtMapKey("printers").AtSliceIndex(0).AtMapKey("name"),
+		nameOf: func(w, s string) string { return "tf-acc-printer-swap-" + w + "-" + s },
+	})
+}
+
+func TestAccPolicyResource_DockItemsSwap(t *testing.T) {
+	runAssignmentSwap(t, assignmentSwapFixtures{
+		kind: "dock",
+		fixtures: func(suffix string) string {
+			var out string
+			for _, w := range []string{"a", "b"} {
+				out += fmt.Sprintf(`
+resource "jamfplatform_pro_dock_item" %q {
+  name = "tf-acc-dock-swap-%s-%s"
+  type = "App"
+  path = "/Applications/Calculator.app"
+}
+`, w, w, suffix)
+			}
+			return out
+		},
+		block: func(which string) string {
+			return fmt.Sprintf(`  dock_items = {
+    dock_items = [{
+      id     = jamfplatform_pro_dock_item.%s.id
+      action = "Add To Beginning"
+    }]
+  }`, which)
+		},
+		name:   tfjsonpath.New("dock_items").AtMapKey("dock_items").AtSliceIndex(0).AtMapKey("name"),
+		nameOf: func(w, s string) string { return "tf-acc-dock-swap-" + w + "-" + s },
+	})
+}
+
+func TestAccPolicyResource_DirectoryBindingsSwap(t *testing.T) {
+	runAssignmentSwap(t, assignmentSwapFixtures{
+		kind: "binding",
+		fixtures: func(suffix string) string {
+			var out string
+			for i, w := range []string{"a", "b"} {
+				out += fmt.Sprintf(`
+resource "jamfplatform_pro_directory_binding" %q {
+  name     = "tf-acc-binding-swap-%s-%s"
+  priority = %d
+  type     = "Open Directory"
+  domain   = "ldap.tf-acc.example.com"
+  username = "cn=joiner,dc=tf-acc,dc=example,dc=com"
+  password = "Sup3rS3cret!"
+
+  open_directory = {
+    encrypt_using_ssl      = false
+    perform_secure_bind    = false
+    use_for_authentication = true
+    use_for_contacts       = false
+  }
+}
+`, w, w, suffix, i+1)
+			}
+			return out
+		},
+		block: func(which string) string {
+			return fmt.Sprintf(`  directory_bindings = [{
+    id = jamfplatform_pro_directory_binding.%s.id
+  }]`, which)
+		},
+		name:   tfjsonpath.New("directory_bindings").AtSliceIndex(0).AtMapKey("name"),
+		nameOf: func(w, s string) string { return "tf-acc-binding-swap-" + w + "-" + s },
+	})
+}
+
+func policyConfigPackageSwapFut(name, suffix, which, fut string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_package" "a" {
+  display_name = "tf-acc-pkg-fut-a-%[2]s"
+  file_name    = "tf-acc-pkg-fut-a-%[2]s.pkg"
+  category_id  = "-1"
+}
+
+resource "jamfplatform_pro_package" "b" {
+  display_name = "tf-acc-pkg-fut-b-%[2]s"
+  file_name    = "tf-acc-pkg-fut-b-%[2]s.pkg"
+  category_id  = "-1"
+}
+
+resource "jamfplatform_pro_policy" "test" {
+  general = {
+    name = %[1]q
+  }
+  packages = {
+    packages = [
+      {
+        id     = jamfplatform_pro_package.%[3]s.id
+        action = "Install"
+        %[4]s
+      },
+    ]
+  }
+}
+`, name, suffix, which, fut)
+}
+
+// TestAccPolicyResource_PackageConfigurationPackagesSwapDoesNotInheritFlags
+// pins that re-pointing a policy at another package does not hand the new entry
+// the old entry's `fut`. The framework pairs a planned set element with prior
+// state by index, so the carried value came from whatever sat at the same
+// position; Jamf Pro's own default for an unset `fut` is false. See issue #464.
+func TestAccPolicyResource_PackageConfigurationPackagesSwapDoesNotInheritFlags(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	policyName := "tf-acc-policy-pkgfut-" + suffix
+	const policy = "jamfplatform_pro_policy.test"
+	fut := tfjsonpath.New("packages").AtMapKey("packages").AtSliceIndex(0).AtMapKey("fut")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckPolicyDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: policyConfigPackageSwapFut(policyName, suffix, "a", "fut = true"),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(policy, fut, knownvalue.Bool(true)),
+				},
+			},
+			{
+				Config: policyConfigPackageSwapFut(policyName, suffix, "b", ""),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(policy, fut, knownvalue.Bool(false)),
+				},
+			},
+			{
+				Config: policyConfigPackageSwapFut(policyName, suffix, "b", "fut = true"),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(policy, fut, knownvalue.Bool(true)),
+				},
+			},
+		},
+	})
+}
+
+// TestAccPolicyResource_PlanTimeChecks pins the configurations Jamf Pro refuses
+// with a bare 409, or accepts and silently drops, that the provider now rejects
+// at plan time. Each step fails before any request is sent, so none creates an
+// object. Regexes are kept short: Terraform wraps diagnostics at about 80
+// columns. See issue #464.
+func TestAccPolicyResource_PlanTimeChecks(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	for _, tc := range []struct {
+		name    string
+		general string // extra attributes inside `general`
+		body    string // extra top-level attributes
+		want    string
+	}{
+		{"pkgact", "", `packages = { packages = [{ id = "1" }] }`, `(?s)action.*required`},
+		{"scriptprio", "", `scripts = { scripts = [{ id = "1" }] }`, `(?s)priority.*required`},
+		{"printeract", "", `printers = { printers = [{ id = "1" }] }`, `(?s)action.*required`},
+		{"dockact", "", `dock_items = { dock_items = [{ id = "1" }] }`, `(?s)action.*required`},
+		{"acctuser", "", `local_accounts = [{ action = "Reset" }]`, `(?s)username.*required`},
+		{"applynoid", "", `disk_encryption = { action = "apply" }`, `(?s)disk_encryption_configuration_id.*required`},
+		{"remnoid", "", `disk_encryption = { action = "remediate", remediate_key_type = "Institutional" }`, `(?s)remediate_disk_encryption_configuration_id.*required`},
+		{"noneauth", "", `disk_encryption = { action = "none", auth_restart = true }`, `(?s)auth_restart.*ignored`},
+		{"efinopw", "", `efi_password = { of_mode = "command" }`, `(?s)of_password.*required`},
+		{"retrynone", `frequency = "Once per computer", retry_event = "none", retry_attempts = 5`, "", `(?s)retry_attempts.*ignored`},
+		{"retryrange", `frequency = "Once per computer", retry_event = "check-in", retry_attempts = 11`, "", `(?s)retry_attempts.*1 to 10`},
+		{"startupdisk", "", `restart_options = { startup_disk = "Macintosh HD" }`, `(?s)startup_disk`},
+		{"delaycap", "", `restart_options = { delay_minutes = 2147483648 }`, `(?s)delay_minutes`},
+		{"deferdays", "", `user_interaction = { deferral_type = "duration", deferral_days = 1001 }`, `(?s)deferral_days`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := fmt.Sprintf(`
+resource "jamfplatform_pro_policy" "test" {
+  general = {
+    name = %q
+    %s
+  }
+  %s
+}
+`, "tf-acc-policy-plan-"+tc.name+"-"+testhelpers.RunSuffix(), tc.general, tc.body)
+			resource.Test(t, resource.TestCase{
+				ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+				Steps: []resource.TestStep{
+					{Config: cfg, ExpectError: regexp.MustCompile(tc.want)},
+				},
+			})
+		})
+	}
 }
