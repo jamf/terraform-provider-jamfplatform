@@ -22,8 +22,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -185,7 +183,7 @@ func (r *MobileAppResource) Schema(ctx context.Context, req resource.SchemaReque
 						MarkdownDescription: "Button label shown after the app is installed. Requires `general.make_available_after_install = true`; Jamf Pro discards the label otherwise and never returns it. Omit to leave the current value untouched.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 						Validators:          []validator.String{requiresMakeAvailableAfterInstall{}},
 					},
 					"self_service_description": optComputedString("Self Service description. Markdown supported. Omit to leave the current value untouched."),
@@ -308,26 +306,25 @@ func (r *MobileAppResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 }
 
-// optComputedString returns an Optional+Computed StringAttribute with
-// UseNonNullStateForUnknown. It carries the prior value forward but skips a null
-// prior, which matters in two places that fail the same way. A block that is new
-// in this plan (self_service going from omitted to declared) has a null prior for
-// every leaf in it, and UseStateForUnknown would copy that null into the plan;
-// apply then returns the server's default and Terraform rejects it with "Provider
-// produced inconsistent result after apply". A new element in a Set or List has
-// the same null prior. Planning Unknown instead lets apply store whatever Jamf
-// Pro returns.
+// optComputedString returns an Optional+Computed StringAttribute carried by
+// planmodifiers.UseStateForUnknownInExistingBlockString.
 //
-// The cost is that a leaf Jamf Pro never returns (for example
-// self_service.after_install_button_text, absent so null) shows as "(known after
-// apply)" in a plan that changes something else, then settles back to null. An
-// idle plan stays empty.
+// Neither stock modifier is right. UseStateForUnknown copies a null prior into
+// the plan when the block holding the leaf is new (self_service going from
+// omitted to declared), so apply returns the server's default and Terraform
+// rejects it with "Provider produced inconsistent result after apply".
+// UseNonNullStateForUnknown fixes that but leaves every leaf Jamf Pro never
+// returns (general.external_url, general.itunes_store_url) Unknown in any plan
+// that differs from state at all. The preferences equality collapses its own
+// CRLF-only change to a no-op and restores nothing else, so
+// `plan -refresh=false` was never empty. This modifier carries a null prior
+// while the block exists and leaves it Unknown only when the block is new.
 func optComputedString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 	}
 }
 
@@ -337,7 +334,7 @@ func optComputedBool(desc string) schema.BoolAttribute {
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseNonNullStateForUnknown()},
+		PlanModifiers:       []planmodifier.Bool{planmodifiers.UseStateForUnknownInExistingBlockBool()},
 	}
 }
 
@@ -347,7 +344,7 @@ func optComputedInt64(desc string) schema.Int64Attribute {
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseNonNullStateForUnknown()},
+		PlanModifiers:       []planmodifier.Int64{planmodifiers.UseStateForUnknownInExistingBlockInt64()},
 	}
 }
 

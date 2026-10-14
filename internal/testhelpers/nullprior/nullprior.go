@@ -28,9 +28,10 @@ import (
 // leaf in it. A modifier that copies the prior value (UseStateForUnknown) plans
 // that null, apply returns the server's default, and Terraform rejects the
 // result with "Provider produced inconsistent result after apply". The leaf has
-// to plan Unknown when its prior is null, which is what UseNonNullStateForUnknown
-// does, so each plan modifier is run with a null prior and an Unknown plan value
-// and must leave the value Unknown.
+// to plan Unknown when its prior is null and the block is new, which is what
+// UseNonNullStateForUnknown and planmodifiers.UseStateForUnknownInExistingBlock*
+// do, so each plan modifier is run with a null prior, an Unknown plan value and
+// a state in which the enclosing block is null, and must leave the value Unknown.
 //
 // A Computed-only leaf (a server-derived count, say) fails the same way, so it
 // is checked too. Only the stock carry modifiers are run on one, recognised by
@@ -54,25 +55,53 @@ func walk(t *testing.T, parent path.Path, attrs map[string]schema.Attribute, und
 			walk(t, p, a.Attributes, underOptionalBlock || (a.Optional && !a.Required))
 		case schema.StringAttribute:
 			if underOptionalBlock && a.Computed {
-				checkString(t, p, a.PlanModifiers, !a.Optional)
+				checkString(t, p, a, !a.Optional)
 			}
 		case schema.BoolAttribute:
 			if underOptionalBlock && a.Computed {
-				checkBool(t, p, a.PlanModifiers, !a.Optional)
+				checkBool(t, p, a, !a.Optional)
 			}
 		case schema.Int64Attribute:
 			if underOptionalBlock && a.Computed {
-				checkInt64(t, p, a.PlanModifiers, !a.Optional)
+				checkInt64(t, p, a, !a.Optional)
 			}
 		}
 	}
 }
 
-// existingState is a non-null state and plan, so a modifier does not return
-// early as it would for a create or a destroy.
-func existingState() (tfsdk.State, tfsdk.Plan, tfsdk.Config) {
-	raw := tftypes.NewValue(tftypes.Object{AttributeTypes: map[string]tftypes.Type{}}, map[string]tftypes.Value{})
-	return tfsdk.State{Raw: raw}, tfsdk.Plan{Raw: raw}, tfsdk.Config{Raw: raw}
+// nullParentFixture returns a state, plan and config in which the leaf's
+// enclosing block is null and every block above it exists, which is the state
+// of a block that is new in this plan. The schema is the leaf's own attribute
+// inside a chain of Optional blocks named by its path, so a modifier that reads
+// the enclosing block from state can do so.
+func nullParentFixture(p path.Path, leaf schema.Attribute) (tfsdk.State, tfsdk.Plan, tfsdk.Config) {
+	ctx := context.Background()
+	var names []string
+	for _, step := range p.Steps() {
+		names = append(names, string(step.(path.PathStepAttributeName)))
+	}
+	n := len(names)
+
+	attrs := map[string]schema.Attribute{names[n-1]: leaf}
+	for i := n - 2; i >= 0; i-- {
+		attrs = map[string]schema.Attribute{names[i]: schema.SingleNestedAttribute{Optional: true, Attributes: attrs}}
+	}
+	sch := schema.Schema{Attributes: attrs}
+
+	rootType := sch.Type().TerraformType(ctx).(tftypes.Object)
+	blockTypes := make([]tftypes.Type, n-1)
+	var parent tftypes.Type = rootType
+	for k := 0; k < n-1; k++ {
+		parent = parent.(tftypes.Object).AttributeTypes[names[k]]
+		blockTypes[k] = parent
+	}
+
+	cur := tftypes.NewValue(blockTypes[n-2], nil)
+	for k := n - 3; k >= 0; k-- {
+		cur = tftypes.NewValue(blockTypes[k], map[string]tftypes.Value{names[k+1]: cur})
+	}
+	raw := tftypes.NewValue(rootType, map[string]tftypes.Value{names[0]: cur})
+	return tfsdk.State{Schema: sch, Raw: raw}, tfsdk.Plan{Schema: sch, Raw: raw}, tfsdk.Config{Schema: sch, Raw: raw}
 }
 
 func report(t *testing.T, p path.Path, planned interface{ IsUnknown() bool }, modifier string) {
@@ -83,11 +112,11 @@ func report(t *testing.T, p path.Path, planned interface{ IsUnknown() bool }, mo
 	}
 }
 
-func checkString(t *testing.T, p path.Path, mods []planmodifier.String, stockOnly bool) {
+func checkString(t *testing.T, p path.Path, a schema.StringAttribute, stockOnly bool) {
 	t.Helper()
 	ctx := context.Background()
-	st, pl, cfg := existingState()
-	for _, m := range mods {
+	st, pl, cfg := nullParentFixture(p, a)
+	for _, m := range a.PlanModifiers {
 		if stockOnly && !strings.HasPrefix(m.Description(ctx), "Once set") {
 			continue
 		}
@@ -98,11 +127,11 @@ func checkString(t *testing.T, p path.Path, mods []planmodifier.String, stockOnl
 	}
 }
 
-func checkBool(t *testing.T, p path.Path, mods []planmodifier.Bool, stockOnly bool) {
+func checkBool(t *testing.T, p path.Path, a schema.BoolAttribute, stockOnly bool) {
 	t.Helper()
 	ctx := context.Background()
-	st, pl, cfg := existingState()
-	for _, m := range mods {
+	st, pl, cfg := nullParentFixture(p, a)
+	for _, m := range a.PlanModifiers {
 		if stockOnly && !strings.HasPrefix(m.Description(ctx), "Once set") {
 			continue
 		}
@@ -113,11 +142,11 @@ func checkBool(t *testing.T, p path.Path, mods []planmodifier.Bool, stockOnly bo
 	}
 }
 
-func checkInt64(t *testing.T, p path.Path, mods []planmodifier.Int64, stockOnly bool) {
+func checkInt64(t *testing.T, p path.Path, a schema.Int64Attribute, stockOnly bool) {
 	t.Helper()
 	ctx := context.Background()
-	st, pl, cfg := existingState()
-	for _, m := range mods {
+	st, pl, cfg := nullParentFixture(p, a)
+	for _, m := range a.PlanModifiers {
 		if stockOnly && !strings.HasPrefix(m.Description(ctx), "Once set") {
 			continue
 		}
