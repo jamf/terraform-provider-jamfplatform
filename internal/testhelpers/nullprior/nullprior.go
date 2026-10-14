@@ -11,6 +11,7 @@ package nullprior
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -44,6 +45,7 @@ import (
 // a block that cannot be null in state when it is next declared, so the
 // transition the guard models cannot happen, and the reason is mandatory so the
 // exemption says why. Do not use it for a block that merely has not failed yet.
+// A name that is not a top-level Optional single-nested block fails the test.
 //
 // Leaves outside an Optional block (a top-level attribute, or one inside a
 // Required block) cannot see the transition and are skipped. So are the
@@ -54,7 +56,26 @@ func AssertOptionalBlockLeavesPlanUnknown(t *testing.T, sch schema.Schema, opts 
 	for _, o := range opts {
 		o(&cfg)
 	}
+	for _, name := range unmatchedExemptions(sch, cfg.exempt) {
+		t.Errorf("nullprior.ExemptBlocks names %q, which is not a top-level Optional single-nested block of this schema: remove the exemption or correct the name", name)
+	}
 	walk(t, path.Empty(), sch.Attributes, false, cfg.exempt)
+}
+
+// unmatchedExemptions returns, sorted, each exempted name that is not a
+// top-level Optional single-nested block of sch. A block that is renamed or
+// removed would otherwise leave its exemption behind, matching nothing, and the
+// block under its new name would be checked or skipped without anyone deciding.
+func unmatchedExemptions(sch schema.Schema, exempt map[string]bool) []string {
+	var out []string
+	for name := range exempt {
+		a, ok := sch.Attributes[name].(schema.SingleNestedAttribute)
+		if !ok || !a.Optional || a.Required {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 type options struct{ exempt map[string]bool }
