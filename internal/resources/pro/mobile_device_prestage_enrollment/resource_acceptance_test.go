@@ -1159,3 +1159,53 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Names_EmptyStringFieldsRo
 		Steps:                    mobilePrestageEmptyNamesSteps(adeFixtureBlock(suffix, token), "tf-acc-names-empty-"+suffix, adeFixtureRef),
 	})
 }
+
+func testAccMobilePrestageBlocksConfig(name string, declared bool) string {
+	blocks := ""
+	if declared {
+		blocks = `
+  location_information   = { username = "tf-acc-user" }
+  purchasing_information = { vendor = "tf-acc-vendor" }
+  names                  = { manage_names = false }
+  skip_setup_items       = { siri = true }`
+	}
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
+  display_name                          = %q
+  device_enrollment_program_instance_id = %s
+  timezone                              = "UTC"
+  scope_serial_numbers                  = []%s
+}
+`, name, adeFixtureRef, blocks)
+}
+
+// TestAccResource_ProMobileDevicePrestageEnrollment_BlocksOmittedToDeclared
+// declares the four optional blocks on a PreStage created without them. Each leaf
+// the configuration leaves out is null in state, and UseStateForUnknown planned
+// that null where Jamf Pro answered "", -1, false, 1970-01-01 or "Serial
+// Numbers": "Provider produced inconsistent result after apply", reproduced live
+// 2026-10-14. Needs the ADE token blob the other tests here use.
+func TestAccResource_ProMobileDevicePrestageEnrollment_BlocksOmittedToDeclared(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	token := requireADETokenBlob(t)
+	suffix := testhelpers.RunSuffix()
+	accCleanupOrphans(t, suffix)
+	name := "tf-acc-mobile-prestage-blocks-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageBlocksConfig(name, false)},
+			{
+				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageBlocksConfig(name, true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "location_information.username", "tf-acc-user"),
+					resource.TestCheckResourceAttrSet(resourceName, "location_information.building_id"),
+					resource.TestCheckResourceAttrSet(resourceName, "purchasing_information.po_date"),
+					resource.TestCheckResourceAttrSet(resourceName, "names.assign_names_using"),
+					resource.TestCheckResourceAttr(resourceName, "skip_setup_items.siri", "true"),
+				),
+			},
+		},
+	})
+}
