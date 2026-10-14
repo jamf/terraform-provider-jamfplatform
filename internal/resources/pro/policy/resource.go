@@ -262,12 +262,12 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					"notification_subject": optComputedString("Notification subject line. Omit to leave the current value untouched."),
 					"notification_message": optComputedString("Notification body text. Omit to leave the current value untouched."),
 					"self_service_icon": schema.SingleNestedAttribute{
-						MarkdownDescription: "Self Service icon. The icon binary is uploaded out-of-band; the provider surfaces the resolved id, URI, and filename. Uploading the icon bytes inline is not currently supported. Open an issue if you need it.",
+						MarkdownDescription: "Self Service icon. Set `id` to the ID of an uploaded icon, such as a `jamfplatform_pro_icon`. Jamf Pro fills in `uri` and `filename` from it. The provider cannot upload icon bytes inline. Open an issue if you need that.",
 						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"id":       optComputedString("Icon ID assigned by Jamf Pro."),
-							"uri":      optComputedString("Icon URI. Returned by Jamf Pro."),
-							"filename": optComputedString("Icon filename. Returned by Jamf Pro."),
+							"uri":      iconMirrorString("Icon URI. Jamf Pro sets it from the icon `id`."),
+							"filename": iconMirrorString("Icon filename. Jamf Pro sets it from the icon `id`."),
 						},
 					},
 					"categories": schema.SetNestedAttribute{
@@ -763,6 +763,30 @@ func serverDerivedName(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Computed:            true,
+	}
+}
+
+// iconMirrorString is a Computed-only string Jamf Pro derives from the Self
+// Service icon's id: the CDN uri and the stored filename of whichever icon the
+// id names.
+//
+// Wire-probed 2026-10-14 on the classic PUT: an authored filename or uri is
+// ignored whatever it says (id=A with a made-up filename and uri stored A's own
+// pair), and a filename with no id is refused 409. The id is the only input.
+// So neither attribute can be Optional, and neither can use
+// UseNonNullStateForUnknown: that carries the previous icon's pair into a plan
+// that repoints id, the apply returns the new icon's, and Terraform fails the
+// apply with "Provider produced inconsistent result after apply". Dropping the
+// modifier instead leaves both Unknown in every plan that changes anything else
+// on the policy. planmodifiers.MirrorOfString watches id and carries the prior
+// value only while it is unchanged. See issue #468.
+func iconMirrorString(desc string) schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: desc,
+		Computed:            true,
+		PlanModifiers: []planmodifier.String{
+			planmodifiers.MirrorOfString(planmodifiers.NestedStringSource(path.MatchRoot("self_service").AtName("self_service_icon"), "id")),
+		},
 	}
 }
 

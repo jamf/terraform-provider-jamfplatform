@@ -273,7 +273,7 @@ func flattenMobileAppSelfService(ss *proclassic.MobileDeviceApplicationSelfServi
 	}
 	if state.SelfServiceIcon != nil && ss.SelfServiceIcon != nil {
 		state.SelfServiceIcon.ID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.SelfServiceIcon.ID)
-		state.SelfServiceIcon.URI = helpers.ReconcileOptionalStringPointer(ss.SelfServiceIcon.URI, state.SelfServiceIcon.URI)
+		state.SelfServiceIcon.URI = helpers.StringPointerValueOrNull(ss.SelfServiceIcon.URI)
 	}
 
 	if ss.SelfServiceCategories != nil && ss.SelfServiceCategories.Category != nil {

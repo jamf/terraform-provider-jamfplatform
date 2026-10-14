@@ -29,9 +29,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-testing/compare"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
@@ -1237,6 +1240,77 @@ func TestAccResource_ProMacApp_OmittedBlocksRetained(t *testing.T) {
 					resource.TestCheckNoResourceAttr(macAppResourceAddr, "scope.targets.all_computers"),
 					macAppRetainedOnServer(t),
 				),
+			},
+		},
+	})
+}
+
+// macAppConfigIconPick declares two icons and an app pointing at the one named
+// by pick ("a" or "b").
+func macAppConfigIconPick(iconA, iconB, name, pick string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_icon" "a" {
+  icon_file_source = %q
+}
+
+resource "jamfplatform_pro_icon" "b" {
+  icon_file_source = %q
+}
+
+resource "jamfplatform_pro_mac_app_store_app" "test" {
+  general = {
+    name            = %q
+    version         = "1.0"
+    bundle_id       = "com.example.tfacc.macapp"
+    url             = "https://apps.apple.com/app/id000000001"
+    deployment_type = "Make Available in Self Service"
+  }
+  self_service = {
+    self_service_icon = {
+      id = jamfplatform_pro_icon.%s.id
+    }
+  }
+}
+`, iconA, iconB, name, pick)
+}
+
+// TestAccResource_ProMacApp_SelfServiceIconRepoint is the #468 regression test
+// for the Mac App Store app. Jamf Pro derives self_service_icon.uri from the
+// icon id, so repointing id changes it. It was Optional+Computed with
+// UseNonNullStateForUnknown, which planned the previous icon's uri and failed
+// the apply with "Provider produced inconsistent result after apply". The
+// trailing empty-plan check the harness runs after each step covers the settle.
+func TestAccResource_ProMacApp_SelfServiceIconRepoint(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-macapp-icon-" + suffix
+	iconA, iconB := testhelpers.WriteIconFixtures(t, suffix)
+	uriPath := tfjsonpath.New("self_service").AtMapKey("self_service_icon").AtMapKey("uri")
+	uriDiffers := statecheck.CompareValue(compare.ValuesDiffer())
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMacAppDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: macAppConfigIconPick(iconA, iconB, name, "a"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPair(macAppResourceAddr, "self_service.self_service_icon.id", "jamfplatform_pro_icon.a", "id"),
+					resource.TestCheckResourceAttrSet(macAppResourceAddr, "self_service.self_service_icon.uri"),
+				),
+				ConfigStateChecks: []statecheck.StateCheck{uriDiffers.AddStateValue(macAppResourceAddr, uriPath)},
+			},
+			{
+				Config: macAppConfigIconPick(iconA, iconB, name, "b"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPair(macAppResourceAddr, "self_service.self_service_icon.id", "jamfplatform_pro_icon.b", "id"),
+					resource.TestCheckResourceAttrSet(macAppResourceAddr, "self_service.self_service_icon.uri"),
+				),
+				ConfigStateChecks: []statecheck.StateCheck{uriDiffers.AddStateValue(macAppResourceAddr, uriPath)},
+			},
+			{
+				Config: macAppConfigIconPick(iconA, iconB, name, "a"),
+				Check:  resource.TestCheckResourceAttrPair(macAppResourceAddr, "self_service.self_service_icon.id", "jamfplatform_pro_icon.a", "id"),
 			},
 		},
 	})

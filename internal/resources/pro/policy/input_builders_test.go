@@ -286,3 +286,35 @@ func TestBuildPolicyInput_NeverSendsAssignmentNames(t *testing.T) {
 		t.Errorf("directory binding name sent: %q", *n)
 	}
 }
+
+// TestBuildPolicySelfService_IconSendsIDOnly pins #468: Jamf Pro derives the
+// icon's uri and filename from its id and ignores any authored pair, and a
+// filename sent without an id is refused 409. The id is the only icon field
+// that goes on the wire, whatever the plan carries for the other two.
+func TestBuildPolicySelfService_IconSendsIDOnly(t *testing.T) {
+	t.Parallel()
+	ss := buildPolicySelfService(&PolicySelfServiceModel{
+		SelfServiceIcon: &PolicySelfServiceIconModel{
+			ID:       types.StringValue("5163"),
+			URI:      types.StringValue("https://example.invalid/icon/hash_old"),
+			Filename: types.StringValue("icon.png"),
+		},
+	})
+	if ss.SelfServiceIcon == nil || ss.SelfServiceIcon.ID == nil || *ss.SelfServiceIcon.ID != 5163 {
+		t.Fatalf("icon id not sent: %#v", ss.SelfServiceIcon)
+	}
+	if ss.SelfServiceIcon.URI != nil || ss.SelfServiceIcon.Filename != nil {
+		t.Errorf("icon uri/filename must not be sent: uri=%v filename=%v", ss.SelfServiceIcon.URI, ss.SelfServiceIcon.Filename)
+	}
+
+	ss = buildPolicySelfService(&PolicySelfServiceModel{
+		SelfServiceIcon: &PolicySelfServiceIconModel{
+			ID:       types.StringUnknown(),
+			URI:      types.StringValue("https://example.invalid/icon/hash_old"),
+			Filename: types.StringValue("icon.png"),
+		},
+	})
+	if ss.SelfServiceIcon != nil {
+		t.Errorf("an icon with no id must send no icon at all, got %#v", ss.SelfServiceIcon)
+	}
+}

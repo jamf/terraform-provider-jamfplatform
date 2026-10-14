@@ -19,6 +19,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-testing/compare"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
@@ -3829,4 +3830,96 @@ resource "jamfplatform_pro_policy" "test" {
 			})
 		})
 	}
+}
+
+// policyConfigIconPick declares two icons and a policy pointing at the one
+// named by pick ("a" or "b"). extra is spliced into the self_service_icon block.
+func policyConfigIconPick(iconA, iconB, name, pick, extra string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_icon" "a" {
+  icon_file_source = %q
+}
+
+resource "jamfplatform_pro_icon" "b" {
+  icon_file_source = %q
+}
+
+resource "jamfplatform_pro_policy" "test" {
+  general = {
+    name = %q
+  }
+  self_service = {
+    use_for_self_service = true
+    self_service_icon = {
+      id = jamfplatform_pro_icon.%s.id
+%s
+    }
+  }
+}
+`, iconA, iconB, name, pick, extra)
+}
+
+// TestAccPolicyResource_SelfServiceIconRepoint is the regression test for #468.
+// Jamf Pro derives self_service_icon.uri and .filename from the icon id, so
+// repointing id changes both. They were Optional+Computed with
+// UseNonNullStateForUnknown, which planned the previous icon's pair and failed
+// the apply with "Provider produced inconsistent result after apply".
+//
+// Step 2 repoints the id and must apply cleanly with both values following it;
+// the harness's trailing empty-plan check covers the settle. Step 3 flips back,
+// since the bug fired on every id change rather than once. Step 4 sets filename
+// in config: Jamf Pro ignores an authored value, so it is rejected at plan.
+func TestAccPolicyResource_SelfServiceIconRepoint(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-policy-icon-" + suffix
+	iconA, iconB := testhelpers.WriteIconFixtures(t, suffix)
+	const addr = "jamfplatform_pro_policy.test"
+	iconPath := tfjsonpath.New("self_service").AtMapKey("self_service_icon")
+
+	uriDiffers := statecheck.CompareValue(compare.ValuesDiffer())
+	filenameDiffers := statecheck.CompareValue(compare.ValuesDiffer())
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckPolicyDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: policyConfigIconPick(iconA, iconB, name, "a", ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPair(addr, "self_service.self_service_icon.id", "jamfplatform_pro_icon.a", "id"),
+					resource.TestCheckResourceAttr(addr, "self_service.self_service_icon.filename", filepath.Base(iconA)),
+					resource.TestCheckResourceAttrSet(addr, "self_service.self_service_icon.uri"),
+				),
+				ConfigStateChecks: []statecheck.StateCheck{
+					uriDiffers.AddStateValue(addr, iconPath.AtMapKey("uri")),
+					filenameDiffers.AddStateValue(addr, iconPath.AtMapKey("filename")),
+				},
+			},
+			{
+				Config: policyConfigIconPick(iconA, iconB, name, "b", ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPair(addr, "self_service.self_service_icon.id", "jamfplatform_pro_icon.b", "id"),
+					resource.TestCheckResourceAttr(addr, "self_service.self_service_icon.filename", filepath.Base(iconB)),
+					resource.TestCheckResourceAttrSet(addr, "self_service.self_service_icon.uri"),
+				),
+				ConfigStateChecks: []statecheck.StateCheck{
+					uriDiffers.AddStateValue(addr, iconPath.AtMapKey("uri")),
+					filenameDiffers.AddStateValue(addr, iconPath.AtMapKey("filename")),
+				},
+			},
+			{
+				Config: policyConfigIconPick(iconA, iconB, name, "a", ""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPair(addr, "self_service.self_service_icon.id", "jamfplatform_pro_icon.a", "id"),
+					resource.TestCheckResourceAttr(addr, "self_service.self_service_icon.filename", filepath.Base(iconA)),
+				),
+			},
+			{
+				Config:      policyConfigIconPick(iconA, iconB, name, "a", `      filename = "authored.png"`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Invalid Configuration for Read-Only Attribute`),
+			},
+		},
+	})
 }

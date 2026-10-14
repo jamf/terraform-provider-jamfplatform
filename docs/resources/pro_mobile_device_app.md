@@ -262,7 +262,10 @@ Optional:
 Optional:
 
 - `id` (String) Icon ID assigned by Jamf Pro.
-- `uri` (String) Icon URI. Returned by Jamf Pro.
+
+Read-Only:
+
+- `uri` (String) Icon URI. Jamf Pro sets it from the icon `id`.
 
 
 

@@ -198,7 +198,7 @@ func (r *MobileAppResource) Schema(ctx context.Context, req resource.SchemaReque
 						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"id":  optComputedString("Icon ID assigned by Jamf Pro."),
-							"uri": optComputedString("Icon URI. Returned by Jamf Pro."),
+							"uri": mirrorString("Icon URI. Jamf Pro sets it from the icon `id`.", planmodifiers.NestedStringSource(path.MatchRoot("self_service").AtName("self_service_icon"), "id")),
 						},
 					},
 					"self_service_categories": schema.SetNestedAttribute{
@@ -397,6 +397,11 @@ func optComputedInt64(desc string) schema.Int64Attribute {
 // whenever another attribute differs only textually, such as CRLF against LF in
 // app_configuration.preferences: the framework marks every unset Computed value
 // Unknown and nothing restores it. Watching the id avoids both failures.
+//
+// self_service.self_service_icon.uri mirrors the icon id. An authored uri is
+// ignored on the wire (wire-probed 2026-10-14 on the policy's identical icon
+// block), and UseNonNullStateForUnknown carried the previous icon's uri into a
+// plan that repointed id, so the apply contradicted it. See issue #468.
 //
 // description watches self_service.self_service_description through
 // planmodifiers.NestedStringSource. Watching the whole self_service block fails:

@@ -17,6 +17,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/iconmirror"
 )
 
 func TestPolicyResource_Schema(t *testing.T) {
@@ -326,5 +327,22 @@ func TestPolicyResource_IntegerRangesMatchTheWire(t *testing.T) {
 				t.Errorf("%v accepted %d", tc.path, v)
 			}
 		}
+	}
+}
+
+// TestPolicyResource_SelfServiceIconDerivedAttributes pins uri and filename of
+// self_service.self_service_icon as Computed-only attributes that follow id.
+// Jamf Pro derives both from the icon the id names and ignores an authored
+// value, so an Optional one could never match what apply returned, and
+// UseNonNullStateForUnknown carried the previous icon's pair into a plan that
+// repointed id. See issue #468.
+func TestPolicyResource_SelfServiceIconDerivedAttributes(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"uri", "filename"} {
+		iconmirror.AssertPlan(t, name, policyResourceAttribute(t, "self_service", "self_service_icon", name))
+	}
+	id, ok := policyResourceAttribute(t, "self_service", "self_service_icon", "id").(rschema.StringAttribute)
+	if !ok || !id.Optional || !id.Computed {
+		t.Errorf("self_service_icon.id must stay Optional+Computed: it is the one input")
 	}
 }

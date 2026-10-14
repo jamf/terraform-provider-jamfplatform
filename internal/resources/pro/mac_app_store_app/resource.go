@@ -29,6 +29,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -187,7 +188,7 @@ func (r *MacAppResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"id":  optComputedString("Icon ID assigned by Jamf Pro."),
-							"uri": optComputedString("Icon URI. Returned by Jamf Pro."),
+							"uri": iconMirrorString("Icon URI. Jamf Pro sets it from the icon `id`."),
 						},
 					},
 					"self_service_categories": schema.SetNestedAttribute{
@@ -303,6 +304,25 @@ func (r *MacAppResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 // element winning: a flag resets the method to "Self Service", and a method
 // turns notifications off. Wire-probed 2026-10-01 against 11.32.0.
 const macAppNotificationMethodSelfService = "Self Service"
+
+// iconMirrorString is a Computed-only string Jamf Pro derives from the Self
+// Service icon's id: the CDN uri of whichever icon the id names.
+//
+// An authored uri is ignored on the wire (wire-probed 2026-10-14 against the
+// policy's identical icon block), so it cannot be Optional, and
+// UseNonNullStateForUnknown carries the previous icon's uri into a plan that
+// repoints id, which the apply then contradicts: "Provider produced
+// inconsistent result after apply". planmodifiers.MirrorOfString watches id and
+// carries the prior value only while it is unchanged. See issue #468.
+func iconMirrorString(desc string) schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: desc,
+		Computed:            true,
+		PlanModifiers: []planmodifier.String{
+			planmodifiers.MirrorOfString(planmodifiers.NestedStringSource(path.MatchRoot("self_service").AtName("self_service_icon"), "id")),
+		},
+	}
+}
 
 func optComputedString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
