@@ -114,7 +114,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 				},
 			},
 			"type": schema.StringAttribute{
-				MarkdownDescription: "Directory service type. Selects which nested block is required. Changing it replaces the binding, because Jamf Pro keeps the type it was created with. One of `\"Active Directory\"`, `\"Open Directory\"`, `\"PowerBroker Identity Services\"`, `\"ADmitMac\"`, `\"Centrify\"`. The admin UI labels the Open Directory option \"Apple Open Directory\", but the value Jamf Pro stores is `\"Open Directory\"`.",
+				MarkdownDescription: "Directory service type. Selects which nested block is required. Jamf Pro keeps the type a binding was created with, so changing `type` replaces the binding and gives it a new ID. Jamf Pro then removes the old binding from every policy that uses it, without an error. A policy managed here that references this resource's `id` picks up the new binding in the same apply. Re-add the binding to any other policy by hand. One of `\"Active Directory\"`, `\"Open Directory\"`, `\"PowerBroker Identity Services\"`, `\"ADmitMac\"`, `\"Centrify\"`. The admin UI labels the Open Directory option \"Apple Open Directory\", but the value Jamf Pro stores is `\"Open Directory\"`.",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(allDirectoryBindingTypes...),
@@ -147,7 +147,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 			},
 
 			"active_directory": schema.SingleNestedAttribute{
-				MarkdownDescription: "Active Directory–specific configuration. Required when `type = \"Active Directory\"` (`{}` takes Jamf Pro's defaults) and forbidden for any other type; both are plan-time errors. When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
+				MarkdownDescription: "Active Directory–specific configuration. Required when `type = \"Active Directory\"` and not allowed with any other type; Terraform checks both at plan time. Set it to `{}` to accept Jamf Pro's defaults. Jamf Pro fills in any field you leave out of the block, and Terraform stores the value it chose.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"forest":                     optString("Active Directory forest."),
@@ -167,7 +167,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 			},
 
 			"open_directory": schema.SingleNestedAttribute{
-				MarkdownDescription: "Open Directory–specific configuration. Required when `type = \"Open Directory\"` (`{}` takes Jamf Pro's defaults) and forbidden for any other type; both are plan-time errors. When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
+				MarkdownDescription: "Open Directory–specific configuration. Required when `type = \"Open Directory\"` and not allowed with any other type; Terraform checks both at plan time. Set it to `{}` to accept Jamf Pro's defaults. Jamf Pro fills in any field you leave out of the block, and Terraform stores the value it chose.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"encrypt_using_ssl":      optBool("**\"Encrypt using SSL\"** in the Jamf Pro admin UI. Encrypt the LDAP connection to the directory."),
@@ -178,7 +178,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 			},
 
 			"admitmac": schema.SingleNestedAttribute{
-				MarkdownDescription: "ADmitMac–specific configuration. Required when `type = \"ADmitMac\"` (`{}` takes Jamf Pro's defaults) and forbidden for any other type; both are plan-time errors. When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
+				MarkdownDescription: "ADmitMac–specific configuration. Required when `type = \"ADmitMac\"` and not allowed with any other type; Terraform checks both at plan time. Set it to `{}` to accept Jamf Pro's defaults. Jamf Pro fills in any field you leave out of the block, and Terraform stores the value it chose.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"require_confirmation":       optBool("**\"Require confirmation\"** in the Jamf Pro admin UI. Require admin confirmation when binding new computers to the directory."),
@@ -208,7 +208,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 			},
 
 			"centrify": schema.SingleNestedAttribute{
-				MarkdownDescription: "Centrify–specific configuration. Required when `type = \"Centrify\"` (`{}` takes Jamf Pro's defaults) and forbidden for any other type; both are plan-time errors. When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
+				MarkdownDescription: "Centrify–specific configuration. Required when `type = \"Centrify\"` and not allowed with any other type; Terraform checks both at plan time. Set it to `{}` to accept Jamf Pro's defaults. Jamf Pro fills in any field you leave out of the block, and Terraform stores the value it chose.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"workstation_mode":        optBool("Bind in Workstation mode (versus joined mode)."),

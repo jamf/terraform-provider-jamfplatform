@@ -39,8 +39,11 @@ import (
 // update that removes it. Wire-probed 2026-10-14. An empty block (`active_directory
 // = {}`) satisfies the rule and takes Jamf Pro's defaults.
 //
-// A block whose value is unknown at plan time counts as supplied. The check
-// reads each attribute with GetAttribute rather than decoding the whole config,
+// A block whose value is unknown at plan time passes both checks: it counts as
+// supplying the matching block and as not supplying any other. Terraform runs
+// the validator again with known values when it re-plans during apply, so a
+// block that resolves to the wrong shape still fails there. The check reads
+// each attribute with GetAttribute rather than decoding the whole config,
 // because a block built from a variable or another resource is unknown during
 // validation and a struct decode fails on it.
 //
@@ -54,7 +57,7 @@ type typeBlockConfigValidator struct{}
 
 // Description returns a plain-text description of the validator.
 func (typeBlockConfigValidator) Description(context.Context) string {
-	return "each value of `type` requires exactly one nested per-type block (none, for the PowerBroker type); supplying a block whose name does not match `type`, or omitting the matching one, is rejected at plan time"
+	return "each value of `type` requires its own nested block, and PowerBroker takes none; a plan fails if the matching block is missing or another type's block is set"
 }
 
 // MarkdownDescription returns the markdown description.
@@ -107,9 +110,9 @@ func (typeBlockConfigValidator) ValidateResource(ctx context.Context, req resour
 			resp.Diagnostics.AddAttributeError(
 				path.Root(name),
 				fmt.Sprintf("%s required when type = %q", name, bindingType),
-				fmt.Sprintf("`type = %q` needs the `%s` block. Jamf Pro returns that block populated whether or not it is sent, so leaving it out makes the apply fail with an inconsistent result. Add `%s = {}` to take Jamf Pro's defaults.", bindingType, name, name),
+				fmt.Sprintf("`type = %q` needs the `%s` block. Jamf Pro returns the block with values filled in even when you leave it out, and the apply then fails with an inconsistent result. Add `%s = {}` to accept Jamf Pro's defaults.", bindingType, name, name),
 			)
-		case name != allowedBlock && !block.IsNull():
+		case name != allowedBlock && !block.IsNull() && !block.IsUnknown():
 			resp.Diagnostics.AddAttributeError(
 				path.Root(name),
 				fmt.Sprintf("%s forbidden when type = %q", name, bindingType),
@@ -130,12 +133,12 @@ var typedBlockNames = []string{"active_directory", "open_directory", "admitmac",
 func explainBlockForbidden(attemptedBlock, bindingType, allowedBlock string) string {
 	if allowedBlock == "" {
 		return fmt.Sprintf(
-			"`%s` cannot be set when `type = %q` — the PowerBroker variant carries no per-type configuration on the wire, so no nested block is permitted. Remove the `%s` block to apply.",
+			"`%s` cannot be set when `type = %q`. Jamf Pro has no type-specific settings for PowerBroker, so it takes no nested block. Remove the `%s` block.",
 			attemptedBlock, bindingType, attemptedBlock,
 		)
 	}
 	return fmt.Sprintf(
-		"`%s` cannot be set when `type = %q` — only the `%s` block applies to this directory binding type. Either change `type` to the value matching the block you supplied, or remove the `%s` block.",
+		"`%s` cannot be set when `type = %q`, which uses the `%s` block. Change `type` to match the block you set, or remove the `%s` block.",
 		attemptedBlock, bindingType, allowedBlock, attemptedBlock,
 	)
 }

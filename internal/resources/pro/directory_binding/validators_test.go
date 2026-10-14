@@ -73,6 +73,8 @@ func TestTypeBlockConfigValidator(t *testing.T) {
 		{"AD with its block", typeActiveDirectory, map[string]blockState{"active_directory": blockSet}, ""},
 		{"AD without its block", typeActiveDirectory, nil, "active_directory required"},
 		{"AD with an unknown block", typeActiveDirectory, map[string]blockState{"active_directory": blockUnknown}, ""},
+		{"AD with an unknown wrong block", typeActiveDirectory, map[string]blockState{"active_directory": blockSet, "centrify": blockUnknown}, ""},
+		{"PowerBroker with an unknown block", typePowerBroker, map[string]blockState{"admitmac": blockUnknown}, ""},
 		{"AD with the wrong block", typeActiveDirectory, map[string]blockState{"active_directory": blockSet, "centrify": blockSet}, "centrify forbidden"},
 		{"AD with only the wrong block", typeActiveDirectory, map[string]blockState{"centrify": blockSet}, "active_directory required"},
 		{"Open Directory without its block", typeOpenDirectory, nil, "open_directory required"},
