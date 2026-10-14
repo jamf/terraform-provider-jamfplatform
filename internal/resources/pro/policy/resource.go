@@ -671,24 +671,6 @@ func (r *PolicyResource) reportScopeImpact(ctx context.Context, req resource.Mod
 	})
 }
 
-// optComputedString returns an Optional+Computed StringAttribute with the
-// UseNonNullStateForUnknown plan modifier for server-augmented fields.
-// Field-level construction helper, not a schema-section decomposition —
-// STYLE_GUIDE §Schema keeps the section bodies inline.
-//
-// Why UseNonNullStateForUnknown and not UseStateForUnknown: these helpers
-// are used both at top level and inside nested list elements. When a list
-// element is appended (list-length growth), the new index has no prior
-// state at its path — prior StateValue is Null. UseStateForUnknown copies
-// that Null into the plan; if the server returns a real value for the
-// field, the post-apply consistency check trips ("Provider produced
-// inconsistent result after apply"). When a Sensitive sibling lives on
-// the same nested element (e.g. a WriteOnly password), the error path
-// is redacted up to the nearest non-sensitive ancestor, masking the
-// real attribute. UseNonNullStateForUnknown leaves the plan Unknown when
-// prior StateValue is Null, so the framework accepts whatever the
-// server returns. Behavior is identical to UseStateForUnknown for the
-// non-Null prior-state case (singletons, already-set values).
 // noExecuteTimeAttribute builds the schema for one end of the daily no-execute
 // window.
 //
@@ -790,6 +772,25 @@ func iconMirrorString(desc string) schema.StringAttribute {
 	}
 }
 
+// optComputedString returns an Optional+Computed StringAttribute with the
+// UseNonNullStateForUnknown plan modifier for server-augmented fields.
+// Field-level construction helper, not a schema-section decomposition —
+// STYLE_GUIDE §Schema keeps the section bodies inline.
+//
+// UseStateForUnknown would copy a null prior into the plan, and a null prior is
+// what every leaf of a block going from omitted to declared has, as does a
+// field of an appended list element. Apply then returns the server's default
+// and Terraform fails with "Provider produced inconsistent result after apply"
+// (reproduced on self_service.notification_location and
+// packages.distribution_point). Leaving a null prior Unknown lets apply store
+// whatever Jamf Pro returns.
+//
+// The cost is that a leaf Jamf Pro never returns, of which the policy has many,
+// reads "(known after apply)" in any plan that changes something else and then
+// settles back to null. That stays harmless only while nothing in the resource
+// can collapse a configured change back to prior state, which would leave those
+// Unknowns as the whole plan; TestPolicyResource_NothingCollapsesAPlan enforces
+// it. See STYLE_GUIDE rule 1a.
 func optComputedString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,

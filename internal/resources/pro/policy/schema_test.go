@@ -359,3 +359,17 @@ func TestPolicyResource_OptionalBlockLeavesPlanUnknownFromNullPrior(t *testing.T
 	NewPolicyResource().Schema(context.Background(), resource.SchemaRequest{}, &resp)
 	nullprior.AssertOptionalBlockLeavesPlanUnknown(t, resp.Schema)
 }
+
+// TestPolicyResource_NothingCollapsesAPlan is what lets the policy's
+// singleton-block leaves keep UseNonNullStateForUnknown (STYLE_GUIDE rule 1a).
+// Many of them are null forever once applied (restart_options.message, or any
+// string Jamf Pro answers empty), so they plan Unknown whenever the plan differs
+// from state. That only shows as a permanent diff if something restores the
+// configured change that caused the difference, and this fails the moment a
+// plan modifier or a ModifyPlan plan write that could do so is added.
+func TestPolicyResource_NothingCollapsesAPlan(t *testing.T) {
+	t.Parallel()
+	var resp resource.SchemaResponse
+	NewPolicyResource().Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	nullprior.AssertNoPlanCollapse(t, resp.Schema, ".")
+}

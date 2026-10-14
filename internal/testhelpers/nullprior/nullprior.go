@@ -1,8 +1,10 @@
 // Copyright Jamf Software LLC 2026
 // SPDX-License-Identifier: MPL-2.0
 
-// Package nullprior holds the schema-wide guard for the "block goes from
-// omitted to declared" failure. It is a package of its own rather than part of
+// Package nullprior holds the schema-wide guards for STYLE_GUIDE rule 1a:
+// AssertOptionalBlockLeavesPlanUnknown for the "block goes from omitted to
+// declared" failure, and AssertNoPlanCollapse for the condition under which a
+// singleton-block leaf may leave a null prior Unknown. It is a package of its own rather than part of
 // testhelpers because testhelpers imports the provider under the acceptance
 // tag, which would make every in-package unit test that uses it an import cycle.
 package nullprior
@@ -107,7 +109,7 @@ func nullParentFixture(p path.Path, leaf schema.Attribute) (tfsdk.State, tfsdk.P
 func report(t *testing.T, p path.Path, planned interface{ IsUnknown() bool }, modifier string) {
 	t.Helper()
 	if !planned.IsUnknown() {
-		t.Errorf("%s: %s plans a known value from a null prior. When its block goes from omitted to declared, apply returns the server's default and fails with %q. Use planmodifiers.UseStateForUnknownInExistingBlock* for a leaf of a single-nested block, or UseNonNullStateForUnknown for a leaf of a Set or List element (STYLE_GUIDE rule 1a).",
+		t.Errorf("%s: %s plans a known value from a null prior. When its block goes from omitted to declared, apply returns the server's default and fails with %q. Use UseNonNullStateForUnknown, which leaves a null prior Unknown, while AssertNoPlanCollapse passes for the resource; if the resource can collapse a plan, use planmodifiers.UseStateForUnknownInExistingBlock* for a leaf of a single-nested block instead (STYLE_GUIDE rule 1a).",
 			p, modifier, "Provider produced inconsistent result after apply")
 	}
 }

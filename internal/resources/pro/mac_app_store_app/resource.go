@@ -292,11 +292,6 @@ func (r *MacAppResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 	}
 }
 
-// optComputedString returns an Optional+Computed StringAttribute with the
-// UseNonNullStateForUnknown plan modifier for server-augmented fields. Used
-// both at top level and inside SetNested list elements — see the policy
-// resource doc comment for why UseNonNullStateForUnknown (not UseStateForUnknown)
-// is required for nested-list growth.
 // macAppNotificationMethodSelfService is the only notification method Jamf Pro
 // keeps for a Mac App Store app. The classic API reads the method and the
 // enabled flag from two sibling <notification> elements into one field, last
@@ -323,6 +318,14 @@ func iconMirrorString(desc string) schema.StringAttribute {
 	}
 }
 
+// optComputedString returns an Optional+Computed StringAttribute with the
+// UseNonNullStateForUnknown plan modifier for server-augmented fields. It is
+// used at top level, in the self_service and vpp blocks and in
+// self_service_categories elements, all of which can have a null prior that
+// UseStateForUnknown would wrongly plan; see the policy's optComputedString.
+// Leaving a null prior Unknown is safe only while nothing in the resource can
+// collapse a configured change back to prior state, which
+// TestMacAppResource_NothingCollapsesAPlan enforces (STYLE_GUIDE rule 1a).
 func optComputedString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,

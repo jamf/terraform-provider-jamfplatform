@@ -144,6 +144,20 @@ func TestMacAppResource_OptionalBlockLeavesPlanUnknownFromNullPrior(t *testing.T
 	nullprior.AssertOptionalBlockLeavesPlanUnknown(t, resp.Schema)
 }
 
+// TestMacAppResource_NothingCollapsesAPlan is what lets the mac app's
+// singleton-block leaves keep UseNonNullStateForUnknown (STYLE_GUIDE rule 1a).
+// self_service.install_button_text, for one, stays null once applied when Jamf
+// Pro answers it empty, so it plans Unknown whenever the plan differs from
+// state. That only shows as a permanent diff if something restores the
+// configured change that caused the difference, and this fails the moment a
+// plan modifier or a ModifyPlan plan write that could do so is added.
+func TestMacAppResource_NothingCollapsesAPlan(t *testing.T) {
+	t.Parallel()
+	var resp resource.SchemaResponse
+	NewMacAppResource().(*MacAppResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	nullprior.AssertNoPlanCollapse(t, resp.Schema, ".")
+}
+
 // TestMacAppResource_VPPLicenseCountsCarryNothingForward pins the three VPP
 // license counts as plain Computed with no plan modifier. They derive from
 // vpp_admin_account_id, which Jamf Pro answers with no counts while it is -1, so
