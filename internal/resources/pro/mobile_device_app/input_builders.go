@@ -305,7 +305,6 @@ func buildMobileAppSelfService(m *MobileAppSelfServiceModel) *proclassic.MobileD
 		for _, c := range m.SelfServiceCategories {
 			cats = append(cats, proclassic.MobileDeviceApplicationSelfServiceSelfServiceCategoriesCategoryItem{
 				ID:        helpers.StringIDPtr(c.ID),
-				Name:      helpers.OptionalStringPointer(c.Name),
 				DisplayIn: helpers.SelfServiceCategoryDisplayIn(c.DisplayIn),
 			})
 		}

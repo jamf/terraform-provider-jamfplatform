@@ -253,6 +253,9 @@ Required:
 Optional:
 
 - `display_in` (Boolean) Display the app in this category.
+
+Read-Only:
+
 - `name` (String) Category display name. Returned by Jamf Pro.
 
 

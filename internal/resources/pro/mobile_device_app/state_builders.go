@@ -284,26 +284,19 @@ func flattenMobileAppSelfService(ss *proclassic.MobileDeviceApplicationSelfServi
 	}
 }
 
-// flattenMobileAppSelfServiceCategories refreshes the managed category set,
-// matching server items to existing state items by ID so caller-authored values
-// (display_in) stick across refreshes. Server items not in state are appended;
-// the set is keyed by category ID.
+// flattenMobileAppSelfServiceCategories reads the category set wire-authoritatively.
+// Every attribute is echoed, name included: Jamf Pro resolves the category by
+// id, so the name it returns is the only correct one.
 func flattenMobileAppSelfServiceCategories(api []proclassic.MobileDeviceApplicationSelfServiceSelfServiceCategoriesCategoryItem, state *MobileAppSelfServiceModel) {
-	byID := make(map[string]MobileAppSelfServiceCategoryModel, len(state.SelfServiceCategories))
-	for _, c := range state.SelfServiceCategories {
-		byID[c.ID.ValueString()] = c
-	}
-
 	out := make([]MobileAppSelfServiceCategoryModel, 0, len(api))
 	for _, c := range api {
 		idStr := ""
 		if s := helpers.StringFromIntPtr(c.ID); s != nil {
 			idStr = *s
 		}
-		current := byID[idStr]
 		out = append(out, MobileAppSelfServiceCategoryModel{
 			ID:        types.StringValue(idStr),
-			Name:      helpers.ReconcileOptionalStringPointer(c.Name, current.Name),
+			Name:      helpers.StringPointerValueOrNull(c.Name),
 			DisplayIn: helpers.BoolPointerValueOrNull(c.DisplayIn),
 		})
 	}

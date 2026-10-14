@@ -312,3 +312,19 @@ func TestEbookScopeClassesCleared_EmitsAnExplicitEmptyElement(t *testing.T) {
 		t.Errorf("second pass body must carry the class members: %s", got)
 	}
 }
+
+// TestBuildEbookSelfService_CategoryNameNeverSent pins that a category entry
+// carries only its id and flags. Jamf Pro ignores the name, and a name carried
+// from another element would misdescribe the entry. See categoryName.
+func TestBuildEbookSelfService_CategoryNameNeverSent(t *testing.T) {
+	t.Parallel()
+	ss := buildEbookSelfService(&EbookSelfServiceModel{
+		Categories: []EbookSelfServiceCategoryModel{{ID: types.StringValue("64"), Name: types.StringValue("Other category")}},
+	})
+	if ss == nil || ss.SelfServiceCategories == nil || ss.SelfServiceCategories.Category == nil || len(*ss.SelfServiceCategories.Category) != 1 {
+		t.Fatal("expected one category on the wire")
+	}
+	if got := (*ss.SelfServiceCategories.Category)[0].Name; got != nil {
+		t.Errorf("category name must not be sent, got %q", *got)
+	}
+}

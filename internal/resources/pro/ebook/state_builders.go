@@ -210,25 +210,19 @@ func flattenEbookSelfService(ss *proclassic.EbookSelfService, state *EbookSelfSe
 	}
 }
 
-// flattenEbookSelfServiceCategories refreshes the managed category set, matching
-// server items to existing state items by ID so caller-authored values
-// (display_in / feature_in) stick across refreshes. The set is keyed by category ID.
+// flattenEbookSelfServiceCategories reads the category set wire-authoritatively.
+// Every attribute is echoed, name included: Jamf Pro resolves the category by
+// id, so the name it returns is the only correct one.
 func flattenEbookSelfServiceCategories(api []proclassic.EbookSelfServiceSelfServiceCategoriesCategoryItem, state *EbookSelfServiceModel) {
-	byID := make(map[string]EbookSelfServiceCategoryModel, len(state.Categories))
-	for _, c := range state.Categories {
-		byID[c.ID.ValueString()] = c
-	}
-
 	out := make([]EbookSelfServiceCategoryModel, 0, len(api))
 	for _, c := range api {
 		idStr := ""
 		if s := helpers.StringFromIntPtr(c.ID); s != nil {
 			idStr = *s
 		}
-		current := byID[idStr]
 		out = append(out, EbookSelfServiceCategoryModel{
 			ID:        types.StringValue(idStr),
-			Name:      helpers.ReconcileOptionalStringPointer(c.Name, current.Name),
+			Name:      helpers.StringPointerValueOrNull(c.Name),
 			DisplayIn: helpers.BoolPointerValueOrNull(c.DisplayIn),
 			FeatureIn: helpers.BoolPointerValueOrNull(c.FeatureIn),
 		})

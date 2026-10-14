@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/iconmirror"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/keyedcategories"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/nullprior"
 )
 
@@ -165,4 +166,16 @@ func TestMobileAppResource_OptionalBlockLeavesPlanUnknownFromNullPrior(t *testin
 	var resp resource.SchemaResponse
 	NewMobileAppResource().(*MobileAppResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
 	nullprior.AssertOptionalBlockLeavesPlanUnknown(t, resp.Schema)
+}
+
+// TestMobileAppResource_SelfServiceCategoriesCarryByID pins the category element
+// shape: Jamf Pro resolves a category by id, so name is Computed-only, and it
+// and the flags carry prior state by id rather than by position. See
+// keyedcategories.AssertCarriedByID.
+func TestMobileAppResource_SelfServiceCategoriesCarryByID(t *testing.T) {
+	t.Parallel()
+	var resp resource.SchemaResponse
+	NewMobileAppResource().(*MobileAppResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	ss := resp.Schema.Attributes["self_service"].(schema.SingleNestedAttribute)
+	keyedcategories.AssertCarriedByID(t, ss.Attributes["self_service_categories"].(schema.SetNestedAttribute).NestedObject.Attributes, "display_in")
 }

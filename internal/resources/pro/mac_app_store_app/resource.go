@@ -345,8 +345,9 @@ func optComputedBool(desc string) schema.BoolAttribute {
 	}
 }
 
-// categoryName is the `name` of a self_service_categories element: plain
-// Computed, no plan modifier, never sent.
+// categoryName is the `name` of a self_service_categories element:
+// Computed-only and never sent, carried from prior state only by the element
+// with the same id.
 //
 // Jamf Pro resolves a Mac app's Self Service category by id and ignores an
 // authored name, wire-probed 2026-10-14: id B sent with category A's name
@@ -355,14 +356,13 @@ func optComputedBool(desc string) schema.BoolAttribute {
 // and the framework pairs set elements with prior state by position, so
 // re-pointing an element at another category planned the old category's name
 // on it and the apply failed with "planned set element ... does not correlate
-// with any element in actual". Left plain Computed it is Unknown for a re-keyed
-// element and Jamf Pro's answer is accepted; for an unchanged element Terraform
-// core carries it from state. The policy's self-service categories are the same
-// (see issue #464).
+// with any element in actual". The keyed carry leaves a re-pointed element
+// Unknown for Jamf Pro to answer and keeps an unchanged element's name.
 func categoryName(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Computed:            true,
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseKeyedStateForUnknownString("id")},
 	}
 }
 

@@ -240,3 +240,20 @@ func TestBuildMobileAppSelfService_CategoryIDOnlySendsDisplayIn(t *testing.T) {
 		t.Fatalf("display_in must be sent as true for an id-only category, got %+v", cats)
 	}
 }
+
+// TestBuildMobileAppSelfService_CategoryNameNeverSent pins that a category
+// entry carries only its id and display_in. Jamf Pro ignores the name, and a
+// name carried from another element would misdescribe the entry. See
+// categoryName.
+func TestBuildMobileAppSelfService_CategoryNameNeverSent(t *testing.T) {
+	t.Parallel()
+	ss := buildMobileAppSelfService(&MobileAppSelfServiceModel{
+		SelfServiceCategories: []MobileAppSelfServiceCategoryModel{{ID: types.StringValue("64"), Name: types.StringValue("Other category")}},
+	})
+	if ss == nil || ss.SelfServiceCategories == nil || ss.SelfServiceCategories.Category == nil || len(*ss.SelfServiceCategories.Category) != 1 {
+		t.Fatal("expected one category on the wire")
+	}
+	if got := (*ss.SelfServiceCategories.Category)[0].Name; got != nil {
+		t.Errorf("category name must not be sent, got %q", *got)
+	}
+}

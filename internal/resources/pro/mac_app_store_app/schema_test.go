@@ -11,8 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/list"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/iconmirror"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/keyedcategories"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/nullprior"
 )
 
@@ -184,28 +184,12 @@ func TestMacAppResource_VPPLicenseCountsCarryNothingForward(t *testing.T) {
 }
 
 // TestMacAppResource_SelfServiceCategoriesCarryByID pins the category element
-// shape. name is Computed-only with no modifier because Jamf Pro resolves the
-// category by id and ignores an authored name; display_in and feature_in carry
-// prior state only from the element with the same id. Both stop a re-pointed
-// element inheriting the previous category's values, which failed the apply.
-// See categoryName and TestAccResource_ProMacApp_SelfServiceCategorySwap.
+// shape: see keyedcategories.AssertCarriedByID and
+// TestAccResource_ProMacApp_SelfServiceCategorySwap.
 func TestMacAppResource_SelfServiceCategoriesCarryByID(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 	var resp resource.SchemaResponse
-	NewMacAppResource().(*MacAppResource).Schema(ctx, resource.SchemaRequest{}, &resp)
+	NewMacAppResource().(*MacAppResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
 	ss := resp.Schema.Attributes["self_service"].(schema.SingleNestedAttribute)
-	elem := ss.Attributes["self_service_categories"].(schema.SetNestedAttribute).NestedObject.Attributes
-
-	n, ok := elem["name"].(schema.StringAttribute)
-	if !ok || n.Optional || n.Required || !n.Computed || len(n.PlanModifiers) != 0 {
-		t.Errorf("self_service_categories.name: want Computed-only with no plan modifier, got %+v", elem["name"])
-	}
-	keyed := planmodifiers.UseKeyedStateForUnknownBool("id").Description(ctx)
-	for _, f := range []string{"display_in", "feature_in"} {
-		b, ok := elem[f].(schema.BoolAttribute)
-		if !ok || !b.Optional || !b.Computed || len(b.PlanModifiers) != 1 || b.PlanModifiers[0].Description(ctx) != keyed {
-			t.Errorf("self_service_categories.%s: want Optional+Computed carried by id, got %+v", f, elem[f])
-		}
-	}
+	keyedcategories.AssertCarriedByID(t, ss.Attributes["self_service_categories"].(schema.SetNestedAttribute).NestedObject.Attributes, "display_in", "feature_in")
 }

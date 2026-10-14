@@ -580,3 +580,30 @@ func TestAssignResourceModel_IncludeUnmanagedHydratesFromScratch(t *testing.T) {
 func contains(haystack []string, needle string) bool {
 	return slices.Contains(haystack, needle)
 }
+
+// TestFlattenSelfServiceCategories_KeepsThePlannedOrder pins that the wire
+// list is read back in the order the plan or prior state lists the ids, with an
+// id it does not name appended. Jamf Pro returns categories in its own order,
+// so adopting the wire order failed any apply listing them otherwise.
+func TestFlattenSelfServiceCategories_KeepsThePlannedOrder(t *testing.T) {
+	t.Parallel()
+	item := func(id int, name string) proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategoriesCategoryItem {
+		return proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategoriesCategoryItem{ID: &id, Name: &name}
+	}
+	wire := &proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategories{
+		Category: &[]proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategoriesCategoryItem{item(1, "a"), item(2, "b"), item(3, "c")},
+	}
+	order := []SelfServiceCategoryItem{{ID: types.StringValue("3")}, {ID: types.StringValue("1")}}
+
+	got := flattenSelfServiceCategories(wire, order)
+	var ids []string
+	for _, c := range got {
+		ids = append(ids, c.ID.ValueString()+"="+c.Name.ValueString())
+	}
+	if want := []string{"3=c", "1=a", "2=b"}; !slices.Equal(ids, want) {
+		t.Errorf("got %v, want %v", ids, want)
+	}
+	if got := flattenSelfServiceCategories(wire, nil); got[0].ID.ValueString() != "1" || got[2].ID.ValueString() != "3" {
+		t.Errorf("with no order the wire order must stand, got %v", got)
+	}
+}

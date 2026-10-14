@@ -4,7 +4,9 @@
 package macos_configuration_profile
 
 import (
+	"cmp"
 	"context"
+	"slices"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -401,9 +403,9 @@ func flattenSelfService(ss *proclassic.OsXConfigurationProfileSelfService, state
 	// list the practitioner never wrote.
 	switch {
 	case state.Categories != nil:
-		state.Categories = flattenSelfServiceCategories(ss.SelfServiceCategories)
+		state.Categories = flattenSelfServiceCategories(ss.SelfServiceCategories, state.Categories)
 	case includeUnmanaged:
-		if cats := flattenSelfServiceCategories(ss.SelfServiceCategories); len(cats) > 0 {
+		if cats := flattenSelfServiceCategories(ss.SelfServiceCategories, nil); len(cats) > 0 {
 			state.Categories = cats
 		}
 	}
@@ -412,7 +414,15 @@ func flattenSelfService(ss *proclassic.OsXConfigurationProfileSelfService, state
 // flattenSelfServiceCategories maps the wire category list onto the model,
 // returning an empty (non-nil) slice when the server carries none so a managed
 // attribute can converge on a declared `[]`.
-func flattenSelfServiceCategories(c *proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategories) []SelfServiceCategoryItem {
+//
+// The items come back in the order of order, matched by category id, with any
+// id order does not name appended in wire order. Jamf Pro does not keep the
+// order a list was written in: categories c then a read back as a then c
+// (wire-probed 2026-10-14), so the wire order carries no meaning, and adopting
+// it failed every apply that listed categories in another order with "Provider
+// produced inconsistent result after apply". order is the planned list on
+// create and update and the prior state on read.
+func flattenSelfServiceCategories(c *proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategories, order []SelfServiceCategoryItem) []SelfServiceCategoryItem {
 	if c == nil || c.Category == nil {
 		return []SelfServiceCategoryItem{}
 	}
@@ -426,6 +436,21 @@ func flattenSelfServiceCategories(c *proclassic.OsXConfigurationProfileSelfServi
 			FeatureIn: helpers.BoolPointerValueOrNull(cat.FeatureIn),
 		})
 	}
+	rank := make(map[string]int, len(order))
+	for i, o := range order {
+		if _, seen := rank[o.ID.ValueString()]; !seen {
+			rank[o.ID.ValueString()] = i
+		}
+	}
+	position := func(it SelfServiceCategoryItem) int {
+		if r, ok := rank[it.ID.ValueString()]; ok {
+			return r
+		}
+		return len(order)
+	}
+	slices.SortStableFunc(items, func(a, b SelfServiceCategoryItem) int {
+		return cmp.Compare(position(a), position(b))
+	})
 	return items
 }
 

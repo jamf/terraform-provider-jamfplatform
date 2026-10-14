@@ -335,7 +335,6 @@ func buildEbookSelfService(m *EbookSelfServiceModel) *proclassic.EbookPostSelfSe
 		for _, c := range m.Categories {
 			cats = append(cats, proclassic.EbookSelfServiceSelfServiceCategoriesCategoryItem{
 				ID:        helpers.StringIDPtr(c.ID),
-				Name:      helpers.OptionalStringPointer(c.Name),
 				DisplayIn: helpers.SelfServiceCategoryDisplayIn(c.DisplayIn),
 				FeatureIn: helpers.OptionalBoolPointer(c.FeatureIn),
 			})

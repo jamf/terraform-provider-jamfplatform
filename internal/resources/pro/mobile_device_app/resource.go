@@ -205,8 +205,8 @@ func (r *MobileAppResource) Schema(ctx context.Context, req resource.SchemaReque
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":         schema.StringAttribute{MarkdownDescription: "Category ID.", Required: true},
-								"name":       optComputedString("Category display name. Returned by Jamf Pro."),
-								"display_in": optComputedBool("Display the app in this category."),
+								"name":       categoryName("Category display name. Returned by Jamf Pro."),
+								"display_in": optComputedBoolKeyed("Display the app in this category."),
 							},
 						},
 					},
@@ -386,5 +386,41 @@ func mirrorString(desc string, sources ...planmodifiers.SourceComparer) schema.S
 		MarkdownDescription: desc,
 		Computed:            true,
 		PlanModifiers:       []planmodifier.String{planmodifiers.MirrorOfString(sources...)},
+	}
+}
+
+// categoryName is the `name` of a Self Service category element: Computed-only
+// and never sent, carried from prior state only by the element with the same
+// id.
+//
+// Jamf Pro resolves the category by id and ignores an authored name,
+// wire-probed 2026-10-14 for a mobile device app: id B sent with category A's name
+// stored B, and id A sent with a name no category has stored A. So the name is
+// a pure echo. It used to carry prior state by position, because the framework
+// pairs set elements with prior state by index, so re-pointing an element at
+// another category planned the old category's name on it and the apply failed
+// with "Provider produced inconsistent result after apply". The keyed carry
+// leaves a re-pointed element Unknown for Jamf Pro to answer and keeps an
+// unchanged element's name, including in a plan another modifier collapses.
+func categoryName(desc string) schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: desc,
+		Computed:            true,
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseKeyedStateForUnknownString("id")},
+	}
+}
+
+// optComputedBoolKeyed is an Optional+Computed flag of a Self Service category
+// element, carried from prior state only by the element with the same id
+// rather than by position, which handed a re-pointed element another
+// category's flag. A new element plans Unknown; display_in is then sent as true
+// (helpers.SelfServiceCategoryDisplayIn). See
+// planmodifiers.UseKeyedStateForUnknownBool.
+func optComputedBoolKeyed(desc string) schema.BoolAttribute {
+	return schema.BoolAttribute{
+		MarkdownDescription: desc,
+		Optional:            true,
+		Computed:            true,
+		PlanModifiers:       []planmodifier.Bool{planmodifiers.UseKeyedStateForUnknownBool("id")},
 	}
 }
