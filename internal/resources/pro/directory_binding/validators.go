@@ -101,8 +101,9 @@ func (typeBlockConfigValidator) ValidateResource(ctx context.Context, req resour
 
 	for _, name := range typedBlockNames {
 		var block types.Object
-		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(name), &block)...)
-		if resp.Diagnostics.HasError() {
+		diags := req.Config.GetAttribute(ctx, path.Root(name), &block)
+		resp.Diagnostics.Append(diags...)
+		if diags.HasError() {
 			return
 		}
 		switch {

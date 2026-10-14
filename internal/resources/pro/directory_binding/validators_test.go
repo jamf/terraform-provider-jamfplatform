@@ -68,35 +68,35 @@ func TestTypeBlockConfigValidator(t *testing.T) {
 		name        string
 		bindingType any
 		blocks      map[string]blockState
-		want        string
+		want        []string
 	}{
-		{"AD with its block", typeActiveDirectory, map[string]blockState{"active_directory": blockSet}, ""},
-		{"AD without its block", typeActiveDirectory, nil, "active_directory required"},
-		{"AD with an unknown block", typeActiveDirectory, map[string]blockState{"active_directory": blockUnknown}, ""},
-		{"AD with an unknown wrong block", typeActiveDirectory, map[string]blockState{"active_directory": blockSet, "centrify": blockUnknown}, ""},
-		{"PowerBroker with an unknown block", typePowerBroker, map[string]blockState{"admitmac": blockUnknown}, ""},
-		{"AD with the wrong block", typeActiveDirectory, map[string]blockState{"active_directory": blockSet, "centrify": blockSet}, "centrify forbidden"},
-		{"AD with only the wrong block", typeActiveDirectory, map[string]blockState{"centrify": blockSet}, "active_directory required"},
-		{"Open Directory without its block", typeOpenDirectory, nil, "open_directory required"},
-		{"ADmitMac without its block", typeADmitMac, nil, "admitmac required"},
-		{"Centrify without its block", typeCentrify, nil, "centrify required"},
-		{"Centrify with its block", typeCentrify, map[string]blockState{"centrify": blockSet}, ""},
-		{"PowerBroker with no block", typePowerBroker, nil, ""},
-		{"PowerBroker with a block", typePowerBroker, map[string]blockState{"admitmac": blockSet}, "admitmac forbidden"},
-		{"unknown type", nil, nil, ""},
+		{"AD with its block", typeActiveDirectory, map[string]blockState{"active_directory": blockSet}, nil},
+		{"AD without its block", typeActiveDirectory, nil, []string{"active_directory required"}},
+		{"AD with an unknown block", typeActiveDirectory, map[string]blockState{"active_directory": blockUnknown}, nil},
+		{"AD with an unknown wrong block", typeActiveDirectory, map[string]blockState{"active_directory": blockSet, "centrify": blockUnknown}, nil},
+		{"PowerBroker with an unknown block", typePowerBroker, map[string]blockState{"admitmac": blockUnknown}, nil},
+		{"AD with the wrong block", typeActiveDirectory, map[string]blockState{"active_directory": blockSet, "centrify": blockSet}, []string{"centrify forbidden"}},
+		{"AD with only the wrong block", typeActiveDirectory, map[string]blockState{"admitmac": blockSet}, []string{"active_directory required", "admitmac forbidden"}},
+		{"AD with two wrong blocks", typeActiveDirectory, map[string]blockState{"active_directory": blockSet, "open_directory": blockSet, "centrify": blockSet}, []string{"open_directory forbidden", "centrify forbidden"}},
+		{"Open Directory without its block", typeOpenDirectory, nil, []string{"open_directory required"}},
+		{"ADmitMac without its block", typeADmitMac, nil, []string{"admitmac required"}},
+		{"Centrify without its block", typeCentrify, nil, []string{"centrify required"}},
+		{"Centrify with its block", typeCentrify, map[string]blockState{"centrify": blockSet}, nil},
+		{"PowerBroker with no block", typePowerBroker, nil, nil},
+		{"PowerBroker with a block", typePowerBroker, map[string]blockState{"admitmac": blockSet}, []string{"admitmac forbidden"}},
+		{"unknown type", nil, nil, nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			got := validateTypeBlocks(t, tc.bindingType, tc.blocks)
-			if tc.want == "" {
-				if len(got) != 0 {
-					t.Fatalf("want no diagnostics, got %v", got)
-				}
-				return
+			if len(got) != len(tc.want) {
+				t.Fatalf("want diagnostics %v, got %v", tc.want, got)
 			}
-			if len(got) != 1 || !strings.Contains(got[0], tc.want) {
-				t.Fatalf("want one diagnostic containing %q, got %v", tc.want, got)
+			for i, w := range tc.want {
+				if !strings.Contains(got[i], w) {
+					t.Fatalf("want diagnostics %v, got %v", tc.want, got)
+				}
 			}
 		})
 	}
