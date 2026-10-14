@@ -826,3 +826,46 @@ func TestAccResource_ProSsoSettings_GeneratedCertEmptyKeystoreFileName(t *testin
 		},
 	})
 }
+
+// TestAccResource_ProSsoSettings_SamlBlockOmittedToDeclared adds saml_settings to
+// an OIDC configuration, which is the one transition where the block goes from
+// omitted to declared. Each saml_settings leaf the configuration leaves out is
+// null in state, and one carried forward with UseStateForUnknown fails apply with
+// "Provider produced inconsistent result after apply" where Jamf Pro defaults it.
+// Not run against the development tenant: it rewrites the tenant's SSO record.
+func TestAccResource_ProSsoSettings_SamlBlockOmittedToDeclared(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	idpURL := requireIdpURL(t)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkSsoStillEnabledAfterDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: oidcEnabledConfig},
+			{
+				Config: fmt.Sprintf(`
+					resource "jamfplatform_pro_sso_settings" "test" {
+						sso_enabled        = true
+						configuration_type = "OIDC_WITH_SAML"
+						oidc_settings = {
+							user_mapping                   = "EMAIL"
+							jamf_id_authentication_enabled = true
+						}
+						saml_settings = {
+							entity_id            = "/saml/metadata"
+							metadata_source      = "URL"
+							idp_url              = %q
+							group_attribute_name = "http://schemas.xmlsoap.org/claims/Group"
+						}
+					}
+				`, idpURL),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("jamfplatform_pro_sso_settings.test", "configuration_type", "OIDC_WITH_SAML"),
+					resource.TestCheckResourceAttrSet("jamfplatform_pro_sso_settings.test", "saml_settings.idp_provider_type"),
+					resource.TestCheckResourceAttrSet("jamfplatform_pro_sso_settings.test", "saml_settings.session_timeout"),
+				),
+			},
+			{Config: oidcEnabledConfig},
+		},
+	})
+}
