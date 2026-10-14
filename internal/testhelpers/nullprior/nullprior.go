@@ -107,7 +107,7 @@ func nullParentFixture(p path.Path, leaf schema.Attribute) (tfsdk.State, tfsdk.P
 func report(t *testing.T, p path.Path, planned interface{ IsUnknown() bool }, modifier string) {
 	t.Helper()
 	if !planned.IsUnknown() {
-		t.Errorf("%s: %s plans a known value from a null prior. When its block goes from omitted to declared, apply returns the server's default and fails with %q. Use UseNonNullStateForUnknown.",
+		t.Errorf("%s: %s plans a known value from a null prior. When its block goes from omitted to declared, apply returns the server's default and fails with %q. Use planmodifiers.UseStateForUnknownInExistingBlock* for a leaf of a single-nested block, or UseNonNullStateForUnknown for a leaf of a Set or List element (STYLE_GUIDE rule 1a).",
 			p, modifier, "Provider produced inconsistent result after apply")
 	}
 }
