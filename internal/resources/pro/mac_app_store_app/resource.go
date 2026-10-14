@@ -21,7 +21,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -344,11 +343,20 @@ func optComputedBool(desc string) schema.BoolAttribute {
 }
 
 // computedInt64 returns a Computed-only Int64Attribute for server-derived
-// values (VPP license counts).
+// values (VPP license counts), with no plan modifier.
+//
+// The counts come from the location vpp_admin_account_id names, and Jamf Pro
+// returns none while it is -1. Carrying the prior value forward is wrong in
+// both directions, wire-probed 2026-10-14 against a VPP-backed Slack for
+// Desktop: UseStateForUnknown planned null when vpp went from omitted to
+// declared and apply returned 10/10/0, and it planned 10/10/0 when
+// vpp_admin_account_id moved to -1 and apply returned null. Both failed with
+// "Provider produced inconsistent result after apply", as did moving back. Left
+// plain Computed, the counts are Unknown in a plan that changes anything else
+// and settle on what Jamf Pro returns; an idle plan stays empty.
 func computedInt64(desc string) schema.Int64Attribute {
 	return schema.Int64Attribute{
 		MarkdownDescription: desc,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 	}
 }

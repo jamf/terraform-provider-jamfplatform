@@ -9,6 +9,7 @@ package nullprior
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -19,8 +20,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-// AssertOptionalBlockLeavesPlanUnknown checks every Optional+Computed string,
-// bool and int64 inside an Optional single-nested block of sch.
+// AssertOptionalBlockLeavesPlanUnknown checks every Optional+Computed or
+// Computed-only string, bool and int64 inside an Optional single-nested block
+// of sch.
 //
 // When such a block goes from omitted to declared, state holds null for each
 // leaf in it. A modifier that copies the prior value (UseStateForUnknown) plans
@@ -29,6 +31,11 @@ import (
 // to plan Unknown when its prior is null, which is what UseNonNullStateForUnknown
 // does, so each plan modifier is run with a null prior and an Unknown plan value
 // and must leave the value Unknown.
+//
+// A Computed-only leaf (a server-derived count, say) fails the same way, so it
+// is checked too. Only the stock carry modifiers are run on one, recognised by
+// their "Once set" description: a custom or mirror modifier there reads sibling
+// attributes the walk does not have, and is covered by a test of its own.
 //
 // Leaves outside an Optional block (a top-level attribute, or one inside a
 // Required block) cannot see the transition and are skipped. So are the
@@ -46,16 +53,16 @@ func walk(t *testing.T, parent path.Path, attrs map[string]schema.Attribute, und
 		case schema.SingleNestedAttribute:
 			walk(t, p, a.Attributes, underOptionalBlock || (a.Optional && !a.Required))
 		case schema.StringAttribute:
-			if underOptionalBlock && a.Optional && a.Computed {
-				checkString(t, p, a.PlanModifiers)
+			if underOptionalBlock && a.Computed {
+				checkString(t, p, a.PlanModifiers, !a.Optional)
 			}
 		case schema.BoolAttribute:
-			if underOptionalBlock && a.Optional && a.Computed {
-				checkBool(t, p, a.PlanModifiers)
+			if underOptionalBlock && a.Computed {
+				checkBool(t, p, a.PlanModifiers, !a.Optional)
 			}
 		case schema.Int64Attribute:
-			if underOptionalBlock && a.Optional && a.Computed {
-				checkInt64(t, p, a.PlanModifiers)
+			if underOptionalBlock && a.Computed {
+				checkInt64(t, p, a.PlanModifiers, !a.Optional)
 			}
 		}
 	}
@@ -76,11 +83,14 @@ func report(t *testing.T, p path.Path, planned interface{ IsUnknown() bool }, mo
 	}
 }
 
-func checkString(t *testing.T, p path.Path, mods []planmodifier.String) {
+func checkString(t *testing.T, p path.Path, mods []planmodifier.String, stockOnly bool) {
 	t.Helper()
 	ctx := context.Background()
 	st, pl, cfg := existingState()
 	for _, m := range mods {
+		if stockOnly && !strings.HasPrefix(m.Description(ctx), "Once set") {
+			continue
+		}
 		req := planmodifier.StringRequest{Path: p, State: st, Plan: pl, Config: cfg, ConfigValue: types.StringNull(), StateValue: types.StringNull(), PlanValue: types.StringUnknown()}
 		resp := &planmodifier.StringResponse{PlanValue: req.PlanValue}
 		m.PlanModifyString(ctx, req, resp)
@@ -88,11 +98,14 @@ func checkString(t *testing.T, p path.Path, mods []planmodifier.String) {
 	}
 }
 
-func checkBool(t *testing.T, p path.Path, mods []planmodifier.Bool) {
+func checkBool(t *testing.T, p path.Path, mods []planmodifier.Bool, stockOnly bool) {
 	t.Helper()
 	ctx := context.Background()
 	st, pl, cfg := existingState()
 	for _, m := range mods {
+		if stockOnly && !strings.HasPrefix(m.Description(ctx), "Once set") {
+			continue
+		}
 		req := planmodifier.BoolRequest{Path: p, State: st, Plan: pl, Config: cfg, ConfigValue: types.BoolNull(), StateValue: types.BoolNull(), PlanValue: types.BoolUnknown()}
 		resp := &planmodifier.BoolResponse{PlanValue: req.PlanValue}
 		m.PlanModifyBool(ctx, req, resp)
@@ -100,11 +113,14 @@ func checkBool(t *testing.T, p path.Path, mods []planmodifier.Bool) {
 	}
 }
 
-func checkInt64(t *testing.T, p path.Path, mods []planmodifier.Int64) {
+func checkInt64(t *testing.T, p path.Path, mods []planmodifier.Int64, stockOnly bool) {
 	t.Helper()
 	ctx := context.Background()
 	st, pl, cfg := existingState()
 	for _, m := range mods {
+		if stockOnly && !strings.HasPrefix(m.Description(ctx), "Once set") {
+			continue
+		}
 		req := planmodifier.Int64Request{Path: p, State: st, Plan: pl, Config: cfg, ConfigValue: types.Int64Null(), StateValue: types.Int64Null(), PlanValue: types.Int64Unknown()}
 		resp := &planmodifier.Int64Response{PlanValue: req.PlanValue}
 		m.PlanModifyInt64(ctx, req, resp)

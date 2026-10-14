@@ -143,3 +143,27 @@ func TestMacAppResource_OptionalBlockLeavesPlanUnknownFromNullPrior(t *testing.T
 	NewMacAppResource().(*MacAppResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
 	nullprior.AssertOptionalBlockLeavesPlanUnknown(t, resp.Schema)
 }
+
+// TestMacAppResource_VPPLicenseCountsCarryNothingForward pins the three VPP
+// license counts as plain Computed with no plan modifier. They derive from
+// vpp_admin_account_id, which Jamf Pro answers with no counts while it is -1, so
+// UseStateForUnknown failed the apply when vpp went from omitted to declared and
+// again when the account moved either way. Wire-probed against a VPP-backed
+// app; see computedInt64.
+func TestMacAppResource_VPPLicenseCountsCarryNothingForward(t *testing.T) {
+	var resp resource.SchemaResponse
+	NewMacAppResource().(*MacAppResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	vpp := resp.Schema.Attributes["vpp"].(schema.SingleNestedAttribute)
+	for _, name := range []string{"total_vpp_licenses", "remaining_vpp_licenses", "used_vpp_licenses"} {
+		a, ok := vpp.Attributes[name].(schema.Int64Attribute)
+		if !ok {
+			t.Fatalf("vpp.%s is not an int64 attribute", name)
+		}
+		if !a.Computed || a.Optional || a.Required {
+			t.Errorf("vpp.%s: Computed=%v Optional=%v Required=%v, want Computed only", name, a.Computed, a.Optional, a.Required)
+		}
+		if len(a.PlanModifiers) != 0 {
+			t.Errorf("vpp.%s has %d plan modifiers, want none: the value follows vpp_admin_account_id", name, len(a.PlanModifiers))
+		}
+	}
+}
