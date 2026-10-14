@@ -40,21 +40,55 @@ import (
 // their "Once set" description: a custom or mirror modifier there reads sibling
 // attributes the walk does not have, and is covered by a test of its own.
 //
+// ExemptBlocks, passed as an option, skips the named top-level blocks. It is for
+// a block that cannot be null in state when it is next declared, so the
+// transition the guard models cannot happen, and the reason is mandatory so the
+// exemption says why. Do not use it for a block that merely has not failed yet.
+//
 // Leaves outside an Optional block (a top-level attribute, or one inside a
 // Required block) cannot see the transition and are skipped. So are the
 // elements of a Set or List, which key their modifiers by element id.
-func AssertOptionalBlockLeavesPlanUnknown(t *testing.T, sch schema.Schema) {
+func AssertOptionalBlockLeavesPlanUnknown(t *testing.T, sch schema.Schema, opts ...Option) {
 	t.Helper()
-	walk(t, path.Empty(), sch.Attributes, false)
+	var cfg options
+	for _, o := range opts {
+		o(&cfg)
+	}
+	walk(t, path.Empty(), sch.Attributes, false, cfg.exempt)
 }
 
-func walk(t *testing.T, parent path.Path, attrs map[string]schema.Attribute, underOptionalBlock bool) {
+type options struct{ exempt map[string]bool }
+
+// Option adjusts AssertOptionalBlockLeavesPlanUnknown.
+type Option func(*options)
+
+// ExemptBlocks exempts the named top-level blocks from the guard. The reason is
+// not used by the guard; it exists so a call site cannot exempt a block without
+// writing down why.
+func ExemptBlocks(reason string, names ...string) Option {
+	if reason == "" {
+		panic("nullprior.ExemptBlocks: a reason is required")
+	}
+	return func(o *options) {
+		if o.exempt == nil {
+			o.exempt = map[string]bool{}
+		}
+		for _, n := range names {
+			o.exempt[n] = true
+		}
+	}
+}
+
+func walk(t *testing.T, parent path.Path, attrs map[string]schema.Attribute, underOptionalBlock bool, exempt map[string]bool) {
 	t.Helper()
 	for name, attr := range attrs {
+		if len(parent.Steps()) == 0 && exempt[name] {
+			continue
+		}
 		p := parent.AtName(name)
 		switch a := attr.(type) {
 		case schema.SingleNestedAttribute:
-			walk(t, p, a.Attributes, underOptionalBlock || (a.Optional && !a.Required))
+			walk(t, p, a.Attributes, underOptionalBlock || (a.Optional && !a.Required), exempt)
 		case schema.StringAttribute:
 			if underOptionalBlock && a.Computed {
 				checkString(t, p, a, !a.Optional)
