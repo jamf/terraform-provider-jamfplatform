@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/iconmirror"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/nullprior"
 )
 
 const wantTypeName = "jamfplatform_pro_mobile_device_app"
@@ -152,4 +153,16 @@ func TestMobileAppResource_SelfServiceIconURIDerivedFromID(t *testing.T) {
 	if id, ok := icon.Attributes["id"].(schema.StringAttribute); !ok || !id.Optional || !id.Computed {
 		t.Errorf("self_service_icon.id must stay Optional+Computed: it is the one input")
 	}
+}
+
+// TestMobileAppResource_OptionalBlockLeavesPlanUnknownFromNullPrior guards the failure
+// where an optional block goes from omitted to declared. Each Optional+Computed
+// leaf inside one holds null in state, and UseStateForUnknown planned that null
+// where apply then returned the server's default: "Provider produced
+// inconsistent result after apply". Reproduced live on self_service.notification_enabled and feature_on_main_page.
+func TestMobileAppResource_OptionalBlockLeavesPlanUnknownFromNullPrior(t *testing.T) {
+	t.Parallel()
+	var resp resource.SchemaResponse
+	NewMobileAppResource().(*MobileAppResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	nullprior.AssertOptionalBlockLeavesPlanUnknown(t, resp.Schema)
 }

@@ -1315,3 +1315,48 @@ func TestAccResource_ProMacApp_SelfServiceIconRepoint(t *testing.T) {
 		},
 	})
 }
+
+// macAppConfigSelfService returns an app whose self_service block is declared
+// when declare is true and omitted otherwise.
+func macAppConfigSelfService(name string, declare bool) string {
+	block := ""
+	if declare {
+		block = `
+  self_service = {
+    install_button_text = "Get"
+  }
+`
+	}
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_mac_app_store_app" "test" {
+  general = {
+    name            = %q
+    version         = "1.0"
+    bundle_id       = "com.example.tfacc.macapp"
+    url             = "https://apps.apple.com/app/id000000001"
+    deployment_type = "Make Available in Self Service"
+  }%s
+}
+`, name, block)
+}
+
+// TestAccResource_ProMacApp_SelfServiceOmittedToDeclared covers the
+// self_service block going from omitted to declared in one apply. The mac app
+// already planned its leaves Unknown from a null prior; this keeps it that way.
+// The harness's trailing empty-plan check covers the settle.
+func TestAccResource_ProMacApp_SelfServiceOmittedToDeclared(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-macapp-ss-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMacAppDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: macAppConfigSelfService(name, false)},
+			{
+				Config: macAppConfigSelfService(name, true),
+				Check:  resource.TestCheckResourceAttr(macAppResourceAddr, "self_service.install_button_text", "Get"),
+			},
+		},
+	})
+}

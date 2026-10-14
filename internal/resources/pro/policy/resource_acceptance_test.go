@@ -3865,10 +3865,12 @@ resource "jamfplatform_pro_policy" "test" {
 // UseNonNullStateForUnknown, which planned the previous icon's pair and failed
 // the apply with "Provider produced inconsistent result after apply".
 //
-// Step 2 repoints the id and must apply cleanly with both values following it;
-// the harness's trailing empty-plan check covers the settle. Step 3 flips back,
-// since the bug fired on every id change rather than once. Step 4 sets filename
-// in config: Jamf Pro ignores an authored value, so it is rejected at plan.
+// Step 1 sets filename in config, which Jamf Pro ignores, so it is rejected at
+// plan. It runs first because the harness destroys with the last step's config,
+// which must be valid. Step 2 creates the policy on icon A. Step 3 repoints the
+// id to icon B and must apply cleanly with both values following it. Step 4
+// flips back, since the bug fired on every id change rather than once. The
+// harness's trailing empty-plan check covers the settle after each apply.
 func TestAccPolicyResource_SelfServiceIconRepoint(t *testing.T) {
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
@@ -3884,6 +3886,13 @@ func TestAccPolicyResource_SelfServiceIconRepoint(t *testing.T) {
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		CheckDestroy:             testAccCheckPolicyDestroy(t),
 		Steps: []resource.TestStep{
+			// Authored filename is refused at plan. It runs first because the
+			// harness destroys with the last step's config, which must be valid.
+			{
+				Config:      policyConfigIconPick(iconA, iconB, name, "a", `      filename = "authored.png"`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Invalid Configuration for Read-Only Attribute`),
+			},
 			{
 				Config: policyConfigIconPick(iconA, iconB, name, "a", ""),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -3915,10 +3924,53 @@ func TestAccPolicyResource_SelfServiceIconRepoint(t *testing.T) {
 					resource.TestCheckResourceAttr(addr, "self_service.self_service_icon.filename", filepath.Base(iconA)),
 				),
 			},
+		},
+	})
+}
+
+// policyConfigBlocks returns a policy whose optional blocks are declared when
+// declare is true and omitted otherwise.
+func policyConfigBlocks(name string, declare bool) string {
+	blocks := ""
+	if declare {
+		blocks = `
+  self_service    = { use_for_self_service = true }
+  packages        = {}
+  restart_options = {}
+`
+	}
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_policy" "test" {
+  general = {
+    name      = %q
+    frequency = "Ongoing"
+  }%s
+}
+`, name, blocks)
+}
+
+// TestAccPolicyResource_OptionalBlocksOmittedToDeclared is the regression test
+// for an optional block going from omitted to declared in one apply. Every
+// Optional+Computed leaf inside the block holds null in state, and
+// UseStateForUnknown planned that null where apply returned the server's
+// default: self_service.notification_location and packages.distribution_point
+// failed with "Provider produced inconsistent result after apply". The
+// harness's trailing empty-plan check covers the settle.
+func TestAccPolicyResource_OptionalBlocksOmittedToDeclared(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-policy-blocks-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckPolicyDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: policyConfigBlocks(name, false)},
 			{
-				Config:      policyConfigIconPick(iconA, iconB, name, "a", `      filename = "authored.png"`),
-				PlanOnly:    true,
-				ExpectError: regexp.MustCompile(`Invalid Configuration for Read-Only Attribute`),
+				Config: policyConfigBlocks(name, true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("jamfplatform_pro_policy.test", "self_service.notification_location"),
+					resource.TestCheckResourceAttrSet("jamfplatform_pro_policy.test", "packages.distribution_point"),
+				),
 			},
 		},
 	})

@@ -185,7 +185,7 @@ func (r *MobileAppResource) Schema(ctx context.Context, req resource.SchemaReque
 						MarkdownDescription: "Button label shown after the app is installed. Requires `general.make_available_after_install = true`; Jamf Pro discards the label otherwise and never returns it. Omit to leave the current value untouched.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 						Validators:          []validator.String{requiresMakeAvailableAfterInstall{}},
 					},
 					"self_service_description": optComputedString("Self Service description. Markdown supported. Omit to leave the current value untouched."),
@@ -207,8 +207,8 @@ func (r *MobileAppResource) Schema(ctx context.Context, req resource.SchemaReque
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":         schema.StringAttribute{MarkdownDescription: "Category ID.", Required: true},
-								"name":       optComputedStringInList("Category display name. Returned by Jamf Pro."),
-								"display_in": optComputedBoolInList("Display the app in this category."),
+								"name":       optComputedString("Category display name. Returned by Jamf Pro."),
+								"display_in": optComputedBool("Display the app in this category."),
 							},
 						},
 					},
@@ -308,43 +308,21 @@ func (r *MobileAppResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 }
 
-// optComputedString returns a top-level Optional+Computed StringAttribute with
-// UseStateForUnknown. UseStateForUnknown copies the prior state value — INCLUDING
-// null — into an unset plan, so a field the server omits when unconfigured (e.g.
-// self_service.after_install_button_text, which the server returns absent → null)
-// stays null on every plan instead of churning to "(known after apply)". For
-// fields the server does default (e.g. install_button_text → "Install") the prior
-// state is non-null and the behaviour is identical to UseNonNullStateForUnknown.
+// optComputedString returns an Optional+Computed StringAttribute with
+// UseNonNullStateForUnknown. It carries the prior value forward but skips a null
+// prior, which matters in two places that fail the same way. A block that is new
+// in this plan (self_service going from omitted to declared) has a null prior for
+// every leaf in it, and UseStateForUnknown would copy that null into the plan;
+// apply then returns the server's default and Terraform rejects it with "Provider
+// produced inconsistent result after apply". A new element in a Set or List has
+// the same null prior. Planning Unknown instead lets apply store whatever Jamf
+// Pro returns.
 //
-// Do NOT use this inside SetNested/ListNested elements: list growth produces a
-// null prior for the new element, which UseStateForUnknown would copy as a known
-// null and then trip "inconsistent result" when the element materialises — use
-// optComputedStringInList there.
+// The cost is that a leaf Jamf Pro never returns (for example
+// self_service.after_install_button_text, absent so null) shows as "(known after
+// apply)" in a plan that changes something else, then settles back to null. An
+// idle plan stays empty.
 func optComputedString(desc string) schema.StringAttribute {
-	return schema.StringAttribute{
-		MarkdownDescription: desc,
-		Optional:            true,
-		Computed:            true,
-		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-	}
-}
-
-// optComputedBool is the bool sibling of optComputedString (top-level).
-func optComputedBool(desc string) schema.BoolAttribute {
-	return schema.BoolAttribute{
-		MarkdownDescription: desc,
-		Optional:            true,
-		Computed:            true,
-		PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
-	}
-}
-
-// optComputedStringInList is the SetNested/ListNested-element flavour of
-// optComputedString: it uses UseNonNullStateForUnknown so a new element's null
-// prior is NOT copied as a known value (which would break the post-apply
-// consistency check as the set grows). See the policy/profile resources for why
-// nested-list Optional+Computed must use the non-null variant.
-func optComputedStringInList(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
@@ -353,8 +331,8 @@ func optComputedStringInList(desc string) schema.StringAttribute {
 	}
 }
 
-// optComputedBoolInList is the bool sibling of optComputedStringInList.
-func optComputedBoolInList(desc string) schema.BoolAttribute {
+// optComputedBool is the bool sibling of optComputedString.
+func optComputedBool(desc string) schema.BoolAttribute {
 	return schema.BoolAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
@@ -363,16 +341,13 @@ func optComputedBoolInList(desc string) schema.BoolAttribute {
 	}
 }
 
-// optComputedInt64 is the Int64 sibling of optComputedString. Int64 has no
-// UseNonNullStateForUnknown in the stock plan modifiers; UseStateForUnknown is
-// safe here because itunes_sync_time is a single top-level scalar (not nested in
-// a growing list), so the null-prior-state consistency trap does not apply.
+// optComputedInt64 is the Int64 sibling of optComputedString.
 func optComputedInt64(desc string) schema.Int64Attribute {
 	return schema.Int64Attribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
+		PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseNonNullStateForUnknown()},
 	}
 }
 

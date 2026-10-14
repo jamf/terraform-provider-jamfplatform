@@ -1408,3 +1408,51 @@ func TestAccResource_ProMobileApp_SelfServiceIconRepoint(t *testing.T) {
 		},
 	})
 }
+
+// mobileAppConfigSelfService returns an app whose self_service block is
+// declared when declare is true and omitted otherwise.
+func mobileAppConfigSelfService(name string, declare bool) string {
+	block := ""
+	if declare {
+		block = `
+  self_service = {
+    install_button_text = "Get"
+  }
+`
+	}
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_mobile_device_app" "test" {
+  general = {
+    name                 = %q
+    version              = "1.0"
+    bundle_id            = "com.example.tfacc.mobileapp"
+    os_type              = "iOS"
+    deploy_automatically = false
+  }%s
+}
+`, name, block)
+}
+
+// TestAccResource_ProMobileApp_SelfServiceOmittedToDeclared is the regression
+// test for the self_service block going from omitted to declared in one apply.
+// Every Optional+Computed leaf inside it holds null in state, and
+// UseStateForUnknown planned that null where apply returned the server's
+// default: feature_on_main_page and notification_enabled failed with "Provider
+// produced inconsistent result after apply". The harness's trailing empty-plan
+// check covers the settle.
+func TestAccResource_ProMobileApp_SelfServiceOmittedToDeclared(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-mobile-ss-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMobileAppDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: mobileAppConfigSelfService(name, false)},
+			{
+				Config: mobileAppConfigSelfService(name, true),
+				Check:  resource.TestCheckResourceAttr(mobileAppResourceAddr, "self_service.install_button_text", "Get"),
+			},
+		},
+	})
+}

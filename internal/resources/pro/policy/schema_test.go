@@ -18,6 +18,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/iconmirror"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/nullprior"
 )
 
 func TestPolicyResource_Schema(t *testing.T) {
@@ -345,4 +346,16 @@ func TestPolicyResource_SelfServiceIconDerivedAttributes(t *testing.T) {
 	if !ok || !id.Optional || !id.Computed {
 		t.Errorf("self_service_icon.id must stay Optional+Computed: it is the one input")
 	}
+}
+
+// TestPolicyResource_OptionalBlockLeavesPlanUnknownFromNullPrior guards the failure
+// where an optional block goes from omitted to declared. Each Optional+Computed
+// leaf inside one holds null in state, and UseStateForUnknown planned that null
+// where apply then returned the server's default: "Provider produced
+// inconsistent result after apply". Reproduced live on self_service.notification_location and packages.distribution_point.
+func TestPolicyResource_OptionalBlockLeavesPlanUnknownFromNullPrior(t *testing.T) {
+	t.Parallel()
+	var resp resource.SchemaResponse
+	NewPolicyResource().Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	nullprior.AssertOptionalBlockLeavesPlanUnknown(t, resp.Schema)
 }

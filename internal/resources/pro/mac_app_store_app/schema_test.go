@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/iconmirror"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/nullprior"
 )
 
 const wantTypeName = "jamfplatform_pro_mac_app_store_app"
@@ -128,4 +129,17 @@ func TestMacAppResource_SelfServiceIconURIDerivedFromID(t *testing.T) {
 	if id, ok := icon.Attributes["id"].(schema.StringAttribute); !ok || !id.Optional || !id.Computed {
 		t.Errorf("self_service_icon.id must stay Optional+Computed: it is the one input")
 	}
+}
+
+// TestMacAppResource_OptionalBlockLeavesPlanUnknownFromNullPrior guards the
+// failure where an optional block goes from omitted to declared. Each
+// Optional+Computed leaf inside one holds null in state, and
+// UseStateForUnknown would plan that null where apply then returns the server's
+// default: "Provider produced inconsistent result after apply". The mac app
+// already uses the non-null modifier; this keeps it that way.
+func TestMacAppResource_OptionalBlockLeavesPlanUnknownFromNullPrior(t *testing.T) {
+	t.Parallel()
+	var resp resource.SchemaResponse
+	NewMacAppResource().(*MacAppResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	nullprior.AssertOptionalBlockLeavesPlanUnknown(t, resp.Schema)
 }
