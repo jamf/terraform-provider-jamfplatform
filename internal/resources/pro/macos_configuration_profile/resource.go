@@ -206,7 +206,7 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 						MarkdownDescription: "Where Self Service surfaces the notification. `Self Service` or `Self Service and Notification Center`.\n\nJamf Pro stores this and `display_notifications` in one field, and setting either resets the other, so `Self Service and Notification Center` cannot be combined with `display_notifications = true` and is refused at plan time. To have both, set them under Self Service ▸ Notification in the Jamf Pro admin UI and leave both attributes out of the configuration; Terraform reads the pairing back and preserves it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 						Validators: []validator.String{
 							stringvalidator.OneOf(validNotificationLocations...),
 						},
@@ -217,7 +217,7 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 						MarkdownDescription: "Removal-by-end-user policy for the Self Service profile. Valid values: `Never`, `Always`, `With Authorization`. `With Authorization` also needs an authorization password, which this resource does not yet expose. Open an issue if you need it. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 						Validators: []validator.String{
 							stringvalidator.OneOf(validRemovalDisallowedValues...),
 						},
@@ -272,12 +272,21 @@ func (r *Resource) ImportState(ctx context.Context, req resource.ImportStateRequ
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// optComputedString and optComputedBool are the top-level / single-nested
-// Optional+Computed field helpers. They use UseStateForUnknown so a state
-// value of Null carries through to the plan as Null (instead of staying
-// Unknown). Required for fields the user may omit in HCL — without this,
-// every plan refresh would show null→Unknown as a planned change and
-// produce a spurious [update] action.
+// optComputedString and optComputedBool are the Optional+Computed field
+// helpers. They carry the prior state value into an unset plan with
+// planmodifiers.UseStateForUnknownInExistingBlock*, so an omitted field the
+// server left null stays null instead of showing a spurious [update].
+//
+// Plain UseStateForUnknown is wrong inside self_service. When the block goes
+// from omitted to declared, every leaf in it holds null in state, the plan
+// copies that null, and apply returns the server's default: "Provider produced
+// inconsistent result after apply" on self_service_display_name,
+// notification_location and removal_disallowed, reproduced live 2026-10-14.
+// UseNonNullStateForUnknown would also avoid that, but this resource's
+// ModifyPlan writes the plan to suppress payload noise, so a plan can collapse
+// to a no-op and the non-null variant would leave every null-prior leaf
+// Unknown in it (STYLE_GUIDE rule 1a). The in-existing-block modifier carries a
+// null prior only when the block is already in state.
 //
 // The categories list elements use categoryName and optComputedBoolKeyed
 // instead, which carry prior state by category id.
@@ -286,7 +295,7 @@ func optComputedString(desc string) schema.StringAttribute {
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 	}
 }
 
@@ -295,7 +304,7 @@ func optComputedBool(desc string) schema.BoolAttribute {
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+		PlanModifiers:       []planmodifier.Bool{planmodifiers.UseStateForUnknownInExistingBlockBool()},
 	}
 }
 

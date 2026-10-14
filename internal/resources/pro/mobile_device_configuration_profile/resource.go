@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -23,6 +22,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -196,7 +196,7 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 						MarkdownDescription: "Removal-by-end-user policy. Valid values: `Never`, `Always`, `With Authorization`. Pair `With Authorization` with `authorization_password` to require a password at removal time. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 						Validators: []validator.String{
 							stringvalidator.OneOf(validRemovalDisallowedValues...),
 						},
@@ -254,12 +254,26 @@ func (r *Resource) ImportState(ctx context.Context, req resource.ImportStateRequ
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
+// optComputedString and optComputedBool are the Optional+Computed field helpers.
+// They carry the prior state value into an unset plan with
+// planmodifiers.UseStateForUnknownInExistingBlock*, so an omitted field the
+// server left null stays null instead of showing a spurious [update].
+//
+// Plain UseStateForUnknown is wrong inside self_service. When the block goes
+// from omitted to declared, every leaf in it holds null in state, the plan
+// copies that null, and apply returns the server's default: "Provider produced
+// inconsistent result after apply" on removal_disallowed, reproduced live
+// 2026-10-14. UseNonNullStateForUnknown would also avoid that, but this
+// resource's ModifyPlan writes the plan to suppress payload noise, so a plan can
+// collapse to a no-op and the non-null variant would leave every null-prior leaf
+// Unknown in it (STYLE_GUIDE rule 1a). The in-existing-block modifier carries a
+// null prior only when the block is already in state.
 func optComputedString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 	}
 }
 
@@ -268,7 +282,7 @@ func optComputedBool(desc string) schema.BoolAttribute {
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+		PlanModifiers:       []planmodifier.Bool{planmodifiers.UseStateForUnknownInExistingBlockBool()},
 	}
 }
 
