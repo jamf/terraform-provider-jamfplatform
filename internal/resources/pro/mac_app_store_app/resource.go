@@ -196,9 +196,9 @@ func (r *MacAppResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":         schema.StringAttribute{MarkdownDescription: "Category ID.", Required: true},
-								"name":       optComputedString("Category display name. Returned by Jamf Pro."),
-								"display_in": optComputedBool("Display the app in this category."),
-								"feature_in": optComputedBool("Feature the app in this category."),
+								"name":       categoryName("Category display name. Returned by Jamf Pro."),
+								"display_in": optComputedBoolKeyed("Display the app in this category."),
+								"feature_in": optComputedBoolKeyed("Feature the app in this category."),
 							},
 						},
 					},
@@ -320,9 +320,9 @@ func iconMirrorString(desc string) schema.StringAttribute {
 
 // optComputedString returns an Optional+Computed StringAttribute with the
 // UseNonNullStateForUnknown plan modifier for server-augmented fields. It is
-// used at top level, in the self_service and vpp blocks and in
-// self_service_categories elements, all of which can have a null prior that
-// UseStateForUnknown would wrongly plan; see the policy's optComputedString.
+// used at top level and in the self_service and vpp blocks, all of which can
+// have a null prior that UseStateForUnknown would wrongly plan; see the
+// policy's optComputedString.
 // Leaving a null prior Unknown is safe only while nothing in the resource can
 // collapse a configured change back to prior state, which
 // TestMacAppResource_NothingCollapsesAPlan enforces (STYLE_GUIDE rule 1a).
@@ -343,6 +343,40 @@ func optComputedBool(desc string) schema.BoolAttribute {
 		Computed:            true,
 		PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseNonNullStateForUnknown()},
 	}
+}
+
+// categoryName is the `name` of a self_service_categories element: plain
+// Computed, no plan modifier, never sent.
+//
+// Jamf Pro resolves a Mac app's Self Service category by id and ignores an
+// authored name, wire-probed 2026-10-14: id B sent with category A's name
+// stored B, and id A sent with a name no category has stored A. So the name is
+// a pure echo. It used to be Optional+Computed with UseNonNullStateForUnknown,
+// and the framework pairs set elements with prior state by position, so
+// re-pointing an element at another category planned the old category's name
+// on it and the apply failed with "planned set element ... does not correlate
+// with any element in actual". Left plain Computed it is Unknown for a re-keyed
+// element and Jamf Pro's answer is accepted; for an unchanged element Terraform
+// core carries it from state. The policy's self-service categories are the same
+// (see issue #464).
+func categoryName(desc string) schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: desc,
+		Computed:            true,
+	}
+}
+
+// optComputedBoolKeyed is optComputedBool for a self_service_categories
+// element. It carries prior state only from the element with the same id,
+// where optComputedBool's positional carry handed a re-keyed element another
+// category's display_in and feature_in. A new element plans Unknown:
+// display_in is then sent as true (helpers.SelfServiceCategoryDisplayIn) and
+// feature_in is omitted, which Jamf Pro stores as false. See
+// planmodifiers.UseKeyedStateForUnknownBool.
+func optComputedBoolKeyed(desc string) schema.BoolAttribute {
+	a := optComputedBool(desc)
+	a.PlanModifiers = []planmodifier.Bool{planmodifiers.UseKeyedStateForUnknownBool("id")}
+	return a
 }
 
 // computedInt64 returns a Computed-only Int64Attribute for server-derived
