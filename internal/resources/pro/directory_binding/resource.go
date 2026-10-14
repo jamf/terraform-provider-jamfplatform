@@ -114,10 +114,13 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 				},
 			},
 			"type": schema.StringAttribute{
-				MarkdownDescription: "Directory service type. Selects which nested block is permitted. One of `\"Active Directory\"`, `\"Open Directory\"`, `\"PowerBroker Identity Services\"`, `\"ADmitMac\"`, `\"Centrify\"`. The admin UI labels the Open Directory option \"Apple Open Directory\", but the value Jamf Pro stores is `\"Open Directory\"`.",
+				MarkdownDescription: "Directory service type. Selects which nested block is required. Changing it replaces the binding, because Jamf Pro keeps the type it was created with. One of `\"Active Directory\"`, `\"Open Directory\"`, `\"PowerBroker Identity Services\"`, `\"ADmitMac\"`, `\"Centrify\"`. The admin UI labels the Open Directory option \"Apple Open Directory\", but the value Jamf Pro stores is `\"Open Directory\"`.",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(allDirectoryBindingTypes...),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"domain": schema.StringAttribute{
@@ -144,7 +147,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 			},
 
 			"active_directory": schema.SingleNestedAttribute{
-				MarkdownDescription: "Active Directory–specific configuration. May only be set when `type = \"Active Directory\"`; setting it for any other type is a plan-time error. " + preserveOnOmitBlock + " When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
+				MarkdownDescription: "Active Directory–specific configuration. Required when `type = \"Active Directory\"` (`{}` takes Jamf Pro's defaults) and forbidden for any other type; both are plan-time errors. When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"forest":                     optString("Active Directory forest."),
@@ -164,7 +167,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 			},
 
 			"open_directory": schema.SingleNestedAttribute{
-				MarkdownDescription: "Open Directory–specific configuration. May only be set when `type = \"Open Directory\"`; setting it for any other type is a plan-time error. " + preserveOnOmitBlock + " When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
+				MarkdownDescription: "Open Directory–specific configuration. Required when `type = \"Open Directory\"` (`{}` takes Jamf Pro's defaults) and forbidden for any other type; both are plan-time errors. When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"encrypt_using_ssl":      optBool("**\"Encrypt using SSL\"** in the Jamf Pro admin UI. Encrypt the LDAP connection to the directory."),
@@ -175,7 +178,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 			},
 
 			"admitmac": schema.SingleNestedAttribute{
-				MarkdownDescription: "ADmitMac–specific configuration. May only be set when `type = \"ADmitMac\"`; setting it for any other type is a plan-time error. " + preserveOnOmitBlock + " When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
+				MarkdownDescription: "ADmitMac–specific configuration. Required when `type = \"ADmitMac\"` (`{}` takes Jamf Pro's defaults) and forbidden for any other type; both are plan-time errors. When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"require_confirmation":       optBool("**\"Require confirmation\"** in the Jamf Pro admin UI. Require admin confirmation when binding new computers to the directory."),
@@ -205,7 +208,7 @@ func (r *DirectoryBindingResource) Schema(ctx context.Context, req resource.Sche
 			},
 
 			"centrify": schema.SingleNestedAttribute{
-				MarkdownDescription: "Centrify–specific configuration. May only be set when `type = \"Centrify\"`; setting it for any other type is a plan-time error. " + preserveOnOmitBlock + " When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
+				MarkdownDescription: "Centrify–specific configuration. Required when `type = \"Centrify\"` (`{}` takes Jamf Pro's defaults) and forbidden for any other type; both are plan-time errors. When you supply the block, Jamf Pro applies a default for any inner field you omit, and Terraform records the value it applied.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"workstation_mode":        optBool("Bind in Workstation mode (versus joined mode)."),
@@ -251,18 +254,18 @@ func (r *DirectoryBindingResource) ImportState(ctx context.Context, req resource
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// preserveOnOmitString, preserveOnOmitBool, preserveOnOmitInteger and
-// preserveOnOmitBlock are the house sentences every preserve-on-omit
-// description ends with, per STYLE_GUIDE.md §Full-replace endpoints & shared
-// backing stores ("Description convention"). The classic /directorybindings
-// update merges field by field (see crud.go), so omitting an attribute — or a
-// whole per-type block — leaves the stored Jamf Pro value alone. The wording
-// differs by type because only a string has a blank that clears.
+// preserveOnOmitString, preserveOnOmitBool and preserveOnOmitInteger are the
+// house sentences every preserve-on-omit description ends with, per
+// STYLE_GUIDE.md §Full-replace endpoints & shared backing stores ("Description
+// convention"). The classic /directorybindings update merges field by field (see
+// crud.go), so omitting an attribute leaves the stored Jamf Pro value alone. A
+// whole per-type block is the exception: it is required for its type, because
+// Jamf Pro returns it populated either way (see typeBlockConfigValidator). The
+// wording differs by type because only a string has a blank that clears.
 const (
 	preserveOnOmitString  = "Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it."
 	preserveOnOmitBool    = "Omit to leave the current value untouched; set `true`/`false` to change it."
 	preserveOnOmitInteger = "Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it."
-	preserveOnOmitBlock   = "Omit the block to leave any existing values untouched (they are not cleared on update)."
 )
 
 // optString is a tiny shorthand for an Optional+Computed schema.StringAttribute
