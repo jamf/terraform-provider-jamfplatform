@@ -135,7 +135,7 @@ resource "jamfplatform_pro_macos_configuration_profile" "self_service" {
 
 ### Optional
 
-- `scope` (Attributes) Profile scope. Each category is independently owned: declare it (including `[]`, which clears it) and Terraform manages its members; omit it and it stays as configured outside Terraform, preserved across updates. `all_computers = true` forbids the per-computer, per-group, per-building and per-department targets. `all_jss_users = true` forbids the per-user and per-user-group targets. `user_ids` and `user_group_ids` map to the admin UI's "Users" and "User Groups" lists. (see [below for nested schema](#nestedatt--scope))
+- `scope` (Attributes) Profile scope. Each category is independently owned: declare it (including `[]`, which clears it) and Terraform manages its members; omit it and it stays as configured outside Terraform, preserved across updates. `all_computers = true` forbids the per-computer and per-group targets. `all_jss_users = true` forbids the per-user and per-user-group targets. You can declare buildings and departments with either toggle. Declaring a forbidden target while its toggle is unset turns the toggle off. `user_ids` and `user_group_ids` map to the admin UI's "Users" and "User Groups" lists. (see [below for nested schema](#nestedatt--scope))
 - `self_service` (Attributes) Self Service integration. Meaningful only when `general.distribution_method = "Make Available in Self Service"`. For `Install Automatically` profiles Jamf Pro still stores these values, but users never see them.
 
 Pair `display_notifications` with `notification_location` to control whether and where Self Service surfaces a notification when the profile becomes available.
@@ -215,8 +215,8 @@ Optional:
 
 Optional:
 
-- `all_computers` (Boolean) Scope to every computer in the tenant. Forbids per-computer / per-group / per-building / per-department targets when true. Omit to leave the toggle as configured outside Terraform.
-- `all_jss_users` (Boolean) Scope to every Jamf Pro user in the tenant. Equivalent to the admin UI's "All Users" toggle. Forbids per-user / per-user-group targets when true. Omit to leave the toggle as configured outside Terraform.
+- `all_computers` (Boolean) Scope to every computer in the tenant. Forbids `computer_ids` and `computer_group_ids` when true. You can declare buildings, departments, users and user groups with it. Left unset, the toggle keeps the value configured outside Terraform, unless you declare `computer_ids` or `computer_group_ids`, which turns it off.
+- `all_jss_users` (Boolean) Scope to every Jamf Pro user in the tenant. Matches the admin UI's "All Users" toggle. Forbids `user_ids` and `user_group_ids` when true. Left unset, the toggle keeps the value configured outside Terraform, unless you declare `user_ids` or `user_group_ids`, which turns it off.
 - `building_ids` (Set of String) Set of Jamf Pro building IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.
 - `computer_group_ids` (Set of String) Set of Jamf Pro computer group IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.
 - `computer_ids` (Set of String) Set of Jamf Pro computer IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.

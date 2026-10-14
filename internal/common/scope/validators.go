@@ -58,7 +58,14 @@ func (v allFlagConflictsWithValidator) ValidateBool(ctx context.Context, req val
 	if !req.ConfigValue.ValueBool() {
 		return
 	}
-	for _, expr := range v.conflicts {
+	reportAllFlagConflicts(ctx, req, v.conflicts, resp)
+}
+
+// reportAllFlagConflicts records one attribute error per populated set among
+// conflicts, resolved relative to the all-flag under validation. Shared by
+// every all-flag validator so the diagnostic is identical whichever fired.
+func reportAllFlagConflicts(ctx context.Context, req validator.BoolRequest, conflicts []path.Expression, resp *validator.BoolResponse) {
+	for _, expr := range conflicts {
 		// Relative path expressions (path.MatchRelative()) are anchored to the
 		// attribute under validation. PathMatches requires an absolute path
 		// expression — merge against req.PathExpression to resolve.
@@ -90,6 +97,82 @@ func (v allFlagConflictsWithValidator) ValidateBool(ctx context.Context, req val
 			)
 		}
 	}
+}
+
+// OmitAllFlagNote is the closing sentence of every all-flag attribute
+// description. paired names the categories the flag conflicts with: declaring
+// any of them while the flag is omitted turns the toggle off at apply (see
+// PickAllFlag), so the omit-means-preserve contract carries that one exception.
+func OmitAllFlagNote(paired string) string {
+	return "Left unset, the toggle keeps the value configured outside Terraform, unless you declare " + paired + ", which turns it off."
+}
+
+// AllFlagsConflictWith is the validator for the combination rule that
+// AllFlagConflictsWith cannot express: it fires only when this flag AND every
+// sibling flag in others are true, and then requires every path in conflicts
+// to be null, unknown, or empty. It exists for the admin UI's ebook scope,
+// which offers no buildings, departments or classes once all computers, all
+// mobile devices and all users are selected together. Attach it to ONE of the
+// flags — attaching it to each would repeat the same diagnostics.
+func AllFlagsConflictWith(others []path.Expression, conflicts ...path.Expression) validator.Bool {
+	return allFlagsConflictWithValidator{others: others, conflicts: conflicts}
+}
+
+// allFlagsConflictWithValidator is the concrete validator returned by
+// AllFlagsConflictWith.
+type allFlagsConflictWithValidator struct {
+	others    []path.Expression
+	conflicts []path.Expression
+}
+
+// Description returns a plain-text description of the validator's rule.
+func (v allFlagsConflictWithValidator) Description(_ context.Context) string {
+	flags := make([]string, 0, len(v.others))
+	for _, expr := range v.others {
+		flags = append(flags, expr.String())
+	}
+	conflicts := make([]string, 0, len(v.conflicts))
+	for _, expr := range v.conflicts {
+		conflicts = append(conflicts, expr.String())
+	}
+	return fmt.Sprintf("when set to true together with %s, conflicts with: %s", strings.Join(flags, ", "), strings.Join(conflicts, ", "))
+}
+
+// MarkdownDescription returns the markdown description of the validator's rule.
+func (v allFlagsConflictWithValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+// ValidateBool implements validator.Bool. It is a no-op unless this flag and
+// every sibling flag is a known true. A sibling that is null or unknown defers
+// the check: an unmanaged flag may be on or off in the admin UI, and an
+// unknown one has no value yet.
+func (v allFlagsConflictWithValidator) ValidateBool(ctx context.Context, req validator.BoolRequest, resp *validator.BoolResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() || !req.ConfigValue.ValueBool() {
+		return
+	}
+	for _, expr := range v.others {
+		absolute := req.PathExpression.MergeExpressions(expr)
+		if len(absolute) == 0 {
+			return
+		}
+		matches, diags := req.Config.PathMatches(ctx, absolute[0])
+		resp.Diagnostics.Append(diags...)
+		if diags.HasError() || len(matches) == 0 {
+			return
+		}
+		for _, p := range matches {
+			var other types.Bool
+			if d := req.Config.GetAttribute(ctx, p, &other); d.HasError() {
+				resp.Diagnostics.Append(d...)
+				return
+			}
+			if other.IsNull() || other.IsUnknown() || !other.ValueBool() {
+				return
+			}
+		}
+	}
+	reportAllFlagConflicts(ctx, req, v.conflicts, resp)
 }
 
 // NumericIDs is the element validator for the ID-bearing scope target

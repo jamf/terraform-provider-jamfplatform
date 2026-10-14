@@ -14,17 +14,19 @@ import (
 // internal/common/scope/merge.go (the LIMITED computer-scope shape is
 // resource-local, so the merge is too). Across the classic family a scope PUT
 // replaces the ENTIRE <scope> subtree the moment any category element is
-// present in the body (wire-probed 2026-07-08 on 8 sibling endpoints;
-// /patchpolicies itself was NOT probed for the full subtree-replace law —
-// same-family behaviour assumed, probe required before release; see crud.go).
-// Update therefore GETs the live object, flattens its scope hydrate-all,
-// overlays the declared plan categories here, and builds the wire scope from
-// the merged model. Every merged field is non-null so the builder emits every
-// category explicitly (empty wrappers for empty categories).
+// present in the body (wire-probed 2026-07-08 on 8 sibling endpoints, and on
+// /patchpolicies itself 2026-10-14: a body carrying only the flag cleared every
+// category). Update therefore GETs the live object, flattens its scope
+// hydrate-all, overlays the declared plan categories here, and builds the wire
+// scope from the merged model. Every merged field is non-null so the builder
+// emits every category explicitly (empty wrappers for empty categories).
 //
 // All-flag precedence: a merged all_computers that is true empties exactly the
-// target categories its AllFlagConflictsWith validator names — never
-// limitations/exclusions, which coexist with a true flag and are preserved.
+// target categories its AllFlagConflictsWith validator names — computers and
+// computer groups, never buildings or departments, which the server keeps
+// alongside the flag (wire-probed 2026-10-14) — and never limitations or
+// exclusions, which coexist with a true flag and are preserved. A declared
+// computer or computer group beats an unmanaged flag (scope.PickAllFlag).
 
 // pickSet returns the declared plan set when the category is managed
 // (non-null), else the live value, else an empty set — merged output is always
@@ -38,18 +40,6 @@ func pickSet(declared, server types.Set) types.Set {
 		return server
 	}
 	return scope.EmptyStringSet()
-}
-
-// pickBool is the all-flag sibling of pickSet: declared wins, else the live
-// value, else false.
-func pickBool(declared, server types.Bool) types.Bool {
-	if !declared.IsNull() {
-		return declared
-	}
-	if !server.IsNull() {
-		return server
-	}
-	return types.BoolValue(false)
 }
 
 // derefOrZero returns the pointed-to sub-block model, or its zero value when
@@ -76,7 +66,7 @@ func mergePatchPolicyScope(plan, server *PatchPolicyScopeModel) *PatchPolicyScop
 	}
 	pt, st := plan.TargetsOrZero(), srv.TargetsOrZero()
 	targets := &PatchPolicyScopeTargetsModel{
-		AllComputers:     pickBool(pt.AllComputers, st.AllComputers),
+		AllComputers:     scope.PickAllFlag(pt.AllComputers, st.AllComputers, pt.ComputerIDs, pt.ComputerGroupIDs),
 		ComputerIDs:      pickSet(pt.ComputerIDs, st.ComputerIDs),
 		ComputerGroupIDs: pickSet(pt.ComputerGroupIDs, st.ComputerGroupIDs),
 		BuildingIDs:      pickSet(pt.BuildingIDs, st.BuildingIDs),
@@ -87,8 +77,6 @@ func mergePatchPolicyScope(plan, server *PatchPolicyScopeModel) *PatchPolicyScop
 	if targets.AllComputers.ValueBool() {
 		targets.ComputerIDs = scope.EmptyStringSet()
 		targets.ComputerGroupIDs = scope.EmptyStringSet()
-		targets.BuildingIDs = scope.EmptyStringSet()
-		targets.DepartmentIDs = scope.EmptyStringSet()
 	}
 
 	pl, sl := derefOrZero(plan.Limitations), derefOrZero(srv.Limitations)

@@ -36,7 +36,7 @@ import (
 func UserScopeAttributes() map[string]schema.Attribute {
 	targets := map[string]schema.Attribute{
 		"all_jss_users": schema.BoolAttribute{
-			MarkdownDescription: "Target all Jamf Pro users. Conflicts with `jss_user_ids` / `jss_user_group_ids`. Omit to leave the toggle as configured outside Terraform.",
+			MarkdownDescription: "Target all Jamf Pro users. Forbids `jss_user_ids` and `jss_user_group_ids` when true. " + OmitAllFlagNote("`jss_user_ids` or `jss_user_group_ids`"),
 			Optional:            true,
 			Validators: []validator.Bool{
 				AllFlagConflictsWith(

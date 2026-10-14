@@ -25,8 +25,12 @@
 // and <udid> wire fields are discarded on read; only IDs round-trip through
 // Terraform state. Full rule set in STYLE_GUIDE.md §Scope helper.
 //
-// Cross-field invariants (all_computers ⇒ no per-computer targets, etc.)
-// are enforced by AllFlagConflictsWith, a value-discriminated bool
-// validator. Per-resource exceptions (e.g. RestrictedSoftware rejects
-// limitations entirely) live in the resource package, not here.
+// Cross-field invariants (all_computers ⇒ no per-computer or per-group
+// targets, etc.) are enforced by AllFlagConflictsWith, a value-discriminated
+// bool validator, and mirrored at apply time by the merge helpers: a true flag
+// empties exactly its paired categories, and a declared paired category turns
+// an unmanaged flag off (PickAllFlag). Per-resource exceptions (e.g.
+// RestrictedSoftware rejects limitations entirely, and honours the admin UI by
+// pairing buildings and departments with all_computers too) live in the
+// resource package, not here.
 package scope

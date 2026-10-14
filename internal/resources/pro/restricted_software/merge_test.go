@@ -138,3 +138,41 @@ func TestMergeRestrictedSoftwareScope_AllComputersPrecedence(t *testing.T) {
 		t.Error("expected exclusions preserved under all_computers=true")
 	}
 }
+
+// This resource honours the admin UI, which offers no target at all once All
+// Computers is selected: unlike every other computer scope, buildings and
+// departments pair with the flag too. So a declared building turns an
+// unmanaged flag off, exactly as a declared computer group does.
+func TestMergeRestrictedSoftwareScope_DeclaredTargetBeatsPreservedAllComputers(t *testing.T) {
+	cases := map[string]RestrictedSoftwareScopeTargetsModel{
+		"computer":       {ComputerIDs: strSet(t, "5")},
+		"computer group": {ComputerGroupIDs: strSet(t, "58")},
+		"building":       {BuildingIDs: strSet(t, "7")},
+		"department":     {DepartmentIDs: strSet(t, "3")},
+	}
+	for name, targets := range cases {
+		t.Run(name, func(t *testing.T) {
+			targets := targets
+			plan := &RestrictedSoftwareScopeModel{Targets: &targets}
+			server := &RestrictedSoftwareScopeModel{Targets: &RestrictedSoftwareScopeTargetsModel{
+				AllComputers: types.BoolValue(true),
+			}}
+			got := mergeRestrictedSoftwareScope(plan, server)
+			if got.Targets.AllComputers.IsNull() || got.Targets.AllComputers.ValueBool() {
+				t.Errorf("expected all_computers=false for a declared %s, got %v", name, got.Targets.AllComputers)
+			}
+		})
+	}
+}
+
+func TestMergeRestrictedSoftwareScope_DeclaredEmptyKeepsPreservedAllComputers(t *testing.T) {
+	plan := &RestrictedSoftwareScopeModel{Targets: &RestrictedSoftwareScopeTargetsModel{
+		BuildingIDs: strSet(t),
+	}}
+	server := &RestrictedSoftwareScopeModel{Targets: &RestrictedSoftwareScopeTargetsModel{
+		AllComputers: types.BoolValue(true),
+	}}
+	if got := mergeRestrictedSoftwareScope(plan, server); !got.Targets.AllComputers.ValueBool() {
+		t.Error("expected the preserved all_computers=true to stay")
+	}
+}

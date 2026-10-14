@@ -124,7 +124,7 @@ Optional:
 
 Optional:
 
-- `all_jss_users` (Boolean) Target all Jamf Pro users. Conflicts with `jss_user_ids` / `jss_user_group_ids`. Omit to leave the toggle as configured outside Terraform.
+- `all_jss_users` (Boolean) Target all Jamf Pro users. Forbids `jss_user_ids` and `jss_user_group_ids` when true. Left unset, the toggle keeps the value configured outside Terraform, unless you declare `jss_user_ids` or `jss_user_group_ids`, which turns it off.
 - `jss_user_group_ids` (Set of String) Set of Jamf Pro user group IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.
 - `jss_user_ids` (Set of String) Set of Jamf Pro user IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.
 

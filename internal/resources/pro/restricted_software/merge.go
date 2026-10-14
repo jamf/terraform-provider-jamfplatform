@@ -24,6 +24,13 @@ import (
 // All-flag precedence: a merged all_computers that is true empties exactly the
 // target categories its AllFlagConflictsWith validator names — never
 // exclusions, which coexist with a true flag and are preserved.
+//
+// This resource deliberately honours the admin UI rather than the wire. The
+// server keeps buildings and departments alongside all_computers on this
+// endpoint (wire-probed 2026-10-14), but the UI offers no target at all once
+// All Computers is selected, so a building stored that way could be neither
+// seen nor removed there. Every target category therefore conflicts with the
+// flag, and a declared one beats an unmanaged flag (scope.PickAllFlag).
 
 // pickSet returns the declared plan set when the category is managed
 // (non-null), else the live value, else an empty set — merged output is always
@@ -37,18 +44,6 @@ func pickSet(declared, server types.Set) types.Set {
 		return server
 	}
 	return scope.EmptyStringSet()
-}
-
-// pickBool is the all-flag sibling of pickSet: declared wins, else the live
-// value, else false.
-func pickBool(declared, server types.Bool) types.Bool {
-	if !declared.IsNull() {
-		return declared
-	}
-	if !server.IsNull() {
-		return server
-	}
-	return types.BoolValue(false)
 }
 
 // derefOrZero returns the pointed-to sub-block model, or its zero value when
@@ -75,7 +70,7 @@ func mergeRestrictedSoftwareScope(plan, server *RestrictedSoftwareScopeModel) *R
 	}
 	pt, st := plan.TargetsOrZero(), srv.TargetsOrZero()
 	targets := &RestrictedSoftwareScopeTargetsModel{
-		AllComputers:     pickBool(pt.AllComputers, st.AllComputers),
+		AllComputers:     scope.PickAllFlag(pt.AllComputers, st.AllComputers, pt.ComputerIDs, pt.ComputerGroupIDs, pt.BuildingIDs, pt.DepartmentIDs),
 		ComputerIDs:      pickSet(pt.ComputerIDs, st.ComputerIDs),
 		ComputerGroupIDs: pickSet(pt.ComputerGroupIDs, st.ComputerGroupIDs),
 		BuildingIDs:      pickSet(pt.BuildingIDs, st.BuildingIDs),

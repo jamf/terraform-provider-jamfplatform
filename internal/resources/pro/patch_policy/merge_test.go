@@ -87,8 +87,9 @@ func TestMergePatchPolicyScope_NilServerTreatedAsEmpty(t *testing.T) {
 }
 
 // TestMergePatchPolicyScope_AllComputersPrecedence pins the flag rule: a merged
-// true all_computers empties exactly the four target categories its validator
-// names — never limitations/exclusions, which coexist with the flag.
+// true all_computers empties exactly the categories it pairs with — computers
+// and computer groups. Buildings and departments, limitations and exclusions
+// all coexist with the flag (wire-probed 2026-10-14) and are preserved.
 func TestMergePatchPolicyScope_AllComputersPrecedence(t *testing.T) {
 	plan := &PatchPolicyScopeModel{
 		Targets: &PatchPolicyScopeTargetsModel{
@@ -117,11 +118,17 @@ func TestMergePatchPolicyScope_AllComputersPrecedence(t *testing.T) {
 	for label, set := range map[string]types.Set{
 		"computer_ids":       got.Targets.ComputerIDs,
 		"computer_group_ids": got.Targets.ComputerGroupIDs,
-		"building_ids":       got.Targets.BuildingIDs,
-		"department_ids":     got.Targets.DepartmentIDs,
 	} {
 		if set.IsNull() || len(set.Elements()) != 0 {
 			t.Errorf("expected target %s emptied under all_computers=true, got %v", label, set)
+		}
+	}
+	for label, set := range map[string]types.Set{
+		"building_ids":   got.Targets.BuildingIDs,
+		"department_ids": got.Targets.DepartmentIDs,
+	} {
+		if len(set.Elements()) != 1 {
+			t.Errorf("expected target %s preserved under all_computers=true, got %v", label, set)
 		}
 	}
 	if len(got.Limitations.NetworkSegmentIDs.Elements()) != 1 {
@@ -129,5 +136,39 @@ func TestMergePatchPolicyScope_AllComputersPrecedence(t *testing.T) {
 	}
 	if len(got.Exclusions.BuildingIDs.Elements()) != 1 {
 		t.Error("expected exclusions preserved under all_computers=true")
+	}
+}
+
+// TestMergePatchPolicyScope_DeclaredGroupBeatsPreservedAllComputers is the #467
+// shape on this endpoint: a declared group turns the unmanaged flag off.
+func TestMergePatchPolicyScope_DeclaredGroupBeatsPreservedAllComputers(t *testing.T) {
+	plan := &PatchPolicyScopeModel{Targets: &PatchPolicyScopeTargetsModel{
+		ComputerGroupIDs: idSet(t, "58"),
+	}}
+	server := &PatchPolicyScopeModel{Targets: &PatchPolicyScopeTargetsModel{
+		AllComputers: types.BoolValue(true),
+	}}
+	got := mergePatchPolicyScope(plan, server)
+	if got.Targets.AllComputers.ValueBool() {
+		t.Error("expected all_computers=false")
+	}
+	if len(got.Targets.ComputerGroupIDs.Elements()) != 1 {
+		t.Errorf("expected declared group kept, got %v", got.Targets.ComputerGroupIDs)
+	}
+}
+
+func TestMergePatchPolicyScope_DeclaredBuildingKeepsPreservedAllComputers(t *testing.T) {
+	plan := &PatchPolicyScopeModel{Targets: &PatchPolicyScopeTargetsModel{
+		BuildingIDs: idSet(t, "7"),
+	}}
+	server := &PatchPolicyScopeModel{Targets: &PatchPolicyScopeTargetsModel{
+		AllComputers: types.BoolValue(true),
+	}}
+	got := mergePatchPolicyScope(plan, server)
+	if !got.Targets.AllComputers.ValueBool() {
+		t.Error("expected the preserved all_computers=true to stay")
+	}
+	if len(got.Targets.BuildingIDs.Elements()) != 1 {
+		t.Errorf("expected declared building kept, got %v", got.Targets.BuildingIDs)
 	}
 }

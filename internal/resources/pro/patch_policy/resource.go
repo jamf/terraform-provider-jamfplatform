@@ -195,7 +195,7 @@ func (r *PatchPolicyResource) Schema(ctx context.Context, req resource.SchemaReq
 			// the schema; the user-facing description frames this as "does not
 			// apply to patch policies".
 			"scope": schema.SingleNestedAttribute{
-				MarkdownDescription: "Policy scope, the \"Scope\" tab in the Jamf Pro admin UI. Each category is independently owned: declare it (including `[]`, which clears it) and Terraform manages its members; omit it and it stays as configured outside Terraform, preserved across updates. Targets are flat sets of Jamf Pro IDs; interpolate `jamfplatform_device_group.<x>.jamf_pro_id` to bridge from Platform Services. Setting `all_computers = true` forbids the per-computer, per-group, per-building and per-department targets. Targets, limitations and exclusions are all addressed by computer, computer group, building, department, network segment and iBeacon.",
+				MarkdownDescription: "Policy scope, the \"Scope\" tab in the Jamf Pro admin UI. Each category is independently owned: declare it (including `[]`, which clears it) and Terraform manages its members; omit it and it stays as configured outside Terraform, preserved across updates. Targets are flat sets of Jamf Pro IDs; interpolate `jamfplatform_device_group.<x>.jamf_pro_id` to bridge from Platform Services. Setting `all_computers = true` forbids the per-computer and per-group targets, but you can declare buildings and departments. Declaring a computer or computer group while `all_computers` is unset turns it off. Targets, limitations and exclusions are all addressed by computer, computer group, building, department, network segment and iBeacon.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"targets": schema.SingleNestedAttribute{
@@ -208,14 +208,12 @@ func (r *PatchPolicyResource) Schema(ctx context.Context, req resource.SchemaReq
 								// the granular per-category ownership contract, so the flag
 								// must not be Computed or carry a state-forwarding plan
 								// modifier (see STYLE_GUIDE.md §Scope helper).
-								MarkdownDescription: "Scope to every computer in the tenant. Forbids per-computer / per-group / per-building / per-department targets when true. Omit to leave the toggle as configured outside Terraform.",
+								MarkdownDescription: "Scope to every computer in the tenant. Forbids `computer_ids` and `computer_group_ids` when true. You can declare buildings and departments with it. " + scope.OmitAllFlagNote("`computer_ids` or `computer_group_ids`"),
 								Optional:            true,
 								Validators: []validator.Bool{
 									scope.AllFlagConflictsWith(
 										path.MatchRelative().AtParent().AtName("computer_ids"),
 										path.MatchRelative().AtParent().AtName("computer_group_ids"),
-										path.MatchRelative().AtParent().AtName("building_ids"),
-										path.MatchRelative().AtParent().AtName("department_ids"),
 									),
 								},
 							},

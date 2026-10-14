@@ -217,8 +217,8 @@ Optional:
 
 Optional:
 
-- `all_jss_users` (Boolean) Scope to every Jamf Pro user in the tenant. Equivalent to the admin UI's "All Users" toggle. Forbids per-user / per-user-group targets when true. Omit to leave the toggle as configured outside Terraform.
-- `all_mobile_devices` (Boolean) Scope to every mobile device in the tenant. Forbids per-device / per-group / per-building / per-department targets when true. Omit to leave the toggle as configured outside Terraform.
+- `all_jss_users` (Boolean) Scope to every Jamf Pro user in the tenant. Matches the admin UI's "All Users" toggle. Forbids `user_ids` and `user_group_ids` when true. Left unset, the toggle keeps the value configured outside Terraform, unless you declare `user_ids` or `user_group_ids`, which turns it off.
+- `all_mobile_devices` (Boolean) Scope to every mobile device in the tenant. Forbids `mobile_device_ids` and `mobile_device_group_ids` when true. You can declare buildings, departments, users and user groups with it. Left unset, the toggle keeps the value configured outside Terraform, unless you declare `mobile_device_ids` or `mobile_device_group_ids`, which turns it off.
 - `building_ids` (Set of String) Set of Jamf Pro building IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.
 - `department_ids` (Set of String) Set of Jamf Pro department IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.
 - `mobile_device_group_ids` (Set of String) Set of Jamf Pro mobile device group IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.

@@ -103,7 +103,7 @@ func (r *RestrictedSoftwareResource) Schema(ctx context.Context, req resource.Sc
 	// their siblings inside `targets`.
 	targets := map[string]schema.Attribute{
 		"all_computers": schema.BoolAttribute{
-			MarkdownDescription: "Scope to every computer in the tenant. Forbids per-computer / per-group / per-building / per-department targets when true. Omit to leave the toggle as configured outside Terraform.",
+			MarkdownDescription: "Scope to every computer in the tenant. When true, you cannot declare `computer_ids`, `computer_group_ids`, `building_ids` or `department_ids`, because the admin UI offers no other target once All Computers is selected. " + scope.OmitAllFlagNote("any of those targets"),
 			Optional:            true,
 			Validators: []validator.Bool{
 				scope.AllFlagConflictsWith(

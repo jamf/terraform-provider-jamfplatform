@@ -150,3 +150,136 @@ func TestMergeEbookScope_AllFlagPrecedence(t *testing.T) {
 		t.Error("expected exclusions preserved under all_computers=true")
 	}
 }
+
+func TestMergeEbookScope_DeclaredPairedCategoryBeatsPreservedFlag(t *testing.T) {
+	cases := map[string]struct {
+		targets EbookScopeTargetsModel
+		flag    func(*EbookScopeTargetsModel) bool
+	}{
+		"computer group": {EbookScopeTargetsModel{ComputerGroupIDs: idSet("58")}, func(t *EbookScopeTargetsModel) bool { return t.AllComputers.ValueBool() }},
+		"mobile group":   {EbookScopeTargetsModel{MobileDeviceGroupIDs: idSet("12")}, func(t *EbookScopeTargetsModel) bool { return t.AllMobileDevices.ValueBool() }},
+		"user group":     {EbookScopeTargetsModel{UserGroupIDs: idSet("9")}, func(t *EbookScopeTargetsModel) bool { return t.AllJssUsers.ValueBool() }},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			targets := tc.targets
+			plan := &EbookScopeModel{Targets: &targets}
+			server := &EbookScopeModel{Targets: &EbookScopeTargetsModel{
+				AllComputers:     types.BoolValue(true),
+				AllMobileDevices: types.BoolValue(true),
+				AllJssUsers:      types.BoolValue(true),
+			}}
+			got := mergeEbookScope(plan, server)
+			if tc.flag(got.Targets) {
+				t.Errorf("expected the flag paired with the declared %s turned off", name)
+			}
+		})
+	}
+}
+
+// Only the paired flag turns off: the other two preserved flags stay as the
+// admin UI left them.
+func TestMergeEbookScope_DeclaredPairedCategoryLeavesOtherFlags(t *testing.T) {
+	plan := &EbookScopeModel{Targets: &EbookScopeTargetsModel{ComputerGroupIDs: idSet("58")}}
+	server := &EbookScopeModel{Targets: &EbookScopeTargetsModel{
+		AllComputers:     types.BoolValue(true),
+		AllMobileDevices: types.BoolValue(true),
+	}}
+	got := mergeEbookScope(plan, server)
+	if got.Targets.AllComputers.ValueBool() {
+		t.Error("expected all_computers=false")
+	}
+	if !got.Targets.AllMobileDevices.ValueBool() {
+		t.Error("expected the unrelated all_mobile_devices=true to stay")
+	}
+}
+
+// With all three flags on the admin UI offers no building, department or
+// class, so the merge empties them (the server would keep them).
+func TestMergeEbookScope_AllThreeFlagsEmptyResidualCategories(t *testing.T) {
+	plan := &EbookScopeModel{Targets: &EbookScopeTargetsModel{
+		AllComputers:     types.BoolValue(true),
+		AllMobileDevices: types.BoolValue(true),
+		AllJssUsers:      types.BoolValue(true),
+	}}
+	server := &EbookScopeModel{Targets: &EbookScopeTargetsModel{
+		BuildingIDs:   idSet("7"),
+		DepartmentIDs: idSet("3"),
+		ClassIDs:      idSet("41"),
+	}, Exclusions: &EbookScopeExclusionsModel{BuildingIDs: idSet("55")}}
+	got := mergeEbookScope(plan, server)
+	for label, set := range map[string]types.Set{
+		"building_ids":   got.Targets.BuildingIDs,
+		"department_ids": got.Targets.DepartmentIDs,
+		"class_ids":      got.Targets.ClassIDs,
+	} {
+		if set.IsNull() || len(set.Elements()) != 0 {
+			t.Errorf("expected %s emptied under all three flags, got %v", label, set)
+		}
+	}
+	if len(got.Exclusions.BuildingIDs.Elements()) != 1 {
+		t.Error("expected exclusions preserved under all three flags")
+	}
+}
+
+// Two flags on is not the all-three case: buildings, departments and classes
+// stay (the UI offers them).
+func TestMergeEbookScope_TwoFlagsKeepResidualCategories(t *testing.T) {
+	plan := &EbookScopeModel{Targets: &EbookScopeTargetsModel{
+		AllComputers:     types.BoolValue(true),
+		AllMobileDevices: types.BoolValue(true),
+	}}
+	server := &EbookScopeModel{Targets: &EbookScopeTargetsModel{
+		BuildingIDs:   idSet("7"),
+		DepartmentIDs: idSet("3"),
+		ClassIDs:      idSet("41"),
+	}}
+	got := mergeEbookScope(plan, server)
+	if len(got.Targets.BuildingIDs.Elements()) != 1 || len(got.Targets.DepartmentIDs.Elements()) != 1 || len(got.Targets.ClassIDs.Elements()) != 1 {
+		t.Errorf("expected residual categories preserved with two flags on, got %v / %v / %v",
+			got.Targets.BuildingIDs, got.Targets.DepartmentIDs, got.Targets.ClassIDs)
+	}
+}
+
+// A declared building while the admin UI has all three flags on: the
+// declaration wins, so every unmanaged flag is turned off rather than the
+// building being wiped.
+func TestMergeEbookScope_DeclaredResidualBeatsPreservedAllThreeFlags(t *testing.T) {
+	plan := &EbookScopeModel{Targets: &EbookScopeTargetsModel{BuildingIDs: idSet("7")}}
+	server := &EbookScopeModel{Targets: &EbookScopeTargetsModel{
+		AllComputers:     types.BoolValue(true),
+		AllMobileDevices: types.BoolValue(true),
+		AllJssUsers:      types.BoolValue(true),
+	}}
+	got := mergeEbookScope(plan, server)
+	if got.Targets.AllComputers.ValueBool() || got.Targets.AllMobileDevices.ValueBool() || got.Targets.AllJssUsers.ValueBool() {
+		t.Errorf("expected every unmanaged flag turned off, got %v / %v / %v",
+			got.Targets.AllComputers, got.Targets.AllMobileDevices, got.Targets.AllJssUsers)
+	}
+	if len(got.Targets.BuildingIDs.Elements()) != 1 {
+		t.Errorf("expected the declared building kept, got %v", got.Targets.BuildingIDs)
+	}
+}
+
+// Flags the plan declares are never touched: with one declared true and the
+// other two preserved, only the preserved ones turn off.
+func TestMergeEbookScope_DeclaredResidualSparesDeclaredFlags(t *testing.T) {
+	plan := &EbookScopeModel{Targets: &EbookScopeTargetsModel{
+		AllComputers: types.BoolValue(true),
+		ClassIDs:     idSet("41"),
+	}}
+	server := &EbookScopeModel{Targets: &EbookScopeTargetsModel{
+		AllMobileDevices: types.BoolValue(true),
+		AllJssUsers:      types.BoolValue(true),
+	}}
+	got := mergeEbookScope(plan, server)
+	if !got.Targets.AllComputers.ValueBool() {
+		t.Error("expected the declared all_computers=true to stay")
+	}
+	if got.Targets.AllMobileDevices.ValueBool() || got.Targets.AllJssUsers.ValueBool() {
+		t.Error("expected the preserved flags turned off")
+	}
+	if len(got.Targets.ClassIDs.Elements()) != 1 {
+		t.Errorf("expected the declared class kept, got %v", got.Targets.ClassIDs)
+	}
+}
