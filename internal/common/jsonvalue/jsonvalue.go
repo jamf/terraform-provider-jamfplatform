@@ -4,7 +4,7 @@
 // Package jsonvalue renders a decoded JSON value for a human-readable diagnostic.
 //
 // Two plan-time validators check an author's JSON against a declared schema and have to say, in a
-// sentence, what they found where they expected something else: internal/common/appleprofiles
+// sentence, what they found where they expected something else: the SDK's appleschemas/profiles
 // against Apple's payload key table, and internal/common/aischemas against a vendor's JSON Schema.
 // The schema languages share nothing, but the vocabulary for naming a decoded value does — and
 // getting it wrong is how a diagnostic ends up reading "expected a integer, found 1e+09".

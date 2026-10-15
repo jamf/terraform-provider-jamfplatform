@@ -18,7 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/jamf/terraform-provider-jamfplatform/internal/common/appledeclarations"
+	appledeclarations "github.com/jamf/jamfplatform-go-sdk/appleschemas/declarations"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/blueprints/blueprint/components"
 )
@@ -307,7 +307,7 @@ func declaredKeyHint(declarationType, problemPath string) string {
 // Every finding whose truth depends on the snapshot's revision qualifies, which is more than the
 // name-based ones: Apple widens an enum, widens a range, and relaxes a required key between
 // revisions, so a snapshot older than the tenant can report any of those against a value that
-// works. That is the same set apple-schemas.yml calls out for review when a refresh narrows one.
+// works. That is the same set the SDK's apple-schemas.yml calls out for review when a refresh narrows one.
 // What is left out is a wrong value type and a miscased name, each wrong against every revision
 // that declares the key at all.
 func staleTableSuspect(kind appledeclarations.ProblemKind) bool {

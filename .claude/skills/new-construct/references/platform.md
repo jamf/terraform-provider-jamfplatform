@@ -30,7 +30,7 @@ that would be awkward to narrow.
 ## Blueprint legacy payloads are validated against Apple's schema
 
 Anything touching `component_blocks[].legacy_payloads` goes through
-`internal/common/appleprofiles`. The rules there are wire-established and asymmetric — an
+`the SDK's appleschemas/profiles`. The rules there are wire-established and asymmetric — an
 unknown *payload type* is rejected and matched case-sensitively; an unknown *key* is silently
 discarded; a key differing only in case is silently stored under Apple's spelling; enum and
 range constraints are **not** enforced. `CLAUDE.md` §Apple profile schemas has the orientation;

@@ -79,7 +79,7 @@ var blockOnlyComponentIdentifiers = map[string]struct{}{
 // (an import cannot recover a redacted value). The rules the plan-time schema check reports — an
 // unrecognised or miscased key, a wrong value type, a missing required key, an out-of-range integer —
 // are named there, with the offending path and Apple's spelling, so they are summarised here rather
-// than enumerated. See internal/common/appleprofiles.
+// than enumerated. See the SDK's appleschemas/profiles.
 const legacyPayloadSettingsBehaviour = "The platform validates each payload against Apple's payload keys for its `payload_type`, " +
 	"and the provider checks the same rules during `plan`, so an unrecognised or miscased key, a wrong value type, " +
 	"or a missing required key is reported before an apply rather than failing one. " +

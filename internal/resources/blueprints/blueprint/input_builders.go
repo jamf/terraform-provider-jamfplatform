@@ -12,8 +12,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	appledeclarations "github.com/jamf/jamfplatform-go-sdk/appleschemas/declarations"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
-	"github.com/jamf/terraform-provider-jamfplatform/internal/common/appledeclarations"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/blueprints/blueprint/components"
 )

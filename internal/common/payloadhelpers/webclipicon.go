@@ -18,7 +18,7 @@ import (
 
 // webClipPayloadType is the one payload type carrying an icon. Apple's
 // device-management schema (Release-v26.4, the snapshot in
-// internal/common/appleprofiles) declares exactly thirteen data-typed payload
+// the SDK's appleschemas/profiles) declares exactly thirteen data-typed payload
 // keys, and only this one is an image: the others are certificates
 // (com.apple.security.{pem,pkcs1,pkcs12,root,scep}, com.apple.eas.account,
 // com.apple.MCX.FileVault2, com.apple.systempolicy.rule), a font

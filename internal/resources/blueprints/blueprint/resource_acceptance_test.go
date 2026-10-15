@@ -1068,7 +1068,7 @@ func TestAccDataSource_BlueprintComponents(t *testing.T) {
 }
 
 // TestAccResource_Blueprint_LegacyPayloads_SchemaValidation covers the plan-time check against
-// Apple's declared payload keys (internal/common/appleprofiles). Each step asserts a configuration
+// Apple's declared payload keys (the SDK's appleschemas/profiles). Each step asserts a configuration
 // Jamf would refuse or quietly rewrite is stopped at plan, so no write is attempted: a value of the
 // wrong type and a missing required key both fail the write outright, and a miscased key is stored
 // under Apple's spelling, which configuration could never match. Every case here was wire-probed

@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/jamf/terraform-provider-jamfplatform/internal/common/appleprofiles"
+	appleprofiles "github.com/jamf/jamfplatform-go-sdk/appleschemas/profiles"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -23,13 +23,13 @@ import (
 //
 // Every finding is an error. Jamf accepts a payload carrying an unrecognised key, reports success
 // and discards the key, so a warning would leave the operator with a payload that silently never
-// applies — the same reasoning as internal/common/appledeclarations. The escape hatch is the same
+// applies — the same reasoning as the SDK's appleschemas/declarations. The escape hatch is the same
 // too, but it is per block rather than per payload: appendLegacyConfigProfile folds every payload in
 // a block into one com.jamf.ddm-configuration-profile component, so a partial move is rejected by
 // rawComponentOverlapDiags rather than written as two copies of that component. The embedded tables
 // are refreshed daily so that erroring on an unrecognised name cannot block a working configuration
 // for long, and a finding that the snapshot could explain says so and names it. See
-// internal/common/appleprofiles.
+// the SDK's appleschemas/profiles.
 //
 // It also carries the one rule Apple's schemas cannot express: a custom settings payload sets
 // exactly one preference domain. A Mac applies one of several and drops the others, and Jamf
