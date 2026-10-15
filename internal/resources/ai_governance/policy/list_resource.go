@@ -154,6 +154,7 @@ func (r *PolicyListResource) List(ctx context.Context, req list.ListRequest, str
 	}
 
 	results := make([]list.ListResult, 0, maxResults)
+	var skipped diag.Diagnostics
 	for _, summary := range summaries {
 		if int64(len(results)) >= maxResults {
 			break
@@ -170,7 +171,17 @@ func (r *PolicyListResource) List(ctx context.Context, req list.ListRequest, str
 		}
 
 		if req.IncludeResource {
-			if !r.appendResourceState(ctx, &result, summary.ID) {
+			switch r.appendResourceState(ctx, &result, summary.ID) {
+			case policyStateGone:
+				skipped.AddWarning(
+					"AI policy archived while it was being listed",
+					"The policy \""+summary.Name+"\" (identifier "+summary.ID+") was in the listing but had "+
+						"been archived by the time it was read, so it has been left out of the results. Another "+
+						"run against the same environment archives policies while this query is in flight; "+
+						"re-run the query for a settled listing.",
+				)
+				continue
+			case policyStateFailed:
 				stream.Results = list.ListResultsStreamDiagnostics(result.Diagnostics)
 				return
 			}
@@ -182,9 +193,10 @@ func (r *PolicyListResource) List(ctx context.Context, req list.ListRequest, str
 	tflog.Debug(ctx, "Listed AI Governance policies", map[string]any{
 		"limit":    req.Limit,
 		"returned": len(results),
+		"skipped":  len(skipped),
 	})
 
-	if len(results) == 0 {
+	if len(results) == 0 && len(skipped) == 0 {
 		stream.Results = list.NoListResults
 		return
 	}
@@ -195,26 +207,48 @@ func (r *PolicyListResource) List(ctx context.Context, req list.ListRequest, str
 				return
 			}
 		}
+		if len(skipped) > 0 {
+			push(list.ListResult{Diagnostics: skipped})
+		}
 	}
 }
 
-// appendResourceState fills one list result's resource state, reporting whether it succeeded.
-func (r *PolicyListResource) appendResourceState(ctx context.Context, result *list.ListResult, id string) bool {
+// policyStateOutcome is what filling one list result's resource state came to.
+type policyStateOutcome int
+
+const (
+	// policyStateSet means the result carries its resource state.
+	policyStateSet policyStateOutcome = iota
+	// policyStateGone means the policy was archived between the listing and its read, which is
+	// ordinary on an environment other runs share and costs the query one entry, not the query.
+	policyStateGone
+	// policyStateFailed means the read failed some other way and the result carries the error.
+	policyStateFailed
+)
+
+// appendResourceState fills one list result's resource state and reports how that went.
+func (r *PolicyListResource) appendResourceState(ctx context.Context, result *list.ListResult, id string) policyStateOutcome {
 	itemCtx, cancel := context.WithTimeout(ctx, defaultItemReadTimeout)
 	detail, err := r.client.GetPolicy(itemCtx, id)
 	cancel()
 	if err != nil {
+		if helpers.IsNotFoundError(err) {
+			return policyStateGone
+		}
 		result.Diagnostics.AddError("Unable to read AI policy "+id, helpers.APIErrorDetail(err))
-		return false
+		return policyStateFailed
 	}
 
 	state := policyModel{Timeouts: helpers.NewResourceTimeoutsNullValue(policyTimeoutAttributeTypes)}
 	if err := applyPolicyToState(&state, detail); err != nil {
 		result.Diagnostics.AddError("Unable to read AI policy settings", helpers.APIErrorDetail(err))
-		return false
+		return policyStateFailed
 	}
 	state.Publish = resolvePublish(state.Publish)
 
 	result.Diagnostics.Append(result.Resource.Set(ctx, &state)...)
-	return !result.Diagnostics.HasError()
+	if result.Diagnostics.HasError() {
+		return policyStateFailed
+	}
+	return policyStateSet
 }
