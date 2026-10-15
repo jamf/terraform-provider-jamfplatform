@@ -17,6 +17,8 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/iconmirror"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/nullprior"
 )
 
 func TestPolicyResource_Schema(t *testing.T) {
@@ -327,4 +329,47 @@ func TestPolicyResource_IntegerRangesMatchTheWire(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestPolicyResource_SelfServiceIconDerivedAttributes pins uri and filename of
+// self_service.self_service_icon as Computed-only attributes that follow id.
+// Jamf Pro derives both from the icon the id names and ignores an authored
+// value, so an Optional one could never match what apply returned, and
+// UseNonNullStateForUnknown carried the previous icon's pair into a plan that
+// repointed id. See issue #468.
+func TestPolicyResource_SelfServiceIconDerivedAttributes(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"uri", "filename"} {
+		iconmirror.AssertPlan(t, name, policyResourceAttribute(t, "self_service", "self_service_icon", name))
+	}
+	id, ok := policyResourceAttribute(t, "self_service", "self_service_icon", "id").(rschema.StringAttribute)
+	if !ok || !id.Optional || !id.Computed {
+		t.Errorf("self_service_icon.id must stay Optional+Computed: it is the one input")
+	}
+}
+
+// TestPolicyResource_OptionalBlockLeavesPlanUnknownFromNullPrior guards the failure
+// where an optional block goes from omitted to declared. Each Optional+Computed
+// leaf inside one holds null in state, and UseStateForUnknown planned that null
+// where apply then returned the server's default: "Provider produced
+// inconsistent result after apply". Reproduced live on self_service.notification_location and packages.distribution_point.
+func TestPolicyResource_OptionalBlockLeavesPlanUnknownFromNullPrior(t *testing.T) {
+	t.Parallel()
+	var resp resource.SchemaResponse
+	NewPolicyResource().Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	nullprior.AssertOptionalBlockLeavesPlanUnknown(t, resp.Schema)
+}
+
+// TestPolicyResource_NothingCollapsesAPlan is what lets the policy's
+// singleton-block leaves keep UseNonNullStateForUnknown (STYLE_GUIDE rule 1a).
+// Many of them are null forever once applied (restart_options.message, or any
+// string Jamf Pro answers empty), so they plan Unknown whenever the plan differs
+// from state. That only shows as a permanent diff if something restores the
+// configured change that caused the difference, and this fails the moment a
+// plan modifier or a ModifyPlan plan write that could do so is added.
+func TestPolicyResource_NothingCollapsesAPlan(t *testing.T) {
+	t.Parallel()
+	var resp resource.SchemaResponse
+	NewPolicyResource().Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	nullprior.AssertNoPlanCollapse(t, resp.Schema, ".")
 }

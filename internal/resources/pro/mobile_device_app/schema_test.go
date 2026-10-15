@@ -11,6 +11,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/list"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/iconmirror"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/keyedcategories"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/nullprior"
 )
 
 const wantTypeName = "jamfplatform_pro_mobile_device_app"
@@ -137,4 +140,42 @@ func TestMobileAppListResource_Schema(t *testing.T) {
 	if _, ok := resp.Schema.Attributes["filter"]; !ok {
 		t.Errorf("list schema missing filter attribute")
 	}
+}
+
+// TestMobileAppResource_SelfServiceIconURIDerivedFromID pins uri as a
+// Computed-only attribute that follows id. Jamf Pro derives it from the icon the
+// id names and ignores an authored value; UseStateForUnknown carried the
+// previous icon's uri into a plan that repointed id. See issue #468.
+func TestMobileAppResource_SelfServiceIconURIDerivedFromID(t *testing.T) {
+	var resp resource.SchemaResponse
+	NewMobileAppResource().(*MobileAppResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	icon := resp.Schema.Attributes["self_service"].(schema.SingleNestedAttribute).Attributes["self_service_icon"].(schema.SingleNestedAttribute)
+	iconmirror.AssertPlan(t, "uri", icon.Attributes["uri"])
+	if id, ok := icon.Attributes["id"].(schema.StringAttribute); !ok || !id.Optional || !id.Computed {
+		t.Errorf("self_service_icon.id must stay Optional+Computed: it is the one input")
+	}
+}
+
+// TestMobileAppResource_OptionalBlockLeavesPlanUnknownFromNullPrior guards the failure
+// where an optional block goes from omitted to declared. Each Optional+Computed
+// leaf inside one holds null in state, and UseStateForUnknown planned that null
+// where apply then returned the server's default: "Provider produced
+// inconsistent result after apply". Reproduced live on self_service.notification_enabled and feature_on_main_page.
+func TestMobileAppResource_OptionalBlockLeavesPlanUnknownFromNullPrior(t *testing.T) {
+	t.Parallel()
+	var resp resource.SchemaResponse
+	NewMobileAppResource().(*MobileAppResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	nullprior.AssertOptionalBlockLeavesPlanUnknown(t, resp.Schema)
+}
+
+// TestMobileAppResource_SelfServiceCategoriesCarryByID pins the category element
+// shape: Jamf Pro resolves a category by id, so name is Computed-only, and it
+// and the flags carry prior state by id rather than by position. See
+// keyedcategories.AssertCarriedByID.
+func TestMobileAppResource_SelfServiceCategoriesCarryByID(t *testing.T) {
+	t.Parallel()
+	var resp resource.SchemaResponse
+	NewMobileAppResource().(*MobileAppResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	ss := resp.Schema.Attributes["self_service"].(schema.SingleNestedAttribute)
+	keyedcategories.AssertCarriedByID(t, ss.Attributes["self_service_categories"].(schema.SetNestedAttribute).NestedObject.Attributes, "display_in")
 }

@@ -561,7 +561,7 @@ Optional:
 - `reinstall_button_text` (String) Re-install-button label. Defaults to `Reinstall`. Omit to leave the current value untouched.
 - `self_service_description` (String) Self Service description. Markdown supported. Omit to leave the current value untouched.
 - `self_service_display_name` (String) Self Service display name (defaults to the policy name). Omit to leave the current value untouched.
-- `self_service_icon` (Attributes) Self Service icon. The icon binary is uploaded out-of-band; the provider surfaces the resolved id, URI, and filename. Uploading the icon bytes inline is not currently supported. Open an issue if you need it. (see [below for nested schema](#nestedatt--self_service--self_service_icon))
+- `self_service_icon` (Attributes) Self Service icon. Set `id` to the ID of an uploaded icon, such as a `jamfplatform_pro_icon`. Jamf Pro fills in `uri` and `filename` from it. The provider cannot upload icon bytes inline. Open an issue if you need that. (see [below for nested schema](#nestedatt--self_service--self_service_icon))
 - `use_for_self_service` (Boolean) Expose the policy in Self Service. Omit to leave the current value untouched; set `true`/`false` to change it.
 
 <a id="nestedatt--self_service--categories"></a>
@@ -586,9 +586,12 @@ Read-Only:
 
 Optional:
 
-- `filename` (String) Icon filename. Returned by Jamf Pro.
 - `id` (String) Icon ID assigned by Jamf Pro.
-- `uri` (String) Icon URI. Returned by Jamf Pro.
+
+Read-Only:
+
+- `filename` (String) Icon filename. Jamf Pro sets it from the icon `id`.
+- `uri` (String) Icon URI. Jamf Pro sets it from the icon `id`.
 
 
 

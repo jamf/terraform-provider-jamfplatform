@@ -202,6 +202,9 @@ Optional:
 
 - `display_in` (Boolean) Display the ebook in this category.
 - `feature_in` (Boolean) Feature the ebook in this category.
+
+Read-Only:
+
 - `name` (String) Category display name. Returned by Jamf Pro.
 
 

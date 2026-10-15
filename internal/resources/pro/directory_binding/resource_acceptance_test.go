@@ -16,8 +16,10 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-testing/config"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
@@ -583,6 +585,98 @@ func TestAccResource_ProDirectoryBinding_EmptyStringFieldsRoundTrip(t *testing.T
 			{
 				Config:            directoryBindingEmptyStringsConfig(suffix, "/bin/zsh", true),
 				ConfigStateChecks: step2,
+			},
+		},
+	})
+}
+
+// TestAccResource_ProDirectoryBinding_TypedBlockRequired rejects, at plan time, a
+// binding whose type needs a typed block and has none. Jamf Pro returns the block
+// populated whether or not it was sent, so before this check the apply failed
+// with "Provider produced inconsistent result after apply" on the block itself.
+func TestAccResource_ProDirectoryBinding_TypedBlockRequired(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-directory-binding-required-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+					resource "jamfplatform_pro_directory_binding" "test" {
+						name = %q
+						type = "Active Directory"
+					}
+				`, name),
+				ExpectError: regexp.MustCompile(`active_directory required when type`),
+			},
+		},
+	})
+}
+
+// TestAccResource_ProDirectoryBinding_BlockFromVariable gives the typed block a
+// value that is unknown while the configuration is validated. The validator used
+// to decode the whole configuration into a struct, which fails on an unknown
+// block with "Value Conversion Error", so a block built from a variable or
+// another resource could not be used at all.
+func TestAccResource_ProDirectoryBinding_BlockFromVariable(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-directory-binding-var-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckDirectoryBindingDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				ConfigVariables: config.Variables{"on": config.BoolVariable(true)},
+				Config: fmt.Sprintf(`
+					variable "on" { type = bool }
+					resource "jamfplatform_pro_directory_binding" "test" {
+						name     = %q
+						type     = "Active Directory"
+						domain   = "corp.example.com"
+						username = "joiner-svc"
+						active_directory = var.on ? { default_shell = "/bin/bash" } : null
+					}
+				`, name),
+				Check: resource.TestCheckResourceAttr("jamfplatform_pro_directory_binding.test", "active_directory.default_shell", "/bin/bash"),
+			},
+		},
+	})
+}
+
+// TestAccResource_ProDirectoryBinding_TypeChangeReplaces changes `type` on an
+// existing binding. Jamf Pro keeps the type a binding was created with, so an
+// in-place update failed with "Provider produced inconsistent result after
+// apply" on type; the change now replaces the binding.
+func TestAccResource_ProDirectoryBinding_TypeChangeReplaces(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-directory-binding-retype-" + testhelpers.RunSuffix()
+	cfg := func(typ, block string) string {
+		return fmt.Sprintf(`
+			resource "jamfplatform_pro_directory_binding" "test" {
+				name     = %q
+				type     = %q
+				domain   = "corp.example.com"
+				username = "joiner-svc"
+				%s
+			}
+		`, name, typ, block)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckDirectoryBindingDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: cfg("Active Directory", `active_directory = { default_shell = "/bin/bash" }`)},
+			{
+				Config: cfg("Centrify", `centrify = { zone = "macs" }`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("jamfplatform_pro_directory_binding.test", plancheck.ResourceActionReplace),
+					},
+				},
+				Check: resource.TestCheckResourceAttr("jamfplatform_pro_directory_binding.test", "type", "Centrify"),
 			},
 		},
 	})

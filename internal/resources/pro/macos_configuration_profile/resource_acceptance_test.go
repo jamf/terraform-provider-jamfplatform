@@ -2362,3 +2362,51 @@ resource "jamfplatform_pro_macos_configuration_profile" "test" {
 		},
 	})
 }
+
+func configSelfServiceBlock(name, payload string, declared bool) string {
+	block := ""
+	if declared {
+		block = `
+  self_service = {
+    install_button_text = "Install now"
+  }`
+	}
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_macos_configuration_profile" "test" {
+  general = {
+    name                = %q
+    distribution_method = "Make Available in Self Service"
+    payloads = <<EOF
+%sEOF
+  }%s
+}
+`, name, payload, block)
+}
+
+// TestAccResource_MacOSConfigurationProfile_SelfServiceOmittedToDeclared adds
+// self_service to a profile that was created without it. Every leaf in the block
+// is null in state, and one carried forward with UseStateForUnknown fails apply
+// with "Provider produced inconsistent result after apply" on whichever leaf Jamf
+// Pro defaults (self_service_display_name, notification_location and
+// removal_disallowed here), with only install_button_text configured.
+func TestAccResource_MacOSConfigurationProfile_SelfServiceOmittedToDeclared(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-mcp-ss-blk-" + testhelpers.RunSuffix()
+	payload := readFixture(t, "1Password__notifications_profile.mobileconfig")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: configSelfServiceBlock(name, payload, false)},
+			{
+				Config: configSelfServiceBlock(name, payload, true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("jamfplatform_pro_macos_configuration_profile.test", "self_service.install_button_text", "Install now"),
+					resource.TestCheckResourceAttrSet("jamfplatform_pro_macos_configuration_profile.test", "self_service.notification_location"),
+					resource.TestCheckResourceAttrSet("jamfplatform_pro_macos_configuration_profile.test", "self_service.removal_disallowed"),
+				),
+			},
+		},
+	})
+}

@@ -1833,3 +1833,51 @@ func TestAccResource_MobileDeviceConfigurationProfile_WebClipIconNotAnImageIsRep
 		},
 	})
 }
+
+func configSelfServiceBlock(name, payload string, declared bool) string {
+	block := ""
+	if declared {
+		block = `
+  self_service = {
+    feature_on_main_page = true
+  }`
+	}
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_mobile_device_configuration_profile" "test" {
+  general = {
+    name                = %q
+    distribution_method = "Make Available in Self Service"
+    payloads = <<EOF
+%sEOF
+  }%s
+}
+`, name, payload, block)
+}
+
+// TestAccResource_MobileDeviceConfigurationProfile_SelfServiceOmittedToDeclared
+// adds self_service to a profile that was created without it. Every leaf in the
+// block is null in state, and one carried forward with UseStateForUnknown fails
+// apply with "Provider produced inconsistent result after apply" on
+// removal_disallowed, which Jamf Pro defaults to "Never". The error surfaces as
+// ".self_service: inconsistent values for sensitive attribute" because the
+// sibling authorization_password is Sensitive.
+func TestAccResource_MobileDeviceConfigurationProfile_SelfServiceOmittedToDeclared(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-mdcp-ss-blk-" + testhelpers.RunSuffix()
+	payload := freshPayload(t, "profile_44.mobileconfig")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: configSelfServiceBlock(name, payload, false)},
+			{
+				Config: configSelfServiceBlock(name, payload, true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("jamfplatform_pro_mobile_device_configuration_profile.test", "self_service.feature_on_main_page", "true"),
+					resource.TestCheckResourceAttr("jamfplatform_pro_mobile_device_configuration_profile.test", "self_service.removal_disallowed", "Never"),
+				),
+			},
+		},
+	})
+}

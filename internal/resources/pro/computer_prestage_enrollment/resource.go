@@ -20,7 +20,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -28,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -507,14 +507,26 @@ func (listUseStateForUnknownModifier) PlanModifyList(_ context.Context, req plan
 }
 
 // optBool / optString / optInt64 are local helpers for the repetitive
-// Optional+Computed scalar shape used inside every SingleNested block.
+// Optional+Computed scalar shape used inside every SingleNested block. They carry
+// the prior value with planmodifiers.UseStateForUnknownInExistingBlock*.
+//
+// Plain UseStateForUnknown is wrong here. When location_information,
+// purchasing_information, account_settings or skip_setup_items goes from omitted
+// to declared, every leaf in it holds null in state, the plan copies that null,
+// and apply returns the server's default ("", -1, false, 1970-01-01): "Provider
+// produced inconsistent result after apply" on every leaf the configuration
+// leaves out, reproduced live 2026-10-14. UseNonNullStateForUnknown would avoid
+// that too, but ModifyPlan writes the plan, so a plan can collapse to a no-op and
+// the non-null variant would leave each null-prior leaf Unknown in it
+// (STYLE_GUIDE rule 1a). The in-existing-block modifier carries a null prior only
+// when the block is already in state.
 func optBool(md string) schema.Attribute {
 	return schema.BoolAttribute{
 		MarkdownDescription: md,
 		Optional:            true,
 		Computed:            true,
 		PlanModifiers: []planmodifier.Bool{
-			boolplanmodifier.UseStateForUnknown(),
+			planmodifiers.UseStateForUnknownInExistingBlockBool(),
 		},
 	}
 }
@@ -525,7 +537,7 @@ func optString(md string) schema.Attribute {
 		Optional:            true,
 		Computed:            true,
 		PlanModifiers: []planmodifier.String{
-			stringplanmodifier.UseStateForUnknown(),
+			planmodifiers.UseStateForUnknownInExistingBlockString(),
 		},
 	}
 }
@@ -536,7 +548,7 @@ func optInt64(md string) schema.Attribute {
 		Optional:            true,
 		Computed:            true,
 		PlanModifiers: []planmodifier.Int64{
-			int64planmodifier.UseStateForUnknown(),
+			planmodifiers.UseStateForUnknownInExistingBlockInt64(),
 		},
 		Validators: []validator.Int64{
 			int64validator.AtLeast(0),
@@ -654,7 +666,7 @@ func accountSettingsSchema() schema.SingleNestedAttribute {
 					stringvalidator.OneOf(userAccountTypeValues...),
 				},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					planmodifiers.UseStateForUnknownInExistingBlockString(),
 				},
 			},
 			"prefill_primary_account_info_feature_enabled": optBool("**\"Prefill Primary Account Info\"** in the Jamf Pro admin UI."),
@@ -667,7 +679,7 @@ func accountSettingsSchema() schema.SingleNestedAttribute {
 					prefillTypeCustomRequiresFullAndUserNames(),
 				},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					planmodifiers.UseStateForUnknownInExistingBlockString(),
 				},
 			},
 			"prefill_account_full_name":              optString("**\"Account Full Name\"** prefill value."),

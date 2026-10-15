@@ -1270,3 +1270,61 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 }
 `, name, adeFixtureRef, anchors)
 }
+
+func testAccComputerPrestageBlocksConfig(name string, declared bool) string {
+	blocks := ""
+	if declared {
+		blocks = `
+  location_information   = { username = "tf-acc-user" }
+  purchasing_information = { vendor = "tf-acc-vendor" }
+  account_settings       = { payload_configured = false }
+  skip_setup_items       = { siri = true }`
+	}
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
+  display_name                          = %q
+  mandatory                             = true
+  mdm_removable                         = true
+  require_authentication                = false
+  device_enrollment_program_instance_id = %s
+  keep_existing_location_information    = false
+  keep_existing_site_membership         = false
+  auto_advance_setup                    = false
+  install_profiles_during_setup         = false
+  prevent_activation_lock               = false
+  enable_device_based_activation_lock   = false
+  scope_serial_numbers                  = []%s
+}
+`, name, adeFixtureRef, blocks)
+}
+
+// TestAccResource_ProComputerPrestageEnrollment_BlocksOmittedToDeclared declares
+// the four optional blocks on a PreStage created without them. Each leaf the
+// configuration leaves out is null in state, and UseStateForUnknown planned that
+// null where Jamf Pro answered "", -1, false or 1970-01-01: "Provider produced
+// inconsistent result after apply" on dozens of leaves, reproduced live
+// 2026-10-14. Needs the ADE token blob the other tests here use.
+func TestAccResource_ProComputerPrestageEnrollment_BlocksOmittedToDeclared(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	token := requireADETokenBlob(t)
+	suffix := testhelpers.RunSuffix()
+	accCleanupOrphans(t, suffix)
+	name := "tf-acc-computer-prestage-blocks-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageBlocksConfig(name, false)},
+			{
+				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageBlocksConfig(name, true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "location_information.username", "tf-acc-user"),
+					resource.TestCheckResourceAttrSet(resourceName, "location_information.building_id"),
+					resource.TestCheckResourceAttrSet(resourceName, "purchasing_information.po_date"),
+					resource.TestCheckResourceAttr(resourceName, "skip_setup_items.siri", "true"),
+					resource.TestCheckResourceAttrSet(resourceName, "skip_setup_items.filevault"),
+				),
+			},
+		},
+	})
+}

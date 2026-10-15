@@ -254,7 +254,7 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						MarkdownDescription: "Notification delivery location. Valid values: `Self Service`, `Self Service and Notification Center`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 						Validators: []validator.String{
 							stringvalidator.OneOf("Self Service", "Self Service and Notification Center"),
 						},
@@ -262,12 +262,12 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					"notification_subject": optComputedString("Notification subject line. Omit to leave the current value untouched."),
 					"notification_message": optComputedString("Notification body text. Omit to leave the current value untouched."),
 					"self_service_icon": schema.SingleNestedAttribute{
-						MarkdownDescription: "Self Service icon. The icon binary is uploaded out-of-band; the provider surfaces the resolved id, URI, and filename. Uploading the icon bytes inline is not currently supported. Open an issue if you need it.",
+						MarkdownDescription: "Self Service icon. Set `id` to the ID of an uploaded icon, such as a `jamfplatform_pro_icon`. Jamf Pro fills in `uri` and `filename` from it. The provider cannot upload icon bytes inline. Open an issue if you need that.",
 						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"id":       optComputedString("Icon ID assigned by Jamf Pro."),
-							"uri":      optComputedString("Icon URI. Returned by Jamf Pro."),
-							"filename": optComputedString("Icon filename. Returned by Jamf Pro."),
+							"uri":      iconMirrorString("Icon URI. Jamf Pro sets it from the icon `id`."),
+							"filename": iconMirrorString("Icon filename. Jamf Pro sets it from the icon `id`."),
 						},
 					},
 					"categories": schema.SetNestedAttribute{
@@ -293,7 +293,7 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						Optional:            true,
 						Computed:            true,
 						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.UseNonNullStateForUnknown(),
 						},
 					},
 					"packages": schema.SetNestedAttribute{
@@ -481,7 +481,7 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						MarkdownDescription: "Reboot-method discriminator. Empty string is the default: a standard reboot with no explicit method. `Standard Restart` matches the admin UI radio option. `MDM Restart with Kernel Cache Rebuild` issues an MDM-driven restart that rebuilds the kernel cache. The admin UI surfaces a separate \"KEXT PATH\" text input alongside the radio, but Jamf Pro does not echo that value back, so it is not exposed here. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 						Validators: []validator.String{
 							stringvalidator.OneOf("", "Standard Restart", "MDM Restart with Kernel Cache Rebuild"),
 						},
@@ -671,24 +671,6 @@ func (r *PolicyResource) reportScopeImpact(ctx context.Context, req resource.Mod
 	})
 }
 
-// optComputedString returns an Optional+Computed StringAttribute with the
-// UseNonNullStateForUnknown plan modifier for server-augmented fields.
-// Field-level construction helper, not a schema-section decomposition —
-// STYLE_GUIDE §Schema keeps the section bodies inline.
-//
-// Why UseNonNullStateForUnknown and not UseStateForUnknown: these helpers
-// are used both at top level and inside nested list elements. When a list
-// element is appended (list-length growth), the new index has no prior
-// state at its path — prior StateValue is Null. UseStateForUnknown copies
-// that Null into the plan; if the server returns a real value for the
-// field, the post-apply consistency check trips ("Provider produced
-// inconsistent result after apply"). When a Sensitive sibling lives on
-// the same nested element (e.g. a WriteOnly password), the error path
-// is redacted up to the nearest non-sensitive ancestor, masking the
-// real attribute. UseNonNullStateForUnknown leaves the plan Unknown when
-// prior StateValue is Null, so the framework accepts whatever the
-// server returns. Behavior is identical to UseStateForUnknown for the
-// non-Null prior-state case (singletons, already-set values).
 // noExecuteTimeAttribute builds the schema for one end of the daily no-execute
 // window.
 //
@@ -766,6 +748,49 @@ func serverDerivedName(desc string) schema.StringAttribute {
 	}
 }
 
+// iconMirrorString is a Computed-only string Jamf Pro derives from the Self
+// Service icon's id: the CDN uri and the stored filename of whichever icon the
+// id names.
+//
+// Wire-probed 2026-10-14 on the classic PUT: an authored filename or uri is
+// ignored whatever it says (id=A with a made-up filename and uri stored A's own
+// pair), and a filename with no id is refused 409. The id is the only input.
+// So neither attribute can be Optional, and neither can use
+// UseNonNullStateForUnknown: that carries the previous icon's pair into a plan
+// that repoints id, the apply returns the new icon's, and Terraform fails the
+// apply with "Provider produced inconsistent result after apply". Dropping the
+// modifier instead leaves both Unknown in every plan that changes anything else
+// on the policy. planmodifiers.MirrorOfString watches id and carries the prior
+// value only while it is unchanged. See issue #468.
+func iconMirrorString(desc string) schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: desc,
+		Computed:            true,
+		PlanModifiers: []planmodifier.String{
+			planmodifiers.MirrorOfString(planmodifiers.NestedStringSource(path.MatchRoot("self_service").AtName("self_service_icon"), "id")),
+		},
+	}
+}
+
+// optComputedString returns an Optional+Computed StringAttribute with the
+// UseNonNullStateForUnknown plan modifier for server-augmented fields.
+// Field-level construction helper, not a schema-section decomposition —
+// STYLE_GUIDE §Schema keeps the section bodies inline.
+//
+// UseStateForUnknown would copy a null prior into the plan, and a null prior is
+// what every leaf of a block going from omitted to declared has, as does a
+// field of an appended list element. Apply then returns the server's default
+// and Terraform fails with "Provider produced inconsistent result after apply"
+// (reproduced on self_service.notification_location and
+// packages.distribution_point). Leaving a null prior Unknown lets apply store
+// whatever Jamf Pro returns.
+//
+// The cost is that a leaf Jamf Pro never returns, of which the policy has many,
+// reads "(known after apply)" in any plan that changes something else and then
+// settles back to null. That stays harmless only while nothing in the resource
+// can collapse a configured change back to prior state, which would leave those
+// Unknowns as the whole plan; TestPolicyResource_NothingCollapsesAPlan enforces
+// it. See STYLE_GUIDE rule 1a.
 func optComputedString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,

@@ -219,6 +219,9 @@ Optional:
 
 - `display_in` (Boolean) Display the app in this category.
 - `feature_in` (Boolean) Feature the app in this category.
+
+Read-Only:
+
 - `name` (String) Category display name. Returned by Jamf Pro.
 
 
@@ -228,7 +231,10 @@ Optional:
 Optional:
 
 - `id` (String) Icon ID assigned by Jamf Pro.
-- `uri` (String) Icon URI. Returned by Jamf Pro.
+
+Read-Only:
+
+- `uri` (String) Icon URI. Jamf Pro sets it from the icon `id`.
 
 
 

@@ -22,8 +22,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -185,7 +183,7 @@ func (r *MobileAppResource) Schema(ctx context.Context, req resource.SchemaReque
 						MarkdownDescription: "Button label shown after the app is installed. Requires `general.make_available_after_install = true`; Jamf Pro discards the label otherwise and never returns it. Omit to leave the current value untouched.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 						Validators:          []validator.String{requiresMakeAvailableAfterInstall{}},
 					},
 					"self_service_description": optComputedString("Self Service description. Markdown supported. Omit to leave the current value untouched."),
@@ -198,7 +196,7 @@ func (r *MobileAppResource) Schema(ctx context.Context, req resource.SchemaReque
 						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"id":  optComputedString("Icon ID assigned by Jamf Pro."),
-							"uri": optComputedString("Icon URI. Returned by Jamf Pro."),
+							"uri": mirrorString("Icon URI. Jamf Pro sets it from the icon `id`.", planmodifiers.NestedStringSource(path.MatchRoot("self_service").AtName("self_service_icon"), "id")),
 						},
 					},
 					"self_service_categories": schema.SetNestedAttribute{
@@ -207,8 +205,8 @@ func (r *MobileAppResource) Schema(ctx context.Context, req resource.SchemaReque
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":         schema.StringAttribute{MarkdownDescription: "Category ID.", Required: true},
-								"name":       optComputedStringInList("Category display name. Returned by Jamf Pro."),
-								"display_in": optComputedBoolInList("Display the app in this category."),
+								"name":       categoryName("Category display name. Returned by Jamf Pro."),
+								"display_in": optComputedBoolKeyed("Display the app in this category."),
 							},
 						},
 					},
@@ -308,71 +306,45 @@ func (r *MobileAppResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 }
 
-// optComputedString returns a top-level Optional+Computed StringAttribute with
-// UseStateForUnknown. UseStateForUnknown copies the prior state value — INCLUDING
-// null — into an unset plan, so a field the server omits when unconfigured (e.g.
-// self_service.after_install_button_text, which the server returns absent → null)
-// stays null on every plan instead of churning to "(known after apply)". For
-// fields the server does default (e.g. install_button_text → "Install") the prior
-// state is non-null and the behaviour is identical to UseNonNullStateForUnknown.
+// optComputedString returns an Optional+Computed StringAttribute carried by
+// planmodifiers.UseStateForUnknownInExistingBlockString.
 //
-// Do NOT use this inside SetNested/ListNested elements: list growth produces a
-// null prior for the new element, which UseStateForUnknown would copy as a known
-// null and then trip "inconsistent result" when the element materialises — use
-// optComputedStringInList there.
+// Neither stock modifier is right. UseStateForUnknown copies a null prior into
+// the plan when the block holding the leaf is new (self_service going from
+// omitted to declared), so apply returns the server's default and Terraform
+// rejects it with "Provider produced inconsistent result after apply".
+// UseNonNullStateForUnknown fixes that but leaves every leaf Jamf Pro never
+// returns (general.external_url, general.itunes_store_url) Unknown in any plan
+// that differs from state at all. The preferences equality collapses its own
+// CRLF-only change to a no-op and restores nothing else, so
+// `plan -refresh=false` was never empty. This modifier carries a null prior
+// while the block exists and leaves it Unknown only when the block is new.
 func optComputedString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 	}
 }
 
-// optComputedBool is the bool sibling of optComputedString (top-level).
+// optComputedBool is the bool sibling of optComputedString.
 func optComputedBool(desc string) schema.BoolAttribute {
 	return schema.BoolAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+		PlanModifiers:       []planmodifier.Bool{planmodifiers.UseStateForUnknownInExistingBlockBool()},
 	}
 }
 
-// optComputedStringInList is the SetNested/ListNested-element flavour of
-// optComputedString: it uses UseNonNullStateForUnknown so a new element's null
-// prior is NOT copied as a known value (which would break the post-apply
-// consistency check as the set grows). See the policy/profile resources for why
-// nested-list Optional+Computed must use the non-null variant.
-func optComputedStringInList(desc string) schema.StringAttribute {
-	return schema.StringAttribute{
-		MarkdownDescription: desc,
-		Optional:            true,
-		Computed:            true,
-		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
-	}
-}
-
-// optComputedBoolInList is the bool sibling of optComputedStringInList.
-func optComputedBoolInList(desc string) schema.BoolAttribute {
-	return schema.BoolAttribute{
-		MarkdownDescription: desc,
-		Optional:            true,
-		Computed:            true,
-		PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseNonNullStateForUnknown()},
-	}
-}
-
-// optComputedInt64 is the Int64 sibling of optComputedString. Int64 has no
-// UseNonNullStateForUnknown in the stock plan modifiers; UseStateForUnknown is
-// safe here because itunes_sync_time is a single top-level scalar (not nested in
-// a growing list), so the null-prior-state consistency trap does not apply.
+// optComputedInt64 is the Int64 sibling of optComputedString.
 func optComputedInt64(desc string) schema.Int64Attribute {
 	return schema.Int64Attribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
+		PlanModifiers:       []planmodifier.Int64{planmodifiers.UseStateForUnknownInExistingBlockInt64()},
 	}
 }
 
@@ -398,6 +370,11 @@ func optComputedInt64(desc string) schema.Int64Attribute {
 // app_configuration.preferences: the framework marks every unset Computed value
 // Unknown and nothing restores it. Watching the id avoids both failures.
 //
+// self_service.self_service_icon.uri mirrors the icon id. An authored uri is
+// ignored on the wire (wire-probed 2026-10-14 on the policy's identical icon
+// block), and UseNonNullStateForUnknown carried the previous icon's uri into a
+// plan that repointed id, so the apply contradicted it. See issue #468.
+//
 // description watches self_service.self_service_description through
 // planmodifiers.NestedStringSource. Watching the whole self_service block fails:
 // the block holds Optional+Computed leaves that are null in config and populated
@@ -409,5 +386,41 @@ func mirrorString(desc string, sources ...planmodifiers.SourceComparer) schema.S
 		MarkdownDescription: desc,
 		Computed:            true,
 		PlanModifiers:       []planmodifier.String{planmodifiers.MirrorOfString(sources...)},
+	}
+}
+
+// categoryName is the `name` of a Self Service category element: Computed-only
+// and never sent, carried from prior state only by the element with the same
+// id.
+//
+// Jamf Pro resolves the category by id and ignores an authored name,
+// wire-probed 2026-10-14 for a mobile device app: id B sent with category A's name
+// stored B, and id A sent with a name no category has stored A. So the name is
+// a pure echo. It used to carry prior state by position, because the framework
+// pairs set elements with prior state by index, so re-pointing an element at
+// another category planned the old category's name on it and the apply failed
+// with "Provider produced inconsistent result after apply". The keyed carry
+// leaves a re-pointed element Unknown for Jamf Pro to answer and keeps an
+// unchanged element's name, including in a plan another modifier collapses.
+func categoryName(desc string) schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: desc,
+		Computed:            true,
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseKeyedStateForUnknownString("id")},
+	}
+}
+
+// optComputedBoolKeyed is an Optional+Computed flag of a Self Service category
+// element, carried from prior state only by the element with the same id
+// rather than by position, which handed a re-pointed element another
+// category's flag. A new element plans Unknown; display_in is then sent as true
+// (helpers.SelfServiceCategoryDisplayIn). See
+// planmodifiers.UseKeyedStateForUnknownBool.
+func optComputedBoolKeyed(desc string) schema.BoolAttribute {
+	return schema.BoolAttribute{
+		MarkdownDescription: desc,
+		Optional:            true,
+		Computed:            true,
+		PlanModifiers:       []planmodifier.Bool{planmodifiers.UseKeyedStateForUnknownBool("id")},
 	}
 }

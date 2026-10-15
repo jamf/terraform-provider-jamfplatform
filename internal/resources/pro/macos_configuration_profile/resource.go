@@ -22,6 +22,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -205,7 +206,7 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 						MarkdownDescription: "Where Self Service surfaces the notification. `Self Service` or `Self Service and Notification Center`.\n\nJamf Pro stores this and `display_notifications` in one field, and setting either resets the other, so `Self Service and Notification Center` cannot be combined with `display_notifications = true` and is refused at plan time. To have both, set them under Self Service ▸ Notification in the Jamf Pro admin UI and leave both attributes out of the configuration; Terraform reads the pairing back and preserves it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 						Validators: []validator.String{
 							stringvalidator.OneOf(validNotificationLocations...),
 						},
@@ -216,7 +217,7 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 						MarkdownDescription: "Removal-by-end-user policy for the Self Service profile. Valid values: `Never`, `Always`, `With Authorization`. `With Authorization` also needs an authorization password, which this resource does not yet expose. Open an issue if you need it. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 						Validators: []validator.String{
 							stringvalidator.OneOf(validRemovalDisallowedValues...),
 						},
@@ -227,9 +228,9 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":         schema.StringAttribute{MarkdownDescription: "Category ID.", Required: true},
-								"name":       optComputedStringInList("Category display name. Returned by Jamf Pro."),
-								"display_in": optComputedBoolInList("Display the profile in this category. Defaults to `true`, which is what listing the category means, matching the tick under the admin UI's \"Display in\". Setting `false` removes the category rather than storing it undisplayed, because Jamf Pro keeps no such state."),
-								"feature_in": optComputedBoolInList("Feature the profile in this category, matching the admin UI's \"Feature in\" column. Has no effect unless `display_in` is `true`."),
+								"name":       categoryName("Category display name. Returned by Jamf Pro."),
+								"display_in": optComputedBoolKeyed("Display the profile in this category. Defaults to `true`, which is what listing the category means, matching the tick under the admin UI's \"Display in\". Setting `false` removes the category rather than storing it undisplayed, because Jamf Pro keeps no such state."),
+								"feature_in": optComputedBoolKeyed("Feature the profile in this category, matching the admin UI's \"Feature in\" column. Has no effect unless `display_in` is `true`."),
 							},
 						},
 					},
@@ -271,26 +272,30 @@ func (r *Resource) ImportState(ctx context.Context, req resource.ImportStateRequ
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// optComputedString and optComputedBool are the top-level / single-nested
-// Optional+Computed field helpers. They use UseStateForUnknown so a state
-// value of Null carries through to the plan as Null (instead of staying
-// Unknown). Required for fields the user may omit in HCL — without this,
-// every plan refresh would show null→Unknown as a planned change and
-// produce a spurious [update] action.
+// optComputedString and optComputedBool are the Optional+Computed field
+// helpers. They carry the prior state value into an unset plan with
+// planmodifiers.UseStateForUnknownInExistingBlock*, so an omitted field the
+// server left null stays null instead of showing a spurious [update].
 //
-// For Optional+Computed scalars that live INSIDE a ListNestedAttribute or
-// SetNestedAttribute element, use optComputedStringInList / optComputedBoolInList
-// — they apply UseNonNullStateForUnknown because an appended list element
-// has prior state Null at its new index, and UseStateForUnknown there would
-// trip the "Provider produced inconsistent result after apply" check.
-// STYLE_GUIDE §"Optional+Computed scalars inside a ListNestedAttribute …"
-// is the reference for that split.
+// Plain UseStateForUnknown is wrong inside self_service. When the block goes
+// from omitted to declared, every leaf in it holds null in state, the plan
+// copies that null, and apply returns the server's default: "Provider produced
+// inconsistent result after apply" on self_service_display_name,
+// notification_location and removal_disallowed, reproduced live 2026-10-14.
+// UseNonNullStateForUnknown would also avoid that, but this resource's
+// ModifyPlan writes the plan to suppress payload noise, so a plan can collapse
+// to a no-op and the non-null variant would leave every null-prior leaf
+// Unknown in it (STYLE_GUIDE rule 1a). The in-existing-block modifier carries a
+// null prior only when the block is already in state.
+//
+// The categories list elements use categoryName and optComputedBoolKeyed
+// instead, which carry prior state by category id.
 func optComputedString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
 	}
 }
 
@@ -299,25 +304,43 @@ func optComputedBool(desc string) schema.BoolAttribute {
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+		PlanModifiers:       []planmodifier.Bool{planmodifiers.UseStateForUnknownInExistingBlockBool()},
 	}
 }
 
-func optComputedStringInList(desc string) schema.StringAttribute {
+// categoryName is the `name` of a Self Service category element: Computed-only
+// and never sent, carried from prior state only by the element with the same
+// id.
+//
+// Jamf Pro resolves the category by id and ignores an authored name,
+// wire-probed 2026-10-14 for a macOS configuration profile (the provider never sent it here, so this records why it must not start): id B sent with category A's name
+// stored B, and id A sent with a name no category has stored A. So the name is
+// a pure echo. It used to carry prior state by position, because the framework
+// pairs list elements with prior state by index, so re-pointing an element at
+// another category planned the old category's name on it and the apply failed
+// with "Provider produced inconsistent result after apply". The keyed carry
+// leaves a re-pointed element Unknown for Jamf Pro to answer and keeps an
+// unchanged element's name, including in a plan another modifier collapses.
+func categoryName(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
-		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseKeyedStateForUnknownString("id")},
 	}
 }
 
-func optComputedBoolInList(desc string) schema.BoolAttribute {
+// optComputedBoolKeyed is an Optional+Computed flag of a Self Service category
+// element, carried from prior state only by the element with the same id
+// rather than by position, which handed a re-pointed element another
+// category's flag. A new element plans Unknown; display_in is then sent as true
+// (helpers.SelfServiceCategoryDisplayIn) and an unset feature_in is omitted. See
+// planmodifiers.UseKeyedStateForUnknownBool.
+func optComputedBoolKeyed(desc string) schema.BoolAttribute {
 	return schema.BoolAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseNonNullStateForUnknown()},
+		PlanModifiers:       []planmodifier.Bool{planmodifiers.UseKeyedStateForUnknownBool("id")},
 	}
 }
 

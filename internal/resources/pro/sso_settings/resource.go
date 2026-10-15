@@ -77,6 +77,14 @@ func (r *SsoSettingsResource) IdentitySchema(ctx context.Context, req resource.I
 }
 
 // Schema returns the resource schema.
+//
+// The Optional+Computed leaves of oidc_settings and saml_settings use
+// UseNonNullStateForUnknown rather than UseStateForUnknown. Either block is null
+// in state until a configuration_type change adds it (OIDC to OIDC_WITH_SAML adds
+// saml_settings, SAML to OIDC_WITH_SAML adds oidc_settings), and a leaf carried
+// from that null fails apply with "Provider produced inconsistent result after
+// apply" wherever Jamf Pro defaults it. Found by nullprior; not reproduced live,
+// because exercising it rewrites the tenant's SSO record.
 func (r *SsoSettingsResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages Jamf Pro **Single Sign-On (SSO)** settings (UI: Settings → System → Single Sign-On). One record per tenant. Combines the SSO configuration with an embedded `signing_certificate` sub-block that manages the SAML signing keystore as a single resource.\n\n" +
@@ -190,13 +198,13 @@ func (r *SsoSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 						MarkdownDescription: "Allow Jamf ID authentication alongside the configured OIDC provider. Omit to leave the current value untouched; set `true`/`false` to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseNonNullStateForUnknown()},
 					},
 					"username_attribute_claim_mapping": schema.StringAttribute{
 						MarkdownDescription: "OIDC claim used as the username attribute. One of `USERNAME` or `EMAIL`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 						Validators: []validator.String{
 							stringvalidator.OneOf(validUserMappings...),
 						},
@@ -212,7 +220,7 @@ func (r *SsoSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 						MarkdownDescription: "SAML IdP type. One of `ADFS`, `OKTA`, `GOOGLE`, `SHIBBOLETH`, `ONELOGIN`, `PING`, `CENTRIFY`, `AZURE`, or `OTHER`. When `OTHER`, `other_provider_type_name` must also be set. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 						Validators: []validator.String{
 							stringvalidator.OneOf(validIdpProviderTypes...),
 							IdpProviderTypeOtherValidator(),
@@ -222,13 +230,13 @@ func (r *SsoSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 						MarkdownDescription: "Display name for the IdP when `idp_provider_type = \"OTHER\"`. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 					},
 					"entity_id": schema.StringAttribute{
 						MarkdownDescription: "SAML EntityID. Required (non-empty) when `configuration_type` includes SAML. Omit to leave the current value untouched.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 						Validators: []validator.String{
 							SamlEntityIDRequiredValidator(),
 						},
@@ -237,7 +245,7 @@ func (r *SsoSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 						MarkdownDescription: "How Jamf Pro obtains IdP SAML metadata. `URL` (Jamf Pro fetches metadata from `idp_url`) or `FILE` (raw base64 supplied in `federation_metadata_file`). The two branches are mutually exclusive. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 						Validators: []validator.String{
 							stringvalidator.OneOf(validMetadataSources...),
 							MetadataSourceBranchValidator(),
@@ -247,7 +255,7 @@ func (r *SsoSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 						MarkdownDescription: "URL Jamf Pro fetches IdP metadata from. Required when `metadata_source = \"URL\"`. Jamf Pro performs a live HTTP fetch when the resource is applied; the URL is not pre-validated for syntax or reachability by the provider. Omit to leave the current value untouched.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 					},
 					"federation_metadata_file": schema.StringAttribute{
 						MarkdownDescription: "Raw base64 of the IdP SAML metadata XML. Required when `metadata_source = \"FILE\"`. Idiomatic usage: `filebase64(\"idp-metadata.xml\")`.",
@@ -258,13 +266,13 @@ func (r *SsoSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 						MarkdownDescription: "Display filename for the uploaded metadata. Required when `metadata_source = \"FILE\"`; must be omitted when `metadata_source = \"URL\"`. Omit to leave the current value untouched.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 					},
 					"session_timeout": schema.Int64Attribute{
 						MarkdownDescription: "SAML session timeout in minutes. Upper bound: 35,791,393. Jamf Pro keeps the stored value even when `token_expiration_disabled = true`. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseNonNullStateForUnknown()},
 						Validators: []validator.Int64{
 							int64validator.AtMost(35791393),
 						},
@@ -273,13 +281,13 @@ func (r *SsoSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 						MarkdownDescription: "Disable SAML token expiration. When `true`, `session_timeout` becomes runtime-inactive but is still stored. Defaults to `true` on the first apply. Jamf Pro requires an explicit boolean here, so the provider always sends one on update. Omit to leave the current value untouched; set `true`/`false` to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseNonNullStateForUnknown()},
 					},
 					"user_mapping": schema.StringAttribute{
 						MarkdownDescription: "How SAML attributes map to Jamf Pro users. One of `USERNAME` or `EMAIL`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 						Validators: []validator.String{
 							stringvalidator.OneOf(validUserMappings...),
 						},
@@ -288,7 +296,7 @@ func (r *SsoSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 						MarkdownDescription: "Use a custom SAML attribute (`user_attribute_name`) for username lookup instead of NameID. Requires `user_attribute_name` when `true`. Defaults to `false` on the first apply. Jamf Pro requires an explicit boolean here, so the provider always sends one on update. Omit to leave the current value untouched; set `true`/`false` to change it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseNonNullStateForUnknown()},
 						Validators: []validator.Bool{
 							UserAttributeEnabledValidator(),
 						},
@@ -297,13 +305,13 @@ func (r *SsoSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 						MarkdownDescription: "Name of the SAML attribute carrying the username. Required when `user_attribute_enabled = true`. Omit to leave the current value untouched.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 					},
 					"group_attribute_name": schema.StringAttribute{
 						MarkdownDescription: "SAML attribute carrying group claims (e.g. `http://schemas.xmlsoap.org/claims/Group`). Required (non-empty) when `configuration_type` includes SAML. Omit to leave the current value untouched.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 						Validators: []validator.String{
 							SamlGroupAttributeNameRequiredValidator(),
 						},
@@ -312,7 +320,7 @@ func (r *SsoSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 						MarkdownDescription: "RDN token (e.g. `CN`, `DC`, `OU`) applied when group claims arrive as full distinguished names. Omit to leave any existing value untouched; set to `\"\"` to clear it.",
 						Optional:            true,
 						Computed:            true,
-						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 					},
 				},
 			},

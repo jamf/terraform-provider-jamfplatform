@@ -21,7 +21,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -29,6 +28,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -187,7 +187,7 @@ func (r *MacAppResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"id":  optComputedString("Icon ID assigned by Jamf Pro."),
-							"uri": optComputedString("Icon URI. Returned by Jamf Pro."),
+							"uri": iconMirrorString("Icon URI. Jamf Pro sets it from the icon `id`."),
 						},
 					},
 					"self_service_categories": schema.SetNestedAttribute{
@@ -196,9 +196,9 @@ func (r *MacAppResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":         schema.StringAttribute{MarkdownDescription: "Category ID.", Required: true},
-								"name":       optComputedString("Category display name. Returned by Jamf Pro."),
-								"display_in": optComputedBool("Display the app in this category."),
-								"feature_in": optComputedBool("Feature the app in this category."),
+								"name":       categoryName("Category display name. Returned by Jamf Pro."),
+								"display_in": optComputedBoolKeyed("Display the app in this category."),
+								"feature_in": optComputedBoolKeyed("Feature the app in this category."),
 							},
 						},
 					},
@@ -292,11 +292,6 @@ func (r *MacAppResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 	}
 }
 
-// optComputedString returns an Optional+Computed StringAttribute with the
-// UseNonNullStateForUnknown plan modifier for server-augmented fields. Used
-// both at top level and inside SetNested list elements — see the policy
-// resource doc comment for why UseNonNullStateForUnknown (not UseStateForUnknown)
-// is required for nested-list growth.
 // macAppNotificationMethodSelfService is the only notification method Jamf Pro
 // keeps for a Mac App Store app. The classic API reads the method and the
 // enabled flag from two sibling <notification> elements into one field, last
@@ -304,6 +299,33 @@ func (r *MacAppResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 // turns notifications off. Wire-probed 2026-10-01 against 11.32.0.
 const macAppNotificationMethodSelfService = "Self Service"
 
+// iconMirrorString is a Computed-only string Jamf Pro derives from the Self
+// Service icon's id: the CDN uri of whichever icon the id names.
+//
+// An authored uri is ignored on the wire (wire-probed 2026-10-14 against the
+// policy's identical icon block), so it cannot be Optional, and
+// UseNonNullStateForUnknown carries the previous icon's uri into a plan that
+// repoints id, which the apply then contradicts: "Provider produced
+// inconsistent result after apply". planmodifiers.MirrorOfString watches id and
+// carries the prior value only while it is unchanged. See issue #468.
+func iconMirrorString(desc string) schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: desc,
+		Computed:            true,
+		PlanModifiers: []planmodifier.String{
+			planmodifiers.MirrorOfString(planmodifiers.NestedStringSource(path.MatchRoot("self_service").AtName("self_service_icon"), "id")),
+		},
+	}
+}
+
+// optComputedString returns an Optional+Computed StringAttribute with the
+// UseNonNullStateForUnknown plan modifier for server-augmented fields. It is
+// used at top level and in the self_service and vpp blocks, all of which can
+// have a null prior that UseStateForUnknown would wrongly plan; see the
+// policy's optComputedString.
+// Leaving a null prior Unknown is safe only while nothing in the resource can
+// collapse a configured change back to prior state, which
+// TestMacAppResource_NothingCollapsesAPlan enforces (STYLE_GUIDE rule 1a).
 func optComputedString(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
@@ -323,12 +345,55 @@ func optComputedBool(desc string) schema.BoolAttribute {
 	}
 }
 
+// categoryName is the `name` of a self_service_categories element:
+// Computed-only and never sent, carried from prior state only by the element
+// with the same id.
+//
+// Jamf Pro resolves a Mac app's Self Service category by id and ignores an
+// authored name, wire-probed 2026-10-14: id B sent with category A's name
+// stored B, and id A sent with a name no category has stored A. So the name is
+// a pure echo. It used to be Optional+Computed with UseNonNullStateForUnknown,
+// and the framework pairs set elements with prior state by position, so
+// re-pointing an element at another category planned the old category's name
+// on it and the apply failed with "planned set element ... does not correlate
+// with any element in actual". The keyed carry leaves a re-pointed element
+// Unknown for Jamf Pro to answer and keeps an unchanged element's name.
+func categoryName(desc string) schema.StringAttribute {
+	return schema.StringAttribute{
+		MarkdownDescription: desc,
+		Computed:            true,
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseKeyedStateForUnknownString("id")},
+	}
+}
+
+// optComputedBoolKeyed is optComputedBool for a self_service_categories
+// element. It carries prior state only from the element with the same id,
+// where optComputedBool's positional carry handed a re-keyed element another
+// category's display_in and feature_in. A new element plans Unknown:
+// display_in is then sent as true (helpers.SelfServiceCategoryDisplayIn) and
+// feature_in is omitted, which Jamf Pro stores as false. See
+// planmodifiers.UseKeyedStateForUnknownBool.
+func optComputedBoolKeyed(desc string) schema.BoolAttribute {
+	a := optComputedBool(desc)
+	a.PlanModifiers = []planmodifier.Bool{planmodifiers.UseKeyedStateForUnknownBool("id")}
+	return a
+}
+
 // computedInt64 returns a Computed-only Int64Attribute for server-derived
-// values (VPP license counts).
+// values (VPP license counts), with no plan modifier.
+//
+// The counts come from the location vpp_admin_account_id names, and Jamf Pro
+// returns none while it is -1. Carrying the prior value forward is wrong in
+// both directions, wire-probed 2026-10-14 against a VPP-backed Slack for
+// Desktop: UseStateForUnknown planned null when vpp went from omitted to
+// declared and apply returned 10/10/0, and it planned 10/10/0 when
+// vpp_admin_account_id moved to -1 and apply returned null. Both failed with
+// "Provider produced inconsistent result after apply", as did moving back. Left
+// plain Computed, the counts are Unknown in a plan that changes anything else
+// and settle on what Jamf Pro returns; an idle plan stays empty.
 func computedInt64(desc string) schema.Int64Attribute {
 	return schema.Int64Attribute{
 		MarkdownDescription: desc,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 	}
 }

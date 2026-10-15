@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -318,14 +319,26 @@ func (r *MobileDevicePrestageEnrollmentResource) ImportState(ctx context.Context
 }
 
 // optBool / optString / optInt64 are local helpers for the repetitive
-// Optional+Computed scalar shape used across the schema.
+// Optional+Computed scalar shape used across the schema. They carry the prior
+// value with planmodifiers.UseStateForUnknownInExistingBlock*.
+//
+// Plain UseStateForUnknown is wrong here. When location_information,
+// purchasing_information, names or skip_setup_items goes from omitted to
+// declared, every leaf in it holds null in state, the plan copies that null, and
+// apply returns the server's default ("", -1, false, 1970-01-01, "Serial
+// Numbers"): "Provider produced inconsistent result after apply" on every leaf
+// the configuration leaves out, reproduced live 2026-10-14.
+// UseNonNullStateForUnknown would avoid that too, but ModifyPlan writes the plan,
+// so a plan can collapse to a no-op and the non-null variant would leave each
+// null-prior leaf Unknown in it (STYLE_GUIDE rule 1a). The in-existing-block
+// modifier carries a null prior only when the block is already in state.
 func optBool(md string) schema.Attribute {
 	return schema.BoolAttribute{
 		MarkdownDescription: md,
 		Optional:            true,
 		Computed:            true,
 		PlanModifiers: []planmodifier.Bool{
-			boolplanmodifier.UseStateForUnknown(),
+			planmodifiers.UseStateForUnknownInExistingBlockBool(),
 		},
 	}
 }
@@ -336,7 +349,7 @@ func optString(md string) schema.Attribute {
 		Optional:            true,
 		Computed:            true,
 		PlanModifiers: []planmodifier.String{
-			stringplanmodifier.UseStateForUnknown(),
+			planmodifiers.UseStateForUnknownInExistingBlockString(),
 		},
 	}
 }
@@ -347,7 +360,7 @@ func optInt64(md string) schema.Attribute {
 		Optional:            true,
 		Computed:            true,
 		PlanModifiers: []planmodifier.Int64{
-			int64planmodifier.UseStateForUnknown(),
+			planmodifiers.UseStateForUnknownInExistingBlockInt64(),
 		},
 		Validators: []validator.Int64{
 			int64validator.AtLeast(0),
@@ -429,7 +442,7 @@ func namesSchema() schema.SingleNestedAttribute {
 					singleNameRequiresSingleDeviceName(),
 				},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					planmodifiers.UseStateForUnknownInExistingBlockString(),
 				},
 			},
 			"manage_names":       optBool("**\"Enforce Mobile Device Names\"** in the Jamf Pro admin UI."),

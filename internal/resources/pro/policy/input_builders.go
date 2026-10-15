@@ -431,13 +431,8 @@ func buildPolicySelfService(m *PolicySelfServiceModel) *proclassic.PolicyPostSel
 	}
 
 	if m.SelfServiceIcon != nil {
-		icon := &proclassic.PolicySelfServiceSelfServiceIcon{
-			ID:       helpers.StringIDPtr(m.SelfServiceIcon.ID),
-			URI:      helpers.OptionalStringPointer(m.SelfServiceIcon.URI),
-			Filename: helpers.OptionalStringPointer(m.SelfServiceIcon.Filename),
-		}
-		if icon.ID != nil || icon.URI != nil || icon.Filename != nil {
-			ss.SelfServiceIcon = icon
+		if id := helpers.StringIDPtr(m.SelfServiceIcon.ID); id != nil {
+			ss.SelfServiceIcon = &proclassic.PolicySelfServiceSelfServiceIcon{ID: id}
 		}
 	}
 

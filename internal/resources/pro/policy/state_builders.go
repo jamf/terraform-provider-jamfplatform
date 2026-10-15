@@ -507,7 +507,9 @@ func flattenExclUsersNameSet(ctx context.Context, u *proclassic.PolicyScopeExclu
 //
 // Every other field here, the self_service_icon triple included, is echoed
 // unconditionally and reads from the wire. Wire-probed against Jamf Pro
-// 11.31.1 on 2026-09-06; see issue #387.
+// 11.31.1 on 2026-09-06; see issue #387. Of the triple only id is an input:
+// uri and filename are Computed-only and always the wire's answer, never a
+// reconcile against the prior value (issue #468).
 func flattenPolicySelfService(ss *proclassic.PolicySelfService, state *PolicySelfServiceModel, includeUnmanaged bool) {
 	if includeUnmanaged {
 		if state.SelfServiceIcon == nil && ss.SelfServiceIcon != nil {
@@ -531,8 +533,8 @@ func flattenPolicySelfService(ss *proclassic.PolicySelfService, state *PolicySel
 
 	if state.SelfServiceIcon != nil && ss.SelfServiceIcon != nil {
 		state.SelfServiceIcon.ID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.SelfServiceIcon.ID)
-		state.SelfServiceIcon.URI = helpers.ReconcileOptionalStringPointer(ss.SelfServiceIcon.URI, state.SelfServiceIcon.URI)
-		state.SelfServiceIcon.Filename = helpers.ReconcileOptionalStringPointer(ss.SelfServiceIcon.Filename, state.SelfServiceIcon.Filename)
+		state.SelfServiceIcon.URI = helpers.StringPointerValueOrNull(ss.SelfServiceIcon.URI)
+		state.SelfServiceIcon.Filename = helpers.StringPointerValueOrNull(ss.SelfServiceIcon.Filename)
 	}
 
 	// Self Service categories are an unordered Set; rebuild the slice

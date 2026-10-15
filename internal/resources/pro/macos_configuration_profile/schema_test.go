@@ -9,6 +9,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/keyedcategories"
 )
 
 func TestResource_Schema(t *testing.T) {
@@ -102,4 +104,16 @@ func TestResource_PayloadsAttributeRequired(t *testing.T) {
 	if _, ok := r.(resource.ResourceWithModifyPlan); !ok {
 		t.Fatal("expected Resource to implement ResourceWithModifyPlan for payload diff suppression")
 	}
+}
+
+// TestMacOSConfigurationProfileResource_SelfServiceCategoriesCarryByID pins the category element
+// shape: Jamf Pro resolves a category by id, so name is Computed-only, and it
+// and the flags carry prior state by id rather than by position. See
+// keyedcategories.AssertCarriedByID.
+func TestMacOSConfigurationProfileResource_SelfServiceCategoriesCarryByID(t *testing.T) {
+	t.Parallel()
+	var resp resource.SchemaResponse
+	NewResource().(*Resource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	ss := resp.Schema.Attributes["self_service"].(rschema.SingleNestedAttribute)
+	keyedcategories.AssertCarriedByID(t, ss.Attributes["categories"].(rschema.ListNestedAttribute).NestedObject.Attributes, "display_in", "feature_in")
 }

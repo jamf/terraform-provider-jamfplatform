@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-testing/compare"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
@@ -1332,6 +1333,125 @@ func TestAccResource_ProMobileApp_EmptyPreferencesRoundTrip(t *testing.T) {
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(mobileAppResourceAddr, tfjsonpath.New("app_configuration").AtMapKey("preferences"), knownvalue.StringExact("")),
 				},
+			},
+		},
+	})
+}
+
+// mobileAppConfigIconPick declares two icons and an app pointing at the one
+// named by pick ("a" or "b").
+func mobileAppConfigIconPick(iconA, iconB, name, pick string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_icon" "a" {
+  icon_file_source = %q
+}
+
+resource "jamfplatform_pro_icon" "b" {
+  icon_file_source = %q
+}
+
+resource "jamfplatform_pro_mobile_device_app" "test" {
+  general = {
+    name                 = %q
+    version              = "1.0"
+    bundle_id            = "com.example.tfacc.mobileapp"
+    os_type              = "iOS"
+    deploy_automatically = false
+  }
+  self_service = {
+    self_service_icon = {
+      id = jamfplatform_pro_icon.%s.id
+    }
+  }
+}
+`, iconA, iconB, name, pick)
+}
+
+// TestAccResource_ProMobileApp_SelfServiceIconRepoint is the #468 regression
+// test for the mobile app. Jamf Pro derives self_service_icon.uri from the icon
+// id, so repointing id changes it. It was Optional+Computed with
+// UseStateForUnknown, which planned the previous icon's uri and failed the
+// apply with "Provider produced inconsistent result after apply". The trailing
+// empty-plan check the harness runs after each step covers the settle.
+func TestAccResource_ProMobileApp_SelfServiceIconRepoint(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-mobile-icon-" + suffix
+	iconA, iconB := testhelpers.WriteIconFixtures(t, suffix)
+	uriPath := tfjsonpath.New("self_service").AtMapKey("self_service_icon").AtMapKey("uri")
+	uriDiffers := statecheck.CompareValue(compare.ValuesDiffer())
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMobileAppDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: mobileAppConfigIconPick(iconA, iconB, name, "a"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPair(mobileAppResourceAddr, "self_service.self_service_icon.id", "jamfplatform_pro_icon.a", "id"),
+					resource.TestCheckResourceAttrSet(mobileAppResourceAddr, "self_service.self_service_icon.uri"),
+				),
+				ConfigStateChecks: []statecheck.StateCheck{uriDiffers.AddStateValue(mobileAppResourceAddr, uriPath)},
+			},
+			{
+				Config: mobileAppConfigIconPick(iconA, iconB, name, "b"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPair(mobileAppResourceAddr, "self_service.self_service_icon.id", "jamfplatform_pro_icon.b", "id"),
+					resource.TestCheckResourceAttrSet(mobileAppResourceAddr, "self_service.self_service_icon.uri"),
+				),
+				ConfigStateChecks: []statecheck.StateCheck{uriDiffers.AddStateValue(mobileAppResourceAddr, uriPath)},
+			},
+			{
+				Config: mobileAppConfigIconPick(iconA, iconB, name, "a"),
+				Check:  resource.TestCheckResourceAttrPair(mobileAppResourceAddr, "self_service.self_service_icon.id", "jamfplatform_pro_icon.a", "id"),
+			},
+		},
+	})
+}
+
+// mobileAppConfigSelfService returns an app whose self_service block is
+// declared when declare is true and omitted otherwise.
+func mobileAppConfigSelfService(name string, declare bool) string {
+	block := ""
+	if declare {
+		block = `
+  self_service = {
+    install_button_text = "Get"
+  }
+`
+	}
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_mobile_device_app" "test" {
+  general = {
+    name                 = %q
+    version              = "1.0"
+    bundle_id            = "com.example.tfacc.mobileapp"
+    os_type              = "iOS"
+    deploy_automatically = false
+  }%s
+}
+`, name, block)
+}
+
+// TestAccResource_ProMobileApp_SelfServiceOmittedToDeclared is the regression
+// test for the self_service block going from omitted to declared in one apply.
+// Every Optional+Computed leaf inside it holds null in state, and
+// UseStateForUnknown planned that null where apply returned the server's
+// default: feature_on_main_page and notification_enabled failed with "Provider
+// produced inconsistent result after apply". The harness's trailing empty-plan
+// check covers the settle.
+func TestAccResource_ProMobileApp_SelfServiceOmittedToDeclared(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-mobile-ss-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMobileAppDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: mobileAppConfigSelfService(name, false)},
+			{
+				Config: mobileAppConfigSelfService(name, true),
+				Check:  resource.TestCheckResourceAttr(mobileAppResourceAddr, "self_service.install_button_text", "Get"),
 			},
 		},
 	})

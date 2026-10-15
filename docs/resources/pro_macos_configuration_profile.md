@@ -256,6 +256,9 @@ Optional:
 
 - `display_in` (Boolean) Display the profile in this category. Defaults to `true`, which is what listing the category means, matching the tick under the admin UI's "Display in". Setting `false` removes the category rather than storing it undisplayed, because Jamf Pro keeps no such state.
 - `feature_in` (Boolean) Feature the profile in this category, matching the admin UI's "Feature in" column. Has no effect unless `display_in` is `true`.
+
+Read-Only:
+
 - `name` (String) Category display name. Returned by Jamf Pro.
 
 
