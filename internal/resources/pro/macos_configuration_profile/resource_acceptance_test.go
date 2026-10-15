@@ -2192,3 +2192,173 @@ func freshWebClipPayload(t *testing.T) string {
 	}
 	return s
 }
+
+// liveProfileScope reads a profile's scope straight from the server, bypassing
+// the provider, so a test can assert what the wire really holds.
+func liveProfileScope(t *testing.T, profileID string) *proclassic.OsXConfigurationProfileScope {
+	t.Helper()
+	got, err := testhelpers.NewProClassicClient(t).GetOSXConfigurationProfileByID(context.Background(), profileID)
+	if err != nil {
+		t.Fatalf("GetOSXConfigurationProfileByID(%s): %v", profileID, err)
+	}
+	if got.Scope == nil {
+		t.Fatalf("profile %s has no scope", profileID)
+	}
+	return got.Scope
+}
+
+// TestAccResource_MacOSConfigurationProfile_ScopeDeclaredGroupSurvivesUIAllComputers
+// is the #467 regression. The configuration declares only computer_group_ids
+// and leaves all_computers unmanaged; an admin then switches All Computers on in
+// the UI, which wipes the group. The next apply must put the declared group
+// back and turn the flag off, not inherit the flag and fail with "Provider
+// produced inconsistent result after apply".
+func TestAccResource_MacOSConfigurationProfile_ScopeDeclaredGroupSurvivesUIAllComputers(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-mcp-uiall-" + suffix
+	payload := readFixture(t, "1Password__notifications_profile.mobileconfig")
+	cfg := fmt.Sprintf(`
+resource "jamfplatform_pro_static_computer_group" "g" {
+  name = %q
+}
+
+resource "jamfplatform_pro_macos_configuration_profile" "test" {
+  general = {
+    name     = %q
+    payloads = <<EOF
+%sEOF
+  }
+  scope = {
+    targets = {
+      computer_group_ids = [jamfplatform_pro_static_computer_group.g.id]
+    }
+  }
+}
+`, name, name, payload)
+
+	var profileID string
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg,
+				Check: func(s *terraform.State) error {
+					profileID = s.RootModule().Resources["jamfplatform_pro_macos_configuration_profile.test"].Primary.ID
+					return nil
+				},
+			},
+			{
+				PreConfig: func() {
+					c := testhelpers.NewProClassicClient(t)
+					if err := c.UpdateOSXConfigurationProfileByID(context.Background(), profileID, &proclassic.OsXConfigurationProfile{
+						Scope: &proclassic.OsXConfigurationProfileScope{AllComputers: new(true)},
+					}); err != nil {
+						t.Fatalf("simulating the UI's All Computers toggle: %v", err)
+					}
+					if live := liveProfileScope(t, profileID); live.AllComputers == nil || !*live.AllComputers {
+						t.Fatalf("precondition: the live profile should have all_computers=true, got %+v", live.AllComputers)
+					}
+				},
+				Config: cfg,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("jamfplatform_pro_macos_configuration_profile.test", "scope.targets.computer_group_ids.#", "1"),
+					resource.TestCheckNoResourceAttr("jamfplatform_pro_macos_configuration_profile.test", "scope.targets.all_computers"),
+					func(*terraform.State) error {
+						live := liveProfileScope(t, profileID)
+						if live.AllComputers == nil || *live.AllComputers {
+							return fmt.Errorf("expected the server's all_computers to be false, got %v", live.AllComputers)
+						}
+						if live.ComputerGroups == nil || live.ComputerGroups.ComputerGroup == nil || len(*live.ComputerGroups.ComputerGroup) != 1 {
+							return fmt.Errorf("expected exactly one computer group on the server, got %+v", live.ComputerGroups)
+						}
+						return nil
+					},
+				),
+			},
+		},
+	})
+}
+
+// TestAccResource_MacOSConfigurationProfile_ScopeAllComputersAlongsideBuilding
+// pins the corrected pairing: all_computers pairs with computers and computer
+// groups only, so a building can be declared alongside it (the server and the
+// admin UI both accept that), and a building an admin adds in the UI survives an
+// unrelated update. Both used to fail: the validator rejected the first and the
+// merge silently emptied the second.
+func TestAccResource_MacOSConfigurationProfile_ScopeAllComputersAlongsideBuilding(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-mcp-allbld-" + suffix
+	payload := readFixture(t, "1Password__notifications_profile.mobileconfig")
+	cfg := func(description string, declareBuilding bool) string {
+		building := ""
+		if declareBuilding {
+			building = "building_ids = [jamfplatform_pro_building.b.id]"
+		}
+		return fmt.Sprintf(`
+resource "jamfplatform_pro_building" "b" {
+  name = %q
+}
+
+resource "jamfplatform_pro_macos_configuration_profile" "test" {
+  general = {
+    name        = %q
+    description = %q
+    payloads    = <<EOF
+%sEOF
+  }
+  scope = {
+    targets = {
+      all_computers = true
+      %s
+    }
+  }
+}
+`, name+"-b", name, description, payload, building)
+	}
+
+	liveBuildings := func(t *testing.T, profileID string) int {
+		live := liveProfileScope(t, profileID)
+		if live.AllComputers == nil || !*live.AllComputers {
+			t.Fatalf("expected the server's all_computers to be true, got %v", live.AllComputers)
+		}
+		if live.Buildings == nil || live.Buildings.Building == nil {
+			return 0
+		}
+		return len(*live.Buildings.Building)
+	}
+
+	var profileID string
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg("declared", true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("jamfplatform_pro_macos_configuration_profile.test", "scope.targets.building_ids.#", "1"),
+					func(s *terraform.State) error {
+						profileID = s.RootModule().Resources["jamfplatform_pro_macos_configuration_profile.test"].Primary.ID
+						if n := liveBuildings(t, profileID); n != 1 {
+							return fmt.Errorf("expected the server to hold the declared building, got %d", n)
+						}
+						return nil
+					},
+				),
+			},
+			{
+				// Drop the declaration and change something unrelated: the building
+				// is now the admin UI's to own, so the update must leave it alone.
+				Config: cfg("building left to the UI", false),
+				Check: func(*terraform.State) error {
+					if n := liveBuildings(t, profileID); n != 1 {
+						return fmt.Errorf("expected the building the configuration no longer declares to survive the update, got %d", n)
+					}
+					return nil
+				},
+			},
+		},
+	})
+}

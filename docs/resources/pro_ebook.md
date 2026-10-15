@@ -155,9 +155,9 @@ Optional:
 
 Optional:
 
-- `all_computers` (Boolean) Scope to every computer in the tenant. Forbids `computer_ids` / `computer_group_ids` when true. Omit to leave the toggle as configured outside Terraform.
-- `all_jss_users` (Boolean) Scope to every Jamf Pro user in the tenant. Forbids `user_ids` / `user_group_ids` when true. Omit to leave the toggle as configured outside Terraform.
-- `all_mobile_devices` (Boolean) Scope to every mobile device in the tenant. Forbids `mobile_device_ids` / `mobile_device_group_ids` when true. Omit to leave the toggle as configured outside Terraform.
+- `all_computers` (Boolean) Scope to every computer in the tenant. Forbids `computer_ids` and `computer_group_ids` when true. When `all_mobile_devices` and `all_jss_users` are also true, it forbids `building_ids`, `department_ids` and `class_ids` too, because the admin UI offers none of them with all three selected. Left unset, the toggle keeps the value configured outside Terraform, unless you declare `computer_ids` or `computer_group_ids`, which turns it off.
+- `all_jss_users` (Boolean) Scope to every Jamf Pro user in the tenant. Forbids `user_ids` and `user_group_ids` when true. Left unset, the toggle keeps the value configured outside Terraform, unless you declare `user_ids` or `user_group_ids`, which turns it off.
+- `all_mobile_devices` (Boolean) Scope to every mobile device in the tenant. Forbids `mobile_device_ids` and `mobile_device_group_ids` when true. Left unset, the toggle keeps the value configured outside Terraform, unless you declare `mobile_device_ids` or `mobile_device_group_ids`, which turns it off.
 - `building_ids` (Set of String) Set of Jamf Pro building IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.
 - `class_ids` (Set of String) Set of Jamf Pro class IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.
 - `computer_group_ids` (Set of String) Set of Jamf Pro computer group IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.

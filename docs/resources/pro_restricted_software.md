@@ -146,7 +146,7 @@ Optional:
 
 Optional:
 
-- `all_computers` (Boolean) Scope to every computer in the tenant. Forbids per-computer / per-group / per-building / per-department targets when true. Omit to leave the toggle as configured outside Terraform.
+- `all_computers` (Boolean) Scope to every computer in the tenant. When true, you cannot declare `computer_ids`, `computer_group_ids`, `building_ids` or `department_ids`, because the admin UI offers no other target once All Computers is selected. Left unset, the toggle keeps the value configured outside Terraform, unless you declare any of those targets, which turns it off.
 - `building_ids` (Set of String) Set of Jamf Pro building IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.
 - `computer_group_ids` (Set of String) Set of Jamf Pro computer group IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.
 - `computer_ids` (Set of String) Set of Jamf Pro computer IDs (numeric). Omit to leave this category as configured outside Terraform; set `[]` to clear it.

@@ -67,19 +67,17 @@ func MobileScopeAttributes(opts MobileScopeOptions) map[string]schema.Attribute 
 
 	targets := map[string]schema.Attribute{
 		"all_mobile_devices": schema.BoolAttribute{
-			MarkdownDescription: "Scope to every mobile device in the tenant. Forbids per-device / per-group / per-building / per-department targets when true. Omit to leave the toggle as configured outside Terraform.",
+			MarkdownDescription: "Scope to every mobile device in the tenant. Forbids `mobile_device_ids` and `mobile_device_group_ids` when true. You can declare buildings, departments, users and user groups with it. " + OmitAllFlagNote("`mobile_device_ids` or `mobile_device_group_ids`"),
 			Optional:            true,
 			Validators: []validator.Bool{
 				AllFlagConflictsWith(
 					path.MatchRelative().AtParent().AtName("mobile_device_ids"),
 					path.MatchRelative().AtParent().AtName("mobile_device_group_ids"),
-					path.MatchRelative().AtParent().AtName("building_ids"),
-					path.MatchRelative().AtParent().AtName("department_ids"),
 				),
 			},
 		},
 		"all_jss_users": schema.BoolAttribute{
-			MarkdownDescription: "Scope to every Jamf Pro user in the tenant. Equivalent to the admin UI's \"All Users\" toggle. Forbids per-user / per-user-group targets when true. Omit to leave the toggle as configured outside Terraform.",
+			MarkdownDescription: "Scope to every Jamf Pro user in the tenant. Matches the admin UI's \"All Users\" toggle. Forbids `user_ids` and `user_group_ids` when true. " + OmitAllFlagNote("`user_ids` or `user_group_ids`"),
 			Optional:            true,
 			Validators: []validator.Bool{
 				AllFlagConflictsWith(

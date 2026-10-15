@@ -23,7 +23,14 @@ import (
 //
 // All-flag precedence: a merged all-flag that is true empties exactly the
 // target categories its AllFlagConflictsWith validator names — never
-// limitations/exclusions, which coexist with a true flag and are preserved.
+// limitations/exclusions, which coexist with a true flag and are preserved. A
+// declared paired category beats an unmanaged flag (scope.PickAllFlag).
+//
+// This resource honours the admin UI where it is stricter than the wire: with
+// all three flags on, the UI offers no building, department or class, while
+// the server keeps them (wire-probed 2026-10-14). That combination therefore
+// empties those three categories too, and AllFlagsConflictWith rejects them at
+// plan time.
 
 // pickSet returns the declared plan set when the category is managed
 // (non-null), else the live value, else an empty set — merged output is always
@@ -39,16 +46,11 @@ func pickSet(declared, server types.Set) types.Set {
 	return scope.EmptyStringSet()
 }
 
-// pickBool is the all-flag sibling of pickSet: declared wins, else the live
-// value, else false.
-func pickBool(declared, server types.Bool) types.Bool {
-	if !declared.IsNull() {
-		return declared
-	}
-	if !server.IsNull() {
-		return server
-	}
-	return types.BoolValue(false)
+// allThreeFlags reports whether all computers, all mobile devices and all users
+// are all on — the one combination under which the admin UI offers no building,
+// department or class target either.
+func allThreeFlags(t *EbookScopeTargetsModel) bool {
+	return t.AllComputers.ValueBool() && t.AllMobileDevices.ValueBool() && t.AllJssUsers.ValueBool()
 }
 
 // derefOrZero returns the pointed-to sub-block model, or its zero value when
@@ -75,9 +77,9 @@ func mergeEbookScope(plan, server *EbookScopeModel) *EbookScopeModel {
 	}
 	pt, st := plan.TargetsOrZero(), srv.TargetsOrZero()
 	targets := &EbookScopeTargetsModel{
-		AllComputers:         pickBool(pt.AllComputers, st.AllComputers),
-		AllMobileDevices:     pickBool(pt.AllMobileDevices, st.AllMobileDevices),
-		AllJssUsers:          pickBool(pt.AllJssUsers, st.AllJssUsers),
+		AllComputers:         scope.PickAllFlag(pt.AllComputers, st.AllComputers, pt.ComputerIDs, pt.ComputerGroupIDs),
+		AllMobileDevices:     scope.PickAllFlag(pt.AllMobileDevices, st.AllMobileDevices, pt.MobileDeviceIDs, pt.MobileDeviceGroupIDs),
+		AllJssUsers:          scope.PickAllFlag(pt.AllJssUsers, st.AllJssUsers, pt.UserIDs, pt.UserGroupIDs),
 		ComputerIDs:          pickSet(pt.ComputerIDs, st.ComputerIDs),
 		ComputerGroupIDs:     pickSet(pt.ComputerGroupIDs, st.ComputerGroupIDs),
 		MobileDeviceIDs:      pickSet(pt.MobileDeviceIDs, st.MobileDeviceIDs),
@@ -87,6 +89,22 @@ func mergeEbookScope(plan, server *EbookScopeModel) *EbookScopeModel {
 		UserIDs:              pickSet(pt.UserIDs, st.UserIDs),
 		UserGroupIDs:         pickSet(pt.UserGroupIDs, st.UserGroupIDs),
 		ClassIDs:             pickSet(pt.ClassIDs, st.ClassIDs),
+	}
+	// The admin UI offers no building, department or class once all three
+	// flags are on, so a declared one of those beats any flag the plan leaves
+	// unmanaged: each such flag is turned off rather than inheriting a true the
+	// UI set, which the empty-on-all-three rule below would then use to wipe
+	// the members the configuration just declared.
+	if allThreeFlags(targets) && scope.HasMembers(pt.BuildingIDs, pt.DepartmentIDs, pt.ClassIDs) {
+		if pt.AllComputers.IsNull() {
+			targets.AllComputers = types.BoolValue(false)
+		}
+		if pt.AllMobileDevices.IsNull() {
+			targets.AllMobileDevices = types.BoolValue(false)
+		}
+		if pt.AllJssUsers.IsNull() {
+			targets.AllJssUsers = types.BoolValue(false)
+		}
 	}
 	// All-flag precedence — empty exactly the categories each flag's
 	// AllFlagConflictsWith validator names (see ebookScopeAttributes).
@@ -101,6 +119,11 @@ func mergeEbookScope(plan, server *EbookScopeModel) *EbookScopeModel {
 	if targets.AllJssUsers.ValueBool() {
 		targets.UserIDs = scope.EmptyStringSet()
 		targets.UserGroupIDs = scope.EmptyStringSet()
+	}
+	if allThreeFlags(targets) {
+		targets.BuildingIDs = scope.EmptyStringSet()
+		targets.DepartmentIDs = scope.EmptyStringSet()
+		targets.ClassIDs = scope.EmptyStringSet()
 	}
 
 	pl, sl := derefOrZero(plan.Limitations), derefOrZero(srv.Limitations)

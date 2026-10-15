@@ -26,11 +26,47 @@ import "github.com/hashicorp/terraform-plugin-framework/types"
 // preserve on a brand-new object, so undeclared (null) categories simply stay
 // off the POST body.
 //
-// All-flag precedence: a merged all-flag that is true empties the target
-// categories its validator declares it mutually exclusive with. The server
-// wipes them anyway when the flag is set (wire-probed), and emitting members
-// alongside a true flag is undefined; limitations and exclusions coexist with
-// a true flag and are preserved as normal.
+// All-flag precedence has two halves, both keyed on the categories the flag's
+// validator declares it mutually exclusive with (its "paired" categories —
+// all_computers pairs with computers and computer groups, never with
+// buildings or departments; wire-probed 2026-10-14 across every scope-bearing
+// endpoint, see STYLE_GUIDE.md §Scope helper):
+//
+//   - A flag that ends up true empties its paired categories. The server wipes
+//     them anyway when the flag is set, and emitting members alongside a true
+//     flag is undefined; every other category, limitations and exclusions
+//     coexist with a true flag and are preserved as normal.
+//   - A DECLARED non-empty paired category beats an UNMANAGED flag (see
+//     PickAllFlag): the flag is sent false rather than inheriting a true the
+//     admin UI set, which would wipe the members the configuration just asked
+//     for and fail the post-apply consistency check (issue #467).
+
+// HasMembers reports whether any of the given declared sets carries at least
+// one element. A null or unknown set carries none.
+func HasMembers(sets ...types.Set) bool {
+	for _, s := range sets {
+		if !s.IsNull() && !s.IsUnknown() && len(s.Elements()) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// PickAllFlag resolves an all-flag for the read-merge-write overlay. A declared
+// flag always wins; otherwise a declared non-empty paired category turns the
+// flag off — the configuration owns the audience through those members, and a
+// preserved true from the admin UI would wipe them. With neither, the live
+// value is kept (false when there is none). paired are the PLAN's sets for the
+// categories the flag conflicts with, never the merged ones.
+func PickAllFlag(declared, server types.Bool, paired ...types.Set) types.Bool {
+	if !declared.IsNull() {
+		return declared
+	}
+	if HasMembers(paired...) {
+		return types.BoolValue(false)
+	}
+	return pickBool(declared, server)
+}
 
 // pickSet returns the declared plan set when the category is managed
 // (non-null), else the server's current value, else an empty set — merged
@@ -61,8 +97,8 @@ func pickBool(declared, server types.Bool) types.Bool {
 // onto the server's, applying all-flag precedence.
 func mergeComputerTargets(plan, server ComputerScopeTargetsModel) *ComputerScopeTargetsModel {
 	merged := &ComputerScopeTargetsModel{
-		AllComputers:     pickBool(plan.AllComputers, server.AllComputers),
-		AllJssUsers:      pickBool(plan.AllJssUsers, server.AllJssUsers),
+		AllComputers:     PickAllFlag(plan.AllComputers, server.AllComputers, plan.ComputerIDs, plan.ComputerGroupIDs),
+		AllJssUsers:      PickAllFlag(plan.AllJssUsers, server.AllJssUsers, plan.UserIDs, plan.UserGroupIDs),
 		ComputerIDs:      pickSet(plan.ComputerIDs, server.ComputerIDs),
 		ComputerGroupIDs: pickSet(plan.ComputerGroupIDs, server.ComputerGroupIDs),
 		BuildingIDs:      pickSet(plan.BuildingIDs, server.BuildingIDs),
@@ -73,8 +109,6 @@ func mergeComputerTargets(plan, server ComputerScopeTargetsModel) *ComputerScope
 	if merged.AllComputers.ValueBool() {
 		merged.ComputerIDs = EmptyStringSet()
 		merged.ComputerGroupIDs = EmptyStringSet()
-		merged.BuildingIDs = EmptyStringSet()
-		merged.DepartmentIDs = EmptyStringSet()
 	}
 	if merged.AllJssUsers.ValueBool() {
 		merged.UserIDs = EmptyStringSet()
@@ -157,8 +191,8 @@ func MergeComputerScopeNoIbeacons(plan, server *ComputerScopeModelNoIbeacons) *C
 // the server's, applying all-flag precedence.
 func mergeMobileTargets(plan, server MobileScopeTargetsModel) *MobileScopeTargetsModel {
 	merged := &MobileScopeTargetsModel{
-		AllMobileDevices:     pickBool(plan.AllMobileDevices, server.AllMobileDevices),
-		AllJssUsers:          pickBool(plan.AllJssUsers, server.AllJssUsers),
+		AllMobileDevices:     PickAllFlag(plan.AllMobileDevices, server.AllMobileDevices, plan.MobileDeviceIDs, plan.MobileDeviceGroupIDs),
+		AllJssUsers:          PickAllFlag(plan.AllJssUsers, server.AllJssUsers, plan.UserIDs, plan.UserGroupIDs),
 		MobileDeviceIDs:      pickSet(plan.MobileDeviceIDs, server.MobileDeviceIDs),
 		MobileDeviceGroupIDs: pickSet(plan.MobileDeviceGroupIDs, server.MobileDeviceGroupIDs),
 		BuildingIDs:          pickSet(plan.BuildingIDs, server.BuildingIDs),
@@ -169,8 +203,6 @@ func mergeMobileTargets(plan, server MobileScopeTargetsModel) *MobileScopeTarget
 	if merged.AllMobileDevices.ValueBool() {
 		merged.MobileDeviceIDs = EmptyStringSet()
 		merged.MobileDeviceGroupIDs = EmptyStringSet()
-		merged.BuildingIDs = EmptyStringSet()
-		merged.DepartmentIDs = EmptyStringSet()
 	}
 	if merged.AllJssUsers.ValueBool() {
 		merged.UserIDs = EmptyStringSet()
@@ -262,7 +294,7 @@ func MergeUserScope(plan, server *UserScopeModel) *UserScopeModel {
 	pl, sl := derefOrZero(plan.Limitations), derefOrZero(srv.Limitations)
 	pe, se := derefOrZero(plan.Exclusions), derefOrZero(srv.Exclusions)
 	targets := &UserScopeTargetsModel{
-		AllJssUsers:     pickBool(pt.AllJssUsers, st.AllJssUsers),
+		AllJssUsers:     PickAllFlag(pt.AllJssUsers, st.AllJssUsers, pt.JssUserIDs, pt.JssUserGroupIDs),
 		JssUserIDs:      pickSet(pt.JssUserIDs, st.JssUserIDs),
 		JssUserGroupIDs: pickSet(pt.JssUserGroupIDs, st.JssUserGroupIDs),
 	}
