@@ -97,7 +97,7 @@ The schemas are the union of Apple's `release` branch and its newest `seed_OS_*`
 
 ## A key the Jamf Pro editor offers, rejected by the plan
 
-Upgrade the provider. The schemas **ship inside the provider release you have installed**, so there is no cache to clear and no setting to change. Every release carries a fresh copy, which keeps the gap between Apple publishing a key and a release delivering it short. It is not zero.
+Upgrade the provider. The schemas **ship inside the provider release you have installed**, so you have no cache to clear and no setting to change. Each release embeds the schemas from the Jamf Platform Go SDK version it depends on. The SDK pulls Apple's changes daily, and maintainers bump the SDK before each provider release, so a key Apple has just published reaches you with the next provider release after the SDK picks it up.
 
 Until an upgrade is available, deliver the payload or declaration through `raw_component`, which the provider does not check.
 

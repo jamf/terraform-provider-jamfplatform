@@ -51,8 +51,6 @@ internal/
 │   └── mcx_forced_payload/ # mcx_forced_payload(domain, prefs) — MCX "Custom Settings" envelope; thin wrapper over mobileconfig.Assemble
 ├── common/
 │   ├── aischemas/     # Vendor JSON Schema fetch/cache/validate for AI Governance policy settings
-│   ├── appledeclarations/ # Apple declarative device management schemas (generated table + plan-time declaration validation; see §Apple declaration schemas)
-│   ├── appleprofiles/ # Apple configuration profile schemas (generated table + plan-time payload validation; see §Apple profile schemas)
 │   ├── availabletitles/ # Shared patch available-titles lookup (patch_external_source, patch_internal_source)
 │   ├── criteria/      # Shared smart-group / advanced-search criteria operator vocabulary (device_group, user_group, future searches)
 │   ├── enumguard/     # Recurrence guard: no enum value or error code restated as a literal the SDK generates
@@ -61,7 +59,7 @@ internal/
 │   ├── helpers/       # Type conversions, polling, timeout, state reconciliation, dynamic JSON, IDs, Pro version
 │   ├── impact/        # Plan-time impact alerts — device counts for scope changes (see §Impact alerts)
 │   ├── invitationcommon/ # Shared enrollment-invitation helpers (computer_invitation, mobile_device_invitation)
-│   ├── jsonvalue/     # Rendering a decoded JSON value for a diagnostic (aischemas, appleprofiles)
+│   ├── jsonvalue/     # Rendering a decoded JSON value for a diagnostic (aischemas)
 │   ├── ldapgroups/    # Directory-service (LDAP / cloud-IdP) group resolution + scope preflight validation
 │   ├── payloadhelpers/ # mobileconfig mask / compare / identifier injection (macos/mobile_device_configuration_profile)
 │   ├── permissions/   # Required-Jamf-permission tables rendered into schema descriptions (see §Required permission tables)
@@ -132,10 +130,11 @@ in `jamfplatform-go-sdk` (capability and actions only, as a privilege oracle) an
 
 ## Apple profile schemas — one-paragraph orientation
 
-`internal/common/appleprofiles/` carries a generated table of Apple's configuration profile payload
-keys, built from the `mdm/profiles` directory of apple/device-management by `make apple-schemas`
-(never part of `make generate` — it needs a network clone; `make apple-profiles` survives as an
-alias for muscle memory). The table is the **union** of Apple's `release` branch and its newest
+The SDK package `appleschemas/profiles` (`github.com/jamf/jamfplatform-go-sdk`, moved there from this
+repository in SDK v1.4.0, SDK issue #97) carries a generated table of Apple's configuration profile
+payload keys, built from the `mdm/profiles` directory of apple/device-management by the SDK's
+`make apple-schemas`. This repository holds no table, generator or refresh workflow; it only wires
+the SDK's validator into the blueprint resource. The table is the **union** of Apple's `release` branch and its newest
 `seed_OS_*` (pre-release) branch, because Jamf's generative-declarations service tracks seed and
 offers seed-only keys in the UI immediately, so a release-only table would reject configurations
 that work — which is why the target *fails* rather than quietly building from release alone when
@@ -144,7 +143,7 @@ the same vocabulary, and wire probing established exactly how: an unknown **payl
 rejected and matched case-sensitively; an unknown **key** is silently discarded; a key differing
 only in case is silently stored under Apple's spelling; a wrong value type or a missing required key
 fails the write; enum and range constraints are **not** enforced (`AlertType: 99` stores fine), so
-the table does not check them either. `appleprofiles.Validate` turns those rules into `Problem`
+the table does not check them either. `profiles.Validate` turns those rules into `Problem`
 values and **every one of them is an error** — the advisory tier is gone, because a discarded key
 produces a payload that reports success and never applies, and a warning left the operator with
 exactly that. What survives of the old split is a *diagnostic* distinction rather than a severity
@@ -160,19 +159,22 @@ Settings" envelope) is passthrough, and Jamf stops validating there too — but 
 *alongside* named keys suppresses only the unknown-key finding, so the named keys are still
 type-checked. The blueprint resource wires this in through `validators.go` for both
 `component_blocks[].legacy_payloads` and the deprecated top-level `legacy_payloads`. Freshness is a
-scheduled concern, not a plan-time one: `.github/workflows/apple-schemas.yml` regenerates **daily**
-and opens a pull request, the same reviewable-PR pattern Dependabot uses here — daily rather than
-monthly because an unrecognised name is now an error, so a stale table blocks a working
-configuration instead of merely warning about one. User guidance is in
-`docs/guides/apple-schema-validation.md`.
+scheduled concern, not a plan-time one: the SDK's `.github/workflows/apple-schemas.yml` regenerates
+**daily** and opens a pull request there — daily rather than monthly because an unrecognised name
+is an error, so a stale table blocks a working configuration instead of merely warning about one.
+A refresh reaches a user in three further steps, none of them automatic end to end: the SDK
+maintainers tag a release (tags are pushed by hand), Dependabot opens the bump here (the root
+`gomod` entry checks **daily** for that reason), and a provider release ships it — which is why
+CONTRIBUTING.md §Release Versioning requires bumping the SDK to its latest tag before tagging.
+`raw_component` covers the window. User guidance is in `docs/guides/apple-schema-validation.md`.
 
 ## Apple declaration schemas — one-paragraph orientation
 
-`internal/common/appledeclarations/` is the same shape for **declarative device management**: a
-generated table of Apple's declaration types, built from the `declarative` directory of
-apple/device-management by the same `make apple-schemas` run, so a legacy payload and the
+The SDK package `appleschemas/declarations` is the same shape for **declarative device management**:
+a generated table of Apple's declaration types, built from the `declarative` directory of
+apple/device-management by the same SDK `make apple-schemas` run, so a legacy payload and the
 declaration wrapping it can never be validated against different upstream revisions. It is
-deliberately a sibling of `appleprofiles/` rather than an extension of it, because the two services
+deliberately a sibling of `appleschemas/profiles` rather than an extension of it, because the two services
 behave *oppositely* on the case question and shared code would blur that. Jamf validates
 declarations not at all: wire probing on 2026-09-10 found the blueprints service returns `201` for
 an unknown declaration type, an invented key, a wrong-cased key, a wrong value type, an out-of-enum
@@ -193,8 +195,8 @@ than from a table; two of the four kinds it derives are a dated **gateway wideni
 `KindForType` in the shape `internal/providerdata/scopes.go` uses, because
 `blueprints.DeclarationKindValues()` declares only `CONFIGURATION` and `ASSET` while
 `POST /blueprints/v1/blueprints` accepted `ACTIVATION` and `MANAGEMENT` and stored both verbatim on
-the EU gateway, 2026-09-10 — and `enum_literals_test.go` is the tripwire for the day a spec ingest
-catches up. The blueprint resource wires this in through `declaration_validators.go` for both
+the EU gateway, 2026-09-10 — and `declaration_kind_test.go` in the blueprint package is the
+tripwire for the day a spec ingest catches up (the SDK carries none). The blueprint resource wires this in through `declaration_validators.go` for both
 declaration-bearing components: `apple_declarations`, a list *of declarations* — the attribute is
 the list, not an object wrapping one, so a finding lands on the exact element and `$PAYLOAD_n`
 cross-references are range-checked — and `custom_declarations`, a set, so a finding names the
@@ -404,7 +406,6 @@ Jamf offers three scopes when an API integration is created, and the provider mi
 | `fix` | `go fix ./...` — rewrites deprecated API usages |
 | `lint` | `golangci-lint run` |
 | `generate` | Copyright headers + `terraform fmt examples/` + docs |
-| `apple-schemas` | Regenerate both embedded Apple schema tables — `internal/common/appleprofiles/profiles.json` and `internal/common/appledeclarations/declarations.json` — from apple/device-management, unioning the `release` branch with the newest `seed_OS_*` branch (network; not part of `generate`; `apple-profiles` survives as an alias) |
 | `permissions-map` | Refetch `internal/common/permissions/permissions-map.md` from Jamf's permissions map article (network; not part of `generate`) |
 | `test` | Unit tests (excludes `acceptance` build tag) |
 | `test-scripts` | Unit tests for `scripts/acctargets` (behind the `acctargets` build tag, so `go test ./...` misses it) |
