@@ -22,9 +22,14 @@ func (r *PackageResource) identifyDependency(_ context.Context, m *PackageResour
 
 var _ resource.ResourceWithModifyPlan = &PackageResource{}
 
-// ModifyPlan reports how many computers this package reaches through the
-// policies using it.
+// ModifyPlan marks the hash attributes Unknown when the uploaded file's bytes
+// changed (see planUploadedContentChange), then reports how many computers this
+// package reaches through the policies using it.
 func (r *PackageResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	planUploadedContentChange(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	impact.ReportDependencyPlan(ctx, req, resp, impact.DependencyPlanReport{
 		Cache: r.impact,
 		// Unanchored: any change reaches every policy using it, so no one attribute
