@@ -275,6 +275,8 @@ The provider does **not** follow strict semver. Until further notice:
 - **Minor** (`X.Y+1.0`): everything else — new resources, new attributes, deprecations, **and breaking changes** (renames, removals, attribute-type changes, behavior changes).
 - **Major** (`X+1.0.0`): reserved. Bumped only as a deliberate coordinated cleanup release (e.g., wide-scale removals or restructuring). Not required for individual breaking changes.
 
+Before tagging a release, bump `github.com/jamf/jamfplatform-go-sdk` to its latest tag. The Apple schema tables that `jamfplatform_blueprint` validates against at plan time ship inside the SDK, and an unrecognised key or declaration type is an error, so a release built on a stale SDK rejects configurations Jamf Pro's editor already offers.
+
 Document any breaking change explicitly in the release notes (generated via goreleaser — see [TESTING.md](TESTING.md) and the release workflow). When the policy changes (e.g., on adopting strict semver post-Pro-rollout), update this section.
 
 ## Commit Messages

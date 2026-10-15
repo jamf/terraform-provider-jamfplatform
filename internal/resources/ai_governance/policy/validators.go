@@ -221,7 +221,7 @@ const catalogueUnchangedNote = "This value is unchanged from the last apply, so 
 // changed, keeps the error, because catching a typo at plan time is the whole point; a value they did
 // not touch is reported and left to the apply, where helpers.go already translates TOOL_ID_UNKNOWN
 // and SCHEMA_VERSION_UNKNOWN into the same guidance. This is the reasoning CLAUDE.md records for
-// appleprofiles — freshness is a scheduled concern, not a plan-time one — which the hard errors
+// the Apple profile schemas — freshness is a scheduled concern, not a plan-time one — which the hard errors
 // contradicted.
 func addCatalogueFinding(diags *diag.Diagnostics, attribute path.Path, changed bool, summary, detail string) {
 	if changed {

@@ -10,10 +10,13 @@ updates:
     schedule:
       interval: "weekly"
   
+  # Daily, not weekly: jamfplatform-go-sdk carries the Apple schema tables the blueprint
+  # resource validates against at plan time, and an unrecognised name there is an error, so a
+  # stale SDK blocks configurations Jamf Pro already offers. See CLAUDE.md §Apple profile schemas.
   - package-ecosystem: "gomod" # See documentation for possible values
     directory: "/" # Location of package manifests
     schedule:
-      interval: "weekly"
+      interval: "daily"
 
   - package-ecosystem: "gomod"
     directory: "/tools"

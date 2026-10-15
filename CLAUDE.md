@@ -162,9 +162,11 @@ type-checked. The blueprint resource wires this in through `validators.go` for b
 scheduled concern, not a plan-time one: the SDK's `.github/workflows/apple-schemas.yml` regenerates
 **daily** and opens a pull request there — daily rather than monthly because an unrecognised name
 is an error, so a stale table blocks a working configuration instead of merely warning about one.
-A refresh reaches this provider with the next SDK tag, days at most, and `raw_component` covers the
-window; bump the SDK (see Dependabot) when a refresh adds names Jamf's UI already offers. User guidance is in
-`docs/guides/apple-schema-validation.md`.
+A refresh reaches a user in three further steps, none of them automatic end to end: the SDK
+maintainers tag a release (tags are pushed by hand), Dependabot opens the bump here (the root
+`gomod` entry checks **daily** for that reason), and a provider release ships it — which is why
+CONTRIBUTING.md §Release Versioning requires bumping the SDK to its latest tag before tagging.
+`raw_component` covers the window. User guidance is in `docs/guides/apple-schema-validation.md`.
 
 ## Apple declaration schemas — one-paragraph orientation
 
