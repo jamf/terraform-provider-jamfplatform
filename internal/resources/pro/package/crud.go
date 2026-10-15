@@ -92,8 +92,8 @@ func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest
 				return
 			}
 		} else {
-			if diags := openHashUploadVerify(createCtx, r.client, &plan, ""); diags.HasError() {
-				resp.Diagnostics.Append(diags...)
+			resp.Diagnostics.Append(openHashUploadVerify(createCtx, r.client, &plan, "")...)
+			if resp.Diagnostics.HasError() {
 				return
 			}
 		}
