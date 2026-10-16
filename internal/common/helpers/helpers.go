@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	resourcetimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -463,6 +464,25 @@ func PreserveStringWhenWireEmpty(wire *string, current types.String) types.Strin
 		return types.StringNull()
 	}
 	return current
+}
+
+// PreserveStringWhenWireTrimsTrailingSpace is PreserveStringWhenWireEmpty for a
+// field Jamf Pro saves with its trailing whitespace removed. It keeps current
+// when the server value is current with trailing whitespace trimmed, so an
+// authored value ending in a newline (every heredoc does) does not trip
+// "Provider produced inconsistent result after apply"; any other server value
+// wins, as it does in PreserveStringWhenWireEmpty. Interior whitespace,
+// including at the end of a line, is stored as sent and so is compared exactly.
+//
+// Observed at: self_service.self_service_description on the Mac App Store app
+// and mobile device app records, 2026-10-16 (Xcode 497799835 and Jamf Parent
+// 1458797105, whose App Store descriptions end in "\n" and " \n").
+func PreserveStringWhenWireTrimsTrailingSpace(wire *string, current types.String) types.String {
+	if wire != nil && !current.IsNull() && !current.IsUnknown() &&
+		*wire == strings.TrimRightFunc(current.ValueString(), unicode.IsSpace) {
+		return current
+	}
+	return PreserveStringWhenWireEmpty(wire, current)
 }
 
 // gatewayUnroutedBody is the response body the Jamf Platform gateway serves for

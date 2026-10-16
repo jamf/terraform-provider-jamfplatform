@@ -110,6 +110,9 @@ type Data struct {
 
 	appTitleMu    sync.Mutex
 	appTitleCache *AppTitleCatalogCache
+
+	appStoreMu    sync.Mutex
+	appStoreCache *AppStoreCache
 }
 
 // AISchemaCache returns the shared AI Governance product catalogue and vendor schema cache, building

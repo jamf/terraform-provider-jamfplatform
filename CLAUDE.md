@@ -29,6 +29,8 @@ internal/
 │   │                  #   (folder name = Terraform slug minus `jamfplatform_account_`)
 │   ├── ai_governance/ # policy/, tool/                                      (Jamf AI Governance)
 │   │                  #   (folder name = Terraform slug minus `jamfplatform_ai_governance_`)
+│   ├── apple/         # app_store_app/ — data source over Apple's public App Store listing (not a Jamf API;
+│   │                  #   SDK standalone `appstore` package, per-run cache in providerdata/appstore.go)
 │   ├── blueprints/    # blueprint/, blueprints/, component/, components/    (Platform Services)
 │   ├── cbengine/      # benchmark/, benchmarks/, baselines/, rules/         (Platform Services)
 │   ├── device/        # Single device data source                            (Platform Services)
@@ -97,6 +99,7 @@ Each leaf resource folder mirrors the file split in [STYLE_GUIDE.md §Resource P
 | Two-form resource where the form is immutable and derived from a block's presence | `internal/resources/security_cloud/ztna_gateway/` |
 | Read-only server catalogue, plural DS only (no per-id endpoint) | `internal/resources/security_cloud/ztna_shared_gateways/` |
 | Free-form vendor JSON payload (JSON-string attribute + semantic equality + live schema validation) | `internal/resources/ai_governance/policy/` |
+| Data source whose upstream is not Jamf (no scope gate, no permissions table, injected logger, per-instance cache + concurrency cap) | `internal/resources/apple/app_store_app/` |
 
 ## Impact alerts — one-paragraph orientation
 

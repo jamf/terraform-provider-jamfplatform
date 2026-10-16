@@ -567,3 +567,30 @@ func TestSelfServiceCategoryDisplayIn(t *testing.T) {
 		})
 	}
 }
+
+func TestPreserveStringWhenWireTrimsTrailingSpace(t *testing.T) {
+	cases := []struct {
+		name    string
+		wire    *string
+		current types.String
+		want    types.String
+	}{
+		{"trailing newline trimmed by server keeps authored", new("Line one\nLine two"), types.StringValue("Line one\nLine two\n"), types.StringValue("Line one\nLine two\n")},
+		{"trailing space and newline trimmed keeps authored", new("ends here"), types.StringValue("ends here \n"), types.StringValue("ends here \n")},
+		{"identical keeps authored", new("same"), types.StringValue("same"), types.StringValue("same")},
+		{"interior difference takes server", new("a\nb"), types.StringValue("a \nb"), types.StringValue("a\nb")},
+		{"different value takes server", new("edited in Jamf Pro"), types.StringValue("authored\n"), types.StringValue("edited in Jamf Pro")},
+		{"whitespace-only authored, empty wire keeps authored", new(""), types.StringValue("\n"), types.StringValue("\n")},
+		{"null current takes server", new("server"), types.StringNull(), types.StringValue("server")},
+		{"unknown current takes server", new("server"), types.StringUnknown(), types.StringValue("server")},
+		{"unknown current and empty wire resolves null", new(""), types.StringUnknown(), types.StringNull()},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := PreserveStringWhenWireTrimsTrailingSpace(tc.wire, tc.current)
+			if !got.Equal(tc.want) {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

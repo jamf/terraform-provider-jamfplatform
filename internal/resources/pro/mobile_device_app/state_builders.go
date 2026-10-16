@@ -257,7 +257,7 @@ func flattenMobileAppScope(ctx context.Context, s *proclassic.MobileDeviceApplic
 func flattenMobileAppSelfService(ss *proclassic.MobileDeviceApplicationSelfService, state *MobileAppSelfServiceModel, includeUnmanaged bool) {
 	state.InstallButtonText = helpers.ReconcileOptionalStringPointer(ss.SelfServiceInstallButtonText, state.InstallButtonText)
 	state.AfterInstallButtonText = helpers.WireWhenPresentString(ss.SelfServiceAfterInstallButtonText, state.AfterInstallButtonText)
-	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmpty(ss.SelfServiceDescription, state.SelfServiceDescription)
+	state.SelfServiceDescription = helpers.PreserveStringWhenWireTrimsTrailingSpace(ss.SelfServiceDescription, state.SelfServiceDescription)
 	state.FeatureOnMainPage = helpers.BoolPointerValueOrNull(ss.FeatureOnMainPage)
 
 	var apiEnabled *bool

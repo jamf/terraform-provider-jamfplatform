@@ -1360,3 +1360,40 @@ func TestAccResource_ProMacApp_SelfServiceOmittedToDeclared(t *testing.T) {
 		},
 	})
 }
+
+// TestAccResource_ProMacApp_SelfServiceDescriptionTrailingNewline covers a
+// Self Service description that ends in whitespace, as every heredoc does.
+// Jamf Pro saves it without the trailing whitespace; the authored value must
+// survive the apply, and a re-plan must be empty.
+func TestAccResource_ProMacApp_SelfServiceDescriptionTrailingNewline(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-pro-macapp-heredoc-" + testhelpers.RunSuffix()
+	cfg := fmt.Sprintf(`
+		resource "jamfplatform_pro_mac_app_store_app" "test" {
+			general = {
+				name      = %q
+				version   = "1.0"
+				bundle_id = "com.example.tfacc.macapp"
+				url       = "https://apps.apple.com/app/id000000001"
+			}
+			self_service = {
+				self_service_description = <<-EOT
+					First line. 
+					Last line, followed by a newline.
+				EOT
+			}
+		}
+	`, name)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMacAppDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg,
+				Check: resource.TestCheckResourceAttr(macAppResourceAddr, "self_service.self_service_description",
+					"First line. \nLast line, followed by a newline.\n"),
+			},
+			{Config: cfg, PlanOnly: true},
+		},
+	})
+}
