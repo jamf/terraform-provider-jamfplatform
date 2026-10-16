@@ -1456,3 +1456,35 @@ func TestAccResource_ProMobileApp_SelfServiceOmittedToDeclared(t *testing.T) {
 		},
 	})
 }
+
+// TestAccResource_ProMobileApp_SelfServiceDescriptionTrailingNewline covers a
+// Self Service description that ends in whitespace, as every heredoc does.
+// Jamf Pro saves it, and the general.description mirror, without the trailing
+// whitespace; the authored value must survive the apply, and a re-plan must be
+// empty.
+func TestAccResource_ProMobileApp_SelfServiceDescriptionTrailingNewline(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-pro-mobileapp-heredoc-" + testhelpers.RunSuffix()
+	cfg := mobileAppSelfServiceConfig(name, "1.0", `
+				self_service_description = <<-EOT
+					First line. 
+					Last line, followed by a newline.
+				EOT
+	`)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMobileAppDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(mobileAppResourceAddr, "self_service.self_service_description",
+						"First line. \nLast line, followed by a newline.\n"),
+					resource.TestCheckResourceAttr(mobileAppResourceAddr, "general.description",
+						"First line. \nLast line, followed by a newline."),
+				),
+			},
+			{Config: cfg, PlanOnly: true},
+		},
+	})
+}
