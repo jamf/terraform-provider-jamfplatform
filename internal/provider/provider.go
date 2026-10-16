@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
+	"github.com/jamf/jamfplatform-go-sdk/appstore"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 	ssodomainactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/account/sso_domain"
 	deviceactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/device"
@@ -42,6 +43,7 @@ import (
 	ssodomain "github.com/jamf/terraform-provider-jamfplatform/internal/resources/account/sso_domain"
 	aigovernancepolicy "github.com/jamf/terraform-provider-jamfplatform/internal/resources/ai_governance/policy"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/ai_governance/tool"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/apple/app_store_app"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/blueprints/blueprint"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/blueprints/blueprints"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/blueprints/component"
@@ -459,8 +461,10 @@ func (p *JamfPlatformProvider) Configure(ctx context.Context, req provider.Confi
 	if authHeaderName != "" {
 		opts = append(opts, jamfplatform.WithAuthorizationHeaderName(authHeaderName))
 	}
+	var httpLogger *TerraformLogger
 	if shouldEnableHTTPLogging() {
-		opts = append(opts, jamfplatform.WithLogger(NewTerraformLogger()))
+		httpLogger = NewTerraformLogger()
+		opts = append(opts, jamfplatform.WithLogger(httpLogger))
 	}
 	apiClient := jamfplatform.NewClient(baseURL, clientID, clientSecret, opts...)
 
@@ -473,6 +477,7 @@ func (p *JamfPlatformProvider) Configure(ctx context.Context, req provider.Confi
 	}
 
 	pd := providerdata.New(apiClient)
+	pd.SetAppStoreClient(newAppStoreClient(p.version, httpLogger))
 
 	tflog.Info(ctx, "Jamf Platform provider configured", map[string]any{
 		"provider_version":     p.version,
@@ -623,6 +628,7 @@ func (p *JamfPlatformProvider) Resources(ctx context.Context) []func() resource.
 
 func (p *JamfPlatformProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
+		app_store_app.NewAppStoreAppDataSource,
 		account.NewAccountDataSource,
 		account_group.NewAccountGroupDataSource,
 		account_privileges.NewAccountPrivilegesDataSource,
@@ -952,6 +958,19 @@ func resolveMinRequestInterval(attr types.Int64) (time.Duration, error) {
 		ms = parsed
 	}
 	return time.Duration(ms) * time.Millisecond, nil
+}
+
+// newAppStoreClient builds the client the App Store data source looks listings up with. It carries
+// the provider's User-Agent and, when logger is non-nil, the same request logger the Jamf client
+// uses, so TF_LOG=debug shows the lookup beside the Jamf calls. It deliberately carries none of the
+// custom_headers or authorization_header_name configuration: those exist for a reverse proxy in
+// front of Jamf, commonly hold a credential, and must never reach Apple.
+func newAppStoreClient(version string, logger *TerraformLogger) *appstore.Client {
+	opts := []appstore.Option{appstore.WithUserAgent("terraform-provider-jamfplatform/" + version)}
+	if logger != nil {
+		opts = append(opts, appstore.WithLogger(logger))
+	}
+	return appstore.New(opts...)
 }
 
 func shouldEnableHTTPLogging() bool {
