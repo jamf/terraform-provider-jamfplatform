@@ -155,3 +155,22 @@ func TestAssignApp_NilGenresIsEmptyList(t *testing.T) {
 		t.Errorf("genres = %v, want an empty list", m.Genres)
 	}
 }
+
+func TestAssignApp_TrimsTrailingDescriptionWhitespace(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"Ends in a newline.\n", "Ends in a newline."},
+		{"Line one \nand timeout \n", "Line one \nand timeout"},
+		{"  Leading kept.", "  Leading kept."},
+		{"Clean.", "Clean."},
+	} {
+		m := model(targetMac)
+		app := pagesMac()
+		app.Description = tc.in
+		if diags := assignApp(context.Background(), m, appstore.Query{ID: app.ID, Country: "US"}, app); diags.HasError() {
+			t.Fatalf("assignApp: %v", diags)
+		}
+		if got := m.Description.ValueString(); got != tc.want {
+			t.Errorf("description %q = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

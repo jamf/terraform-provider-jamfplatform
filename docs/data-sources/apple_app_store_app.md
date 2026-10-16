@@ -118,7 +118,7 @@ data "jamfplatform_apple_app_store_app" "from_link" {
 
 ### Read-Only
 
-- `description` (String) App description as listed. Use it for `self_service.self_service_description`.
+- `description` (String) App description as listed, without trailing whitespace, which Jamf Pro drops when it saves a description. Use it for `self_service.self_service_description`.
 - `genres` (List of String) App Store categories, primary category first.
 - `icon_url` (String) URL of the app's icon as a 512 × 512 PNG. Use it as `icon_file_source` on a `jamfplatform_pro_icon`, and set the app record's `self_service.self_service_icon.id` to that icon. Null when the listing has no icon.
 - `is_free` (Boolean) Whether the app is free in `country_region`. Use it for `general.is_free`.

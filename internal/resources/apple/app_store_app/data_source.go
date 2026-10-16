@@ -173,8 +173,9 @@ func (d *AppStoreAppDataSource) Schema(ctx context.Context, _ datasource.SchemaR
 				Computed: true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "App description as listed. Use it for `self_service.self_service_description`.",
-				Computed:            true,
+				MarkdownDescription: "App description as listed, without trailing whitespace, which Jamf Pro drops when it saves a " +
+					"description. Use it for `self_service.self_service_description`.",
+				Computed: true,
 			},
 			"icon_url": schema.StringAttribute{
 				MarkdownDescription: "URL of the app's icon as a 512 × 512 PNG. Use it as `icon_file_source` on a " +
