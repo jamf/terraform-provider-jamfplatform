@@ -62,7 +62,7 @@ func assignApp(ctx context.Context, m *AppStoreAppDataSourceModel, q appstore.Qu
 		m.IconURL = types.StringNull()
 	default:
 		diags.AddAttributeError(path.Root("icon_url"), "Unreadable App Store icon address",
-			fmt.Sprintf("The App Store listing for %q carries an icon address in a form the provider does not recognise, so no icon URL can be built from it: %s", app.Name, helpers.APIErrorDetail(err)))
+			fmt.Sprintf("The App Store listing for %q carries an icon address in a form the provider does not recognise, so the provider cannot build an icon URL from it: %s", app.Name, helpers.APIErrorDetail(err)))
 		return diags
 	}
 

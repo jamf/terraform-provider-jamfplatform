@@ -101,30 +101,30 @@ func (d *AppStoreAppDataSource) Schema(ctx context.Context, _ datasource.SchemaR
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Looks up an app's App Store listing, so a `jamfplatform_pro_mac_app_store_app` or " +
 			"`jamfplatform_pro_mobile_device_app` can take its name, version, bundle identifier, store URL, description " +
-			"and icon from the App Store instead of having them copied by hand. Set exactly one of `id`, `bundle_id` or " +
+			"and icon from the App Store, and you do not copy them by hand. Set exactly one of `id`, `bundle_id` or " +
 			"`store_url`, and set `target` to the kind of app record the values feed.\n\n" +
 			"The listing is read again on every plan. When the developer releases a new version, `version` changes and " +
 			"an app record that uses it shows the new version as a planned change. Pin `general.version` or list it in " +
 			"`lifecycle.ignore_changes` to keep releases out of plans.\n\n" +
 			"The icon follows the listing the same way. When the developer changes the app's artwork, `icon_url` " +
 			"changes, the next plan replaces the `jamfplatform_pro_icon` built from it, and the app record picks up the " +
-			"new icon. That replacement is intended and is not drift.\n\n" +
-			"Custom apps distributed to a single organization are not listed publicly, so they cannot be looked up. " +
-			"No Jamf Pro permission is needed, because the lookup reads the App Store directly.",
+			"new icon. Expect that replacement after any artwork change.\n\n" +
+			"The App Store does not list custom apps distributed to a single organization, so you cannot look one up. " +
+			"The lookup reads the App Store directly and needs no Jamf Pro permission.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "App Store ID: the number after `id` in the app's App Store link (`497799835` for " +
-					"Xcode). Set exactly one of `id`, `bundle_id` or `store_url`. Filled from the listing when the lookup " +
-					"uses one of the other two.",
+					"Xcode). Set exactly one of `id`, `bundle_id` or `store_url`. When you look up by `bundle_id` or " +
+					"`store_url`, the provider fills this in from the listing.",
 				Optional:   true,
 				Computed:   true,
 				Validators: []validator.String{stringvalidator.RegexMatches(regexp.MustCompile(`^[0-9]+$`), "must be the App Store ID's digits")},
 			},
 			"bundle_id": schema.StringAttribute{
 				MarkdownDescription: "App bundle identifier, such as `com.apple.dt.Xcode`. Set exactly one of `id`, " +
-					"`bundle_id` or `store_url`. Jamf Pro stores a bundle identifier exactly as written, so a value whose " +
-					"letter case differs from the App Store listing is rejected with the listed spelling. Filled from the " +
-					"listing when the lookup uses `id` or `store_url`. Use it for `general.bundle_id`.",
+					"`bundle_id` or `store_url`. Jamf Pro stores a bundle identifier exactly as written, so the provider rejects " +
+					"a value whose letter case differs from the App Store listing and names the listed spelling. When you look " +
+					"up by `id` or `store_url`, the provider fills this in from the listing. Use it for `general.bundle_id`.",
 				Optional:   true,
 				Computed:   true,
 				Validators: []validator.String{stringvalidator.LengthAtLeast(1), stringvalidator.RegexMatches(regexp.MustCompile(`^[^,\s]+$`), "must be a single bundle identifier")},
@@ -132,7 +132,7 @@ func (d *AppStoreAppDataSource) Schema(ctx context.Context, _ datasource.SchemaR
 			"store_url": schema.StringAttribute{
 				MarkdownDescription: "The app's App Store link, such as " +
 					"`https://apps.apple.com/gb/app/pages-create-documents/id361309726`. Set exactly one of `id`, " +
-					"`bundle_id` or `store_url`. The country or region in the link is used when `country_region` is not set.",
+					"`bundle_id` or `store_url`. When `country_region` is not set, the provider uses the link's country or region.",
 				Optional:   true,
 				Validators: []validator.String{storeURLValidator{}},
 			},
@@ -140,14 +140,14 @@ func (d *AppStoreAppDataSource) Schema(ctx context.Context, _ datasource.SchemaR
 				MarkdownDescription: "The kind of app record the values feed: `mac` for `jamfplatform_pro_mac_app_store_app` " +
 					"(Mac Apps) or `mobile_device` for `jamfplatform_pro_mobile_device_app` (Mobile Device Apps). An app " +
 					"sold for both has a separate Mac listing with its own icon, description and version, so the target " +
-					"must match the record. An iPhone and iPad app is not found with `mac`. One of " + valueList(targetValues()) + ".",
+					"must match the record. Looking up an iPhone and iPad app with `mac` finds nothing. One of " + valueList(targetValues()) + ".",
 				Required:   true,
 				Validators: []validator.String{stringvalidator.OneOf(targetValues()...)},
 			},
 			"country_region": schema.StringAttribute{
 				MarkdownDescription: "Two-letter App Store country or region code in upper case, such as `US` or `GB`. " +
-					"Defaults to the one in `store_url`, then `US`. A code the App Store does not recognise is rejected " +
-					"rather than answered from another country. Use it for `general.itunes_country_region` on a mobile " +
+					"Defaults to the one in `store_url`, then `US`. The App Store answers a code it does not recognise from " +
+					"the US App Store, so the provider rejects one. Use it for `general.itunes_country_region` on a mobile " +
 					"device app.",
 				Optional:   true,
 				Computed:   true,

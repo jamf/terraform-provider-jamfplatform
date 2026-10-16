@@ -5,8 +5,8 @@ data "jamfplatform_apple_app_store_app" "pages_mac" {
   target = "mac"
 }
 
-# The icon is fetched from the App Store link. When the developer changes the
-# artwork, icon_url changes and the next plan replaces this icon.
+# The provider downloads the icon from the App Store. When the developer changes
+# the artwork, icon_url changes and the next plan replaces this icon.
 resource "jamfplatform_pro_icon" "pages_mac" {
   icon_file_source = data.jamfplatform_apple_app_store_app.pages_mac.icon_url
 }
@@ -68,8 +68,8 @@ resource "jamfplatform_pro_mobile_device_app" "keynote" {
   }
 }
 
-# A store link works too. Its country or region is used when country_region is
-# not set.
+# You can also look up an app by its store link. The provider uses the link's
+# country or region when country_region is not set.
 data "jamfplatform_apple_app_store_app" "from_link" {
   store_url = "https://apps.apple.com/us/app/xcode/id497799835?mt=12"
   target    = "mac"

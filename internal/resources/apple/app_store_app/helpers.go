@@ -103,7 +103,7 @@ func notFoundDetail(q appstore.Query, target string) string {
 	} else {
 		b.WriteString("- The app is Mac only. Use target = \"mac\".\n")
 	}
-	b.WriteString("- The app is a custom app distributed to one organization. Custom apps are not listed publicly, so they cannot be looked up.")
+	b.WriteString("- The app is a custom app distributed to one organization. The App Store does not list custom apps, so you cannot look one up.")
 	return b.String()
 }
 
