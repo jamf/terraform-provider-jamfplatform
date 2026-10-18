@@ -34,6 +34,13 @@ import (
 // It also carries the one rule Apple's schemas cannot express: a custom settings payload sets
 // exactly one preference domain. A Mac applies one of several and drops the others, and Jamf
 // discards an empty dictionary. See appendMCXDomainProblems.
+//
+// A payload whose settings are not yet known is skipped silently. Terraform calls validators twice
+// during a plan: first while validating, when module variables and each.key or each.value are still
+// unknown, and again while planning, with those values resolved. Reading an unknown as empty would
+// report every required key missing on the first call and fail a configuration that is valid. A value
+// still unknown on the second call is known only at apply, and uncheckedPayloadWarnings reports that
+// from ModifyPlan, which the validate step never reaches.
 type legacyPayloadSchemaValidator struct{}
 
 // blockLegacyPayloadSchemaValidator validates a component block's typed legacy payload list, whose
@@ -75,7 +82,7 @@ func (v legacyPayloadSchemaValidator) ValidateList(ctx context.Context, req vali
 
 	for i, payload := range payloads {
 		entry := req.Path.AtListIndex(i)
-		if !helpers.IsConfiguredValue(payload.PayloadType) {
+		if !helpers.IsConfiguredValue(payload.PayloadType) || payload.Settings.IsUnknown() {
 			continue
 		}
 
@@ -93,8 +100,12 @@ func (v legacyPayloadSchemaValidator) ValidateList(ctx context.Context, req vali
 }
 
 // ValidateDynamic checks the deprecated top-level dynamic legacy payload value.
-func (v legacyPayloadSchemaValidator) ValidateDynamic(_ context.Context, req validator.DynamicRequest, resp *validator.DynamicResponse) {
-	if !helpers.IsConfiguredValue(req.ConfigValue) {
+//
+// The value is skipped whole while any part of it is unknown, because TerraformDynamicToJSON turns
+// an unknown into nil and a nil setting reads as a missing one. A dynamic value carries no per-payload
+// path to skip by, and the carrier is deprecated, so the coarser skip is not worth refining.
+func (v legacyPayloadSchemaValidator) ValidateDynamic(ctx context.Context, req validator.DynamicRequest, resp *validator.DynamicResponse) {
+	if !helpers.IsConfiguredValue(req.ConfigValue) || !isFullyKnown(ctx, req.ConfigValue) {
 		return
 	}
 

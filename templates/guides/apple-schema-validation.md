@@ -95,6 +95,12 @@ The right-hand column is the one to read first. A finding marked **Yes** says so
 
 The schemas are the union of Apple's `release` branch and its newest `seed_OS_*` (pre-release) branch, because Jamf Pro tracks seed: keys and declaration types show up in the blueprint editor while Apple still has them in pre-release. The diagnostic tells you when a finding comes from a pre-release part of the schema.
 
+## Payloads built from variables or other resources
+
+You can build a payload from a module variable, from `each.key` or `each.value`, or from `file()` or `templatefile()` with a path or template variables that use them. `terraform validate` skips the check, because Terraform does not know those values yet. `terraform plan` knows them and runs it.
+
+Build a payload from an attribute another resource computes during the apply, such as the ID of an object that does not exist yet, and the provider cannot check it during plan. The plan warns instead: **Legacy payload was not checked against Apple's schemas** or **Declaration payload was not checked against Apple's schemas**. Jamf Pro refuses a wrong value type or a missing required key when the apply writes the payload. It accepts an unrecognised key, reports success and never delivers it. To have the plan check the payload, build it from values Terraform knows at plan time.
+
 ## A key the Jamf Pro editor offers, rejected by the plan
 
 Upgrade the provider. The schemas **ship inside the provider release you have installed**, so you have no cache to clear and no setting to change. Each release embeds the schemas from the Jamf Platform Go SDK version it depends on. The SDK pulls Apple's changes daily, and maintainers bump the SDK before each provider release, so a key Apple has just published reaches you with the next provider release after the SDK picks it up.
