@@ -5,15 +5,16 @@ package benchmark
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/compliancebenchmarks"
-
-	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers"
 )
 
 const deletionTestBenchmarkID = "bench-485"
@@ -54,7 +55,8 @@ func (s *deletionStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		testhelpers.RespondJSON(w, http.StatusOK, compliancebenchmarks.BenchmarkResponseV2{
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(compliancebenchmarks.BenchmarkResponseV2{
 			BenchmarkID: deletionTestBenchmarkID,
 			Deleted:     answer == flagged,
 		})
@@ -67,9 +69,28 @@ func (s *deletionStub) counts() (gets, deletes int) {
 	return s.gets, s.deletes
 }
 
+// newStubClient points an SDK client at stub, answering the token exchange
+// itself. It cannot use testhelpers.NewMockClient: under the acceptance build
+// tag testhelpers imports the provider, which imports this package. Pacing and
+// retries are off, as the provider configures them.
+func newStubClient(t *testing.T, stub http.Handler) *compliancebenchmarks.Client {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/token" {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "test-token", "token_type": "Bearer", "expires_in": 3600})
+			return
+		}
+		stub.ServeHTTP(w, r)
+	}))
+	t.Cleanup(server.Close)
+	return compliancebenchmarks.New(jamfplatform.NewClient(server.URL, "test-id", "test-secret",
+		jamfplatform.WithRetryPolicy(0, 0, 0), jamfplatform.WithMinRequestInterval(0)))
+}
+
 func runDeletionWait(t *testing.T, stub *deletionStub, timeout, redeleteAfter time.Duration) error {
 	t.Helper()
-	c := compliancebenchmarks.New(testhelpers.NewMockClient(t, stub))
+	c := newStubClient(t, stub)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return waitForBenchmarkDeletion(ctx, c, deletionTestBenchmarkID, time.Millisecond, redeleteAfter)
@@ -125,7 +146,7 @@ func TestWaitForBenchmarkDeletion_ReissuedDelete404IsSuccess(t *testing.T) {
 // never goes away fails at the timeout with its last deleted flag in the error.
 func TestWaitForBenchmarkDeletion_TimeoutNamesLastFlag(t *testing.T) {
 	stub := &deletionStub{answers: []string{notYetFlagged, flagged}, deleteStatus: http.StatusNoContent}
-	err := runDeletionWait(t, stub, time.Second, 0)
+	err := runDeletionWait(t, stub, 200*time.Millisecond, 0)
 	if err == nil {
 		t.Fatal("waitForBenchmarkDeletion succeeded for a benchmark that was never removed")
 	}
