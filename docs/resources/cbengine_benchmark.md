@@ -4,6 +4,8 @@ page_title: "jamfplatform_cbengine_benchmark Resource - terraform-provider-jamfp
 subcategory: ""
 description: |-
   Creates a Jamf Compliance Benchmark. Creation is asynchronous: the platform accepts the request and deploys the associated artifacts to the MDM. The provider polls the benchmark's sync state until it reaches SYNCED or a terminal failure. Requires Compliance Benchmarks API access.
+  Jamf cannot update a benchmark in place, so a change to any argument replaces it. Terraform deletes the old benchmark before it creates the new one, and your devices have no benchmark until the create finishes. Setting create_before_destroy alone fails: Jamf refuses a second benchmark with the same title (409 DuplicateFieldException). To create the new benchmark first, set create_before_destroy and change title in the same apply.
+  The provider creates and deletes benchmarks one at a time: when Jamf deletes several at once, it leaves some of their configuration profiles and policies behind in Jamf Pro. Expect about half a minute of apply time for each benchmark you create or replace. A benchmark waiting its turn holds one of Terraform's -parallelism slots, so raise -parallelism if other resources in the same apply wait behind your benchmarks.
   Required Jamf permissions
   Jamf lists this under Platform environment scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
@@ -14,6 +16,10 @@ description: |-
 # jamfplatform_cbengine_benchmark (Resource)
 
 Creates a Jamf Compliance Benchmark. Creation is asynchronous: the platform accepts the request and deploys the associated artifacts to the MDM. The provider polls the benchmark's sync state until it reaches `SYNCED` or a terminal failure. Requires **Compliance Benchmarks API** access.
+
+Jamf cannot update a benchmark in place, so a change to any argument replaces it. Terraform deletes the old benchmark before it creates the new one, and your devices have no benchmark until the create finishes. Setting `create_before_destroy` alone fails: Jamf refuses a second benchmark with the same title (`409 DuplicateFieldException`). To create the new benchmark first, set `create_before_destroy` and change `title` in the same apply.
+
+The provider creates and deletes benchmarks one at a time: when Jamf deletes several at once, it leaves some of their configuration profiles and policies behind in Jamf Pro. Expect about half a minute of apply time for each benchmark you create or replace. A benchmark waiting its turn holds one of Terraform's `-parallelism` slots, so raise `-parallelism` if other resources in the same apply wait behind your benchmarks.
 
 **Required Jamf permissions**
 
