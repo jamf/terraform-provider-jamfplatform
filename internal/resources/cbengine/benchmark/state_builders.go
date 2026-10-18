@@ -9,11 +9,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/compliancebenchmarks"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
 // assignBenchmarkModelFromResponse maps the API response into the Terraform benchmark resource model.
 // For device-group targeting, the API always returns a slice; we preserve whichever attribute the
 // user originally configured (singular or plural) so post-apply state matches plan without drift.
+// The API echoes an omitted description as "", so description is reconciled against the model's
+// prior value: null stays null and an explicit "" stays "".
 func assignBenchmarkModelFromResponse(model *BenchmarkResourceModel, bench *compliancebenchmarks.BenchmarkResponseV2) {
 	if model == nil || bench == nil {
 		return
@@ -21,7 +24,7 @@ func assignBenchmarkModelFromResponse(model *BenchmarkResourceModel, bench *comp
 
 	model.ID = types.StringValue(bench.BenchmarkID)
 	model.Title = types.StringValue(bench.Title)
-	model.Description = types.StringValue(bench.Description)
+	model.Description = helpers.ReconcileOptionalString(bench.Description, model.Description)
 	model.TenantID = types.StringValue(bench.TenantID)
 	model.Deleted = types.BoolValue(bench.Deleted)
 	model.UpdateAvailable = types.BoolValue(bench.UpdateAvailable)
