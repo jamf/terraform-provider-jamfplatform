@@ -80,7 +80,11 @@ func (r *AdvancedMobileDeviceSearchResource) IdentitySchema(ctx context.Context,
 // resource.
 func (r *AdvancedMobileDeviceSearchResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a Jamf Pro advanced mobile device search, a saved criteria-driven inventory query with a configurable set of display columns. The matched-device result set and the Reports tab (file format, scheduled email) are report concerns Jamf Pro computes, and are intentionally not modelled. Mirrors the Devices → Search Inventory → Advanced Mobile Device Search UI." + resourcePrivileges,
+		MarkdownDescription: "Manages a Jamf Pro advanced mobile device search, a saved criteria-driven inventory query with a configurable set of display columns. The matched-device result set is report data Jamf Pro computes, and is intentionally not modelled. Mirrors the Devices → Search Inventory → Advanced Mobile Device Search UI.\n\n" +
+			"~> **Updating a search through Terraform deletes its email report.** Jamf Pro clears the " +
+			"recipients, subject, body and schedule from Reports → Email. Terraform cannot read or set " +
+			"these settings, so `terraform plan` won't show you the loss. After an apply that changes a " +
+			"search, set up its email report again in the Jamf Pro admin UI." + resourcePrivileges,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Advanced mobile device search ID assigned by Jamf Pro.",
