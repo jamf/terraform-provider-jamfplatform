@@ -108,10 +108,10 @@ func waitForBenchmarkDeletion(ctx context.Context, c *compliancebenchmarks.Clien
 		return false, nil
 	})
 	if err != nil && seen && ctx.Err() != nil {
-		return fmt.Errorf("benchmark %s still existed when the delete timeout expired (deleted=%t): %w. "+
+		return fmt.Errorf("the benchmark still exists after the delete timeout (deleted=%t): %w. "+
 			"Jamf cannot finish deleting a benchmark while a Jamf Pro object refers to one of the smart groups the benchmark created, "+
 			"for example a smart group with a \"member of\" criterion naming one. "+
-			"Remove that reference in Jamf Pro and run the destroy again: Jamf does not resume the delete by itself", id, lastDeleted, err)
+			"Remove that reference in Jamf Pro and run the destroy again, because Jamf does not resume the delete on its own", lastDeleted, err)
 	}
 	return err
 }

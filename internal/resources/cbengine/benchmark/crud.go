@@ -229,7 +229,7 @@ func (r *BenchmarkResource) Delete(ctx context.Context, req resource.DeleteReque
 		}
 		resp.Diagnostics.AddError(
 			"Error waiting for benchmark deletion",
-			fmt.Sprintf("Benchmark %s deletion did not complete: %s", data.ID.ValueString(), helpers.APIErrorDetail(err)),
+			fmt.Sprintf("Jamf did not finish deleting benchmark %s: %s", data.ID.ValueString(), helpers.APIErrorDetail(err)),
 		)
 		return
 	}
