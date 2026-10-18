@@ -153,4 +153,7 @@ func TestWaitForBenchmarkDeletion_TimeoutNamesLastFlag(t *testing.T) {
 	if !strings.Contains(err.Error(), "(deleted=true)") {
 		t.Errorf("error %q does not name the last deleted flag", err)
 	}
+	if !strings.Contains(err.Error(), `"member of"`) {
+		t.Errorf("error %q does not point at a Jamf Pro reference to the benchmark's smart groups", err)
+	}
 }

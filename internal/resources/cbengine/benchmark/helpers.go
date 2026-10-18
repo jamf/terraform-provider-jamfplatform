@@ -66,6 +66,16 @@ func waitForBenchmarkSync(ctx context.Context, c *compliancebenchmarks.Client, i
 // which clears one that stalls (observed for over five minutes until a second
 // delete removed it in eight seconds). A re-issued delete answering 404 means
 // the benchmark is gone. On timeout the error names the last deleted flag seen.
+//
+// A Jamf Pro object that refers to one of the benchmark's generated smart
+// groups blocks the teardown outright. Wire-observed on the EU gateway
+// 2026-10-18 with a smart group whose "member of" criterion named one: the
+// benchmark sat at DELETING with deleted=true for twelve minutes, 26 re-issued
+// deletes were accepted without effect, and removing the referring group did
+// not resume it. The first delete sent after the removal finished in seven
+// seconds and left no Jamf Pro objects behind. So the timeout error points at
+// that reference, and a re-issued delete clears the benchmark once the
+// operator removes it mid-wait.
 func waitForBenchmarkDeletion(ctx context.Context, c *compliancebenchmarks.Client, id string, interval, redeleteAfter time.Duration) error {
 	lastDelete := time.Now()
 	seen, lastDeleted := false, false
@@ -98,7 +108,10 @@ func waitForBenchmarkDeletion(ctx context.Context, c *compliancebenchmarks.Clien
 		return false, nil
 	})
 	if err != nil && seen && ctx.Err() != nil {
-		return fmt.Errorf("benchmark %s still existed when the delete timeout expired (deleted=%t): %w", id, lastDeleted, err)
+		return fmt.Errorf("benchmark %s still existed when the delete timeout expired (deleted=%t): %w. "+
+			"Jamf cannot finish deleting a benchmark while a Jamf Pro object refers to one of the smart groups the benchmark created, "+
+			"for example a smart group with a \"member of\" criterion naming one. "+
+			"Remove that reference in Jamf Pro and run the destroy again: Jamf does not resume the delete by itself", id, lastDeleted, err)
 	}
 	return err
 }
