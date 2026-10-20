@@ -29,6 +29,9 @@ import (
 //   - Server-derived fields (id, invitation, last_action, date_sent*,
 //     expiration_date_epoch/_utc, and the read-only <site> element) are
 //     intentionally omitted; they are populated on read only.
+//   - target_ios is never sent. Jamf Pro stores `iOS 4` whatever the body
+//     carries, on every invitation type, and refuses a PUT (wire-verified
+//     2026-10-20, Jamf Pro 11.32.0), so it is Computed-only.
 func buildMobileDeviceInvitationInput(plan MobileDeviceInvitationResourceModel, siteID string) *proclassic.MobileDeviceInvitationPost {
 	in := &proclassic.MobileDeviceInvitationPost{
 		InvitationType:             helpers.OptionalStringPointer(plan.InvitationType),
@@ -43,7 +46,6 @@ func buildMobileDeviceInvitationInput(plan MobileDeviceInvitationResourceModel, 
 		SentFrom:          helpers.OptionalStringPointer(plan.SentFrom),
 		SentTo:            helpers.OptionalStringPointer(plan.SentTo),
 		Username:          helpers.OptionalStringPointer(plan.Username),
-		TargetIos:         helpers.OptionalStringPointer(plan.TargetIos),
 	}
 
 	if siteID != "" {

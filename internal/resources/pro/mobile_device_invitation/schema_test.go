@@ -84,11 +84,15 @@ func TestMobileDeviceInvitationResource_Schema(t *testing.T) {
 		}
 	}
 
-	// Optional+Computed server-defaulted inputs. expiration_date and target_ios
-	// are here (not Optional-only): when omitted the server assigns a value
-	// (e.g. Unlimited / iOS 4) that must be adoptable into state without a
-	// post-apply inconsistency.
-	for _, oc := range []string{"expiration_date", "enroll_into_site_id", "target_ios", "keep_existing_site_membership", "multiple_uses_allowed", "require_login"} {
+	// target_ios is read-only: Jamf Pro always stores `iOS 4`.
+	if a := s.Attributes["target_ios"]; a.IsOptional() || !a.IsComputed() {
+		t.Errorf("target_ios must be Computed-only, got optional=%v computed=%v", a.IsOptional(), a.IsComputed())
+	}
+
+	// Optional+Computed server-defaulted inputs. expiration_date is here (not
+	// Optional-only): when omitted the server assigns a value (e.g. Unlimited)
+	// that must be adoptable into state without a post-apply inconsistency.
+	for _, oc := range []string{"expiration_date", "enroll_into_site_id", "keep_existing_site_membership", "multiple_uses_allowed", "require_login"} {
 		a := s.Attributes[oc]
 		if !a.IsOptional() || !a.IsComputed() {
 			t.Errorf("%q must be Optional+Computed, got optional=%v computed=%v", oc, a.IsOptional(), a.IsComputed())
