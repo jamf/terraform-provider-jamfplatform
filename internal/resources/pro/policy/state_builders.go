@@ -528,8 +528,8 @@ func flattenPolicySelfService(ss *proclassic.PolicySelfService, state *PolicySel
 	state.IncludeInFeaturedCategory = helpers.BoolPointerValueOrNull(ss.FeatureOnMainPage)
 	state.DisplayNotifications = flattenNotificationEnabled(ss.Notification, state.DisplayNotifications)
 	state.NotificationLocation = helpers.WireWhenPresentString(ss.NotificationType, state.NotificationLocation)
-	state.NotificationSubject = helpers.WireWhenPresentString(ss.NotificationSubject, state.NotificationSubject)
-	state.NotificationMessage = helpers.WireWhenPresentString(ss.NotificationMessage, state.NotificationMessage)
+	state.NotificationSubject = helpers.WireWhenPresentStringTrimmed(ss.NotificationSubject, state.NotificationSubject)
+	state.NotificationMessage = helpers.WireWhenPresentStringTrimmed(ss.NotificationMessage, state.NotificationMessage)
 
 	if state.SelfServiceIcon != nil && ss.SelfServiceIcon != nil {
 		state.SelfServiceIcon.ID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.SelfServiceIcon.ID)

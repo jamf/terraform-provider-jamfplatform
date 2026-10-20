@@ -102,6 +102,30 @@ func TestStringValueTrimmed(t *testing.T) {
 	}
 }
 
+func TestWireWhenPresentStringTrimmed(t *testing.T) {
+	ptr := func(s string) *string { return &s }
+	cases := []struct {
+		name    string
+		wire    *string
+		current types.String
+		want    types.String
+	}{
+		{"server trimmed keeps current", ptr("subject"), types.StringValue(" subject\n"), types.StringValue(" subject\n")},
+		{"different value takes server", ptr("renamed"), types.StringValue("subject "), types.StringValue("renamed")},
+		{"absent wire keeps current", nil, types.StringValue("subject "), types.StringValue("subject ")},
+		{"empty wire keeps current", ptr(""), types.StringValue("subject "), types.StringValue("subject ")},
+		{"absent wire with unknown current is null", nil, types.StringUnknown(), types.StringNull()},
+		{"null current takes server", ptr("subject"), types.StringNull(), types.StringValue("subject")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := WireWhenPresentStringTrimmed(tc.wire, tc.current); !got.Equal(tc.want) {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestPlainStringHelpersStayStrict pins the opt-in: the plain helpers serve
 // endpoints that store whitespace verbatim, so a server value that is the prior
 // value trimmed is a real change and must win.

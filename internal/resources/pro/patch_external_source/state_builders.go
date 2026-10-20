@@ -44,7 +44,7 @@ func assignPatchExternalSourceResourceModel(state *PatchExternalSourceResourceMo
 		state.Name = helpers.StringPointerValueOrNullTrimmed(s.Name, state.Name)
 	}
 	state.Enabled = helpers.BoolPointerValueOrNull(s.Enabled)
-	state.HostName = helpers.StringPointerValueOrNull(s.HostName)
+	state.HostName = helpers.StringPointerValueOrNullTrimmed(s.HostName, state.HostName)
 	state.Port = portValueOrNull(s.Port)
 	state.SslEnabled = helpers.BoolPointerValueOrNull(s.SslEnabled)
 	state.CertificateValidationEnabled = helpers.BoolPointerValueOrNull(s.CertificateValidationEnabled)

@@ -29,7 +29,7 @@ func assignDockItemResourceModel(state *DockItemResourceModel, di *proclassic.Do
 		state.Type = helpers.StringPointerValueOrNull(di.Type)
 	}
 	if di.Path != nil {
-		state.Path = helpers.StringPointerValueOrNull(di.Path)
+		state.Path = helpers.StringPointerValueOrNullTrimmed(di.Path, state.Path)
 	}
 	state.Contents = helpers.StringPointerValueOrNull(di.Contents)
 	return diags

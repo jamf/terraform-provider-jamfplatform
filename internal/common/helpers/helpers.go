@@ -280,6 +280,17 @@ func WireWhenPresentString(wire *string, current types.String) types.String {
 	return current
 }
 
+// WireWhenPresentStringTrimmed is WireWhenPresentString for a field whose
+// write reaches an endpoint that saves it trimmed: it keeps current when wire is
+// current trimmed (see wireIsTrimmedCurrent), and otherwise behaves exactly as
+// WireWhenPresentString. Same opt-in rule as StringPointerValueOrNullTrimmed.
+func WireWhenPresentStringTrimmed(wire *string, current types.String) types.String {
+	if wireIsTrimmedCurrent(wire, current) {
+		return current
+	}
+	return WireWhenPresentString(wire, current)
+}
+
 // WireWhenPresentBool is the bool sibling of WireWhenPresentString and carries
 // the same rationale. There is no empty form for a bool, so only a nil wire
 // pointer counts as absent.

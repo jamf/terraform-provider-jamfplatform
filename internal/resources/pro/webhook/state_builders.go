@@ -30,7 +30,7 @@ func assignWebhookResourceModel(ctx context.Context, state *WebhookResourceModel
 	}
 	state.Name = helpers.StringPointerValueOrNullTrimmed(w.Name, state.Name)
 	state.Enabled = helpers.BoolPointerValueOrNull(w.Enabled)
-	state.URL = helpers.StringPointerValueOrNull(w.URL)
+	state.URL = helpers.StringPointerValueOrNullTrimmed(w.URL, state.URL)
 	state.AuthenticationType = helpers.StringPointerValueOrNull(w.AuthenticationType)
 	state.ConnectionTimeout = helpers.Int64FromIntPtr(w.ConnectionTimeout)
 	state.ReadTimeout = helpers.Int64FromIntPtr(w.ReadTimeout)

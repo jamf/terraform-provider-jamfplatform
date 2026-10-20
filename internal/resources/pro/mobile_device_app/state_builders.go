@@ -107,8 +107,8 @@ func flattenMobileAppGeneral(g *proclassic.MobileDeviceApplicationGeneral, state
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
 	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
-	state.Version = helpers.StringPointerValueOrNull(g.Version)
-	state.BundleID = helpers.StringPointerValueOrNull(g.BundleID)
+	state.Version = helpers.StringPointerValueOrNullTrimmed(g.Version, state.Version)
+	state.BundleID = helpers.StringPointerValueOrNullTrimmed(g.BundleID, state.BundleID)
 	// os_type echo is asymmetric (wire-probed): a POST never persists/echoes it,
 	// and a non-internal app never carries it, but once set via a PUT to an
 	// in-house app it is stored and echoed on every GET. Reflect the echo when
@@ -256,7 +256,7 @@ func flattenMobileAppScope(ctx context.Context, s *proclassic.MobileDeviceApplic
 // #392.
 func flattenMobileAppSelfService(ss *proclassic.MobileDeviceApplicationSelfService, state *MobileAppSelfServiceModel, includeUnmanaged bool) {
 	state.InstallButtonText = helpers.ReconcileOptionalStringPointerTrimmed(ss.SelfServiceInstallButtonText, state.InstallButtonText)
-	state.AfterInstallButtonText = helpers.WireWhenPresentString(ss.SelfServiceAfterInstallButtonText, state.AfterInstallButtonText)
+	state.AfterInstallButtonText = helpers.WireWhenPresentStringTrimmed(ss.SelfServiceAfterInstallButtonText, state.AfterInstallButtonText)
 	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmptyTrimmed(ss.SelfServiceDescription, state.SelfServiceDescription)
 	state.FeatureOnMainPage = helpers.BoolPointerValueOrNull(ss.FeatureOnMainPage)
 
@@ -265,8 +265,8 @@ func flattenMobileAppSelfService(ss *proclassic.MobileDeviceApplicationSelfServi
 		apiEnabled = ss.Notification.Enabled
 	}
 	state.NotificationEnabled = helpers.WireWhenPresentBool(apiEnabled, state.NotificationEnabled)
-	state.NotificationSubject = helpers.WireWhenPresentString(ss.NotificationSubject, state.NotificationSubject)
-	state.NotificationMessage = helpers.WireWhenPresentString(ss.NotificationMessage, state.NotificationMessage)
+	state.NotificationSubject = helpers.WireWhenPresentStringTrimmed(ss.NotificationSubject, state.NotificationSubject)
+	state.NotificationMessage = helpers.WireWhenPresentStringTrimmed(ss.NotificationMessage, state.NotificationMessage)
 
 	if includeUnmanaged && state.SelfServiceIcon == nil && ss.SelfServiceIcon != nil {
 		state.SelfServiceIcon = &MobileAppSelfServiceIconModel{}

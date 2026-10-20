@@ -79,9 +79,9 @@ func flattenMacAppGeneral(g *proclassic.MacApplicationGeneral, state *MacAppGene
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
 	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
-	state.Version = helpers.StringPointerValueOrNull(g.Version)
-	state.BundleID = helpers.StringPointerValueOrNull(g.BundleID)
-	state.URL = helpers.StringPointerValueOrNull(g.URL)
+	state.Version = helpers.StringPointerValueOrNullTrimmed(g.Version, state.Version)
+	state.BundleID = helpers.StringPointerValueOrNullTrimmed(g.BundleID, state.BundleID)
+	state.URL = helpers.StringPointerValueOrNullTrimmed(g.URL, state.URL)
 	state.IsFree = helpers.StickyIgnoringDriftBool(g.IsFree, state.IsFree)
 	state.DeploymentType = helpers.ReconcileOptionalStringPointerTrimmed(g.DeploymentType, state.DeploymentType)
 
@@ -188,8 +188,8 @@ func flattenMacAppSelfService(ss *proclassic.MacApplicationSelfService, state *M
 	}
 	state.NotificationEnabled = helpers.WireWhenPresentBool(apiEnabled, state.NotificationEnabled)
 	state.NotificationMethod = helpers.WireWhenPresentString(apiMethod, state.NotificationMethod)
-	state.NotificationSubject = helpers.WireWhenPresentString(ss.NotificationSubject, state.NotificationSubject)
-	state.NotificationMessage = helpers.WireWhenPresentString(ss.NotificationMessage, state.NotificationMessage)
+	state.NotificationSubject = helpers.WireWhenPresentStringTrimmed(ss.NotificationSubject, state.NotificationSubject)
+	state.NotificationMessage = helpers.WireWhenPresentStringTrimmed(ss.NotificationMessage, state.NotificationMessage)
 
 	if state.SelfServiceIcon != nil && ss.SelfServiceIcon != nil {
 		state.SelfServiceIcon.ID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.SelfServiceIcon.ID)

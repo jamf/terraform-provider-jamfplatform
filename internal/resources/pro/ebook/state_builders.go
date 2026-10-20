@@ -76,7 +76,7 @@ func flattenEbookGeneral(g *proclassic.EbookGeneral, state *EbookGeneralModel) {
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
 	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
-	state.URL = helpers.StringPointerValueOrNull(g.URL)
+	state.URL = helpers.StringPointerValueOrNullTrimmed(g.URL, state.URL)
 	state.Author = helpers.ReconcileOptionalStringPointerTrimmed(g.Author, state.Author)
 	state.DeploymentType = helpers.ReconcileOptionalStringPointerTrimmed(g.DeploymentType, state.DeploymentType)
 	state.DeployAsManaged = helpers.StickyIgnoringDriftBool(g.DeployAsManaged, state.DeployAsManaged)
@@ -194,8 +194,8 @@ func flattenEbookSelfService(ss *proclassic.EbookSelfService, state *EbookSelfSe
 	}
 	state.NotificationEnabled = helpers.WireWhenPresentBool(apiEnabled, state.NotificationEnabled)
 	state.NotificationMethod = helpers.WireWhenPresentString(apiMethod, state.NotificationMethod)
-	state.NotificationSubject = helpers.WireWhenPresentString(ss.NotificationSubject, state.NotificationSubject)
-	state.NotificationMessage = helpers.WireWhenPresentString(ss.NotificationMessage, state.NotificationMessage)
+	state.NotificationSubject = helpers.WireWhenPresentStringTrimmed(ss.NotificationSubject, state.NotificationSubject)
+	state.NotificationMessage = helpers.WireWhenPresentStringTrimmed(ss.NotificationMessage, state.NotificationMessage)
 
 	if ss.SelfServiceIcon != nil {
 		state.IconID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.IconID)
