@@ -3,7 +3,10 @@
 page_title: "jamfplatform_cbengine_benchmark Resource - terraform-provider-jamfplatform"
 subcategory: ""
 description: |-
-  Creates a Jamf Compliance Benchmark. Creation is asynchronous: the platform accepts the request and deploys the associated artifacts to the MDM. The provider polls the benchmark's sync state until it reaches SYNCED or a terminal failure. Requires Compliance Benchmarks API access.
+  Creates a Jamf Compliance Benchmark. Jamf accepts the create, then deploys the benchmark's configuration profiles, policies, smart groups, scripts and extension attributes to Jamf Pro. The provider waits until the benchmark's sync state reaches SYNCED, and reports an error if the sync fails. Requires Compliance Benchmarks API access.
+  Jamf cannot update a benchmark in place, so changing any argument replaces it. Terraform deletes the old benchmark before it creates the new one, and your devices have no benchmark until the create finishes. create_before_destroy alone fails, because Jamf refuses a second benchmark with the same title (409 DuplicateFieldException). To create the new benchmark first, set create_before_destroy and change title in the same apply.
+  Jamf cannot delete a benchmark while a Jamf Pro object refers to one of the smart groups the benchmark created, for example a smart group with a member of criterion naming one. The provider then waits for the delete timeout (15 minutes by default) and reports an error. Remove the reference in Jamf Pro and run the destroy again. If you remove it during the wait, the provider finishes the delete within half a minute.
+  The provider creates and deletes benchmarks one at a time, because when Jamf deletes several at once it leaves some of their configuration profiles and policies behind in Jamf Pro. Each benchmark you create or replace adds about half a minute to the apply. A benchmark waiting its turn holds one of Terraform's -parallelism slots, so raise -parallelism if other resources in the same apply wait behind your benchmarks.
   Required Jamf permissions
   Jamf lists this under Platform environment scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
@@ -13,7 +16,13 @@ description: |-
 
 # jamfplatform_cbengine_benchmark (Resource)
 
-Creates a Jamf Compliance Benchmark. Creation is asynchronous: the platform accepts the request and deploys the associated artifacts to the MDM. The provider polls the benchmark's sync state until it reaches `SYNCED` or a terminal failure. Requires **Compliance Benchmarks API** access.
+Creates a Jamf Compliance Benchmark. Jamf accepts the create, then deploys the benchmark's configuration profiles, policies, smart groups, scripts and extension attributes to Jamf Pro. The provider waits until the benchmark's sync state reaches `SYNCED`, and reports an error if the sync fails. Requires **Compliance Benchmarks API** access.
+
+Jamf cannot update a benchmark in place, so changing any argument replaces it. Terraform deletes the old benchmark before it creates the new one, and your devices have no benchmark until the create finishes. `create_before_destroy` alone fails, because Jamf refuses a second benchmark with the same title (`409 DuplicateFieldException`). To create the new benchmark first, set `create_before_destroy` and change `title` in the same apply.
+
+Jamf cannot delete a benchmark while a Jamf Pro object refers to one of the smart groups the benchmark created, for example a smart group with a `member of` criterion naming one. The provider then waits for the `delete` timeout (15 minutes by default) and reports an error. Remove the reference in Jamf Pro and run the destroy again. If you remove it during the wait, the provider finishes the delete within half a minute.
+
+The provider creates and deletes benchmarks one at a time, because when Jamf deletes several at once it leaves some of their configuration profiles and policies behind in Jamf Pro. Each benchmark you create or replace adds about half a minute to the apply. A benchmark waiting its turn holds one of Terraform's `-parallelism` slots, so raise `-parallelism` if other resources in the same apply wait behind your benchmarks.
 
 **Required Jamf permissions**
 

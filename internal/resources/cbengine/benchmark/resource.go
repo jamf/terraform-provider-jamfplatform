@@ -36,6 +36,9 @@ type BenchmarkResource struct {
 	// impact backs the plan-time impact alert on device group targeting. nil when
 	// the provider's impact_alerts attribute is off, which is the default.
 	impact *impact.Cache
+	// lock serializes creates and deletes across every benchmark in this
+	// provider instance; see providerdata.BenchmarkLock.
+	lock *providerdata.BenchmarkLock
 }
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -48,6 +51,10 @@ const (
 	defaultCreateTimeout = 15 * time.Minute
 	defaultReadTimeout   = 60 * time.Second
 	defaultDeleteTimeout = 15 * time.Minute
+
+	// redeleteInterval is how long a benchmark may go on existing after a
+	// delete before the delete is issued again.
+	redeleteInterval = 20 * time.Second
 )
 
 // uuidRegex matches UUID strings used to validate device group IDs.
@@ -87,7 +94,7 @@ func (r *BenchmarkResource) Schema(ctx context.Context, req resource.SchemaReque
 func benchmarkResourceSchema(ctx context.Context) schema.Schema {
 	return schema.Schema{
 		Version:             1,
-		MarkdownDescription: "Creates a Jamf Compliance Benchmark. Creation is asynchronous: the platform accepts the request and deploys the associated artifacts to the MDM. The provider polls the benchmark's sync state until it reaches `SYNCED` or a terminal failure. Requires **Compliance Benchmarks API** access." + resourcePrivileges,
+		MarkdownDescription: "Creates a Jamf Compliance Benchmark. Jamf accepts the create, then deploys the benchmark's configuration profiles, policies, smart groups, scripts and extension attributes to Jamf Pro. The provider waits until the benchmark's sync state reaches `SYNCED`, and reports an error if the sync fails. Requires **Compliance Benchmarks API** access.\n\nJamf cannot update a benchmark in place, so changing any argument replaces it. Terraform deletes the old benchmark before it creates the new one, and your devices have no benchmark until the create finishes. `create_before_destroy` alone fails, because Jamf refuses a second benchmark with the same title (`409 DuplicateFieldException`). To create the new benchmark first, set `create_before_destroy` and change `title` in the same apply.\n\nJamf cannot delete a benchmark while a Jamf Pro object refers to one of the smart groups the benchmark created, for example a smart group with a `member of` criterion naming one. The provider then waits for the `delete` timeout (15 minutes by default) and reports an error. Remove the reference in Jamf Pro and run the destroy again. If you remove it during the wait, the provider finishes the delete within half a minute.\n\nThe provider creates and deletes benchmarks one at a time, because when Jamf deletes several at once it leaves some of their configuration profiles and policies behind in Jamf Pro. Each benchmark you create or replace adds about half a minute to the apply. A benchmark waiting its turn holds one of Terraform's `-parallelism` slots, so raise `-parallelism` if other resources in the same apply wait behind your benchmarks." + resourcePrivileges,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Unique identifier assigned by the platform.",
@@ -423,6 +430,7 @@ func (r *BenchmarkResource) Configure(ctx context.Context, req resource.Configur
 	}
 
 	r.impact = pd.ImpactCache()
+	r.lock = pd.BenchmarkLock()
 	r.client = compliancebenchmarks.New(pd.Client)
 }
 

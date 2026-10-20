@@ -34,6 +34,13 @@ func (r *BenchmarkResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	release, err := r.lock.Acquire(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError("Error creating benchmark", "Terraform canceled the create while it waited for another benchmark to finish creating or deleting: "+helpers.APIErrorDetail(err))
+		return
+	}
+	defer release()
+
 	createCtx, cancel := context.WithTimeout(ctx, createTimeout)
 	defer cancel()
 
@@ -185,16 +192,22 @@ func (r *BenchmarkResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	deleteCtx, cancel := context.WithTimeout(ctx, deleteTimeout)
-	defer cancel()
-
 	if data.ID.IsNull() || data.ID.ValueString() == "" {
 		resp.Diagnostics.AddError("Missing ID", "Cannot delete benchmark without ID.")
 		return
 	}
 
-	err := r.client.DeleteBenchmark(deleteCtx, data.ID.ValueString())
+	release, err := r.lock.Acquire(ctx)
 	if err != nil {
+		resp.Diagnostics.AddError("Error deleting benchmark", "Terraform canceled the delete while it waited for another benchmark to finish creating or deleting: "+helpers.APIErrorDetail(err))
+		return
+	}
+	defer release()
+
+	deleteCtx, cancel := context.WithTimeout(ctx, deleteTimeout)
+	defer cancel()
+
+	if err := r.client.DeleteBenchmark(deleteCtx, data.ID.ValueString()); err != nil {
 		if helpers.IsNotFoundError(err) {
 			tflog.Info(ctx, "Benchmark already deleted", map[string]any{
 				"benchmark_id": data.ID.ValueString(),
@@ -210,13 +223,13 @@ func (r *BenchmarkResource) Delete(ctx context.Context, req resource.DeleteReque
 	}
 
 	pollInterval := 5 * time.Second
-	if err := waitForBenchmarkDeletion(deleteCtx, r.client, data.ID.ValueString(), pollInterval); err != nil {
+	if err := waitForBenchmarkDeletion(deleteCtx, r.client, data.ID.ValueString(), pollInterval, redeleteInterval); err != nil {
 		if helpers.IsNotFoundError(err) {
 			return
 		}
 		resp.Diagnostics.AddError(
 			"Error waiting for benchmark deletion",
-			fmt.Sprintf("Benchmark %s deletion did not complete: %s", data.ID.ValueString(), helpers.APIErrorDetail(err)),
+			fmt.Sprintf("Jamf did not finish deleting benchmark %s: %s", data.ID.ValueString(), helpers.APIErrorDetail(err)),
 		)
 		return
 	}

@@ -185,6 +185,29 @@ func TestAssignBenchmarkModelFromResponse_NilInputs(t *testing.T) {
 	assignBenchmarkModelFromResponse(&BenchmarkResourceModel{}, nil)
 }
 
+func TestAssignBenchmarkModelFromResponse_DescriptionReconciled(t *testing.T) {
+	cases := []struct {
+		name  string
+		prior types.String
+		wire  string
+		want  types.String
+	}{
+		{"omitted stays null", types.StringNull(), "", types.StringNull()},
+		{"explicit empty kept", types.StringValue(""), "", types.StringValue("")},
+		{"server value adopted", types.StringNull(), "from server", types.StringValue("from server")},
+		{"configured value echoed", types.StringValue("mine"), "mine", types.StringValue("mine")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			model := &BenchmarkResourceModel{Description: tc.prior, TargetDeviceGroups: types.SetNull(types.StringType)}
+			assignBenchmarkModelFromResponse(model, &compliancebenchmarks.BenchmarkResponseV2{Description: tc.wire})
+			if !model.Description.Equal(tc.want) {
+				t.Errorf("description = %s, want %s", model.Description, tc.want)
+			}
+		})
+	}
+}
+
 func TestAssignBenchmarkDataSourceFromResponse(t *testing.T) {
 	model := &BenchmarkDataSourceModel{}
 	lastUpdatedDS, _ := time.Parse(time.RFC3339, "2025-01-01T00:00:00Z")
