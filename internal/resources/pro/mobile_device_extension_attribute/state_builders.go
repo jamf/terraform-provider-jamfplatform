@@ -52,7 +52,7 @@ func assignMobileDeviceExtensionAttributeDataSourceModel(ctx context.Context, st
 
 	state.ID = helpers.StringPointerValueOrNull(ea.ID)
 	state.Name = types.StringValue(ea.Name)
-	state.Description = helpers.StringPointerValueOrNull(ea.Description)
+	state.Description = helpers.StringPointerValueOrCurrent(ea.Description, state.Description)
 	state.DataType = types.StringValue(ea.DataType)
 	state.InputType = types.StringValue(ea.InputType)
 	state.InventoryDisplay = types.StringValue(ea.InventoryDisplayType)

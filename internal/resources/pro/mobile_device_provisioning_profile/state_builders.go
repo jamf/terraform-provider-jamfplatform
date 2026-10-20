@@ -24,7 +24,7 @@ func assignProvisioningProfileResourceModel(state *ProvisioningProfileResourceMo
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
 	state.DisplayName = helpers.StringPointerValueOrNull(g.DisplayName)
 	state.UUID = helpers.StringPointerValueOrNull(g.UUID)
 	state.CreationDateUTC = helpers.StringPointerValueOrNull(g.CreationDateUtc)
@@ -49,7 +49,7 @@ func assignProvisioningProfileDataSourceModel(state *ProvisioningProfileDataSour
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
 	state.DisplayName = helpers.StringPointerValueOrNull(g.DisplayName)
 	state.UUID = helpers.StringPointerValueOrNull(g.UUID)
 	state.CreationDateUTC = helpers.StringPointerValueOrNull(g.CreationDateUtc)

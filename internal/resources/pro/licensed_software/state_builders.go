@@ -71,7 +71,7 @@ func flattenGeneral(g *proclassic.LicensedSoftwareGeneral, state *LicensedSoftwa
 	if g == nil {
 		return
 	}
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
 	state.Publisher = helpers.ReconcileOptionalStringPointer(g.Publisher, state.Publisher)
 	state.Platform = helpers.ReconcileOptionalStringPointer(g.Platform, state.Platform)
 	state.Notes = helpers.ReconcileOptionalStringPointer(g.Notes, state.Notes)

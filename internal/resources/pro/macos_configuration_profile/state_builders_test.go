@@ -607,3 +607,36 @@ func TestFlattenSelfServiceCategories_KeepsThePlannedOrder(t *testing.T) {
 		t.Errorf("with no order the wire order must stand, got %v", got)
 	}
 }
+
+// Issue #510: a profile created in the Jamf Pro UI keeps a trailing space in
+// its self-service strings, import carries them into state, and the first write
+// through the API returns them trimmed. The carried-forward value must survive
+// the post-apply flatten, for every string Jamf trims.
+func TestFlattenSelfService_WireTrimsTrailingSpace(t *testing.T) {
+	state := &SelfServiceModel{
+		SelfServiceDisplayName: types.StringValue("Display "),
+		InstallButtonText:      types.StringValue("Install "),
+		SelfServiceDescription: types.StringValue("Desc\n"),
+		NotificationSubject:    types.StringValue("FileVault "),
+		NotificationMessage:    types.StringValue("Message \n"),
+	}
+	flattenSelfService(&proclassic.OsXConfigurationProfileSelfService{
+		SelfServiceDisplayName: new("Display"),
+		InstallButtonText:      new("Install"),
+		SelfServiceDescription: new("Desc"),
+		NotificationSubject:    new("FileVault"),
+		NotificationMessage:    new("Message"),
+	}, state, false)
+
+	for name, got := range map[string]types.String{
+		"self_service_display_name": state.SelfServiceDisplayName,
+		"install_button_text":       state.InstallButtonText,
+		"self_service_description":  state.SelfServiceDescription,
+		"notification_subject":      state.NotificationSubject,
+		"notification_message":      state.NotificationMessage,
+	} {
+		if v := got.ValueString(); v == "" || v[len(v)-1] != ' ' && v[len(v)-1] != '\n' {
+			t.Errorf("%s: authored trailing whitespace lost, got %q", name, v)
+		}
+	}
+}

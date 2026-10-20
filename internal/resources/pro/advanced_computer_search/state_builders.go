@@ -27,7 +27,7 @@ func assignAdvancedComputerSearchResourceModel(ctx context.Context, state *Advan
 	if search.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(search.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(search.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(search.Name, state.Name)
 
 	siteID, siteName := scope.FlattenSiteObject(search.Site)
 	state.SiteID = helpers.ReconcileOptionalStringPointer(siteID, state.SiteID)
@@ -56,7 +56,7 @@ func assignAdvancedComputerSearchDataSourceModel(ctx context.Context, state *Adv
 	if search.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(search.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(search.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(search.Name, state.Name)
 
 	siteID, siteName := scope.FlattenSiteObject(search.Site)
 	state.SiteID = helpers.StringPointerValueOrNull(siteID)

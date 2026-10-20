@@ -43,7 +43,7 @@ func assignDirectoryBindingResourceModel(state *DirectoryBindingResourceModel, b
 	if b.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(b.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(b.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(b.Name, state.Name)
 	state.Type = helpers.StringPointerValueOrNull(b.Type)
 	state.Domain = helpers.ReconcileOptionalStringPointer(b.Domain, state.Domain)
 	state.Username = helpers.ReconcileOptionalStringPointer(b.Username, state.Username)
@@ -70,7 +70,7 @@ func assignDirectoryBindingDataSourceModel(state *DirectoryBindingDataSourceMode
 	if b.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(b.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(b.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(b.Name, state.Name)
 	state.Type = helpers.StringPointerValueOrNull(b.Type)
 	state.Domain = helpers.StringPointerValueOrNull(b.Domain)
 	state.Username = helpers.StringPointerValueOrNull(b.Username)

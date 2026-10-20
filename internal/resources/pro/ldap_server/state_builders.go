@@ -88,7 +88,7 @@ func assignLdapServerDataSourceModel(state *LdapServerDataSourceModel, s *procla
 			state.ID = helpers.StringValueFromIntPtr(s.Connection.ID)
 		}
 		if s.Connection.Name != nil {
-			state.Name = helpers.StringPointerValueOrNull(s.Connection.Name)
+			state.Name = helpers.StringPointerValueOrCurrent(s.Connection.Name, state.Name)
 		}
 	}
 	state.Connection = assignConnectionModel(s.Connection, nil)

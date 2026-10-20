@@ -27,7 +27,7 @@ func assignClassResourceModel(ctx context.Context, state *ClassResourceModel, c 
 	if c.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(c.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(c.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(c.Name, state.Name)
 	state.Description = helpers.ReconcileOptionalStringPointer(c.Description, state.Description)
 	state.Source = helpers.StringPointerValueOrNull(c.Source)
 
@@ -67,8 +67,8 @@ func assignClassDataSourceModel(ctx context.Context, state *ClassDataSourceModel
 	if c.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(c.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(c.Name)
-	state.Description = helpers.StringPointerValueOrNull(c.Description)
+	state.Name = helpers.StringPointerValueOrCurrent(c.Name, state.Name)
+	state.Description = helpers.StringPointerValueOrCurrent(c.Description, state.Description)
 	state.Source = helpers.StringPointerValueOrNull(c.Source)
 
 	siteID, siteName := scope.FlattenSiteObject(c.Site)

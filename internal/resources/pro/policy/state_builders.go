@@ -158,7 +158,7 @@ func flattenPolicyGeneral(ctx context.Context, g *proclassic.PolicyGeneral, stat
 		}
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
 	state.Enabled = helpers.BoolPointerValueOrNull(g.Enabled)
 	state.Trigger = helpers.StringPointerValueOrNull(g.Trigger)
 	state.TriggerCheckin = helpers.BoolPointerValueOrNull(g.TriggerCheckin)

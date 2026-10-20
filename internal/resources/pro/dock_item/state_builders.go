@@ -23,7 +23,7 @@ func assignDockItemResourceModel(state *DockItemResourceModel, di *proclassic.Do
 		state.ID = helpers.StringValueFromIntPtr(di.ID)
 	}
 	if di.Name != nil {
-		state.Name = helpers.StringPointerValueOrNull(di.Name)
+		state.Name = helpers.StringPointerValueOrCurrent(di.Name, state.Name)
 	}
 	if di.Type != nil {
 		state.Type = helpers.StringPointerValueOrNull(di.Type)
@@ -47,7 +47,7 @@ func assignDockItemDataSourceModel(state *DockItemDataSourceModel, di *proclassi
 	if di.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(di.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(di.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(di.Name, state.Name)
 	state.Type = helpers.StringPointerValueOrNull(di.Type)
 	state.Path = helpers.StringPointerValueOrNull(di.Path)
 	state.Contents = helpers.StringPointerValueOrNull(di.Contents)

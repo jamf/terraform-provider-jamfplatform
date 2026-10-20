@@ -34,7 +34,7 @@ func assignNetworkSegmentResourceModel(state *NetworkSegmentResourceModel, s *pr
 		state.ID = helpers.StringValueFromIntPtr(s.ID)
 	}
 	if s.Name != nil {
-		state.Name = helpers.StringPointerValueOrNull(s.Name)
+		state.Name = helpers.StringPointerValueOrCurrent(s.Name, state.Name)
 	}
 	if s.StartingAddress != nil {
 		state.StartingAddress = helpers.StringPointerValueOrNull(s.StartingAddress)
@@ -68,7 +68,7 @@ func assignNetworkSegmentDataSourceModel(state *NetworkSegmentDataSourceModel, s
 		state.ID = helpers.StringValueFromIntPtr(s.ID)
 	}
 	if s.Name != nil {
-		state.Name = helpers.StringPointerValueOrNull(s.Name)
+		state.Name = helpers.StringPointerValueOrCurrent(s.Name, state.Name)
 	}
 	state.StartingAddress = helpers.StringPointerValueOrNull(s.StartingAddress)
 	state.EndingAddress = helpers.StringPointerValueOrNull(s.EndingAddress)

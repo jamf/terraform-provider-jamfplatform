@@ -33,7 +33,7 @@ func assignEnrollmentProfileResourceModel(state *EnrollmentProfileResourceModel,
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
 	state.Description = helpers.ReconcileOptionalStringPointer(g.Description, state.Description)
 	state.Invitation = bigIntStringOrNull(g.Invitation)
 	state.UUID = stringOrNull(g.UUID)
@@ -77,8 +77,8 @@ func assignEnrollmentProfileDataSourceModel(state *EnrollmentProfileDataSourceMo
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
-	state.Description = helpers.StringPointerValueOrNull(g.Description)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
+	state.Description = helpers.StringPointerValueOrCurrent(g.Description, state.Description)
 	state.Invitation = bigIntStringOrNull(g.Invitation)
 	state.UUID = stringOrNull(g.UUID)
 	if g.Site != nil {

@@ -78,7 +78,7 @@ func flattenMacAppGeneral(g *proclassic.MacApplicationGeneral, state *MacAppGene
 		return
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
 	state.Version = helpers.StringPointerValueOrNull(g.Version)
 	state.BundleID = helpers.StringPointerValueOrNull(g.BundleID)
 	state.URL = helpers.StringPointerValueOrNull(g.URL)
@@ -176,7 +176,7 @@ func flattenMacAppScope(ctx context.Context, s *proclassic.MacApplicationScope, 
 // #387.
 func flattenMacAppSelfService(ss *proclassic.MacApplicationSelfService, state *MacAppSelfServiceModel) {
 	state.InstallButtonText = helpers.ReconcileOptionalStringPointer(ss.InstallButtonText, state.InstallButtonText)
-	state.SelfServiceDescription = helpers.PreserveStringWhenWireTrimsTrailingSpace(ss.SelfServiceDescription, state.SelfServiceDescription)
+	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmpty(ss.SelfServiceDescription, state.SelfServiceDescription)
 	state.ForceUsersToViewDescription = helpers.BoolPointerValueOrNull(ss.ForceUsersToViewDescription)
 	state.FeatureOnMainPage = helpers.BoolPointerValueOrNull(ss.FeatureOnMainPage)
 

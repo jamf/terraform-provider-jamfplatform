@@ -38,7 +38,7 @@ func assignVPPInvitationResourceModel(ctx context.Context, state *VPPInvitationR
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
 	if g.VppAccount != nil {
 		state.VPPAccountID = helpers.StringValueFromIntPtr(g.VppAccount.ID)
 	}
@@ -69,7 +69,7 @@ func assignVPPInvitationDataSourceModel(ctx context.Context, state *VPPInvitatio
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
 	if g.VppAccount != nil {
 		state.VPPAccountID = helpers.StringValueFromIntPtr(g.VppAccount.ID)
 	}

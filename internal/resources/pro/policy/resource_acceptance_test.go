@@ -3975,3 +3975,45 @@ func TestAccPolicyResource_OptionalBlocksOmittedToDeclared(t *testing.T) {
 		},
 	})
 }
+
+// TestAccPolicyResource_TrailingWhitespaceKept covers issue #510 for policies:
+// Jamf Pro saves the name and every Self Service string without trailing
+// whitespace (wire-verified 2026-10-20), so an authored value ending in
+// whitespace must survive the apply and a re-plan must be empty.
+func TestAccPolicyResource_TrailingWhitespaceKept(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-policy-trail-" + testhelpers.RunSuffix()
+	cfg := fmt.Sprintf(`
+resource "jamfplatform_pro_policy" "test" {
+  general = {
+    name    = " %s "
+    enabled = true
+  }
+  self_service = {
+    use_for_self_service      = true
+    self_service_display_name = "Display "
+    install_button_text       = "Install "
+    self_service_description  = "Description\n"
+  }
+}
+`, name)
+	exact := func(path tfjsonpath.Path, v string) statecheck.StateCheck {
+		return statecheck.ExpectKnownValue("jamfplatform_pro_policy.test", path, knownvalue.StringExact(v))
+	}
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckPolicyDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg,
+				ConfigStateChecks: []statecheck.StateCheck{
+					exact(tfjsonpath.New("general").AtMapKey("name"), " "+name+" "),
+					exact(tfjsonpath.New("self_service").AtMapKey("self_service_display_name"), "Display "),
+					exact(tfjsonpath.New("self_service").AtMapKey("install_button_text"), "Install "),
+					exact(tfjsonpath.New("self_service").AtMapKey("self_service_description"), "Description\n"),
+				},
+			},
+			{Config: cfg, PlanOnly: true},
+		},
+	})
+}

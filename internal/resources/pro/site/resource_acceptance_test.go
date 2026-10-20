@@ -232,3 +232,20 @@ func TestAccListResource_ProSite_Basic(t *testing.T) {
 		},
 	})
 }
+
+// TestAccResource_ProSite_NameWhitespaceKept covers issue #510: Jamf Pro saves a
+// site name without its surrounding whitespace (wire-verified 2026-10-20), and
+// the authored name must survive the apply with an empty re-plan.
+func TestAccResource_ProSite_NameWhitespaceKept(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := " tf-acc-pro-site-ws-" + testhelpers.RunSuffix() + " "
+	cfg := siteConfig(name)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckSiteDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: cfg, Check: resource.TestCheckResourceAttr("jamfplatform_pro_site.test", "name", name)},
+			{Config: cfg, PlanOnly: true},
+		},
+	})
+}

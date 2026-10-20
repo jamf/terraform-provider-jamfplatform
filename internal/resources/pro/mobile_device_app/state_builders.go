@@ -106,7 +106,7 @@ func flattenMobileAppGeneral(g *proclassic.MobileDeviceApplicationGeneral, state
 		return
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
 	state.Version = helpers.StringPointerValueOrNull(g.Version)
 	state.BundleID = helpers.StringPointerValueOrNull(g.BundleID)
 	// os_type echo is asymmetric (wire-probed): a POST never persists/echoes it,
@@ -118,7 +118,7 @@ func flattenMobileAppGeneral(g *proclassic.MobileDeviceApplicationGeneral, state
 	// follow-up PUT precisely so the server persists it and this echo is present.
 	state.OsType = helpers.WireWhenPresentString(g.OsType, state.OsType)
 
-	state.Description = helpers.StringPointerValueOrNull(g.Description)
+	state.Description = helpers.StringPointerValueOrCurrent(g.Description, state.Description)
 	state.DeploymentType = helpers.StringPointerValueOrNull(g.DeploymentType)
 
 	// Optional+Computed echoes.
@@ -257,7 +257,7 @@ func flattenMobileAppScope(ctx context.Context, s *proclassic.MobileDeviceApplic
 func flattenMobileAppSelfService(ss *proclassic.MobileDeviceApplicationSelfService, state *MobileAppSelfServiceModel, includeUnmanaged bool) {
 	state.InstallButtonText = helpers.ReconcileOptionalStringPointer(ss.SelfServiceInstallButtonText, state.InstallButtonText)
 	state.AfterInstallButtonText = helpers.WireWhenPresentString(ss.SelfServiceAfterInstallButtonText, state.AfterInstallButtonText)
-	state.SelfServiceDescription = helpers.PreserveStringWhenWireTrimsTrailingSpace(ss.SelfServiceDescription, state.SelfServiceDescription)
+	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmpty(ss.SelfServiceDescription, state.SelfServiceDescription)
 	state.FeatureOnMainPage = helpers.BoolPointerValueOrNull(ss.FeatureOnMainPage)
 
 	var apiEnabled *bool

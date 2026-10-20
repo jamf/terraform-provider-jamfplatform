@@ -75,7 +75,7 @@ func flattenEbookGeneral(g *proclassic.EbookGeneral, state *EbookGeneralModel) {
 		return
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
 	state.URL = helpers.StringPointerValueOrNull(g.URL)
 	state.Author = helpers.ReconcileOptionalStringPointer(g.Author, state.Author)
 	state.DeploymentType = helpers.ReconcileOptionalStringPointer(g.DeploymentType, state.DeploymentType)

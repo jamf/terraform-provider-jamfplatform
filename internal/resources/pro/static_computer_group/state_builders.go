@@ -35,7 +35,7 @@ func assignStaticComputerGroupResourceState(state *StaticComputerGroupResourceMo
 	if got.ID != "" {
 		state.ID = types.StringValue(got.ID)
 	}
-	state.Name = types.StringValue(got.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(&got.Name, state.Name)
 	state.Description = helpers.ReconcileOptionalStringPointer(got.Description, state.Description)
 	state.SiteID = progroups.SiteIDForState(got.SiteID)
 }
@@ -49,8 +49,8 @@ func assignStaticComputerGroupDataSourceState(state *StaticComputerGroupDataSour
 	if got.ID != "" {
 		state.ID = types.StringValue(got.ID)
 	}
-	state.Name = types.StringValue(got.Name)
-	state.Description = helpers.StringPointerValueOrNull(got.Description)
+	state.Name = helpers.StringPointerValueOrCurrent(&got.Name, state.Name)
+	state.Description = helpers.StringPointerValueOrCurrent(got.Description, state.Description)
 	state.SiteID = progroups.SiteIDForState(got.SiteID)
 }
 

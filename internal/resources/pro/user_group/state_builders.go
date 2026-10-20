@@ -45,7 +45,7 @@ func assignUserGroupResourceModel(
 		state.ID = helpers.StringValueFromIntPtr(ug.ID)
 	}
 	if ug.Name != nil {
-		state.Name = helpers.StringPointerValueOrNull(ug.Name)
+		state.Name = helpers.StringPointerValueOrCurrent(ug.Name, state.Name)
 	}
 	state.GroupType = groupTypeFromIsSmart(ug.IsSmart)
 	// notify_on_membership_change is Optional+Computed with a static default.
@@ -115,7 +115,7 @@ func assignUserGroupDataSourceModel(state *UserGroupDataSourceModel, ug *proclas
 		state.ID = helpers.StringValueFromIntPtr(ug.ID)
 	}
 	if ug.Name != nil {
-		state.Name = helpers.StringPointerValueOrNull(ug.Name)
+		state.Name = helpers.StringPointerValueOrCurrent(ug.Name, state.Name)
 	}
 	state.GroupType = groupTypeFromIsSmart(ug.IsSmart)
 	state.NotifyOnMembershipChange = helpers.BoolPointerValueOrNull(ug.IsNotifyOnChange)

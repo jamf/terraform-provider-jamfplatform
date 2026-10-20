@@ -568,7 +568,7 @@ func TestSelfServiceCategoryDisplayIn(t *testing.T) {
 	}
 }
 
-func TestPreserveStringWhenWireTrimsTrailingSpace(t *testing.T) {
+func TestPreserveStringWhenWireEmpty_TrimmedWire(t *testing.T) {
 	cases := []struct {
 		name    string
 		wire    *string
@@ -577,6 +577,7 @@ func TestPreserveStringWhenWireTrimsTrailingSpace(t *testing.T) {
 	}{
 		{"trailing newline trimmed by server keeps authored", new("Line one\nLine two"), types.StringValue("Line one\nLine two\n"), types.StringValue("Line one\nLine two\n")},
 		{"trailing space and newline trimmed keeps authored", new("ends here"), types.StringValue("ends here \n"), types.StringValue("ends here \n")},
+		{"leading and trailing space trimmed by server keeps authored", new("name"), types.StringValue(" name "), types.StringValue(" name ")},
 		{"identical keeps authored", new("same"), types.StringValue("same"), types.StringValue("same")},
 		{"interior difference takes server", new("a\nb"), types.StringValue("a \nb"), types.StringValue("a\nb")},
 		{"different value takes server", new("edited in Jamf Pro"), types.StringValue("authored\n"), types.StringValue("edited in Jamf Pro")},
@@ -587,7 +588,35 @@ func TestPreserveStringWhenWireTrimsTrailingSpace(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := PreserveStringWhenWireTrimsTrailingSpace(tc.wire, tc.current)
+			got := PreserveStringWhenWireEmpty(tc.wire, tc.current)
+			if !got.Equal(tc.want) {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestReconcileOptionalString_TrimmedWire(t *testing.T) {
+	cases := []struct {
+		name    string
+		wire    *string
+		current types.String
+		want    types.String
+	}{
+		{"imported trailing space stripped by server keeps current (#510)", new("FileVault"), types.StringValue("FileVault "), types.StringValue("FileVault ")},
+		{"authored trailing newline keeps authored", new("text"), types.StringValue("text\n"), types.StringValue("text\n")},
+		{"identical", new("same"), types.StringValue("same"), types.StringValue("same")},
+		{"different value takes server", new("edited"), types.StringValue("authored "), types.StringValue("edited")},
+		{"interior difference takes server", new("a\nb"), types.StringValue("a \nb"), types.StringValue("a\nb")},
+		{"empty wire, null current collapses to null", new(""), types.StringNull(), types.StringNull()},
+		{"empty wire, authored empty keeps empty", new(""), types.StringValue(""), types.StringValue("")},
+		{"empty wire clears a non-empty current", new(""), types.StringValue("was set"), types.StringNull()},
+		{"nil wire, null current", nil, types.StringNull(), types.StringNull()},
+		{"unknown current takes server", new("v"), types.StringUnknown(), types.StringValue("v")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ReconcileOptionalStringPointer(tc.wire, tc.current)
 			if !got.Equal(tc.want) {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}

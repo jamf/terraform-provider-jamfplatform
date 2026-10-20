@@ -62,7 +62,7 @@ func flattenGeneral(g *proclassic.RestrictedSoftwareGeneral, state *RestrictedSo
 		return
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
 	state.ProcessName = helpers.StringPointerValueOrNull(g.ProcessName)
 	state.RestrictExactProcessName = helpers.BoolPointerValueOrNull(g.MatchExactProcessName)
 	state.SendEmailNotificationOnViolation = helpers.BoolPointerValueOrNull(g.SendNotification)

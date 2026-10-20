@@ -28,7 +28,7 @@ func assignWebhookResourceModel(ctx context.Context, state *WebhookResourceModel
 	if id := extractWebhookID(w); id != "" {
 		state.ID = types.StringValue(id)
 	}
-	state.Name = helpers.StringPointerValueOrNull(w.Name)
+	state.Name = helpers.StringPointerValueOrCurrent(w.Name, state.Name)
 	state.Enabled = helpers.BoolPointerValueOrNull(w.Enabled)
 	state.URL = helpers.StringPointerValueOrNull(w.URL)
 	state.AuthenticationType = helpers.StringPointerValueOrNull(w.AuthenticationType)

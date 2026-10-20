@@ -2410,3 +2410,56 @@ func TestAccResource_MacOSConfigurationProfile_SelfServiceOmittedToDeclared(t *t
 		},
 	})
 }
+
+// TestAccResource_MacOSConfigurationProfile_TrailingWhitespaceKept covers issue
+// #510. Jamf Pro saves name, description and every Self Service string with
+// trailing whitespace removed (wire-verified 2026-10-20), so an authored value
+// ending in whitespace failed with "Provider produced inconsistent result after
+// apply". The authored value must survive and a re-plan must be empty.
+func TestAccResource_MacOSConfigurationProfile_TrailingWhitespaceKept(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-mcp-trail-" + testhelpers.RunSuffix()
+	payload := readFixture(t, "1Password__notifications_profile.mobileconfig")
+	cfg := fmt.Sprintf(`
+resource "jamfplatform_pro_macos_configuration_profile" "test" {
+  general = {
+    name                = " %s "
+    description         = "Description \n"
+    distribution_method = "Make Available in Self Service"
+    payloads = <<EOF
+%sEOF
+  }
+  self_service = {
+    self_service_display_name = "Display "
+    install_button_text       = "Install "
+    self_service_description  = "Self Service description\n"
+    notification_subject      = "Subject "
+    notification_message      = "Message \n"
+  }
+}
+`, name, payload)
+
+	const addr = "jamfplatform_pro_macos_configuration_profile.test"
+	exact := func(path tfjsonpath.Path, v string) statecheck.StateCheck {
+		return statecheck.ExpectKnownValue(addr, path, knownvalue.StringExact(v))
+	}
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg,
+				ConfigStateChecks: []statecheck.StateCheck{
+					exact(tfjsonpath.New("general").AtMapKey("name"), " "+name+" "),
+					exact(tfjsonpath.New("general").AtMapKey("description"), "Description \n"),
+					exact(tfjsonpath.New("self_service").AtMapKey("self_service_display_name"), "Display "),
+					exact(tfjsonpath.New("self_service").AtMapKey("install_button_text"), "Install "),
+					exact(tfjsonpath.New("self_service").AtMapKey("self_service_description"), "Self Service description\n"),
+					exact(tfjsonpath.New("self_service").AtMapKey("notification_subject"), "Subject "),
+					exact(tfjsonpath.New("self_service").AtMapKey("notification_message"), "Message \n"),
+				},
+			},
+			{Config: cfg, PlanOnly: true},
+		},
+	})
+}
