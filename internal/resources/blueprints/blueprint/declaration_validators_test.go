@@ -40,31 +40,26 @@ func TestValidateDeclarationPayloadAcceptsValid(t *testing.T) {
 	}
 }
 
-// TestValidateDeclarationPayloadSkipsUnresolvedValues pins the plan-time behaviour: a value
-// Terraform has yet to compute must be left alone rather than guessed at, or an interpolated
-// payload would fail every plan before its inputs exist. It must not pass silently either — the
-// check never runs again, because the apply path marshals a payload without validating it — so an
-// unknown value warns that the promised check did not happen. A null is a different case: there is
-// nothing to check and nothing to warn about.
+// TestValidateDeclarationPayloadSkipsUnresolvedValues pins the validator's half of #484: a value
+// Terraform has yet to compute is skipped with no diagnostic at all. Terraform validates before it
+// plans, with module variables and each.key or each.value still unknown, so an error would fail a
+// valid configuration and a warning would appear on every plan even though the planning call then
+// checks the resolved value. A value unknown until apply is uncheckedPayloadWarnings' to report.
 func TestValidateDeclarationPayloadSkipsUnresolvedValues(t *testing.T) {
 	cases := map[string]struct {
 		declarationType, payload types.String
-		wantWarning              bool
 	}{
 		"unknown payload": {
 			types.StringValue("com.apple.configuration.siri.settings"),
 			types.StringUnknown(),
-			true,
 		},
 		"unknown type": {
 			types.StringUnknown(),
 			types.StringValue(`{"Enabled":true}`),
-			true,
 		},
 		"null payload": {
 			types.StringValue("com.apple.configuration.siri.settings"),
 			types.StringNull(),
-			false,
 		},
 	}
 	for name, tc := range cases {
@@ -72,21 +67,8 @@ func TestValidateDeclarationPayloadSkipsUnresolvedValues(t *testing.T) {
 			diags := validateDeclarationPayload(
 				types.StringNull(), tc.declarationType, tc.payload, declarationPath(), "",
 			)
-			if diags.HasError() {
-				t.Errorf("unresolved value produced errors: %v", diags.Errors())
-			}
-			warnings := diags.Warnings()
-			if tc.wantWarning != (len(warnings) == 1) {
-				t.Fatalf("warnings = %v, want exactly one = %v", warnings, tc.wantWarning)
-			}
-			if !tc.wantWarning {
-				return
-			}
-			if summary := warnings[0].Summary(); !strings.Contains(summary, "not checked") {
-				t.Errorf("summary = %q, want it to say the check did not run", summary)
-			}
-			if detail := warnings[0].Detail(); !strings.Contains(detail, "not known until apply") {
-				t.Errorf("detail = %q, want it to name the reason the check was skipped", detail)
+			if len(diags) != 0 {
+				t.Errorf("unresolved value produced diagnostics: %v", diags)
 			}
 		})
 	}

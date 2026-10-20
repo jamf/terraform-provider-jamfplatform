@@ -135,23 +135,16 @@ func (v declarationSchemaValidator) ValidateObject(ctx context.Context, req vali
 // agreement with the type. attribution names the declaration in the diagnostic when the path cannot
 // point at it precisely, and is empty when it can.
 //
-// A type or payload Terraform has yet to compute cannot be checked, and the check never runs again:
-// attribute validators run at plan, and the apply path marshals a payload without validating it. So
-// an unresolved value warns rather than passing silently. A warning is right rather than an error
-// because the configuration may be perfectly valid — the operator only needs to know the guarantee
-// the payload's description promises did not apply here.
+// A type or payload Terraform has yet to compute is skipped silently. Terraform calls validators
+// twice during a plan, first while validating, when module variables and each.key or each.value are
+// still unknown, and again while planning with them resolved, so a warning here would claim on every
+// plan that a payload went unchecked when the second call checked it. A value still unknown on the
+// second call is known only at apply, and uncheckedPayloadWarnings reports that from ModifyPlan, which
+// the validate step never reaches.
 func validateDeclarationPayload(authoredKind, declarationType, payload types.String, at path.Path, attribution string) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	if !helpers.IsConfiguredValue(declarationType) || !helpers.IsConfiguredValue(payload) {
-		if declarationType.IsUnknown() || payload.IsUnknown() {
-			diags.AddAttributeWarning(at,
-				"Declaration payload was not checked against Apple's schemas",
-				attributionPrefix(attribution)+"The payload is not known until apply, so the plan-time schema "+
-					"check did not run for it. Jamf Pro accepts and discards an unrecognised key without "+
-					"reporting anything, so this declaration is delivered unchecked.",
-			)
-		}
 		return diags
 	}
 

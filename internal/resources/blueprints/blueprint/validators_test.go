@@ -654,3 +654,57 @@ func TestMCXPayloadTypeIsAppleDeclared(t *testing.T) {
 		t.Errorf("Apple's schema for %s declares no %s key", mcxPayloadType, mcxPreferenceDomainsKey)
 	}
 }
+
+// TestLegacyPayloadValidator_SkipsUnknownSettings pins issue #484. Terraform validates before it
+// plans, with module variables and each.key or each.value still unknown, and the validator used to
+// read unknown settings as an empty payload and report every required key missing, failing a valid
+// configuration on every plan. Both carriers must skip without a diagnostic and leave the check to
+// the planning call, where the value is resolved.
+func TestLegacyPayloadValidator_SkipsUnknownSettings(t *testing.T) {
+	t.Parallel()
+
+	t.Run("block carrier", func(t *testing.T) {
+		t.Parallel()
+
+		elementType := legacyPayloadElementType()
+		element, diags := types.ObjectValue(elementType.AttrTypes, map[string]attr.Value{
+			"payload_type": types.StringValue(mcxPayloadType),
+			"settings":     types.StringUnknown(),
+		})
+		if diags.HasError() {
+			t.Fatalf("building a legacy payload element: %v", diags)
+		}
+		list, diags := types.ListValue(elementType, []attr.Value{element})
+		if diags.HasError() {
+			t.Fatalf("building the legacy payload list: %v", diags)
+		}
+
+		if diags := validateBlockLegacyPayloads(t, list); len(diags) != 0 {
+			t.Errorf("unknown settings produced diagnostics: %v", diags)
+		}
+	})
+
+	t.Run("flat carrier", func(t *testing.T) {
+		t.Parallel()
+
+		settings := types.ObjectValueMust(
+			map[string]attr.Type{"PayloadContent": types.StringType},
+			map[string]attr.Value{"PayloadContent": types.StringUnknown()},
+		)
+		payload := types.ObjectValueMust(
+			map[string]attr.Type{"payload_type": types.StringType, "settings": settings.Type(context.Background())},
+			map[string]attr.Value{"payload_type": types.StringValue(mcxPayloadType), "settings": settings},
+		)
+		value := types.DynamicValue(types.TupleValueMust([]attr.Type{payload.Type(context.Background())}, []attr.Value{payload}))
+
+		var resp validator.DynamicResponse
+		flatLegacyPayloadSchemaValidator().ValidateDynamic(
+			context.Background(),
+			validator.DynamicRequest{Path: path.Root("legacy_payloads"), ConfigValue: value},
+			&resp,
+		)
+		if len(resp.Diagnostics) != 0 {
+			t.Errorf("a nested unknown setting produced diagnostics: %v", resp.Diagnostics)
+		}
+	})
+}

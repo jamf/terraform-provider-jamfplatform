@@ -448,12 +448,17 @@ func (r *BlueprintResource) Configure(ctx context.Context, req resource.Configur
 // no change is left untouched so the resource keeps showing an empty plan.
 //
 // It also refuses a flat-mode apply that would delete component blocks the diff cannot show — see
-// checkFlatModeBlockLoss.
+// checkFlatModeBlockLoss. And it warns about any legacy payload or declaration whose content is known
+// only at apply, on create as well as update — see uncheckedPayloadWarnings.
 func (r *BlueprintResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	// Runs ahead of the create/destroy guard below: a blueprint entering or
 	// leaving management changes what devices receive, so both are worth an
 	// impact alert even though neither needs the unknown-marking that follows.
 	r.reportDeviceGroupImpact(ctx, req, resp)
+
+	if !req.Plan.Raw.IsNull() {
+		resp.Diagnostics.Append(uncheckedPayloadWarnings(ctx, req.Config)...)
+	}
 
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
