@@ -25,6 +25,10 @@ import (
 //     to clear a field round-trips, while a never-set field stays null.
 //   - state.ID is only overwritten when the API ID is non-nil so a transient
 //     GET that drops the ID does not clobber the value persisted from Create.
+//
+// The name uses StringValueTrimmed because /v1/distribution-points saves it with its outer
+// whitespace removed (probed 2026-10-20, issue #510); other fields are assigned
+// from the wire.
 func assignFileShareDistributionPointResourceModel(state *FileShareDistributionPointResourceModel, c *pro.DistributionPoint) {
 	if c == nil {
 		return
@@ -32,7 +36,7 @@ func assignFileShareDistributionPointResourceModel(state *FileShareDistributionP
 	if c.ID != nil {
 		state.ID = types.StringValue(*c.ID)
 	}
-	state.Name = types.StringValue(c.Name)
+	state.Name = helpers.StringValueTrimmed(c.Name, state.Name)
 	state.ServerName = types.StringValue(c.ServerName)
 	state.FileSharingConnectionType = types.StringValue(c.FileSharingConnectionType)
 

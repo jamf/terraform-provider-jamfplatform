@@ -28,9 +28,9 @@ func assignUserExtensionAttributeResourceModel(ctx context.Context, state *UserE
 		state.ID = helpers.StringValueFromIntPtr(ea.ID)
 	}
 	if ea.Name != nil {
-		state.Name = helpers.StringPointerValueOrCurrent(ea.Name, state.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(ea.Name, state.Name)
 	}
-	state.Description = helpers.ReconcileOptionalStringPointer(ea.Description, state.Description)
+	state.Description = helpers.ReconcileOptionalStringPointerTrimmed(ea.Description, state.Description)
 	if ea.DataType != nil {
 		state.DataType = helpers.StringPointerValueOrNull(ea.DataType)
 	}
@@ -58,9 +58,9 @@ func assignUserExtensionAttributeDataSourceModel(ctx context.Context, state *Use
 		state.ID = helpers.StringValueFromIntPtr(ea.ID)
 	}
 	if ea.Name != nil {
-		state.Name = helpers.StringPointerValueOrCurrent(ea.Name, state.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(ea.Name, state.Name)
 	}
-	state.Description = helpers.StringPointerValueOrCurrent(ea.Description, state.Description)
+	state.Description = helpers.StringPointerValueOrNullTrimmed(ea.Description, state.Description)
 	if ea.DataType != nil {
 		state.DataType = helpers.StringPointerValueOrNull(ea.DataType)
 	}

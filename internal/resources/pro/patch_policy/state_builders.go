@@ -42,7 +42,7 @@ func assignPatchPolicyResourceModel(ctx context.Context, state *PatchPolicyResou
 		state.ID = types.StringValue(id)
 	}
 	if p.SoftwareTitleConfigurationID != nil {
-		state.SoftwareTitleConfigurationID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(p.SoftwareTitleConfigurationID), state.SoftwareTitleConfigurationID)
+		state.SoftwareTitleConfigurationID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(p.SoftwareTitleConfigurationID), state.SoftwareTitleConfigurationID)
 	}
 
 	diags.Append(flattenGeneral(ctx, p.General, state)...)
@@ -77,10 +77,10 @@ func flattenGeneral(ctx context.Context, g *proclassic.PatchPolicyGeneral, state
 		return diags
 	}
 
-	state.Name = helpers.ReconcileOptionalStringPointer(g.Name, state.Name)
-	state.TargetVersion = helpers.ReconcileOptionalStringPointer(g.TargetVersion, state.TargetVersion)
+	state.Name = helpers.ReconcileOptionalStringPointerTrimmed(g.Name, state.Name)
+	state.TargetVersion = helpers.ReconcileOptionalStringPointerTrimmed(g.TargetVersion, state.TargetVersion)
 	state.Enabled = helpers.BoolPointerValueOrNull(g.Enabled)
-	state.DistributionMethod = helpers.ReconcileOptionalStringPointer(g.DistributionMethod, state.DistributionMethod)
+	state.DistributionMethod = helpers.ReconcileOptionalStringPointerTrimmed(g.DistributionMethod, state.DistributionMethod)
 	state.AllowDowngrade = helpers.BoolPointerValueOrNull(g.AllowDowngrade)
 	state.PatchUnknown = helpers.BoolPointerValueOrNull(g.PatchUnknown)
 
@@ -225,7 +225,7 @@ func flattenUserInteraction(ui *proclassic.PatchPolicyUserInteraction, state *Pa
 	}
 
 	state.InstallButtonText = helpers.WireWhenPresentString(ui.InstallButtonText, state.InstallButtonText)
-	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmpty(ui.SelfServiceDescription, state.SelfServiceDescription)
+	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmptyTrimmed(ui.SelfServiceDescription, state.SelfServiceDescription)
 	var iconID *string
 	if ui.SelfServiceIcon != nil {
 		iconID = helpers.StringFromIntPtr(ui.SelfServiceIcon.ID)

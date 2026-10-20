@@ -18,11 +18,17 @@ import (
 // Neither identifier is touched. The response carries no id at all, so id and
 // platform_id are the caller's to set: the create takes them from the create
 // response and the bridge, and a refresh carries the values already in state.
+//
+// The name goes through StringValueTrimmed because the fallback write
+// lands on /JSSResource/computergroups, which saves a name with its outer
+// whitespace removed (issue #510); v3 stores it verbatim, so the primary path is
+// unaffected. Description is written through PATCH /pro/v2/groups, which also
+// stores verbatim, and is assigned from the wire as before.
 func assignSmartComputerGroupResourceModel(state *SmartComputerGroupResourceModel, got *pro.SmartComputerGroupV3) {
 	if got == nil {
 		return
 	}
-	state.Name = types.StringValue(got.Name)
+	state.Name = helpers.StringValueTrimmed(got.Name, state.Name)
 	state.Description = types.StringValue(helpers.DerefString(got.Description))
 	state.SiteID = progroups.SiteIDForState(got.SiteID)
 	state.Criteria = criteria.FlattenComputerSmartGroupCriteria(got.Criteria)

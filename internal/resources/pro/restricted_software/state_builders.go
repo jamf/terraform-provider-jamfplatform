@@ -62,19 +62,19 @@ func flattenGeneral(g *proclassic.RestrictedSoftwareGeneral, state *RestrictedSo
 		return
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
-	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
 	state.ProcessName = helpers.StringPointerValueOrNull(g.ProcessName)
 	state.RestrictExactProcessName = helpers.BoolPointerValueOrNull(g.MatchExactProcessName)
 	state.SendEmailNotificationOnViolation = helpers.BoolPointerValueOrNull(g.SendNotification)
 	state.KillProcess = helpers.BoolPointerValueOrNull(g.KillProcess)
 	state.DeleteApplication = helpers.BoolPointerValueOrNull(g.DeleteExecutable)
-	state.DisplayMessage = helpers.ReconcileOptionalStringPointer(g.DisplayMessage, state.DisplayMessage)
+	state.DisplayMessage = helpers.ReconcileOptionalStringPointerTrimmed(g.DisplayMessage, state.DisplayMessage)
 
 	if g.Site != nil {
-		state.SiteID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(g.Site.ID), state.SiteID)
+		state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(g.Site.ID), state.SiteID)
 		state.SiteName = helpers.DerivedRefName(g.Site.ID, g.Site.Name)
 	} else {
-		state.SiteID = helpers.ReconcileOptionalStringPointer(nil, state.SiteID)
+		state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(nil, state.SiteID)
 		state.SiteName = types.StringNull()
 	}
 }

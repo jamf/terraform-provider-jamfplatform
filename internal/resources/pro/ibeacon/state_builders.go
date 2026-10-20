@@ -35,7 +35,7 @@ func assignIbeaconResourceModel(state *IbeaconResourceModel, ib *proclassic.Ibea
 	// Required attributes on the resource — server is authoritative; direct
 	// copy keeps the import path aligned with the post-apply refresh path.
 	if ib.Name != nil {
-		state.Name = helpers.StringPointerValueOrCurrent(ib.Name, state.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(ib.Name, state.Name)
 	}
 	if ib.UUID != nil {
 		state.UUID = helpers.StringPointerValueOrNull(ib.UUID)
@@ -73,7 +73,7 @@ func assignIbeaconDataSourceModel(state *IbeaconDataSourceModel, ib *proclassic.
 		state.ID = helpers.StringValueFromIntPtr(ib.ID)
 	}
 	if ib.Name != nil {
-		state.Name = helpers.StringPointerValueOrCurrent(ib.Name, state.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(ib.Name, state.Name)
 	}
 	state.UUID = helpers.StringPointerValueOrNull(ib.UUID)
 

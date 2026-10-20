@@ -22,7 +22,7 @@ func assignPatchInternalSourceDataSourceModel(state *PatchInternalSourceDataSour
 		state.ID = helpers.StringValueFromIntPtr(s.ID)
 	}
 	if s.Name != nil {
-		state.Name = helpers.StringPointerValueOrCurrent(s.Name, state.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(s.Name, state.Name)
 	}
 	state.Enabled = helpers.BoolPointerValueOrNull(s.Enabled)
 	state.Endpoint = helpers.StringPointerValueOrNull(s.Endpoint)

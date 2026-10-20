@@ -34,7 +34,7 @@ func assignNetworkSegmentResourceModel(state *NetworkSegmentResourceModel, s *pr
 		state.ID = helpers.StringValueFromIntPtr(s.ID)
 	}
 	if s.Name != nil {
-		state.Name = helpers.StringPointerValueOrCurrent(s.Name, state.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(s.Name, state.Name)
 	}
 	if s.StartingAddress != nil {
 		state.StartingAddress = helpers.StringPointerValueOrNull(s.StartingAddress)
@@ -46,8 +46,8 @@ func assignNetworkSegmentResourceModel(state *NetworkSegmentResourceModel, s *pr
 	// already returns a wire value the caller never authored, which is why
 	// building and department survived into generated config while the two bools
 	// beside them did not.
-	state.Building = helpers.ReconcileOptionalStringPointer(s.Building, state.Building)
-	state.Department = helpers.ReconcileOptionalStringPointer(s.Department, state.Department)
+	state.Building = helpers.ReconcileOptionalStringPointerTrimmed(s.Building, state.Building)
+	state.Department = helpers.ReconcileOptionalStringPointerTrimmed(s.Department, state.Department)
 	state.OverrideBuildings = helpers.ReconcileOrAdoptBoolPointer(s.OverrideBuildings, state.OverrideBuildings, adopt)
 	state.OverrideDepartments = helpers.ReconcileOrAdoptBoolPointer(s.OverrideDepartments, state.OverrideDepartments, adopt)
 	state.DistributionPoint = helpers.StringPointerValueOrNull(s.DistributionPoint)
@@ -68,7 +68,7 @@ func assignNetworkSegmentDataSourceModel(state *NetworkSegmentDataSourceModel, s
 		state.ID = helpers.StringValueFromIntPtr(s.ID)
 	}
 	if s.Name != nil {
-		state.Name = helpers.StringPointerValueOrCurrent(s.Name, state.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(s.Name, state.Name)
 	}
 	state.StartingAddress = helpers.StringPointerValueOrNull(s.StartingAddress)
 	state.EndingAddress = helpers.StringPointerValueOrNull(s.EndingAddress)

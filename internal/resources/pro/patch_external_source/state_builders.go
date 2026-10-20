@@ -41,7 +41,7 @@ func assignPatchExternalSourceResourceModel(state *PatchExternalSourceResourceMo
 		state.ID = helpers.StringValueFromIntPtr(s.ID)
 	}
 	if s.Name != nil {
-		state.Name = helpers.StringPointerValueOrCurrent(s.Name, state.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(s.Name, state.Name)
 	}
 	state.Enabled = helpers.BoolPointerValueOrNull(s.Enabled)
 	state.HostName = helpers.StringPointerValueOrNull(s.HostName)
@@ -63,7 +63,7 @@ func assignPatchExternalSourceDataSourceModel(state *PatchExternalSourceDataSour
 		state.ID = helpers.StringValueFromIntPtr(s.ID)
 	}
 	if s.Name != nil {
-		state.Name = helpers.StringPointerValueOrCurrent(s.Name, state.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(s.Name, state.Name)
 	}
 	state.Enabled = helpers.BoolPointerValueOrNull(s.Enabled)
 	state.HostName = helpers.StringPointerValueOrNull(s.HostName)

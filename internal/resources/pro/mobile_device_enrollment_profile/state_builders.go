@@ -33,8 +33,8 @@ func assignEnrollmentProfileResourceModel(state *EnrollmentProfileResourceModel,
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
-	state.Description = helpers.ReconcileOptionalStringPointer(g.Description, state.Description)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
+	state.Description = helpers.ReconcileOptionalStringPointerTrimmed(g.Description, state.Description)
 	state.Invitation = bigIntStringOrNull(g.Invitation)
 	state.UUID = stringOrNull(g.UUID)
 	if g.Site != nil {
@@ -77,8 +77,8 @@ func assignEnrollmentProfileDataSourceModel(state *EnrollmentProfileDataSourceMo
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
-	state.Description = helpers.StringPointerValueOrCurrent(g.Description, state.Description)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
+	state.Description = helpers.StringPointerValueOrNullTrimmed(g.Description, state.Description)
 	state.Invitation = bigIntStringOrNull(g.Invitation)
 	state.UUID = stringOrNull(g.UUID)
 	if g.Site != nil {
@@ -101,14 +101,14 @@ func flattenLocationModel(api *proclassic.Location, prior *LocationModel) *Locat
 		prior = &LocationModel{}
 	}
 	return &LocationModel{
-		Username:     helpers.ReconcileOptionalStringPointer(api.Username, prior.Username),
-		RealName:     helpers.ReconcileOptionalStringPointer(firstNonNil(api.RealName, api.Realname), prior.RealName),
-		EmailAddress: helpers.ReconcileOptionalStringPointer(api.EmailAddress, prior.EmailAddress),
-		PhoneNumber:  helpers.ReconcileOptionalStringPointer(firstNonNil(api.PhoneNumber, api.Phone), prior.PhoneNumber),
-		Department:   helpers.ReconcileOptionalStringPointer(api.Department, prior.Department),
-		Building:     helpers.ReconcileOptionalStringPointer(api.Building, prior.Building),
-		Room:         helpers.ReconcileOptionalStringPointer(api.Room, prior.Room),
-		Position:     helpers.ReconcileOptionalStringPointer(api.Position, prior.Position),
+		Username:     helpers.ReconcileOptionalStringPointerTrimmed(api.Username, prior.Username),
+		RealName:     helpers.ReconcileOptionalStringPointerTrimmed(firstNonNil(api.RealName, api.Realname), prior.RealName),
+		EmailAddress: helpers.ReconcileOptionalStringPointerTrimmed(api.EmailAddress, prior.EmailAddress),
+		PhoneNumber:  helpers.ReconcileOptionalStringPointerTrimmed(firstNonNil(api.PhoneNumber, api.Phone), prior.PhoneNumber),
+		Department:   helpers.ReconcileOptionalStringPointerTrimmed(api.Department, prior.Department),
+		Building:     helpers.ReconcileOptionalStringPointerTrimmed(api.Building, prior.Building),
+		Room:         helpers.ReconcileOptionalStringPointerTrimmed(api.Room, prior.Room),
+		Position:     helpers.ReconcileOptionalStringPointerTrimmed(api.Position, prior.Position),
 	}
 }
 
@@ -126,22 +126,22 @@ func flattenPurchasingModel(api *proclassic.Purchasing, prior *PurchasingModel) 
 	return &PurchasingModel{
 		IsPurchased:       helpers.BoolPointerValueOrNull(api.IsPurchased),
 		IsLeased:          helpers.BoolPointerValueOrNull(api.IsLeased),
-		PONumber:          helpers.ReconcileOptionalStringPointer(api.PoNumber, prior.PONumber),
-		PODate:            helpers.ReconcileOptionalStringPointer(api.PoDate, prior.PODate),
+		PONumber:          helpers.ReconcileOptionalStringPointerTrimmed(api.PoNumber, prior.PONumber),
+		PODate:            helpers.ReconcileOptionalStringPointerTrimmed(api.PoDate, prior.PODate),
 		PODateEpoch:       intStringOrNull(api.PoDateEpoch),
 		PODateUTC:         stringOrNull(api.PoDateUtc),
-		Vendor:            helpers.ReconcileOptionalStringPointer(api.Vendor, prior.Vendor),
-		WarrantyExpires:   helpers.ReconcileOptionalStringPointer(api.WarrantyExpires, prior.WarrantyExpires),
+		Vendor:            helpers.ReconcileOptionalStringPointerTrimmed(api.Vendor, prior.Vendor),
+		WarrantyExpires:   helpers.ReconcileOptionalStringPointerTrimmed(api.WarrantyExpires, prior.WarrantyExpires),
 		WarrantyEpoch:     intStringOrNull(api.WarrantyExpiresEpoch),
 		WarrantyUTC:       stringOrNull(api.WarrantyExpiresUtc),
-		AppleCareID:       helpers.ReconcileOptionalStringPointer(api.ApplecareID, prior.AppleCareID),
-		LeaseExpires:      helpers.ReconcileOptionalStringPointer(api.LeaseExpires, prior.LeaseExpires),
+		AppleCareID:       helpers.ReconcileOptionalStringPointerTrimmed(api.ApplecareID, prior.AppleCareID),
+		LeaseExpires:      helpers.ReconcileOptionalStringPointerTrimmed(api.LeaseExpires, prior.LeaseExpires),
 		LeaseEpoch:        intStringOrNull(api.LeaseExpiresEpoch),
 		LeaseUTC:          stringOrNull(api.LeaseExpiresUtc),
-		PurchasePrice:     helpers.ReconcileOptionalStringPointer(api.PurchasePrice, prior.PurchasePrice),
+		PurchasePrice:     helpers.ReconcileOptionalStringPointerTrimmed(api.PurchasePrice, prior.PurchasePrice),
 		LifeExpectancy:    int64ValueOrNull(api.LifeExpectancy),
-		PurchasingAccount: helpers.ReconcileOptionalStringPointer(api.PurchasingAccount, prior.PurchasingAccount),
-		PurchasingContact: helpers.ReconcileOptionalStringPointer(api.PurchasingContact, prior.PurchasingContact),
+		PurchasingAccount: helpers.ReconcileOptionalStringPointerTrimmed(api.PurchasingAccount, prior.PurchasingAccount),
+		PurchasingContact: helpers.ReconcileOptionalStringPointerTrimmed(api.PurchasingContact, prior.PurchasingContact),
 	}
 }
 

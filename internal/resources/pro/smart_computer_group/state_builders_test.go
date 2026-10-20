@@ -66,6 +66,23 @@ func TestAssignSmartComputerGroupResourceModel_NormalisesTheAbsentValues(t *test
 	}
 }
 
+// TestAssignSmartComputerGroupResourceModel_KeepsNameTheClassicFallbackTrims
+// covers issue #510 on the fallback write: /JSSResource/computergroups saves the
+// name without its outer whitespace, and the v3 read-back must not overwrite
+// the planned value with it. Any other server name still wins.
+func TestAssignSmartComputerGroupResourceModel_KeepsNameTheClassicFallbackTrims(t *testing.T) {
+	state := SmartComputerGroupResourceModel{Name: types.StringValue(" grp ")}
+	assignSmartComputerGroupResourceModel(&state, &pro.SmartComputerGroupV3{Name: "grp"})
+	if !state.Name.Equal(types.StringValue(" grp ")) {
+		t.Errorf("a name the classic write trimmed must keep the planned value, got %q", state.Name.ValueString())
+	}
+
+	assignSmartComputerGroupResourceModel(&state, &pro.SmartComputerGroupV3{Name: "renamed"})
+	if !state.Name.Equal(types.StringValue("renamed")) {
+		t.Errorf("a different server name must win, got %q", state.Name.ValueString())
+	}
+}
+
 // TestAssignSmartComputerGroupResourceModel_FlattensCriteria covers the read
 // side of the criteria round-trip, including the parenthesis flags the wire
 // carries as pointers.

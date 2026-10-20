@@ -628,15 +628,29 @@ func TestFlattenSelfService_WireTrimsTrailingSpace(t *testing.T) {
 		NotificationMessage:    new("Message"),
 	}, state, false)
 
-	for name, got := range map[string]types.String{
-		"self_service_display_name": state.SelfServiceDisplayName,
-		"install_button_text":       state.InstallButtonText,
-		"self_service_description":  state.SelfServiceDescription,
-		"notification_subject":      state.NotificationSubject,
-		"notification_message":      state.NotificationMessage,
+	for name, c := range map[string]struct {
+		got  types.String
+		want string
+	}{
+		"self_service_display_name": {state.SelfServiceDisplayName, "Display "},
+		"install_button_text":       {state.InstallButtonText, "Install "},
+		"self_service_description":  {state.SelfServiceDescription, "Desc\n"},
+		"notification_subject":      {state.NotificationSubject, "FileVault "},
+		"notification_message":      {state.NotificationMessage, "Message \n"},
 	} {
-		if v := got.ValueString(); v == "" || v[len(v)-1] != ' ' && v[len(v)-1] != '\n' {
-			t.Errorf("%s: authored trailing whitespace lost, got %q", name, v)
+		if !c.got.Equal(types.StringValue(c.want)) {
+			t.Errorf("%s: got %q, want %q", name, c.got.ValueString(), c.want)
 		}
+	}
+
+	flattenSelfService(&proclassic.OsXConfigurationProfileSelfService{
+		SelfServiceDisplayName: new("Edited in Jamf Pro"),
+		NotificationSubject:    new("FileVault (managed)"),
+	}, state, false)
+	if got := state.SelfServiceDisplayName.ValueString(); got != "Edited in Jamf Pro" {
+		t.Errorf("self_service_display_name: a real server edit must win, got %q", got)
+	}
+	if got := state.NotificationSubject.ValueString(); got != "FileVault (managed)" {
+		t.Errorf("notification_subject: a real server edit must win, got %q", got)
 	}
 }

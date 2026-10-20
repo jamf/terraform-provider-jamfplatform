@@ -106,7 +106,7 @@ func flattenMobileAppGeneral(g *proclassic.MobileDeviceApplicationGeneral, state
 		return
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
-	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
 	state.Version = helpers.StringPointerValueOrNull(g.Version)
 	state.BundleID = helpers.StringPointerValueOrNull(g.BundleID)
 	// os_type echo is asymmetric (wire-probed): a POST never persists/echoes it,
@@ -118,14 +118,14 @@ func flattenMobileAppGeneral(g *proclassic.MobileDeviceApplicationGeneral, state
 	// follow-up PUT precisely so the server persists it and this echo is present.
 	state.OsType = helpers.WireWhenPresentString(g.OsType, state.OsType)
 
-	state.Description = helpers.StringPointerValueOrCurrent(g.Description, state.Description)
+	state.Description = helpers.StringPointerValueOrNullTrimmed(g.Description, state.Description)
 	state.DeploymentType = helpers.StringPointerValueOrNull(g.DeploymentType)
 
 	// Optional+Computed echoes.
 	state.IsFree = helpers.BoolPointerValueOrNull(g.Free)
-	state.ExternalURL = helpers.ReconcileOptionalStringPointer(g.ExternalURL, state.ExternalURL)
-	state.ItunesStoreURL = helpers.ReconcileOptionalStringPointer(g.ItunesStoreURL, state.ItunesStoreURL)
-	state.ItunesCountryRegion = helpers.ReconcileOptionalStringPointer(g.ItunesCountryRegion, state.ItunesCountryRegion)
+	state.ExternalURL = helpers.ReconcileOptionalStringPointerTrimmed(g.ExternalURL, state.ExternalURL)
+	state.ItunesStoreURL = helpers.ReconcileOptionalStringPointerTrimmed(g.ItunesStoreURL, state.ItunesStoreURL)
+	state.ItunesCountryRegion = helpers.ReconcileOptionalStringPointerTrimmed(g.ItunesCountryRegion, state.ItunesCountryRegion)
 	state.ItunesSyncTime = helpers.Int64FromIntPtr(g.ItunesSyncTime)
 	state.MakeAvailableAfterInstall = helpers.BoolPointerValueOrNull(g.MakeAvailableAfterInstall)
 	state.KeepDescriptionAndIconUpToDate = helpers.BoolPointerValueOrNull(g.KeepDescriptionAndIconUpToDate)
@@ -140,18 +140,18 @@ func flattenMobileAppGeneral(g *proclassic.MobileDeviceApplicationGeneral, state
 	state.HostExternally = helpers.StickyIgnoringDriftBool(g.HostExternally, state.HostExternally)
 
 	if g.Category != nil {
-		state.CategoryID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(g.Category.ID), state.CategoryID)
+		state.CategoryID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(g.Category.ID), state.CategoryID)
 		state.CategoryName = helpers.DerivedRefName(g.Category.ID, g.Category.Name)
 	} else {
-		state.CategoryID = helpers.ReconcileOptionalStringPointer(nil, state.CategoryID)
+		state.CategoryID = helpers.ReconcileOptionalStringPointerTrimmed(nil, state.CategoryID)
 		state.CategoryName = types.StringNull()
 	}
 
 	if g.Site != nil {
-		state.SiteID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(g.Site.ID), state.SiteID)
+		state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(g.Site.ID), state.SiteID)
 		state.SiteName = helpers.DerivedRefName(g.Site.ID, g.Site.Name)
 	} else {
-		state.SiteID = helpers.ReconcileOptionalStringPointer(nil, state.SiteID)
+		state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(nil, state.SiteID)
 		state.SiteName = types.StringNull()
 	}
 }
@@ -255,9 +255,9 @@ func flattenMobileAppScope(ctx context.Context, s *proclassic.MobileDeviceApplic
 // mobile_device_configuration_profile, which took the same fix under issue
 // #392.
 func flattenMobileAppSelfService(ss *proclassic.MobileDeviceApplicationSelfService, state *MobileAppSelfServiceModel, includeUnmanaged bool) {
-	state.InstallButtonText = helpers.ReconcileOptionalStringPointer(ss.SelfServiceInstallButtonText, state.InstallButtonText)
+	state.InstallButtonText = helpers.ReconcileOptionalStringPointerTrimmed(ss.SelfServiceInstallButtonText, state.InstallButtonText)
 	state.AfterInstallButtonText = helpers.WireWhenPresentString(ss.SelfServiceAfterInstallButtonText, state.AfterInstallButtonText)
-	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmpty(ss.SelfServiceDescription, state.SelfServiceDescription)
+	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmptyTrimmed(ss.SelfServiceDescription, state.SelfServiceDescription)
 	state.FeatureOnMainPage = helpers.BoolPointerValueOrNull(ss.FeatureOnMainPage)
 
 	var apiEnabled *bool
@@ -272,7 +272,7 @@ func flattenMobileAppSelfService(ss *proclassic.MobileDeviceApplicationSelfServi
 		state.SelfServiceIcon = &MobileAppSelfServiceIconModel{}
 	}
 	if state.SelfServiceIcon != nil && ss.SelfServiceIcon != nil {
-		state.SelfServiceIcon.ID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.SelfServiceIcon.ID)
+		state.SelfServiceIcon.ID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.SelfServiceIcon.ID)
 		state.SelfServiceIcon.URI = helpers.StringPointerValueOrNull(ss.SelfServiceIcon.URI)
 	}
 
@@ -305,7 +305,7 @@ func flattenMobileAppSelfServiceCategories(api []proclassic.MobileDeviceApplicat
 
 func flattenMobileAppVpp(v *proclassic.MobileDeviceApplicationVpp, state *MobileAppVppModel) {
 	state.AssignVppDeviceBasedLicenses = helpers.BoolPointerValueOrNull(v.AssignVppDeviceBasedLicenses)
-	state.VppAdminAccountID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(v.VppAdminAccountID), state.VppAdminAccountID)
+	state.VppAdminAccountID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(v.VppAdminAccountID), state.VppAdminAccountID)
 }
 
 // ---- scope sub-slice accessors -------------------------------------------------

@@ -44,7 +44,7 @@ func assignScriptDataSourceModel(state *ScriptDataSourceModel, s *pro.Script) {
 	state.CategoryID = helpers.StringPointerValueOrNull(s.CategoryID)
 	state.CategoryName = helpers.StringPointerValueOrNull(s.CategoryName)
 	state.Info = helpers.StringPointerValueOrNull(s.Info)
-	state.Notes = helpers.StringPointerValueOrCurrent(s.Notes, state.Notes)
+	state.Notes = helpers.StringPointerValueOrNull(s.Notes)
 	state.OsRequirements = helpers.StringPointerValueOrNull(s.OsRequirements)
 	state.Priority = helpers.StringPointerValueOrNull(s.Priority)
 	state.Parameter4 = helpers.StringPointerValueOrNull(s.Parameter4)

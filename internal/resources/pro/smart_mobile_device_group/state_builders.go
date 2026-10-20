@@ -25,6 +25,10 @@ import (
 //
 // platform_id is not touched here. It is resolved once, by the caller, and only
 // on the paths that have no value for it yet.
+//
+// The name uses StringValueTrimmed because the classic fallback write
+// (/JSSResource/mobiledevicegroups) saves it with its outer whitespace removed
+// (issue #510); v2 stores it verbatim, so the primary path is unaffected.
 func assignSmartMobileDeviceGroupResourceModel(target *SmartMobileDeviceGroupResourceModel, got *pro.SmartGroupDetailV2) {
 	if got == nil {
 		return
@@ -32,7 +36,7 @@ func assignSmartMobileDeviceGroupResourceModel(target *SmartMobileDeviceGroupRes
 	if got.GroupID != "" {
 		target.ID = types.StringValue(got.GroupID)
 	}
-	target.Name = types.StringValue(got.GroupName)
+	target.Name = helpers.StringValueTrimmed(got.GroupName, target.Name)
 	target.Description = helpers.ReconcileOptionalString(got.GroupDescription, target.Description)
 	target.SiteID = progroups.SiteIDForState(&got.SiteID)
 

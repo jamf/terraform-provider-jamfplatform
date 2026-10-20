@@ -158,7 +158,7 @@ func flattenPolicyGeneral(ctx context.Context, g *proclassic.PolicyGeneral, stat
 		}
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
-	state.Name = helpers.StringPointerValueOrCurrent(g.Name, state.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
 	state.Enabled = helpers.BoolPointerValueOrNull(g.Enabled)
 	state.Trigger = helpers.StringPointerValueOrNull(g.Trigger)
 	state.TriggerCheckin = helpers.BoolPointerValueOrNull(g.TriggerCheckin)
@@ -166,9 +166,9 @@ func flattenPolicyGeneral(ctx context.Context, g *proclassic.PolicyGeneral, stat
 	state.TriggerLogin = helpers.BoolPointerValueOrNull(g.TriggerLogin)
 	state.TriggerNetworkStateChanged = helpers.BoolPointerValueOrNull(g.TriggerNetworkStateChanged)
 	state.TriggerStartup = helpers.BoolPointerValueOrNull(g.TriggerStartup)
-	state.TriggerOther = helpers.ReconcileOptionalStringPointer(g.TriggerOther, state.TriggerOther)
-	state.Frequency = helpers.ReconcileOptionalStringPointer(g.Frequency, state.Frequency)
-	state.RetryEvent = helpers.ReconcileOptionalStringPointer(g.RetryEvent, state.RetryEvent)
+	state.TriggerOther = helpers.ReconcileOptionalStringPointerTrimmed(g.TriggerOther, state.TriggerOther)
+	state.Frequency = helpers.ReconcileOptionalStringPointerTrimmed(g.Frequency, state.Frequency)
+	state.RetryEvent = helpers.ReconcileOptionalStringPointerTrimmed(g.RetryEvent, state.RetryEvent)
 	if g.RetryAttempts != nil {
 		state.RetryAttempts = helpers.Int64FromIntPtr(g.RetryAttempts)
 	} else {
@@ -176,23 +176,23 @@ func flattenPolicyGeneral(ctx context.Context, g *proclassic.PolicyGeneral, stat
 	}
 	state.NotifyOnEachFailedRetry = helpers.BoolPointerValueOrNull(g.NotifyOnEachFailedRetry)
 	state.LimitToJamfProAssignedUser = helpers.BoolPointerValueOrNull(g.LocationUserOnly)
-	state.TargetDrive = helpers.ReconcileOptionalStringPointer(g.TargetDrive, state.TargetDrive)
+	state.TargetDrive = helpers.ReconcileOptionalStringPointerTrimmed(g.TargetDrive, state.TargetDrive)
 	state.Offline = helpers.BoolPointerValueOrNull(g.Offline)
-	state.NetworkRequirements = helpers.ReconcileOptionalStringPointer(g.NetworkRequirements, state.NetworkRequirements)
+	state.NetworkRequirements = helpers.ReconcileOptionalStringPointerTrimmed(g.NetworkRequirements, state.NetworkRequirements)
 
 	if g.Category != nil {
-		state.CategoryID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(g.Category.ID), state.CategoryID)
+		state.CategoryID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(g.Category.ID), state.CategoryID)
 		state.CategoryName = helpers.DerivedRefName(g.Category.ID, g.Category.Name)
 	} else {
-		state.CategoryID = helpers.ReconcileOptionalStringPointer(nil, state.CategoryID)
+		state.CategoryID = helpers.ReconcileOptionalStringPointerTrimmed(nil, state.CategoryID)
 		state.CategoryName = types.StringNull()
 	}
 
 	if g.Site != nil {
-		state.SiteID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(g.Site.ID), state.SiteID)
+		state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(g.Site.ID), state.SiteID)
 		state.SiteName = helpers.DerivedRefName(g.Site.ID, g.Site.Name)
 	} else {
-		state.SiteID = helpers.ReconcileOptionalStringPointer(nil, state.SiteID)
+		state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(nil, state.SiteID)
 		state.SiteName = types.StringNull()
 	}
 
@@ -224,8 +224,8 @@ func flattenPolicyGeneral(ctx context.Context, g *proclassic.PolicyGeneral, stat
 // GET returns exactly what the practitioner asked for and this read can simply
 // take it. See no_execute.go for the arithmetic and issue #387.
 func flattenPolicyDateTimeLimitations(ctx context.Context, dtl *proclassic.PolicyGeneralDateTimeLimitations, state *PolicyGeneralDateTimeLimitationsModel) {
-	state.ActivationDate = helpers.ReconcileOptionalStringPointer(dtl.ActivationDate, state.ActivationDate)
-	state.ExpirationDate = helpers.ReconcileOptionalStringPointer(dtl.ExpirationDate, state.ExpirationDate)
+	state.ActivationDate = helpers.ReconcileOptionalStringPointerTrimmed(dtl.ActivationDate, state.ActivationDate)
+	state.ExpirationDate = helpers.ReconcileOptionalStringPointerTrimmed(dtl.ExpirationDate, state.ExpirationDate)
 	state.NoExecuteStart = helpers.StringPointerValueOrNull(dtl.NoExecuteStart)
 	state.NoExecuteEnd = helpers.StringPointerValueOrNull(dtl.NoExecuteEnd)
 
@@ -520,10 +520,10 @@ func flattenPolicySelfService(ss *proclassic.PolicySelfService, state *PolicySel
 		}
 	}
 	state.UseForSelfService = helpers.BoolPointerValueOrNull(ss.UseForSelfService)
-	state.SelfServiceDisplayName = helpers.ReconcileOptionalStringPointer(ss.SelfServiceDisplayName, state.SelfServiceDisplayName)
-	state.InstallButtonText = helpers.ReconcileOptionalStringPointer(ss.InstallButtonText, state.InstallButtonText)
-	state.ReinstallButtonText = helpers.ReconcileOptionalStringPointer(ss.ReinstallButtonText, state.ReinstallButtonText)
-	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmpty(ss.SelfServiceDescription, state.SelfServiceDescription)
+	state.SelfServiceDisplayName = helpers.ReconcileOptionalStringPointerTrimmed(ss.SelfServiceDisplayName, state.SelfServiceDisplayName)
+	state.InstallButtonText = helpers.ReconcileOptionalStringPointerTrimmed(ss.InstallButtonText, state.InstallButtonText)
+	state.ReinstallButtonText = helpers.ReconcileOptionalStringPointerTrimmed(ss.ReinstallButtonText, state.ReinstallButtonText)
+	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmptyTrimmed(ss.SelfServiceDescription, state.SelfServiceDescription)
 	state.EnsureUsersViewDescription = helpers.BoolPointerValueOrNull(ss.ForceUsersToViewDescription)
 	state.IncludeInFeaturedCategory = helpers.BoolPointerValueOrNull(ss.FeatureOnMainPage)
 	state.DisplayNotifications = flattenNotificationEnabled(ss.Notification, state.DisplayNotifications)
@@ -532,7 +532,7 @@ func flattenPolicySelfService(ss *proclassic.PolicySelfService, state *PolicySel
 	state.NotificationMessage = helpers.WireWhenPresentString(ss.NotificationMessage, state.NotificationMessage)
 
 	if state.SelfServiceIcon != nil && ss.SelfServiceIcon != nil {
-		state.SelfServiceIcon.ID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.SelfServiceIcon.ID)
+		state.SelfServiceIcon.ID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.SelfServiceIcon.ID)
 		state.SelfServiceIcon.URI = helpers.StringPointerValueOrNull(ss.SelfServiceIcon.URI)
 		state.SelfServiceIcon.Filename = helpers.StringPointerValueOrNull(ss.SelfServiceIcon.Filename)
 	}
@@ -562,7 +562,7 @@ func flattenPolicySelfService(ss *proclassic.PolicySelfService, state *PolicySel
 }
 
 func flattenPolicyPackageConfiguration(pc *proclassic.PolicyPackageConfiguration, state *PolicyPackagesModel) {
-	state.DistributionPoint = helpers.ReconcileOptionalStringPointer(pc.DistributionPoint, state.DistributionPoint)
+	state.DistributionPoint = helpers.ReconcileOptionalStringPointerTrimmed(pc.DistributionPoint, state.DistributionPoint)
 
 	if pc.Packages == nil || pc.Packages.Package == nil {
 		state.Packages = nil
@@ -614,14 +614,14 @@ func flattenPolicyScripts(sc *proclassic.PolicyScripts, state *PolicyScriptsMode
 			ID:          id,
 			Name:        helpers.StringPointerValueOrNull(s.Name),
 			Priority:    helpers.StringPointerValueOrNull(s.Priority),
-			Parameter4:  helpers.ReconcileOptionalStringPointer(s.Parameter4, prev.Parameter4),
-			Parameter5:  helpers.ReconcileOptionalStringPointer(s.Parameter5, prev.Parameter5),
-			Parameter6:  helpers.ReconcileOptionalStringPointer(s.Parameter6, prev.Parameter6),
-			Parameter7:  helpers.ReconcileOptionalStringPointer(s.Parameter7, prev.Parameter7),
-			Parameter8:  helpers.ReconcileOptionalStringPointer(s.Parameter8, prev.Parameter8),
-			Parameter9:  helpers.ReconcileOptionalStringPointer(s.Parameter9, prev.Parameter9),
-			Parameter10: helpers.ReconcileOptionalStringPointer(s.Parameter10, prev.Parameter10),
-			Parameter11: helpers.ReconcileOptionalStringPointer(s.Parameter11, prev.Parameter11),
+			Parameter4:  helpers.ReconcileOptionalStringPointerTrimmed(s.Parameter4, prev.Parameter4),
+			Parameter5:  helpers.ReconcileOptionalStringPointerTrimmed(s.Parameter5, prev.Parameter5),
+			Parameter6:  helpers.ReconcileOptionalStringPointerTrimmed(s.Parameter6, prev.Parameter6),
+			Parameter7:  helpers.ReconcileOptionalStringPointerTrimmed(s.Parameter7, prev.Parameter7),
+			Parameter8:  helpers.ReconcileOptionalStringPointerTrimmed(s.Parameter8, prev.Parameter8),
+			Parameter9:  helpers.ReconcileOptionalStringPointerTrimmed(s.Parameter9, prev.Parameter9),
+			Parameter10: helpers.ReconcileOptionalStringPointerTrimmed(s.Parameter10, prev.Parameter10),
+			Parameter11: helpers.ReconcileOptionalStringPointerTrimmed(s.Parameter11, prev.Parameter11),
 		})
 	}
 	state.Scripts = out
@@ -765,14 +765,14 @@ func flattenPolicyAccountMaintenance(am *proclassic.PolicyAccountMaintenance, st
 			return PolicyAccountItemModel{
 				Action:                         helpers.StringPointerValueOrNull(a.Action),
 				Username:                       helpers.StringPointerValueOrNull(a.Username),
-				Realname:                       helpers.ReconcileOptionalStringPointer(a.Realname, prev.Realname),
+				Realname:                       helpers.ReconcileOptionalStringPointerTrimmed(a.Realname, prev.Realname),
 				Password:                       types.StringNull(),     // WriteOnly — framework strips from state
 				PasswordWoVersion:              prev.PasswordWoVersion, // round-trip from prior state
 				PermanentlyDeleteHomeDirectory: invertBoolPointerValueOrNull(a.ArchiveHomeDirectory),
-				ArchiveHomeDirectoryTo:         helpers.ReconcileOptionalStringPointer(a.ArchiveHomeDirectoryTo, prev.ArchiveHomeDirectoryTo),
-				Home:                           helpers.ReconcileOptionalStringPointer(a.Home, prev.Home),
-				Hint:                           helpers.ReconcileOptionalStringPointer(a.Hint, prev.Hint),
-				Picture:                        helpers.ReconcileOptionalStringPointer(a.Picture, prev.Picture),
+				ArchiveHomeDirectoryTo:         helpers.ReconcileOptionalStringPointerTrimmed(a.ArchiveHomeDirectoryTo, prev.ArchiveHomeDirectoryTo),
+				Home:                           helpers.ReconcileOptionalStringPointerTrimmed(a.Home, prev.Home),
+				Hint:                           helpers.ReconcileOptionalStringPointerTrimmed(a.Hint, prev.Hint),
+				Picture:                        helpers.ReconcileOptionalStringPointerTrimmed(a.Picture, prev.Picture),
 				Admin:                          helpers.BoolPointerValueOrNull(a.Admin),
 				FilevaultEnabled:               helpers.BoolPointerValueOrNull(a.FilevaultEnabled),
 				SecureTokenAllowed:             helpers.BoolPointerValueOrNull(a.SecureTokenAllowed),
@@ -825,11 +825,11 @@ func flattenPolicyAccountMaintenance(am *proclassic.PolicyAccountMaintenance, st
 	// Mirror the assignPolicyResourceModel section-level gate — only refresh
 	// when the caller already manages the sub-block.
 	if state.ManagementAccount != nil && am.ManagementAccount != nil {
-		state.ManagementAccount.Action = helpers.ReconcileOptionalStringPointer(am.ManagementAccount.Action, state.ManagementAccount.Action)
+		state.ManagementAccount.Action = helpers.ReconcileOptionalStringPointerTrimmed(am.ManagementAccount.Action, state.ManagementAccount.Action)
 	}
 
 	if state.EfiPassword != nil && am.OpenFirmwareEfiPassword != nil {
-		state.EfiPassword.OfMode = helpers.ReconcileOptionalStringPointer(am.OpenFirmwareEfiPassword.OfMode, state.EfiPassword.OfMode)
+		state.EfiPassword.OfMode = helpers.ReconcileOptionalStringPointerTrimmed(am.OpenFirmwareEfiPassword.OfMode, state.EfiPassword.OfMode)
 		// of_password is WriteOnly — framework strips from state.
 		// of_password_wo_version round-trips as a regular Optional Int64;
 		// the API never echoes it, so the prior state value passes through
@@ -838,11 +838,11 @@ func flattenPolicyAccountMaintenance(am *proclassic.PolicyAccountMaintenance, st
 }
 
 func flattenPolicyReboot(r *proclassic.PolicyReboot, state *PolicyRestartOptionsModel) {
-	state.Message = helpers.ReconcileOptionalStringPointer(r.Message, state.Message)
-	state.StartupDisk = helpers.ReconcileOptionalStringPointer(r.StartupDisk, state.StartupDisk)
-	state.SpecifyStartup = helpers.ReconcileOptionalStringPointer(r.SpecifyStartup, state.SpecifyStartup)
-	state.NoUserLoggedIn = helpers.ReconcileOptionalStringPointer(r.NoUserLoggedIn, state.NoUserLoggedIn)
-	state.UserLoggedIn = helpers.ReconcileOptionalStringPointer(r.UserLoggedIn, state.UserLoggedIn)
+	state.Message = helpers.ReconcileOptionalStringPointerTrimmed(r.Message, state.Message)
+	state.StartupDisk = helpers.ReconcileOptionalStringPointerTrimmed(r.StartupDisk, state.StartupDisk)
+	state.SpecifyStartup = helpers.ReconcileOptionalStringPointerTrimmed(r.SpecifyStartup, state.SpecifyStartup)
+	state.NoUserLoggedIn = helpers.ReconcileOptionalStringPointerTrimmed(r.NoUserLoggedIn, state.NoUserLoggedIn)
+	state.UserLoggedIn = helpers.ReconcileOptionalStringPointerTrimmed(r.UserLoggedIn, state.UserLoggedIn)
 	state.DelayMinutes = helpers.Int64FromIntPtr(r.MinutesUntilReboot)
 	state.StartRebootTimerImmediately = helpers.BoolPointerValueOrNull(r.StartRebootTimerImmediately)
 	state.FileVault2Reboot = helpers.BoolPointerValueOrNull(r.FileVault2Reboot)
@@ -860,14 +860,14 @@ func flattenPolicyMaintenance(m *proclassic.PolicyMaintenance, state *PolicyMain
 }
 
 func flattenPolicyFilesProcesses(fp *proclassic.PolicyFilesProcesses, state *PolicyFilesAndProcessesModel) {
-	state.SearchByPath = helpers.ReconcileOptionalStringPointer(fp.SearchByPath, state.SearchByPath)
+	state.SearchByPath = helpers.ReconcileOptionalStringPointerTrimmed(fp.SearchByPath, state.SearchByPath)
 	state.DeleteFileIfFound = helpers.BoolPointerValueOrNull(fp.DeleteFile)
-	state.SearchByFilename = helpers.ReconcileOptionalStringPointer(fp.LocateFile, state.SearchByFilename)
+	state.SearchByFilename = helpers.ReconcileOptionalStringPointerTrimmed(fp.LocateFile, state.SearchByFilename)
 	state.UpdateLocateDatabase = helpers.BoolPointerValueOrNull(fp.UpdateLocateDatabase)
-	state.SearchBySpotlight = helpers.ReconcileOptionalStringPointer(fp.SpotlightSearch, state.SearchBySpotlight)
-	state.SearchForProcess = helpers.ReconcileOptionalStringPointer(fp.SearchForProcess, state.SearchForProcess)
+	state.SearchBySpotlight = helpers.ReconcileOptionalStringPointerTrimmed(fp.SpotlightSearch, state.SearchBySpotlight)
+	state.SearchForProcess = helpers.ReconcileOptionalStringPointerTrimmed(fp.SearchForProcess, state.SearchForProcess)
 	state.KillProcessIfFound = helpers.BoolPointerValueOrNull(fp.KillProcess)
-	state.ExecuteCommand = helpers.ReconcileOptionalStringPointer(fp.RunCommand, state.ExecuteCommand)
+	state.ExecuteCommand = helpers.ReconcileOptionalStringPointerTrimmed(fp.RunCommand, state.ExecuteCommand)
 }
 
 // flattenPolicyUserInteraction collapses the wire's three-field deferral
@@ -876,8 +876,8 @@ func flattenPolicyFilesProcesses(fp *proclassic.PolicyFilesProcesses, state *Pol
 // here (server enforces the cross-field invariants on every PUT, so the
 // stored values are always self-consistent).
 func flattenPolicyUserInteraction(u *proclassic.PolicyUserInteraction, state *PolicyUserInteractionModel) {
-	state.StartMessage = helpers.ReconcileOptionalStringPointer(u.MessageStart, state.StartMessage)
-	state.CompleteMessage = helpers.ReconcileOptionalStringPointer(u.MessageFinish, state.CompleteMessage)
+	state.StartMessage = helpers.ReconcileOptionalStringPointerTrimmed(u.MessageStart, state.StartMessage)
+	state.CompleteMessage = helpers.ReconcileOptionalStringPointerTrimmed(u.MessageFinish, state.CompleteMessage)
 
 	defer_ := false
 	if u.AllowUsersToDefer != nil {

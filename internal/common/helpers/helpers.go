@@ -36,16 +36,27 @@ func StringPointerValueOrNull(value *string) types.String {
 	return types.StringValue(*value)
 }
 
-// StringPointerValueOrCurrent is StringPointerValueOrNull for a Required (or
-// otherwise non-reconciled) string Jamf Pro saves trimmed: it keeps current
-// when value is current with that whitespace removed (see wireIsTrimmedCurrent),
-// and otherwise behaves exactly as StringPointerValueOrNull. Use it for a name
-// or description assigned straight from the wire.
-func StringPointerValueOrCurrent(value *string, current types.String) types.String {
+// StringPointerValueOrNullTrimmed is StringPointerValueOrNull for a field whose
+// write reaches an endpoint that saves it with its outer whitespace removed: it
+// keeps current when value is current trimmed (see wireIsTrimmedCurrent), and
+// otherwise behaves exactly as StringPointerValueOrNull. Use it only where that
+// trimming is wire-verified; on any other endpoint it hides drift.
+func StringPointerValueOrNullTrimmed(value *string, current types.String) types.String {
 	if wireIsTrimmedCurrent(value, current) {
 		return current
 	}
 	return StringPointerValueOrNull(value)
+}
+
+// StringValueTrimmed is types.StringValue for a Required string whose write
+// reaches an endpoint that saves it trimmed: it keeps current when value is
+// current trimmed (see wireIsTrimmedCurrent). Same opt-in rule as
+// StringPointerValueOrNullTrimmed.
+func StringValueTrimmed(value string, current types.String) types.String {
+	if wireIsTrimmedCurrent(&value, current) {
+		return current
+	}
+	return types.StringValue(value)
 }
 
 // StringPointerValueOrEmpty unwraps a *string to a Terraform string, returning an
@@ -438,12 +449,7 @@ func ReconcileOptionalStringPointer(apiValue *string, current types.String) type
 }
 
 // ReconcileOptionalString keeps explicit empty strings set by the user while allowing nulls when unset.
-// It also keeps current when apiValue is current with the whitespace Jamf Pro
-// strips on save removed (see wireIsTrimmedCurrent).
 func ReconcileOptionalString(apiValue string, current types.String) types.String {
-	if wireIsTrimmedCurrent(&apiValue, current) {
-		return current
-	}
 	if apiValue == "" {
 		if IsConfiguredValue(current) && current.ValueString() == "" {
 			return current
@@ -465,8 +471,6 @@ func ReconcileOptionalString(apiValue string, current types.String) types.String
 // which makes the root cause hard to spot — prefer this helper for any
 // user-authored string under a block that also carries a Sensitive attribute.
 // Observed at: macos / mobile_device configuration profile self-service blocks.
-// Like ReconcileOptionalString it also keeps current when wire is current with
-// the whitespace Jamf Pro strips on save removed (see wireIsTrimmedCurrent).
 //
 // An Unknown current value resolves to Null rather than propagating, for the
 // same reason WireWhenPresentString does it: an Optional+Computed attribute
@@ -476,9 +480,6 @@ func ReconcileOptionalString(apiValue string, current types.String) types.String
 // element, so the Unknown arm is reached on the first apply of any config that
 // declares the block without setting the attribute.
 func PreserveStringWhenWireEmpty(wire *string, current types.String) types.String {
-	if wireIsTrimmedCurrent(wire, current) {
-		return current
-	}
 	if wire != nil && *wire != "" {
 		return types.StringValue(*wire)
 	}
@@ -488,20 +489,63 @@ func PreserveStringWhenWireEmpty(wire *string, current types.String) types.Strin
 	return current
 }
 
-// wireIsTrimmedCurrent reports whether wire is current with the whitespace Jamf
-// Pro strips on save removed: trailing whitespace on any field, and leading as
-// well on names. It is false when current is not a configured value, and for
-// identical values, which every caller handles on its ordinary path.
+// ReconcileOptionalStringTrimmed is ReconcileOptionalString for a field whose
+// write reaches an endpoint that saves it trimmed (see wireIsTrimmedCurrent).
+func ReconcileOptionalStringTrimmed(apiValue string, current types.String) types.String {
+	if wireIsTrimmedCurrent(&apiValue, current) {
+		return current
+	}
+	return ReconcileOptionalString(apiValue, current)
+}
+
+// ReconcileOptionalStringPointerTrimmed is ReconcileOptionalStringPointer for a
+// field whose write reaches an endpoint that saves it trimmed (see
+// wireIsTrimmedCurrent).
+func ReconcileOptionalStringPointerTrimmed(apiValue *string, current types.String) types.String {
+	return ReconcileOptionalStringTrimmed(DerefString(apiValue), current)
+}
+
+// PreserveStringWhenWireEmptyTrimmed is PreserveStringWhenWireEmpty for a field
+// whose write reaches an endpoint that saves it trimmed (see
+// wireIsTrimmedCurrent).
+func PreserveStringWhenWireEmptyTrimmed(wire *string, current types.String) types.String {
+	if wireIsTrimmedCurrent(wire, current) {
+		return current
+	}
+	return PreserveStringWhenWireEmpty(wire, current)
+}
+
+// wireIsTrimmedCurrent reports whether wire is current with its outer
+// whitespace removed: trailing alone, or leading and trailing together. It is
+// false when current is not a configured value, and for identical values, which
+// every caller handles on its ordinary path. Interior whitespace is compared
+// exactly.
 //
-// Jamf Pro's classic endpoints (osxconfigurationprofiles, policies, sites,
-// classes, computergroups, usergroups, networksegments, printers, ibeacons and
-// ebooks) store name, description and Self Service strings trimmed, on POST and
-// PUT — wire-verified 2026-10-20. Authored values ending in whitespace (every
-// heredoc ends in "\n") and values an object created in the Jamf Pro UI carries
-// into state, such as the profile name "FileVault " and the notification
-// subject derived from it, otherwise come back different after apply: "Provider
-// produced inconsistent result after apply" (issue #510). Interior whitespace
-// is stored as sent, so it is compared exactly.
+// It backs the *Trimmed helpers, which a state builder opts into per field, only
+// where the write is wire-verified to trim. Probed 2026-10-20, POST and PUT:
+//
+//   - Jamf Pro classic (/JSSResource) trims every string field tested, on every
+//     endpoint tested: names, descriptions, notes, Self Service strings, and
+//     URLs, paths and hostnames too (sites, policies, osxconfigurationprofiles,
+//     classes, computergroups, usergroups, networksegments, printers, ibeacons,
+//     ebooks, webhooks, advanced computer and user searches, dock items,
+//     licensed and restricted software, user extension attributes, disk
+//     encryption configurations, directory bindings, patch external sources,
+//     LDAP servers, mobile device enrollment profiles and applications).
+//   - Jamf Pro JSON trims the name on /v1/departments, /v1/distribution-points,
+//     /v1/computer-extension-attributes and /v1/mobile-device-extension-attributes
+//     (descriptions there are verbatim), and stores whitespace verbatim on
+//     categories, buildings, scripts, packages, v3 computer groups, v2 mobile
+//     device groups, advanced mobile device and user content searches, volume
+//     purchasing subscriptions, v2 enrollment customizations and Venafi.
+//
+// Without it, an authored value ending in whitespace (every heredoc ends in
+// "\n"), or a value an object created in the Jamf Pro UI carries into state,
+// such as the profile name "FileVault " and the notification subject derived
+// from it, comes back different after apply: "Provider produced inconsistent
+// result after apply" (issue #510). On an endpoint that stores verbatim it would
+// instead hide an out-of-band edit trimming such a value, which is why it is
+// opt-in rather than built into the plain helpers.
 func wireIsTrimmedCurrent(wire *string, current types.String) bool {
 	if wire == nil || !IsConfiguredValue(current) {
 		return false

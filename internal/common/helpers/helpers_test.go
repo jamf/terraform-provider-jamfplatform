@@ -51,6 +51,78 @@ func TestStringPointerValueOrNull(t *testing.T) {
 	}
 }
 
+func TestStringPointerValueOrNullTrimmed(t *testing.T) {
+	cases := []struct {
+		name    string
+		wire    *string
+		current types.String
+		want    types.String
+	}{
+		{"trailing whitespace trimmed keeps current", new("name"), types.StringValue("name \n"), types.StringValue("name \n")},
+		{"only trailing trimmed with leading kept keeps current", new(" name"), types.StringValue(" name "), types.StringValue(" name ")},
+		{"leading and trailing trimmed keeps current", new("name"), types.StringValue(" name "), types.StringValue(" name ")},
+		{"only leading trimmed with trailing kept takes server", new("name "), types.StringValue(" name "), types.StringValue("name ")},
+		{"server added whitespace takes server", new(" name"), types.StringValue("name"), types.StringValue(" name")},
+		{"different value takes server", new("renamed"), types.StringValue("name "), types.StringValue("renamed")},
+		{"interior difference takes server", new("a\nb"), types.StringValue("a \nb"), types.StringValue("a\nb")},
+		{"whitespace-only current against empty wire keeps current", new(""), types.StringValue(" "), types.StringValue(" ")},
+		{"empty wire against non-blank current is null", new(""), types.StringValue("name"), types.StringNull()},
+		{"nil wire is null", nil, types.StringValue("name "), types.StringNull()},
+		{"null current takes server", new("name"), types.StringNull(), types.StringValue("name")},
+		{"unknown current takes server", new("name"), types.StringUnknown(), types.StringValue("name")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := StringPointerValueOrNullTrimmed(tc.wire, tc.current)
+			if !got.Equal(tc.want) {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestStringValueTrimmed(t *testing.T) {
+	cases := []struct {
+		name    string
+		wire    string
+		current types.String
+		want    types.String
+	}{
+		{"server trimmed keeps current", "name", types.StringValue(" name\n"), types.StringValue(" name\n")},
+		{"different value takes server", "renamed", types.StringValue("name "), types.StringValue("renamed")},
+		{"empty wire stays a known empty string", "", types.StringValue("name"), types.StringValue("")},
+		{"null current takes server", "name", types.StringNull(), types.StringValue("name")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := StringValueTrimmed(tc.wire, tc.current); !got.Equal(tc.want) {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestPlainStringHelpersStayStrict pins the opt-in: the plain helpers serve
+// endpoints that store whitespace verbatim, so a server value that is the prior
+// value trimmed is a real change and must win.
+func TestPlainStringHelpersStayStrict(t *testing.T) {
+	wire := "name"
+	current := types.StringValue("name ")
+	want := types.StringValue("name")
+	if got := ReconcileOptionalString(wire, current); !got.Equal(want) {
+		t.Errorf("ReconcileOptionalString: got %q, want %q", got, want)
+	}
+	if got := ReconcileOptionalStringPointer(&wire, current); !got.Equal(want) {
+		t.Errorf("ReconcileOptionalStringPointer: got %q, want %q", got, want)
+	}
+	if got := PreserveStringWhenWireEmpty(&wire, current); !got.Equal(want) {
+		t.Errorf("PreserveStringWhenWireEmpty: got %q, want %q", got, want)
+	}
+	if got := StringPointerValueOrNull(&wire); !got.Equal(want) {
+		t.Errorf("StringPointerValueOrNull: got %q, want %q", got, want)
+	}
+}
+
 func TestDerivedRefName(t *testing.T) {
 	hq := "HQ"
 	none := "NONE"
@@ -568,7 +640,7 @@ func TestSelfServiceCategoryDisplayIn(t *testing.T) {
 	}
 }
 
-func TestPreserveStringWhenWireEmpty_TrimmedWire(t *testing.T) {
+func TestPreserveStringWhenWireEmptyTrimmed(t *testing.T) {
 	cases := []struct {
 		name    string
 		wire    *string
@@ -588,7 +660,7 @@ func TestPreserveStringWhenWireEmpty_TrimmedWire(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := PreserveStringWhenWireEmpty(tc.wire, tc.current)
+			got := PreserveStringWhenWireEmptyTrimmed(tc.wire, tc.current)
 			if !got.Equal(tc.want) {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}
@@ -596,7 +668,7 @@ func TestPreserveStringWhenWireEmpty_TrimmedWire(t *testing.T) {
 	}
 }
 
-func TestReconcileOptionalString_TrimmedWire(t *testing.T) {
+func TestReconcileOptionalStringPointerTrimmed(t *testing.T) {
 	cases := []struct {
 		name    string
 		wire    *string
@@ -616,7 +688,7 @@ func TestReconcileOptionalString_TrimmedWire(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := ReconcileOptionalStringPointer(tc.wire, tc.current)
+			got := ReconcileOptionalStringPointerTrimmed(tc.wire, tc.current)
 			if !got.Equal(tc.want) {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}

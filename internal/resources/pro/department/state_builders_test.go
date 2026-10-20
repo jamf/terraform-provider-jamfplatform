@@ -85,3 +85,20 @@ func TestAssignDepartmentDataSourceModel_PreservesIDWhenAPINil(t *testing.T) {
 		t.Errorf("expected Name %q, got %q", "Finance", state.Name.ValueString())
 	}
 }
+
+// TestAssignDepartmentResourceModel_KeepsNameTheServerTrims covers issue #510:
+// /v1/departments saves a name without its outer whitespace (probed
+// 2026-10-20), so the planned value must survive the read-back, while a real
+// rename on the server still wins.
+func TestAssignDepartmentResourceModel_KeepsNameTheServerTrims(t *testing.T) {
+	state := DepartmentResourceModel{Name: types.StringValue(" Engineering ")}
+	assignDepartmentResourceModel(&state, &pro.Department{Name: "Engineering"})
+	if !state.Name.Equal(types.StringValue(" Engineering ")) {
+		t.Errorf("a name the server trimmed must keep the planned value, got %q", state.Name.ValueString())
+	}
+
+	assignDepartmentResourceModel(&state, &pro.Department{Name: "Sales"})
+	if !state.Name.Equal(types.StringValue("Sales")) {
+		t.Errorf("a different server name must win, got %q", state.Name.ValueString())
+	}
+}
