@@ -4,6 +4,7 @@ page_title: "jamfplatform_pro_advanced_computer_search Resource - terraform-prov
 subcategory: ""
 description: |-
   Manages a Jamf Pro advanced computer search: a saved, criteria-driven inventory query with a configurable set of display columns. The matched-computer result set is report data Jamf Pro computes, and is intentionally not modelled. Mirrors the Computers → Search Inventory → Advanced Computer Search UI.
+  ~> Updating a search through Terraform deletes its email report. Jamf Pro clears the recipients, subject, body and schedule from Reports → Email, including on an update that changes nothing. Terraform cannot read or set these settings, so terraform plan won't show you the loss. After an apply that changes a search, set up its email report again in the Jamf Pro admin UI.
   Required Jamf permissions
   Jamf lists this under Platform environment scope (preferred for new integrations) or Tenant scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
@@ -14,6 +15,8 @@ description: |-
 # jamfplatform_pro_advanced_computer_search (Resource)
 
 Manages a Jamf Pro advanced computer search: a saved, criteria-driven inventory query with a configurable set of display columns. The matched-computer result set is report data Jamf Pro computes, and is intentionally not modelled. Mirrors the Computers → Search Inventory → Advanced Computer Search UI.
+
+~> **Updating a search through Terraform deletes its email report.** Jamf Pro clears the recipients, subject, body and schedule from Reports → Email, including on an update that changes nothing. Terraform cannot read or set these settings, so `terraform plan` won't show you the loss. After an apply that changes a search, set up its email report again in the Jamf Pro admin UI.
 
 **Required Jamf permissions**
 
