@@ -74,7 +74,7 @@ func assignMobileDeviceInvitationResourceModel(state *MobileDeviceInvitationReso
 	state.SentFrom = helpers.ReconcileOptionalStringPointerTrimmed(m.SentFrom, state.SentFrom)
 	state.SentTo = helpers.ReconcileOptionalStringPointerTrimmed(m.SentTo, state.SentTo)
 	state.Username = helpers.ReconcileOptionalStringPointerTrimmed(m.Username, state.Username)
-	state.TargetIos = helpers.StringPointerValueOrNullTrimmed(m.TargetIos, state.TargetIos)
+	state.TargetIos = helpers.StringPointerValueOrNull(m.TargetIos)
 	state.LastAction = helpers.StringPointerValueOrNull(m.LastAction)
 	state.DateSent = helpers.StringPointerValueOrNull(m.DateSent)
 	state.DateSentUtc = helpers.StringPointerValueOrNull(m.DateSentUtc)
