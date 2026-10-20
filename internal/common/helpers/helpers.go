@@ -537,7 +537,9 @@ func PreserveStringWhenWireEmptyTrimmed(wire *string, current types.String) type
 //     (descriptions there are verbatim), and stores whitespace verbatim on
 //     categories, buildings, scripts, packages, v3 computer groups, v2 mobile
 //     device groups, advanced mobile device and user content searches, volume
-//     purchasing subscriptions, v2 enrollment customizations and Venafi.
+//     purchasing subscriptions, v2 enrollment customizations, Venafi, v3 computer
+//     and v2 mobile device prestages, app installer deployments, volume
+//     purchasing locations and Automated Device Enrollment instances.
 //
 // Without it, an authored value ending in whitespace (every heredoc ends in
 // "\n"), or a value an object created in the Jamf Pro UI carries into state,
