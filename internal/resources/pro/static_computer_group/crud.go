@@ -86,7 +86,12 @@ func (r *StaticComputerGroupResource) Create(ctx context.Context, req resource.C
 	}
 	plan.PlatformID = types.StringValue(created.ID)
 
-	got, err := r.client.GetStaticComputerGroupV3(createCtx, created.ID)
+	got, err := progroups.ReadBackAfterWrite(createCtx,
+		func(ctx context.Context) (*pro.StaticComputerGroup, error) {
+			return r.client.GetStaticComputerGroupV3(ctx, created.ID)
+		},
+		func(got *pro.StaticComputerGroup) bool { return staticComputerGroupReflectsPlan(plan, got) },
+	)
 	if err != nil {
 		if recoveryErr := recordCreatedGroup(createCtx, r.client, &plan, created.ID, resp); recoveryErr != nil {
 			resp.Diagnostics.AddError(
@@ -317,7 +322,12 @@ func (r *StaticComputerGroupResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
-	got, err := r.client.GetStaticComputerGroupV3(updateCtx, plan.ID.ValueString())
+	got, err := progroups.ReadBackAfterWrite(updateCtx,
+		func(ctx context.Context) (*pro.StaticComputerGroup, error) {
+			return r.client.GetStaticComputerGroupV3(ctx, plan.ID.ValueString())
+		},
+		func(got *pro.StaticComputerGroup) bool { return staticComputerGroupReflectsPlan(plan, got) },
+	)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading the updated Jamf Pro "+groupLabel, helpers.APIErrorDetail(err))
 		return
@@ -378,7 +388,12 @@ func (r *StaticComputerGroupResource) Delete(ctx context.Context, req resource.D
 			return
 		}
 		resp.Diagnostics.Append(progroups.DeleteDiagnostics(err, groupLabel)...)
+		return
 	}
+	progroups.WaitUntilGone(deleteCtx, func(ctx context.Context) error {
+		_, err := r.client.GetStaticComputerGroupV3(ctx, state.ID.ValueString())
+		return err
+	})
 }
 
 // recordCreatedGroup records a group the create has already made, when the

@@ -85,3 +85,51 @@ func searchResultModel(item pro.SmartComputerGroupSearch, platformIDs map[string
 		MemberCount: types.Int64Value(int64(item.MembershipCount)),
 	}
 }
+
+// smartComputerGroupReflectsPlan reports whether a group read back after an
+// update carries the planned name, description, site and criteria, the settled
+// test progroups.ReadBackAfterWrite needs to outlast Jamf Pro 11.32.0's
+// one-write-behind read. It flattens into a copy of plan, so it compares
+// exactly what Terraform will.
+func smartComputerGroupReflectsPlan(plan SmartComputerGroupResourceModel, got *pro.SmartComputerGroupV3) bool {
+	read := plan
+	assignSmartComputerGroupResourceModel(&read, got)
+	return progroups.PlannedValueReflected(plan.Name, read.Name) &&
+		progroups.PlannedValueReflected(plan.Description, read.Description) &&
+		progroups.PlannedValueReflected(plan.SiteID, read.SiteID) &&
+		criteriaReflectPlan(plan.Criteria, read.Criteria)
+}
+
+// fallbackWriteReflectsPlan is smartComputerGroupReflectsPlan without the
+// description, which the classic fallback write cannot carry: it reports
+// whether that write is readable, so the description patch that follows it
+// does not write back the group as it was before.
+func fallbackWriteReflectsPlan(plan SmartComputerGroupResourceModel, got *pro.SmartComputerGroupV3) bool {
+	read := plan
+	assignSmartComputerGroupResourceModel(&read, got)
+	return progroups.PlannedValueReflected(plan.Name, read.Name) &&
+		progroups.PlannedValueReflected(plan.SiteID, read.SiteID) &&
+		criteriaReflectPlan(plan.Criteria, read.Criteria)
+}
+
+// criteriaReflectPlan is PlannedValueReflected over every field of every
+// criterion, so a planned Computed field that is still unknown, such as a
+// priority Jamf Pro assigns, does not hold the read-back open.
+func criteriaReflectPlan(planned, read []criteria.CriterionModel) bool {
+	if len(planned) != len(read) {
+		return false
+	}
+	for i := range planned {
+		p, r := planned[i], read[i]
+		if !progroups.PlannedValueReflected(p.Priority, r.Priority) ||
+			!progroups.PlannedValueReflected(p.Name, r.Name) ||
+			!progroups.PlannedValueReflected(p.SearchType, r.SearchType) ||
+			!progroups.PlannedValueReflected(p.Value, r.Value) ||
+			!progroups.PlannedValueReflected(p.AndOr, r.AndOr) ||
+			!progroups.PlannedValueReflected(p.HasOpeningParenthesis, r.HasOpeningParenthesis) ||
+			!progroups.PlannedValueReflected(p.HasClosingParenthesis, r.HasClosingParenthesis) {
+			return false
+		}
+	}
+	return true
+}

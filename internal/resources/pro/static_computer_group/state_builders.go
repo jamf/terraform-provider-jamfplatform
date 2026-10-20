@@ -87,3 +87,16 @@ func membershipSetValue(ctx context.Context, ids []string) (types.Set, diag.Diag
 	}
 	return types.SetValueFrom(ctx, types.StringType, ids)
 }
+
+// staticComputerGroupReflectsPlan reports whether a group read back after an
+// update carries the planned name, description and site, the settled test
+// progroups.ReadBackAfterWrite needs to outlast Jamf Pro 11.32.0's one-write-
+// behind read. It flattens into a copy of plan, so it compares exactly what
+// Terraform will.
+func staticComputerGroupReflectsPlan(plan StaticComputerGroupResourceModel, got *pro.StaticComputerGroup) bool {
+	read := plan
+	assignStaticComputerGroupResourceState(&read, got)
+	return progroups.PlannedValueReflected(plan.Name, read.Name) &&
+		progroups.PlannedValueReflected(plan.Description, read.Description) &&
+		progroups.PlannedValueReflected(plan.SiteID, read.SiteID)
+}
