@@ -12,9 +12,9 @@
 // a blob-bearing profile returns HTTP 500, so name/display_name/profile_data are
 // all RequiresReplace — the "update" step is therefore a replacement.
 //
-// Fixture: a real Apple-signed enterprise .mobileprovision (testdata/, see its
-// README). Jamf rejects synthesised blobs with 500, so a genuine signed profile is
-// mandatory; the test base64-encodes it at runtime.
+// Fixture: an unsigned sample .mobileprovision from facebook/buck (testdata/, see
+// its README). Jamf Pro 11.32.0 stores an unsigned profile and parses its UUID,
+// so no Apple-signed profile is needed; the test base64-encodes it at runtime.
 
 package mobile_device_provisioning_profile_test
 
@@ -48,7 +48,7 @@ const resourceAddr = "jamfplatform_pro_mobile_device_provisioning_profile.test"
 func fixtureBase64(t *testing.T) string {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
-	p := filepath.Join(filepath.Dir(file), "testdata", "Certificates.mobileprovision")
+	p := filepath.Join(filepath.Dir(file), "testdata", "sample.mobileprovision")
 	b, err := os.ReadFile(p) //nolint:gosec // test fixture path is fixed
 	if err != nil {
 		t.Fatalf("reading fixture: %v", err)
