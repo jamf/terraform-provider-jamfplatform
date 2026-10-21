@@ -49,8 +49,8 @@ func siteNameValue(s *proclassic.MobileDeviceInvitationEnrollIntoSite) types.Str
 //     whether it was written as "" or never sent, so those are reconciled
 //     against the incoming model (the plan on Create and Update, prior state on
 //     Read): an authored "" survives the read rather than collapsing to null,
-//     which the post-apply consistency check rejects. target_ios is not: the
-//     server replaces "" with its default.
+//     which the post-apply consistency check rejects. target_ios is read-only
+//     and taken from the wire as is: Jamf Pro always stores `iOS 4`.
 func assignMobileDeviceInvitationResourceModel(state *MobileDeviceInvitationResourceModel, m *proclassic.MobileDeviceInvitation) {
 	if m == nil {
 		return

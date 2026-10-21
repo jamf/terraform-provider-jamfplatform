@@ -39,8 +39,8 @@ func TestBuildMobileDeviceInvitationInput_FullPayload(t *testing.T) {
 	if got.SentTo == nil || *got.SentTo != "user@example.com" {
 		t.Errorf("sent_to not propagated: %v", got.SentTo)
 	}
-	if got.TargetIos == nil || *got.TargetIos != "iOS 17" {
-		t.Errorf("target_ios not propagated: %v", got.TargetIos)
+	if got.TargetIos != nil {
+		t.Errorf("target_ios must never be sent, Jamf Pro ignores it: %v", *got.TargetIos)
 	}
 	if got.EnrollIntoSite == nil || got.EnrollIntoSite.ID == nil || *got.EnrollIntoSite.ID != 7 {
 		t.Fatalf("enroll_into_site ID not set from enroll_into_site_id, got %+v", got.EnrollIntoSite)

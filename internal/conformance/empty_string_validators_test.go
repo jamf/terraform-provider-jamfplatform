@@ -40,7 +40,6 @@ func TestEmptyStringRejectedWhereJamfProDoesNotStoreIt(t *testing.T) {
 		{"jamfplatform_pro_advanced_volume_purchasing_content_search", "site_id", "1"},
 		{"jamfplatform_pro_disk_encryption_configuration", "institutional_recovery_key.data", "TUlJ"},
 		{"jamfplatform_pro_pki_adcs", "api_client_id", "00000000-0000-0000-0000-000000000000"},
-		{"jamfplatform_pro_mobile_device_invitation", "target_ios", "iOS 4"},
 		{"jamfplatform_pro_printer", "category", "Printers"},
 		{"jamfplatform_pro_mobile_device_provisioning_profile", "profile_data", "TUlJ"},
 		{"jamfplatform_pro_ldap_server", "mappings_for_users.user_mappings.user_uuid", "objectGUID"},
