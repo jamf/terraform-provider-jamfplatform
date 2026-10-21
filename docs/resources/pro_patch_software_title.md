@@ -92,18 +92,38 @@ output "adobe_air_extension_attributes" {
   value = jamfplatform_pro_patch_software_title.adobe_air.extension_attributes
 }
 
-# A smart group criterion named "Patch Reporting: <title>" matches the catalog
-# name in software_title_name, not the name label. Referencing it also makes
-# Terraform create the title before the group.
-resource "jamfplatform_pro_smart_computer_group" "eight_by_eight_outdated" {
-  name = "8x8 Work out of date"
+# Manage several titles from the same catalog, then build a smart group per
+# title. A smart group criterion named "Patch Reporting: <title>" matches the
+# catalog name, which can differ from name, so it reads software_title_name.
+# The reference also makes Terraform create each title before its group.
+locals {
+  patch_apps = ["Audacity 4", "Mozilla Firefox"]
+
+  catalog = {
+    for app in local.patch_apps : app => one([
+      for t in data.jamfplatform_pro_patch_internal_source.jamf.available_titles : t
+      if t.app_name == app
+    ])
+  }
+}
+
+resource "jamfplatform_pro_patch_software_title" "apps" {
+  for_each = local.catalog
+
+  name      = each.value.app_name
+  name_id   = each.value.name_id
+  source_id = tonumber(data.jamfplatform_pro_patch_internal_source.jamf.id)
+}
+
+resource "jamfplatform_pro_smart_computer_group" "outdated" {
+  for_each = jamfplatform_pro_patch_software_title.apps
+
+  name = "${each.value.name} out of date"
   criteria = [
     {
-      priority    = 0
-      name        = "Patch Reporting: ${jamfplatform_pro_patch_software_title.eight_by_eight.software_title_name}"
+      name        = "Patch Reporting: ${each.value.software_title_name}"
       search_type = "less than"
       value       = "Latest Version"
-      and_or      = "and"
     },
   ]
 }
