@@ -12,8 +12,13 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/querycheck"
+	"github.com/hashicorp/terraform-plugin-testing/querycheck/queryfilter"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
+	"github.com/hashicorp/terraform-plugin-testing/tfversion"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/devicegroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers"
@@ -516,4 +521,72 @@ func TestAccResource_DeviceGroup_DSGroupCriteria(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestAccListResource_DeviceGroup_EmptyStaticMembersNull is the regression for
+// #524: an empty static group must come out of the list resource with
+// `members = null`, the value the import Read stores, so a generated config
+// plans clean after import. Covers both device types.
+func TestAccListResource_DeviceGroup_EmptyStaticMembersNull(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+
+	for _, deviceType := range []string{"computer", "mobile"} {
+		t.Run(deviceType, func(t *testing.T) {
+			name := fmt.Sprintf("tf-acc-dg-empty-%s-%s", deviceType, suffix)
+			addr := "jamfplatform_device_group.src"
+
+			resource.Test(t, resource.TestCase{
+				TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+					tfversion.SkipBelow(tfversion.Version1_14_0),
+				},
+				ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+				CheckDestroy:             testAccCheckDeviceGroupDestroy(t),
+				Steps: []resource.TestStep{
+					{
+						Config: fmt.Sprintf(`
+							resource "jamfplatform_device_group" "src" {
+								name        = %q
+								group_type  = "static"
+								device_type = %q
+							}
+						`, name, deviceType),
+					},
+					{
+						Query: true,
+						Config: fmt.Sprintf(`
+							provider "jamfplatform" {}
+
+							list "jamfplatform_device_group" "test" {
+								provider         = jamfplatform
+								include_resource = true
+
+								config {
+									filter = [{
+										selector = "name"
+										argument = %q
+									}]
+								}
+							}
+						`, name),
+						QueryResultChecks: []querycheck.QueryResultCheck{
+							querycheck.ExpectLength("jamfplatform_device_group.test", 1),
+							querycheck.ExpectResourceKnownValues(
+								"jamfplatform_device_group.test",
+								queryfilter.ByDisplayName(knownvalue.StringExact(name)),
+								[]querycheck.KnownValueCheck{
+									{Path: tfjsonpath.New("members"), KnownValue: knownvalue.Null()},
+								},
+							),
+						},
+					},
+					{
+						ResourceName:      addr,
+						ImportState:       true,
+						ImportStateVerify: true,
+					},
+				},
+			})
+		})
+	}
 }
