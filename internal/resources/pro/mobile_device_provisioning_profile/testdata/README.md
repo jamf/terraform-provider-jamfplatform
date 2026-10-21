@@ -1,34 +1,23 @@
 # Acceptance test fixtures
 
-`Certificates.mobileprovision` is a real, Apple-signed enterprise `.mobileprovision`
-profile used to exercise the create-with-blob path. Jamf Pro cryptographically
-validates the profile on upload and **rejects synthesised / self-signed blobs with
-HTTP 500**, so a genuine signed profile is required — a generated fixture will not
-work.
+`sample.mobileprovision` is an **unsigned** sample provisioning profile (a plain
+XML property list, no CMS signature) used to exercise the create-with-blob path.
+It carries `UUID` `00000000-0000-0000-0000-000000000000`, `Name` and `TeamName`
+`Example`, and an `ExpirationDate` of **9999-03-05**, so it does not expire.
 
-Provenance: sourced from the public repository
-<https://github.com/loyahdev/certificates> (file `Certificates.mobileprovision`).
-It contains only the certificates already published there; nothing tenant- or
-account-specific is added by this repo.
+Provenance: copied verbatim from
+[facebook/buck](https://github.com/facebook/buck/blob/b3fc2598badeb689bed543f306f2b4867dbcd068/test/com/facebook/buck/apple/testdata/provisioning_profiles/sample.mobileprovision)
+at commit `b3fc2598badeb689bed543f306f2b4867dbcd068`, licensed under the Apache
+License 2.0. It contains no certificates, devices or account data.
 
-The acceptance test base64-encodes this file at runtime and feeds it to
-`profile_data`. The embedded profile carries a fixed UUID and expiration that the
-server parses back out — the tests assert those computed fields are populated, not
-their exact values (the profile may expire).
+Jamf Pro accepts it: wire-verified 2026-10-20 on Jamf Pro 11.32.0, a classic
+`POST /JSSResource/mobiledeviceprovisioningprofiles/id/0` carrying it answers 201
+and the stored record reports the embedded UUID. This replaces the earlier
+Apple-signed enterprise fixture, which expired on 2026-06-26 and whose README
+recorded that Jamf rejects unsigned blobs with HTTP 500; that does not hold on
+11.32.0. If a later Jamf Pro release starts validating the signature, the create
+steps fail with 500 and a signed profile is needed again.
 
-## ⚠️ Expiration fuse
-
-This fixture's embedded `ExpirationDate` is **2026-06-26** (1-year enterprise
-profile, created 2025-06-26). Uploads of a non-expired profile succeed (verified).
-If Jamf Pro rejects an *expired* profile at upload — unverified — the acceptance
-`create` steps will begin failing **after 2026-06-26**. When that happens, replace
-this file with a longer-lived signed `.mobileprovision` (any real enterprise
-profile works; synthesised/self-signed blobs are rejected with HTTP 500). All
-real enterprise profiles expire, so this fixture will need periodic refresh.
-
-Decode the dates with:
-
-```bash
-openssl smime -verify -inform DER -noverify -in Certificates.mobileprovision 2>/dev/null \
-  | plutil -extract ExpirationDate raw -
-```
+The acceptance test base64-encodes the file at runtime and feeds it to
+`profile_data`; the tests assert the computed fields are populated, not their
+exact values.
