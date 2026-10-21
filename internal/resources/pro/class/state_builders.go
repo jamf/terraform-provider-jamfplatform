@@ -27,12 +27,12 @@ func assignClassResourceModel(ctx context.Context, state *ClassResourceModel, c 
 	if c.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(c.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(c.Name)
-	state.Description = helpers.ReconcileOptionalStringPointer(c.Description, state.Description)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(c.Name, state.Name)
+	state.Description = helpers.ReconcileOptionalStringPointerTrimmed(c.Description, state.Description)
 	state.Source = helpers.StringPointerValueOrNull(c.Source)
 
 	siteID, siteName := scope.FlattenSiteObject(c.Site)
-	state.SiteID = helpers.ReconcileOptionalStringPointer(siteID, state.SiteID)
+	state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(siteID, state.SiteID)
 	state.SiteName = helpers.StringPointerValueOrNull(siteName)
 
 	var d diag.Diagnostics
@@ -67,8 +67,8 @@ func assignClassDataSourceModel(ctx context.Context, state *ClassDataSourceModel
 	if c.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(c.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(c.Name)
-	state.Description = helpers.StringPointerValueOrNull(c.Description)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(c.Name, state.Name)
+	state.Description = helpers.StringPointerValueOrNullTrimmed(c.Description, state.Description)
 	state.Source = helpers.StringPointerValueOrNull(c.Source)
 
 	siteID, siteName := scope.FlattenSiteObject(c.Site)

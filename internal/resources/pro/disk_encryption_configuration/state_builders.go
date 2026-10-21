@@ -30,7 +30,7 @@ func assignDiskEncryptionConfigurationResourceModel(state *DiskEncryptionConfigu
 	if c.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(c.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(c.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(c.Name, state.Name)
 	state.KeyType = helpers.StringPointerValueOrNull(c.KeyType)
 	state.FileVaultEnabledUsers = helpers.StringPointerValueOrNull(c.FileVaultEnabledUsers)
 
@@ -64,7 +64,7 @@ func assignDiskEncryptionConfigurationDataSourceModel(state *DiskEncryptionConfi
 	if c.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(c.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(c.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(c.Name, state.Name)
 	state.KeyType = helpers.StringPointerValueOrNull(c.KeyType)
 	state.FileVaultEnabledUsers = helpers.StringPointerValueOrNull(c.FileVaultEnabledUsers)
 	state.InstitutionalRecoveryKey = assignIRKDataSourceModel(c.InstitutionalRecoveryKey)

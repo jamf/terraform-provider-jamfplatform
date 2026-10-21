@@ -37,20 +37,20 @@ func assignPrinterResourceModel(state *PrinterResourceModel, p *proclassic.Print
 		state.ID = helpers.StringValueFromIntPtr(p.ID)
 	}
 	if p.Name != nil {
-		state.Name = helpers.StringPointerValueOrNull(p.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(p.Name, state.Name)
 	}
 	state.Category = decodeCategory(p.Category)
-	state.URI = helpers.ReconcileOptionalStringPointer(p.URI, state.URI)
-	state.CUPSName = helpers.ReconcileOptionalStringPointer(p.CUPSName, state.CUPSName)
-	state.Location = helpers.ReconcileOptionalStringPointer(p.Location, state.Location)
-	state.Model = helpers.ReconcileOptionalStringPointer(p.Model, state.Model)
-	state.Info = helpers.ReconcileOptionalStringPointer(p.Info, state.Info)
-	state.Notes = helpers.ReconcileOptionalStringPointer(p.Notes, state.Notes)
+	state.URI = helpers.ReconcileOptionalStringPointerTrimmed(p.URI, state.URI)
+	state.CUPSName = helpers.ReconcileOptionalStringPointerTrimmed(p.CUPSName, state.CUPSName)
+	state.Location = helpers.ReconcileOptionalStringPointerTrimmed(p.Location, state.Location)
+	state.Model = helpers.ReconcileOptionalStringPointerTrimmed(p.Model, state.Model)
+	state.Info = helpers.ReconcileOptionalStringPointerTrimmed(p.Info, state.Info)
+	state.Notes = helpers.ReconcileOptionalStringPointerTrimmed(p.Notes, state.Notes)
 	state.MakeDefault = helpers.BoolPointerValueOrNull(p.MakeDefault)
 	state.UseGeneric = helpers.BoolPointerValueOrNull(p.UseGeneric)
 	state.PPD, state.PPDPath, state.PPDContents = ppdTrioValues(p, state.PPD)
 	state.Shared = helpers.BoolPointerValueOrNull(p.Shared)
-	state.OSRequirements = helpers.ReconcileOptionalStringPointer(p.OsRequirements, state.OSRequirements)
+	state.OSRequirements = helpers.ReconcileOptionalStringPointerTrimmed(p.OsRequirements, state.OSRequirements)
 	return diags
 }
 
@@ -66,7 +66,7 @@ func ppdTrioValues(p *proclassic.Printer, currentPPD types.String) (ppd, ppdPath
 	if p.UseGeneric == nil || *p.UseGeneric {
 		return types.StringNull(), types.StringNull(), trimmedStringValueFromPtr(nil)
 	}
-	return helpers.ReconcileOptionalStringPointer(p.Ppd, currentPPD),
+	return helpers.ReconcileOptionalStringPointerTrimmed(p.Ppd, currentPPD),
 		helpers.StringPointerValueOrNull(p.PpdPath),
 		trimmedStringValueFromPtr(p.PpdContents)
 }
@@ -83,14 +83,14 @@ func assignPrinterDataSourceModel(state *PrinterDataSourceModel, p *proclassic.P
 	if p.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(p.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(p.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(p.Name, state.Name)
 	state.Category = decodeCategory(p.Category)
 	state.URI = helpers.StringPointerValueOrNull(p.URI)
 	state.CUPSName = helpers.StringPointerValueOrNull(p.CUPSName)
-	state.Location = helpers.StringPointerValueOrNull(p.Location)
+	state.Location = helpers.StringPointerValueOrNullTrimmed(p.Location, state.Location)
 	state.Model = helpers.StringPointerValueOrNull(p.Model)
 	state.Info = helpers.StringPointerValueOrNull(p.Info)
-	state.Notes = helpers.StringPointerValueOrNull(p.Notes)
+	state.Notes = helpers.StringPointerValueOrNullTrimmed(p.Notes, state.Notes)
 	state.MakeDefault = helpers.BoolPointerValueOrNull(p.MakeDefault)
 	state.UseGeneric = helpers.BoolPointerValueOrNull(p.UseGeneric)
 	state.PPD, state.PPDPath, state.PPDContents = ppdTrioValues(p, types.StringNull())

@@ -88,7 +88,7 @@ func assignLdapServerDataSourceModel(state *LdapServerDataSourceModel, s *procla
 			state.ID = helpers.StringValueFromIntPtr(s.Connection.ID)
 		}
 		if s.Connection.Name != nil {
-			state.Name = helpers.StringPointerValueOrNull(s.Connection.Name)
+			state.Name = helpers.StringPointerValueOrNullTrimmed(s.Connection.Name, state.Name)
 		}
 	}
 	state.Connection = assignConnectionModel(s.Connection, nil)
@@ -134,7 +134,7 @@ func assignConnectionModel(c *proclassic.LdapServerConnection, existing *ldapCon
 		Account:            assignAccountModel(c.Account, existingAccount),
 		ConnectionTimeout:  helpers.Int64FromIntPtr(c.OpenCloseTimeout),
 		SearchTimeout:      helpers.Int64FromIntPtr(c.SearchTimeout),
-		ReferralResponse:   helpers.PreserveStringWhenWireEmpty(c.ReferralResponse, existingReferralResponse),
+		ReferralResponse:   helpers.PreserveStringWhenWireEmptyTrimmed(c.ReferralResponse, existingReferralResponse),
 		UseWildcards:       helpers.BoolPointerValueOrNull(c.UseWildcards),
 		IsEnabled:          helpers.BoolPointerValueOrNull(c.IsEnabled),
 		MigratedToID:       helpers.Int64FromIntPtr(c.MigratedToID),
@@ -190,21 +190,21 @@ func assignMappingsModel(m *proclassic.LdapServerMappingsForUsers, prior *ldapMa
 			pu = &ldapUserMappingsModel{}
 		}
 		out.UserMappings = &ldapUserMappingsModel{
-			ObjectClassLimitation: helpers.ReconcileOptionalStringPointer(u.MapObjectClassToAnyOrAll, pu.ObjectClassLimitation),
-			ObjectClasses:         helpers.ReconcileOptionalStringPointer(u.ObjectClasses, pu.ObjectClasses),
-			SearchBase:            helpers.ReconcileOptionalStringPointer(u.SearchBase, pu.SearchBase),
-			SearchScope:           helpers.ReconcileOptionalStringPointer(u.SearchScope, pu.SearchScope),
-			UserID:                helpers.ReconcileOptionalStringPointer(u.MapUserID, pu.UserID),
-			Username:              helpers.ReconcileOptionalStringPointer(u.MapUsername, pu.Username),
-			RealName:              helpers.ReconcileOptionalStringPointer(u.MapRealname, pu.RealName),
-			EmailAddress:          helpers.ReconcileOptionalStringPointer(u.MapEmailAddress, pu.EmailAddress),
-			AppendToEmailResults:  helpers.ReconcileOptionalStringPointer(u.AppendToEmailResults, pu.AppendToEmailResults),
-			Department:            helpers.ReconcileOptionalStringPointer(u.MapDepartment, pu.Department),
-			Building:              helpers.ReconcileOptionalStringPointer(u.MapBuilding, pu.Building),
-			Room:                  helpers.ReconcileOptionalStringPointer(u.MapRoom, pu.Room),
-			Phone:                 helpers.ReconcileOptionalStringPointer(u.MapPhone, pu.Phone),
-			Position:              helpers.ReconcileOptionalStringPointer(u.MapPosition, pu.Position),
-			UserUUID:              helpers.ReconcileOptionalStringPointer(u.MapUserUUID, pu.UserUUID),
+			ObjectClassLimitation: helpers.ReconcileOptionalStringPointerTrimmed(u.MapObjectClassToAnyOrAll, pu.ObjectClassLimitation),
+			ObjectClasses:         helpers.ReconcileOptionalStringPointerTrimmed(u.ObjectClasses, pu.ObjectClasses),
+			SearchBase:            helpers.ReconcileOptionalStringPointerTrimmed(u.SearchBase, pu.SearchBase),
+			SearchScope:           helpers.ReconcileOptionalStringPointerTrimmed(u.SearchScope, pu.SearchScope),
+			UserID:                helpers.ReconcileOptionalStringPointerTrimmed(u.MapUserID, pu.UserID),
+			Username:              helpers.ReconcileOptionalStringPointerTrimmed(u.MapUsername, pu.Username),
+			RealName:              helpers.ReconcileOptionalStringPointerTrimmed(u.MapRealname, pu.RealName),
+			EmailAddress:          helpers.ReconcileOptionalStringPointerTrimmed(u.MapEmailAddress, pu.EmailAddress),
+			AppendToEmailResults:  helpers.ReconcileOptionalStringPointerTrimmed(u.AppendToEmailResults, pu.AppendToEmailResults),
+			Department:            helpers.ReconcileOptionalStringPointerTrimmed(u.MapDepartment, pu.Department),
+			Building:              helpers.ReconcileOptionalStringPointerTrimmed(u.MapBuilding, pu.Building),
+			Room:                  helpers.ReconcileOptionalStringPointerTrimmed(u.MapRoom, pu.Room),
+			Phone:                 helpers.ReconcileOptionalStringPointerTrimmed(u.MapPhone, pu.Phone),
+			Position:              helpers.ReconcileOptionalStringPointerTrimmed(u.MapPosition, pu.Position),
+			UserUUID:              helpers.ReconcileOptionalStringPointerTrimmed(u.MapUserUUID, pu.UserUUID),
 		}
 	}
 	if g := m.UserGroupMappings; g != nil {
@@ -213,13 +213,13 @@ func assignMappingsModel(m *proclassic.LdapServerMappingsForUsers, prior *ldapMa
 			pg = &ldapUserGroupMappingsModel{}
 		}
 		out.UserGroupMappings = &ldapUserGroupMappingsModel{
-			ObjectClassLimitation: helpers.ReconcileOptionalStringPointer(g.MapObjectClassToAnyOrAll, pg.ObjectClassLimitation),
-			ObjectClasses:         helpers.ReconcileOptionalStringPointer(g.ObjectClasses, pg.ObjectClasses),
-			SearchBase:            helpers.ReconcileOptionalStringPointer(g.SearchBase, pg.SearchBase),
-			SearchScope:           helpers.ReconcileOptionalStringPointer(g.SearchScope, pg.SearchScope),
-			GroupID:               helpers.ReconcileOptionalStringPointer(g.MapGroupID, pg.GroupID),
-			GroupName:             helpers.ReconcileOptionalStringPointer(g.MapGroupName, pg.GroupName),
-			GroupUUID:             helpers.ReconcileOptionalStringPointer(g.MapGroupUUID, pg.GroupUUID),
+			ObjectClassLimitation: helpers.ReconcileOptionalStringPointerTrimmed(g.MapObjectClassToAnyOrAll, pg.ObjectClassLimitation),
+			ObjectClasses:         helpers.ReconcileOptionalStringPointerTrimmed(g.ObjectClasses, pg.ObjectClasses),
+			SearchBase:            helpers.ReconcileOptionalStringPointerTrimmed(g.SearchBase, pg.SearchBase),
+			SearchScope:           helpers.ReconcileOptionalStringPointerTrimmed(g.SearchScope, pg.SearchScope),
+			GroupID:               helpers.ReconcileOptionalStringPointerTrimmed(g.MapGroupID, pg.GroupID),
+			GroupName:             helpers.ReconcileOptionalStringPointerTrimmed(g.MapGroupName, pg.GroupName),
+			GroupUUID:             helpers.ReconcileOptionalStringPointerTrimmed(g.MapGroupUUID, pg.GroupUUID),
 		}
 	}
 	if b := m.UserGroupMembershipMappings; b != nil {
@@ -228,21 +228,21 @@ func assignMappingsModel(m *proclassic.LdapServerMappingsForUsers, prior *ldapMa
 			pb = &ldapMembershipMappingsModel{}
 		}
 		out.UserGroupMembershipMappings = &ldapMembershipMappingsModel{
-			MembershipLocation:                helpers.ReconcileOptionalStringPointer(b.UserGroupMembershipStoredIn, pb.MembershipLocation),
-			MemberUserMapping:                 helpers.ReconcileOptionalStringPointer(b.MapUserMembershipToGroupField, pb.MemberUserMapping),
-			GroupMembershipMapping:            helpers.ReconcileOptionalStringPointer(b.MapGroupMembershipToUserField, pb.GroupMembershipMapping),
-			AppendToUsername:                  helpers.ReconcileOptionalStringPointer(b.AppendToUsername, pb.AppendToUsername),
+			MembershipLocation:                helpers.ReconcileOptionalStringPointerTrimmed(b.UserGroupMembershipStoredIn, pb.MembershipLocation),
+			MemberUserMapping:                 helpers.ReconcileOptionalStringPointerTrimmed(b.MapUserMembershipToGroupField, pb.MemberUserMapping),
+			GroupMembershipMapping:            helpers.ReconcileOptionalStringPointerTrimmed(b.MapGroupMembershipToUserField, pb.GroupMembershipMapping),
+			AppendToUsername:                  helpers.ReconcileOptionalStringPointerTrimmed(b.AppendToUsername, pb.AppendToUsername),
 			UseDN:                             helpers.BoolPointerValueOrNull(b.UseDn),
 			UseLDAPCompare:                    helpers.BoolPointerValueOrNull(b.UserGroupMembershipUseLdapCompare),
 			RecursiveLookups:                  helpers.BoolPointerValueOrNull(b.RecursiveLookups),
 			MapUserMembershipUseDN:            helpers.BoolPointerValueOrNull(b.MapUserMembershipUseDn),
 			MembershipCalculationOptimization: helpers.BoolPointerValueOrNull(b.MembershipScopingOptimization),
-			ObjectClassLimitation:             helpers.ReconcileOptionalStringPointer(b.MapObjectClassToAnyOrAll, pb.ObjectClassLimitation),
-			ObjectClasses:                     helpers.ReconcileOptionalStringPointer(b.ObjectClasses, pb.ObjectClasses),
-			SearchBase:                        helpers.ReconcileOptionalStringPointer(b.SearchBase, pb.SearchBase),
-			SearchScope:                       helpers.ReconcileOptionalStringPointer(b.SearchScope, pb.SearchScope),
-			UsernameMapping:                   helpers.ReconcileOptionalStringPointer(b.Username, pb.UsernameMapping),
-			GroupIDMapping:                    helpers.ReconcileOptionalStringPointer(b.GroupID, pb.GroupIDMapping),
+			ObjectClassLimitation:             helpers.ReconcileOptionalStringPointerTrimmed(b.MapObjectClassToAnyOrAll, pb.ObjectClassLimitation),
+			ObjectClasses:                     helpers.ReconcileOptionalStringPointerTrimmed(b.ObjectClasses, pb.ObjectClasses),
+			SearchBase:                        helpers.ReconcileOptionalStringPointerTrimmed(b.SearchBase, pb.SearchBase),
+			SearchScope:                       helpers.ReconcileOptionalStringPointerTrimmed(b.SearchScope, pb.SearchScope),
+			UsernameMapping:                   helpers.ReconcileOptionalStringPointerTrimmed(b.Username, pb.UsernameMapping),
+			GroupIDMapping:                    helpers.ReconcileOptionalStringPointerTrimmed(b.GroupID, pb.GroupIDMapping),
 			UseMemberFieldForSelectQueries:    helpers.BoolPointerValueOrNull(b.GroupMembershipEnabledWhenUserMembershipSelected),
 		}
 	}

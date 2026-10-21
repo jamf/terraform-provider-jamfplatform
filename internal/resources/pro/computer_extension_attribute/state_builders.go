@@ -21,6 +21,10 @@ import (
 // reconciled to collapse the empty echo back to null. manage_existing_data is
 // write-only — never returned by Jamf Pro — and is deliberately left untouched
 // so state retains the configured value.
+//
+// The name uses StringValueTrimmed because /v1/computer-extension-attributes saves it with its outer
+// whitespace removed (probed 2026-10-20, issue #510); the description is stored
+// verbatim and assigned from the wire.
 func assignComputerExtensionAttributeResourceModel(ctx context.Context, state *ComputerExtensionAttributeResourceModel, ea *pro.ComputerExtensionAttributes) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if ea == nil {
@@ -28,7 +32,7 @@ func assignComputerExtensionAttributeResourceModel(ctx context.Context, state *C
 	}
 
 	state.ID = helpers.StringPointerValueOrNull(ea.ID)
-	state.Name = types.StringValue(ea.Name)
+	state.Name = helpers.StringValueTrimmed(ea.Name, state.Name)
 	state.Description = helpers.ReconcileOptionalStringPointer(ea.Description, state.Description)
 	state.DataType = types.StringValue(ea.DataType)
 	state.InputType = types.StringValue(ea.InputType)

@@ -75,28 +75,28 @@ func flattenEbookGeneral(g *proclassic.EbookGeneral, state *EbookGeneralModel) {
 		return
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
-	state.URL = helpers.StringPointerValueOrNull(g.URL)
-	state.Author = helpers.ReconcileOptionalStringPointer(g.Author, state.Author)
-	state.DeploymentType = helpers.ReconcileOptionalStringPointer(g.DeploymentType, state.DeploymentType)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
+	state.URL = helpers.StringPointerValueOrNullTrimmed(g.URL, state.URL)
+	state.Author = helpers.ReconcileOptionalStringPointerTrimmed(g.Author, state.Author)
+	state.DeploymentType = helpers.ReconcileOptionalStringPointerTrimmed(g.DeploymentType, state.DeploymentType)
 	state.DeployAsManaged = helpers.StickyIgnoringDriftBool(g.DeployAsManaged, state.DeployAsManaged)
 	state.Free = helpers.BoolPointerValueOrNull(g.Free)
 	state.FileType = helpers.StickyIgnoringDriftString(g.FileType, state.FileType)
-	state.Version = helpers.ReconcileOptionalStringPointer(g.Version, state.Version)
+	state.Version = helpers.ReconcileOptionalStringPointerTrimmed(g.Version, state.Version)
 
 	if g.Category != nil {
-		state.CategoryID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(g.Category.ID), state.CategoryID)
+		state.CategoryID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(g.Category.ID), state.CategoryID)
 		state.CategoryName = helpers.DerivedRefName(g.Category.ID, g.Category.Name)
 	} else {
-		state.CategoryID = helpers.ReconcileOptionalStringPointer(nil, state.CategoryID)
+		state.CategoryID = helpers.ReconcileOptionalStringPointerTrimmed(nil, state.CategoryID)
 		state.CategoryName = types.StringNull()
 	}
 
 	if g.Site != nil {
-		state.SiteID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(g.Site.ID), state.SiteID)
+		state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(g.Site.ID), state.SiteID)
 		state.SiteName = helpers.DerivedRefName(g.Site.ID, g.Site.Name)
 	} else {
-		state.SiteID = helpers.ReconcileOptionalStringPointer(nil, state.SiteID)
+		state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(nil, state.SiteID)
 		state.SiteName = types.StringNull()
 	}
 }
@@ -180,9 +180,9 @@ func flattenEbookScope(ctx context.Context, s *proclassic.EbookScope, state *Ebo
 // from the wire. Wire-probed against Jamf Pro 11.31.1 on 2026-09-06; see issue
 // #387.
 func flattenEbookSelfService(ss *proclassic.EbookSelfService, state *EbookSelfServiceModel) {
-	state.DisplayName = helpers.ReconcileOptionalStringPointer(ss.SelfServiceDisplayName, state.DisplayName)
-	state.InstallButtonText = helpers.ReconcileOptionalStringPointer(ss.InstallButtonText, state.InstallButtonText)
-	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmpty(ss.SelfServiceDescription, state.SelfServiceDescription)
+	state.DisplayName = helpers.ReconcileOptionalStringPointerTrimmed(ss.SelfServiceDisplayName, state.DisplayName)
+	state.InstallButtonText = helpers.ReconcileOptionalStringPointerTrimmed(ss.InstallButtonText, state.InstallButtonText)
+	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmptyTrimmed(ss.SelfServiceDescription, state.SelfServiceDescription)
 	state.ForceUsersToViewDescription = helpers.BoolPointerValueOrNull(ss.ForceUsersToViewDescription)
 	state.FeatureOnMainPage = helpers.BoolPointerValueOrNull(ss.FeatureOnMainPage)
 
@@ -194,14 +194,14 @@ func flattenEbookSelfService(ss *proclassic.EbookSelfService, state *EbookSelfSe
 	}
 	state.NotificationEnabled = helpers.WireWhenPresentBool(apiEnabled, state.NotificationEnabled)
 	state.NotificationMethod = helpers.WireWhenPresentString(apiMethod, state.NotificationMethod)
-	state.NotificationSubject = helpers.WireWhenPresentString(ss.NotificationSubject, state.NotificationSubject)
-	state.NotificationMessage = helpers.WireWhenPresentString(ss.NotificationMessage, state.NotificationMessage)
+	state.NotificationSubject = helpers.WireWhenPresentStringTrimmed(ss.NotificationSubject, state.NotificationSubject)
+	state.NotificationMessage = helpers.WireWhenPresentStringTrimmed(ss.NotificationMessage, state.NotificationMessage)
 
 	if ss.SelfServiceIcon != nil {
-		state.IconID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.IconID)
+		state.IconID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.IconID)
 		state.IconURI = helpers.StringPointerValueOrNull(ss.SelfServiceIcon.URI)
 	} else {
-		state.IconID = helpers.ReconcileOptionalStringPointer(nil, state.IconID)
+		state.IconID = helpers.ReconcileOptionalStringPointerTrimmed(nil, state.IconID)
 		state.IconURI = types.StringNull()
 	}
 

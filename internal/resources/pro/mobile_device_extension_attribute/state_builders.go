@@ -18,6 +18,10 @@ import (
 // after Create/Update. Jamf Pro echoes inapplicable companion fields as empty
 // values ("" / [] / false) rather than null, so user-authored string fields are
 // reconciled to collapse the empty echo back to null.
+//
+// The name uses StringValueTrimmed because /v1/mobile-device-extension-attributes saves it with its outer
+// whitespace removed (probed 2026-10-20, issue #510); the description is stored
+// verbatim and assigned from the wire.
 func assignMobileDeviceExtensionAttributeResourceModel(ctx context.Context, state *MobileDeviceExtensionAttributeResourceModel, ea *pro.MobileDeviceExtensionAttributes) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if ea == nil {
@@ -25,7 +29,7 @@ func assignMobileDeviceExtensionAttributeResourceModel(ctx context.Context, stat
 	}
 
 	state.ID = helpers.StringPointerValueOrNull(ea.ID)
-	state.Name = types.StringValue(ea.Name)
+	state.Name = helpers.StringValueTrimmed(ea.Name, state.Name)
 	state.Description = helpers.ReconcileOptionalStringPointer(ea.Description, state.Description)
 	state.DataType = types.StringValue(ea.DataType)
 	state.InputType = types.StringValue(ea.InputType)

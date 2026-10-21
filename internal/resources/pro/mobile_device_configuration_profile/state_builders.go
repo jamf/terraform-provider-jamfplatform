@@ -66,8 +66,8 @@ func flattenGeneral(g *proclassic.MobileDeviceConfigurationProfileGeneral, state
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.ReconcileOptionalStringPointer(g.Name, state.Name)
-	state.Description = helpers.ReconcileOptionalStringPointer(g.Description, state.Description)
+	state.Name = helpers.ReconcileOptionalStringPointerTrimmed(g.Name, state.Name)
+	state.Description = helpers.ReconcileOptionalStringPointerTrimmed(g.Description, state.Description)
 	// RedeployOnUpdate: the Classic API always returns "Newly Assigned" on read
 	// regardless of what was PUT — write-only on the wire. Preserve the
 	// user-authored value so a plan after `redeploy_on_update = "All"` does
@@ -95,7 +95,7 @@ func flattenGeneral(g *proclassic.MobileDeviceConfigurationProfileGeneral, state
 		}
 	}
 	// Wire element is <deployment_method>; TF attribute is distribution_method (UI-canonical).
-	state.DistributionMethod = helpers.ReconcileOptionalStringPointer(g.DeploymentMethod, state.DistributionMethod)
+	state.DistributionMethod = helpers.ReconcileOptionalStringPointerTrimmed(g.DeploymentMethod, state.DistributionMethod)
 
 	if g.Level != nil {
 		state.Level = types.StringValue(levelFromWireRead(*g.Level))
@@ -364,8 +364,8 @@ func flattenSelfService(ss *proclassic.MobileDeviceConfigurationProfileSelfServi
 	state.FeatureOnMainPage = helpers.ReconcileOptionalBoolPointer(ss.FeatureOnMainPage, state.FeatureOnMainPage)
 
 	if ss.Security != nil {
-		state.RemovalDisallowed = helpers.ReconcileOptionalStringPointer(ss.Security.RemovalDisallowed, state.RemovalDisallowed)
-		state.AuthorizationPassword = helpers.PreserveStringWhenWireEmpty(ss.Security.Password, state.AuthorizationPassword)
+		state.RemovalDisallowed = helpers.ReconcileOptionalStringPointerTrimmed(ss.Security.RemovalDisallowed, state.RemovalDisallowed)
+		state.AuthorizationPassword = helpers.PreserveStringWhenWireEmptyTrimmed(ss.Security.Password, state.AuthorizationPassword)
 	}
 
 	// categories is ownership-gated like every sibling above it. It used not to

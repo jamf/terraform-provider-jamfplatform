@@ -36,6 +36,29 @@ func StringPointerValueOrNull(value *string) types.String {
 	return types.StringValue(*value)
 }
 
+// StringPointerValueOrNullTrimmed is StringPointerValueOrNull for a field whose
+// write reaches an endpoint that saves it with its outer whitespace removed: it
+// keeps current when value is current trimmed (see wireIsTrimmedCurrent), and
+// otherwise behaves exactly as StringPointerValueOrNull. Use it only where that
+// trimming is wire-verified; on any other endpoint it hides drift.
+func StringPointerValueOrNullTrimmed(value *string, current types.String) types.String {
+	if wireIsTrimmedCurrent(value, current) {
+		return current
+	}
+	return StringPointerValueOrNull(value)
+}
+
+// StringValueTrimmed is types.StringValue for a Required string whose write
+// reaches an endpoint that saves it trimmed: it keeps current when value is
+// current trimmed (see wireIsTrimmedCurrent). Same opt-in rule as
+// StringPointerValueOrNullTrimmed.
+func StringValueTrimmed(value string, current types.String) types.String {
+	if wireIsTrimmedCurrent(&value, current) {
+		return current
+	}
+	return types.StringValue(value)
+}
+
 // StringPointerValueOrEmpty unwraps a *string to a Terraform string, returning an
 // empty string (never null) when the pointer is nil. Use for a Required attribute
 // the server may return absent or empty but which must round-trip as a present
@@ -257,6 +280,17 @@ func WireWhenPresentString(wire *string, current types.String) types.String {
 	return current
 }
 
+// WireWhenPresentStringTrimmed is WireWhenPresentString for a field whose
+// write reaches an endpoint that saves it trimmed: it keeps current when wire is
+// current trimmed (see wireIsTrimmedCurrent), and otherwise behaves exactly as
+// WireWhenPresentString. Same opt-in rule as StringPointerValueOrNullTrimmed.
+func WireWhenPresentStringTrimmed(wire *string, current types.String) types.String {
+	if wireIsTrimmedCurrent(wire, current) {
+		return current
+	}
+	return WireWhenPresentString(wire, current)
+}
+
 // WireWhenPresentBool is the bool sibling of WireWhenPresentString and carries
 // the same rationale. There is no empty form for a bool, so only a nil wire
 // pointer counts as absent.
@@ -466,23 +500,71 @@ func PreserveStringWhenWireEmpty(wire *string, current types.String) types.Strin
 	return current
 }
 
-// PreserveStringWhenWireTrimsTrailingSpace is PreserveStringWhenWireEmpty for a
-// field Jamf Pro saves with its trailing whitespace removed. It keeps current
-// when the server value is current with trailing whitespace trimmed, so an
-// authored value ending in a newline (every heredoc does) does not trip
-// "Provider produced inconsistent result after apply"; any other server value
-// wins, as it does in PreserveStringWhenWireEmpty. Interior whitespace,
-// including at the end of a line, is stored as sent and so is compared exactly.
-//
-// Observed at: self_service.self_service_description on the Mac App Store app
-// and mobile device app records, 2026-10-16 (Xcode 497799835 and Jamf Parent
-// 1458797105, whose App Store descriptions end in "\n" and " \n").
-func PreserveStringWhenWireTrimsTrailingSpace(wire *string, current types.String) types.String {
-	if wire != nil && !current.IsNull() && !current.IsUnknown() &&
-		*wire == strings.TrimRightFunc(current.ValueString(), unicode.IsSpace) {
+// ReconcileOptionalStringTrimmed is ReconcileOptionalString for a field whose
+// write reaches an endpoint that saves it trimmed (see wireIsTrimmedCurrent).
+func ReconcileOptionalStringTrimmed(apiValue string, current types.String) types.String {
+	if wireIsTrimmedCurrent(&apiValue, current) {
+		return current
+	}
+	return ReconcileOptionalString(apiValue, current)
+}
+
+// ReconcileOptionalStringPointerTrimmed is ReconcileOptionalStringPointer for a
+// field whose write reaches an endpoint that saves it trimmed (see
+// wireIsTrimmedCurrent).
+func ReconcileOptionalStringPointerTrimmed(apiValue *string, current types.String) types.String {
+	return ReconcileOptionalStringTrimmed(DerefString(apiValue), current)
+}
+
+// PreserveStringWhenWireEmptyTrimmed is PreserveStringWhenWireEmpty for a field
+// whose write reaches an endpoint that saves it trimmed (see
+// wireIsTrimmedCurrent).
+func PreserveStringWhenWireEmptyTrimmed(wire *string, current types.String) types.String {
+	if wireIsTrimmedCurrent(wire, current) {
 		return current
 	}
 	return PreserveStringWhenWireEmpty(wire, current)
+}
+
+// wireIsTrimmedCurrent reports whether wire is current with its outer
+// whitespace removed: trailing alone, or leading and trailing together. It is
+// false when current is not a configured value, and for identical values, which
+// every caller handles on its ordinary path. Interior whitespace is compared
+// exactly.
+//
+// It backs the *Trimmed helpers, which a state builder opts into per field, only
+// where the write is wire-verified to trim. Probed 2026-10-20, POST and PUT:
+//
+//   - Jamf Pro classic (/JSSResource) trims every string field tested, on every
+//     endpoint tested: names, descriptions, notes, Self Service strings, and
+//     URLs, paths and hostnames too (sites, policies, osxconfigurationprofiles,
+//     classes, computergroups, usergroups, networksegments, printers, ibeacons,
+//     ebooks, webhooks, advanced computer and user searches, dock items,
+//     licensed and restricted software, user extension attributes, disk
+//     encryption configurations, directory bindings, patch external sources,
+//     LDAP servers, mobile device enrollment profiles and applications).
+//   - Jamf Pro JSON trims the name on /v1/departments, /v1/distribution-points,
+//     /v1/computer-extension-attributes and /v1/mobile-device-extension-attributes
+//     (descriptions there are verbatim), and stores whitespace verbatim on
+//     categories, buildings, scripts, packages, v3 computer groups, v2 mobile
+//     device groups, advanced mobile device and user content searches, volume
+//     purchasing subscriptions, v2 enrollment customizations, Venafi, v3 computer
+//     and v2 mobile device prestages, app installer deployments, volume
+//     purchasing locations and Automated Device Enrollment instances.
+//
+// Without it, an authored value ending in whitespace (every heredoc ends in
+// "\n"), or a value an object created in the Jamf Pro UI carries into state,
+// such as the profile name "FileVault " and the notification subject derived
+// from it, comes back different after apply: "Provider produced inconsistent
+// result after apply" (issue #510). On an endpoint that stores verbatim it would
+// instead hide an out-of-band edit trimming such a value, which is why it is
+// opt-in rather than built into the plain helpers.
+func wireIsTrimmedCurrent(wire *string, current types.String) bool {
+	if wire == nil || !IsConfiguredValue(current) {
+		return false
+	}
+	c := current.ValueString()
+	return *wire == strings.TrimRightFunc(c, unicode.IsSpace) || *wire == strings.TrimSpace(c)
 }
 
 // gatewayUnroutedBody is the response body the Jamf Platform gateway serves for

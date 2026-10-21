@@ -38,16 +38,16 @@ func assignVPPInvitationResourceModel(ctx context.Context, state *VPPInvitationR
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
 	if g.VppAccount != nil {
 		state.VPPAccountID = helpers.StringValueFromIntPtr(g.VppAccount.ID)
 	}
 	state.DistributionMethod = helpers.StringPointerValueOrNull(g.DistributionMethod)
 	state.AutoRegisterManagedUsers = helpers.BoolPointerValueOrNull(g.AutoRegisterManagedUsers)
-	state.SenderName = helpers.ReconcileOptionalStringPointer(g.SenderName, state.SenderName)
-	state.SenderEmailAddress = helpers.ReconcileOptionalStringPointer(g.SenderEmailAddress, state.SenderEmailAddress)
-	state.Subject = helpers.ReconcileOptionalStringPointer(g.Subject, state.Subject)
-	state.Message = helpers.ReconcileOptionalStringPointer(g.Message, state.Message)
+	state.SenderName = helpers.ReconcileOptionalStringPointerTrimmed(g.SenderName, state.SenderName)
+	state.SenderEmailAddress = helpers.ReconcileOptionalStringPointerTrimmed(g.SenderEmailAddress, state.SenderEmailAddress)
+	state.Subject = helpers.ReconcileOptionalStringPointerTrimmed(g.Subject, state.Subject)
+	state.Message = helpers.ReconcileOptionalStringPointerTrimmed(g.Message, state.Message)
 	state.RequireLogin = helpers.BoolPointerValueOrNull(g.RequireLogin)
 
 	if includeUnmanaged && state.Scope == nil && api.Scope != nil {
@@ -69,7 +69,7 @@ func assignVPPInvitationDataSourceModel(ctx context.Context, state *VPPInvitatio
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
 	if g.VppAccount != nil {
 		state.VPPAccountID = helpers.StringValueFromIntPtr(g.VppAccount.ID)
 	}

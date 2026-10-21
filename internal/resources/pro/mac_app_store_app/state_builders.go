@@ -78,26 +78,26 @@ func flattenMacAppGeneral(g *proclassic.MacApplicationGeneral, state *MacAppGene
 		return
 	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
-	state.Version = helpers.StringPointerValueOrNull(g.Version)
-	state.BundleID = helpers.StringPointerValueOrNull(g.BundleID)
-	state.URL = helpers.StringPointerValueOrNull(g.URL)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
+	state.Version = helpers.StringPointerValueOrNullTrimmed(g.Version, state.Version)
+	state.BundleID = helpers.StringPointerValueOrNullTrimmed(g.BundleID, state.BundleID)
+	state.URL = helpers.StringPointerValueOrNullTrimmed(g.URL, state.URL)
 	state.IsFree = helpers.StickyIgnoringDriftBool(g.IsFree, state.IsFree)
-	state.DeploymentType = helpers.ReconcileOptionalStringPointer(g.DeploymentType, state.DeploymentType)
+	state.DeploymentType = helpers.ReconcileOptionalStringPointerTrimmed(g.DeploymentType, state.DeploymentType)
 
 	if g.Category != nil {
-		state.CategoryID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(g.Category.ID), state.CategoryID)
+		state.CategoryID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(g.Category.ID), state.CategoryID)
 		state.CategoryName = helpers.DerivedRefName(g.Category.ID, g.Category.Name)
 	} else {
-		state.CategoryID = helpers.ReconcileOptionalStringPointer(nil, state.CategoryID)
+		state.CategoryID = helpers.ReconcileOptionalStringPointerTrimmed(nil, state.CategoryID)
 		state.CategoryName = types.StringNull()
 	}
 
 	if g.Site != nil {
-		state.SiteID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(g.Site.ID), state.SiteID)
+		state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(g.Site.ID), state.SiteID)
 		state.SiteName = helpers.DerivedRefName(g.Site.ID, g.Site.Name)
 	} else {
-		state.SiteID = helpers.ReconcileOptionalStringPointer(nil, state.SiteID)
+		state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(nil, state.SiteID)
 		state.SiteName = types.StringNull()
 	}
 }
@@ -175,8 +175,8 @@ func flattenMacAppScope(ctx context.Context, s *proclassic.MacApplicationScope, 
 // from the wire. Wire-probed against Jamf Pro 11.31.1 on 2026-09-06; see issue
 // #387.
 func flattenMacAppSelfService(ss *proclassic.MacApplicationSelfService, state *MacAppSelfServiceModel) {
-	state.InstallButtonText = helpers.ReconcileOptionalStringPointer(ss.InstallButtonText, state.InstallButtonText)
-	state.SelfServiceDescription = helpers.PreserveStringWhenWireTrimsTrailingSpace(ss.SelfServiceDescription, state.SelfServiceDescription)
+	state.InstallButtonText = helpers.ReconcileOptionalStringPointerTrimmed(ss.InstallButtonText, state.InstallButtonText)
+	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmptyTrimmed(ss.SelfServiceDescription, state.SelfServiceDescription)
 	state.ForceUsersToViewDescription = helpers.BoolPointerValueOrNull(ss.ForceUsersToViewDescription)
 	state.FeatureOnMainPage = helpers.BoolPointerValueOrNull(ss.FeatureOnMainPage)
 
@@ -188,11 +188,11 @@ func flattenMacAppSelfService(ss *proclassic.MacApplicationSelfService, state *M
 	}
 	state.NotificationEnabled = helpers.WireWhenPresentBool(apiEnabled, state.NotificationEnabled)
 	state.NotificationMethod = helpers.WireWhenPresentString(apiMethod, state.NotificationMethod)
-	state.NotificationSubject = helpers.WireWhenPresentString(ss.NotificationSubject, state.NotificationSubject)
-	state.NotificationMessage = helpers.WireWhenPresentString(ss.NotificationMessage, state.NotificationMessage)
+	state.NotificationSubject = helpers.WireWhenPresentStringTrimmed(ss.NotificationSubject, state.NotificationSubject)
+	state.NotificationMessage = helpers.WireWhenPresentStringTrimmed(ss.NotificationMessage, state.NotificationMessage)
 
 	if state.SelfServiceIcon != nil && ss.SelfServiceIcon != nil {
-		state.SelfServiceIcon.ID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.SelfServiceIcon.ID)
+		state.SelfServiceIcon.ID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(ss.SelfServiceIcon.ID), state.SelfServiceIcon.ID)
 		state.SelfServiceIcon.URI = helpers.StringPointerValueOrNull(ss.SelfServiceIcon.URI)
 	}
 
@@ -223,7 +223,7 @@ func flattenMacAppSelfServiceCategories(api []proclassic.MacApplicationSelfServi
 
 func flattenMacAppVpp(v *proclassic.MacApplicationVpp, state *MacAppVppModel) {
 	state.AssignVppDeviceBasedLicenses = helpers.BoolPointerValueOrNull(v.AssignVppDeviceBasedLicenses)
-	state.VppAdminAccountID = helpers.ReconcileOptionalStringPointer(helpers.StringFromIntPtr(v.VppAdminAccountID), state.VppAdminAccountID)
+	state.VppAdminAccountID = helpers.ReconcileOptionalStringPointerTrimmed(helpers.StringFromIntPtr(v.VppAdminAccountID), state.VppAdminAccountID)
 	state.TotalVppLicenses = helpers.Int64FromIntPtr(v.TotalVppLicenses)
 	state.RemainingVppLicenses = helpers.Int64FromIntPtr(v.RemainingVppLicenses)
 	state.UsedVppLicenses = helpers.Int64FromIntPtr(v.UsedVppLicenses)

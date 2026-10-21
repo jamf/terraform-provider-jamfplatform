@@ -20,7 +20,7 @@ func assignSiteResourceModel(state *SiteResourceModel, s *proclassic.Site) {
 		state.ID = helpers.StringValueFromIntPtr(s.ID)
 	}
 	if s.Name != nil {
-		state.Name = helpers.StringPointerValueOrNull(s.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(s.Name, state.Name)
 	}
 }
 
@@ -37,6 +37,6 @@ func assignSiteDataSourceModel(state *SiteDataSourceModel, s *proclassic.Site) {
 		state.ID = helpers.StringValueFromIntPtr(s.ID)
 	}
 	if s.Name != nil {
-		state.Name = helpers.StringPointerValueOrNull(s.Name)
+		state.Name = helpers.StringPointerValueOrNullTrimmed(s.Name, state.Name)
 	}
 }

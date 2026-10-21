@@ -607,3 +607,50 @@ func TestFlattenSelfServiceCategories_KeepsThePlannedOrder(t *testing.T) {
 		t.Errorf("with no order the wire order must stand, got %v", got)
 	}
 }
+
+// Issue #510: a profile created in the Jamf Pro UI keeps a trailing space in
+// its self-service strings, import carries them into state, and the first write
+// through the API returns them trimmed. The carried-forward value must survive
+// the post-apply flatten, for every string Jamf trims.
+func TestFlattenSelfService_WireTrimsTrailingSpace(t *testing.T) {
+	state := &SelfServiceModel{
+		SelfServiceDisplayName: types.StringValue("Display "),
+		InstallButtonText:      types.StringValue("Install "),
+		SelfServiceDescription: types.StringValue("Desc\n"),
+		NotificationSubject:    types.StringValue("FileVault "),
+		NotificationMessage:    types.StringValue("Message \n"),
+	}
+	flattenSelfService(&proclassic.OsXConfigurationProfileSelfService{
+		SelfServiceDisplayName: new("Display"),
+		InstallButtonText:      new("Install"),
+		SelfServiceDescription: new("Desc"),
+		NotificationSubject:    new("FileVault"),
+		NotificationMessage:    new("Message"),
+	}, state, false)
+
+	for name, c := range map[string]struct {
+		got  types.String
+		want string
+	}{
+		"self_service_display_name": {state.SelfServiceDisplayName, "Display "},
+		"install_button_text":       {state.InstallButtonText, "Install "},
+		"self_service_description":  {state.SelfServiceDescription, "Desc\n"},
+		"notification_subject":      {state.NotificationSubject, "FileVault "},
+		"notification_message":      {state.NotificationMessage, "Message \n"},
+	} {
+		if !c.got.Equal(types.StringValue(c.want)) {
+			t.Errorf("%s: got %q, want %q", name, c.got.ValueString(), c.want)
+		}
+	}
+
+	flattenSelfService(&proclassic.OsXConfigurationProfileSelfService{
+		SelfServiceDisplayName: new("Edited in Jamf Pro"),
+		NotificationSubject:    new("FileVault (managed)"),
+	}, state, false)
+	if got := state.SelfServiceDisplayName.ValueString(); got != "Edited in Jamf Pro" {
+		t.Errorf("self_service_display_name: a real server edit must win, got %q", got)
+	}
+	if got := state.NotificationSubject.ValueString(); got != "FileVault (managed)" {
+		t.Errorf("notification_subject: a real server edit must win, got %q", got)
+	}
+}

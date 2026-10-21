@@ -37,7 +37,7 @@ func assignVPPAssignmentResourceModel(ctx context.Context, state *VPPAssignmentR
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
 	state.VPPAdminAccountID = intStringOrNull(g.VppAdminAccountID)
 	state.VPPAdminAccountName = helpers.StringPointerValueOrNull(g.VppAdminAccountName)
 
@@ -74,7 +74,7 @@ func assignVPPAssignmentDataSourceModel(ctx context.Context, state *VPPAssignmen
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(g.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
 	state.VPPAdminAccountID = intStringOrNull(g.VppAdminAccountID)
 	state.VPPAdminAccountName = helpers.StringPointerValueOrNull(g.VppAdminAccountName)
 

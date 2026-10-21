@@ -43,11 +43,11 @@ func assignDirectoryBindingResourceModel(state *DirectoryBindingResourceModel, b
 	if b.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(b.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(b.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(b.Name, state.Name)
 	state.Type = helpers.StringPointerValueOrNull(b.Type)
-	state.Domain = helpers.ReconcileOptionalStringPointer(b.Domain, state.Domain)
-	state.Username = helpers.ReconcileOptionalStringPointer(b.Username, state.Username)
-	state.ComputerOU = helpers.ReconcileOptionalStringPointer(b.ComputerOu, state.ComputerOU)
+	state.Domain = helpers.ReconcileOptionalStringPointerTrimmed(b.Domain, state.Domain)
+	state.Username = helpers.ReconcileOptionalStringPointerTrimmed(b.Username, state.Username)
+	state.ComputerOU = helpers.ReconcileOptionalStringPointerTrimmed(b.ComputerOu, state.ComputerOU)
 	state.Priority = helpers.Int64FromIntPtr(b.Priority)
 
 	state.ActiveDirectory = assignActiveDirectoryModel(b.ActiveDirectory, state.ActiveDirectory)
@@ -70,7 +70,7 @@ func assignDirectoryBindingDataSourceModel(state *DirectoryBindingDataSourceMode
 	if b.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(b.ID)
 	}
-	state.Name = helpers.StringPointerValueOrNull(b.Name)
+	state.Name = helpers.StringPointerValueOrNullTrimmed(b.Name, state.Name)
 	state.Type = helpers.StringPointerValueOrNull(b.Type)
 	state.Domain = helpers.StringPointerValueOrNull(b.Domain)
 	state.Username = helpers.StringPointerValueOrNull(b.Username)
@@ -102,19 +102,19 @@ func assignActiveDirectoryModel(a *proclassic.DirectoryBindingActiveDirectory, p
 		prior = &directoryBindingActiveDirectoryModel{}
 	}
 	return &directoryBindingActiveDirectoryModel{
-		Forest:                  helpers.ReconcileOptionalStringPointer(a.Forest, prior.Forest),
+		Forest:                  helpers.ReconcileOptionalStringPointerTrimmed(a.Forest, prior.Forest),
 		CreateMobileAccount:     helpers.BoolPointerValueOrNull(a.CacheLastUser),
 		RequireConfirmation:     helpers.BoolPointerValueOrNull(a.RequireConfirmation),
 		ForceLocalHomeDirectory: helpers.BoolPointerValueOrNull(a.LocalHome),
 		UseUncPath:              helpers.BoolPointerValueOrNull(a.UseUncPath),
-		NetworkProtocol:         helpers.ReconcileOptionalStringPointer(a.MountStyle, prior.NetworkProtocol),
-		DefaultShell:            helpers.ReconcileOptionalStringPointer(a.DefaultShell, prior.DefaultShell),
-		UIDAttributeMapping:     helpers.ReconcileOptionalStringPointer(a.Uid, prior.UIDAttributeMapping),
-		UserGIDAttributeMapping: helpers.ReconcileOptionalStringPointer(a.UserGid, prior.UserGIDAttributeMapping),
-		GIDAttributeMapping:     helpers.ReconcileOptionalStringPointer(a.Gid, prior.GIDAttributeMapping),
+		NetworkProtocol:         helpers.ReconcileOptionalStringPointerTrimmed(a.MountStyle, prior.NetworkProtocol),
+		DefaultShell:            helpers.ReconcileOptionalStringPointerTrimmed(a.DefaultShell, prior.DefaultShell),
+		UIDAttributeMapping:     helpers.ReconcileOptionalStringPointerTrimmed(a.Uid, prior.UIDAttributeMapping),
+		UserGIDAttributeMapping: helpers.ReconcileOptionalStringPointerTrimmed(a.UserGid, prior.UserGIDAttributeMapping),
+		GIDAttributeMapping:     helpers.ReconcileOptionalStringPointerTrimmed(a.Gid, prior.GIDAttributeMapping),
 		MultipleDomains:         helpers.BoolPointerValueOrNull(a.MultipleDomains),
-		PreferredDomain:         helpers.ReconcileOptionalStringPointer(a.PreferredDomain, prior.PreferredDomain),
-		AdminGroups:             helpers.ReconcileOptionalStringPointer(a.AdminGroups, prior.AdminGroups),
+		PreferredDomain:         helpers.ReconcileOptionalStringPointerTrimmed(a.PreferredDomain, prior.PreferredDomain),
+		AdminGroups:             helpers.ReconcileOptionalStringPointerTrimmed(a.AdminGroups, prior.AdminGroups),
 	}
 }
 
@@ -142,21 +142,21 @@ func assignAdmitmacModel(a *proclassic.DirectoryBindingAdmitmac, prior *director
 	}
 	return &directoryBindingAdmitmacModel{
 		RequireConfirmation:     helpers.BoolPointerValueOrNull(a.RequireConfirmation),
-		HomeLocation:            helpers.ReconcileOptionalStringPointer(a.LocalHome, prior.HomeLocation),
-		NetworkProtocol:         helpers.ReconcileOptionalStringPointer(a.MountStyle, prior.NetworkProtocol),
-		DefaultShell:            helpers.ReconcileOptionalStringPointer(a.DefaultShell, prior.DefaultShell),
+		HomeLocation:            helpers.ReconcileOptionalStringPointerTrimmed(a.LocalHome, prior.HomeLocation),
+		NetworkProtocol:         helpers.ReconcileOptionalStringPointerTrimmed(a.MountStyle, prior.NetworkProtocol),
+		DefaultShell:            helpers.ReconcileOptionalStringPointerTrimmed(a.DefaultShell, prior.DefaultShell),
 		MountNetworkHome:        helpers.BoolPointerValueOrNull(a.MountNetworkHome),
-		PlaceHomeFolders:        helpers.ReconcileOptionalStringPointer(a.PlaceHomeFolders, prior.PlaceHomeFolders),
-		UIDAttributeMapping:     helpers.ReconcileOptionalStringPointer(a.Uid, prior.UIDAttributeMapping),
-		UserGIDAttributeMapping: helpers.ReconcileOptionalStringPointer(a.UserGid, prior.UserGIDAttributeMapping),
-		GIDAttributeMapping:     helpers.ReconcileOptionalStringPointer(a.Gid, prior.GIDAttributeMapping),
-		AdminGroup:              helpers.ReconcileOptionalStringPointer(a.AdminGroup, prior.AdminGroup),
+		PlaceHomeFolders:        helpers.ReconcileOptionalStringPointerTrimmed(a.PlaceHomeFolders, prior.PlaceHomeFolders),
+		UIDAttributeMapping:     helpers.ReconcileOptionalStringPointerTrimmed(a.Uid, prior.UIDAttributeMapping),
+		UserGIDAttributeMapping: helpers.ReconcileOptionalStringPointerTrimmed(a.UserGid, prior.UserGIDAttributeMapping),
+		GIDAttributeMapping:     helpers.ReconcileOptionalStringPointerTrimmed(a.Gid, prior.GIDAttributeMapping),
+		AdminGroup:              helpers.ReconcileOptionalStringPointerTrimmed(a.AdminGroup, prior.AdminGroup),
 		CachedCredentials:       helpers.Int64FromIntPtr(a.CachedCredentials),
 		AddUserToLocal:          helpers.BoolPointerValueOrNull(a.AddUserToLocal),
-		UsersOU:                 helpers.ReconcileOptionalStringPointer(a.UsersOu, prior.UsersOU),
-		GroupsOU:                helpers.ReconcileOptionalStringPointer(a.GroupsOu, prior.GroupsOU),
-		PrintersOU:              helpers.ReconcileOptionalStringPointer(a.PrintersOu, prior.PrintersOU),
-		SharedFoldersOU:         helpers.ReconcileOptionalStringPointer(a.SharedFoldersOu, prior.SharedFoldersOU),
+		UsersOU:                 helpers.ReconcileOptionalStringPointerTrimmed(a.UsersOu, prior.UsersOU),
+		GroupsOU:                helpers.ReconcileOptionalStringPointerTrimmed(a.GroupsOu, prior.GroupsOU),
+		PrintersOU:              helpers.ReconcileOptionalStringPointerTrimmed(a.PrintersOu, prior.PrintersOU),
+		SharedFoldersOU:         helpers.ReconcileOptionalStringPointerTrimmed(a.SharedFoldersOu, prior.SharedFoldersOU),
 	}
 }
 
@@ -173,7 +173,7 @@ func assignCentrifyModel(c *proclassic.DirectoryBindingCentrify, prior *director
 		WorkstationMode:       helpers.BoolPointerValueOrNull(c.WorkstationMode),
 		OverwriteExisting:     helpers.BoolPointerValueOrNull(c.OverwriteExisting),
 		UpdatePAM:             helpers.BoolPointerValueOrNull(c.UpdatePAM),
-		Zone:                  helpers.ReconcileOptionalStringPointer(c.Zone, prior.Zone),
-		PreferredDomainServer: helpers.ReconcileOptionalStringPointer(c.PreferredDomainServer, prior.PreferredDomainServer),
+		Zone:                  helpers.ReconcileOptionalStringPointerTrimmed(c.Zone, prior.Zone),
+		PreferredDomainServer: helpers.ReconcileOptionalStringPointerTrimmed(c.PreferredDomainServer, prior.PreferredDomainServer),
 	}
 }

@@ -68,8 +68,8 @@ func flattenGeneral(g *proclassic.OsXConfigurationProfileGeneral, state *General
 	if g.ID != nil {
 		state.ID = helpers.StringValueFromIntPtr(g.ID)
 	}
-	state.Name = helpers.ReconcileOptionalStringPointer(g.Name, state.Name)
-	state.Description = helpers.ReconcileOptionalStringPointer(g.Description, state.Description)
+	state.Name = helpers.ReconcileOptionalStringPointerTrimmed(g.Name, state.Name)
+	state.Description = helpers.ReconcileOptionalStringPointerTrimmed(g.Description, state.Description)
 	state.UserRemovable = helpers.ReconcileOptionalBoolPointer(g.UserRemovable, state.UserRemovable)
 	// RedeployOnUpdate: the Classic API always returns "Newly Assigned" on
 	// read regardless of what was sent on Update — the field is effectively
@@ -106,7 +106,7 @@ func flattenGeneral(g *proclassic.OsXConfigurationProfileGeneral, state *General
 			state.Payloads = types.StringValue(string(plisthelpers.CanonicalisePlistXML([]byte(server))))
 		}
 	}
-	state.DistributionMethod = helpers.ReconcileOptionalStringPointer(g.DistributionMethod, state.DistributionMethod)
+	state.DistributionMethod = helpers.ReconcileOptionalStringPointerTrimmed(g.DistributionMethod, state.DistributionMethod)
 
 	// Level wire-read translation. The wire returns System for Computer Level
 	// and User for User Level — translate back to the UI-canonical strings.
@@ -370,21 +370,21 @@ func flattenSelfService(ss *proclassic.OsXConfigurationProfileSelfService, state
 	if ss == nil {
 		return
 	}
-	state.SelfServiceDisplayName = helpers.ReconcileOptionalStringPointer(ss.SelfServiceDisplayName, state.SelfServiceDisplayName)
-	state.InstallButtonText = helpers.ReconcileOptionalStringPointer(ss.InstallButtonText, state.InstallButtonText)
-	state.SelfServiceDescription = helpers.ReconcileOptionalStringPointer(ss.SelfServiceDescription, state.SelfServiceDescription)
+	state.SelfServiceDisplayName = helpers.ReconcileOptionalStringPointerTrimmed(ss.SelfServiceDisplayName, state.SelfServiceDisplayName)
+	state.InstallButtonText = helpers.ReconcileOptionalStringPointerTrimmed(ss.InstallButtonText, state.InstallButtonText)
+	state.SelfServiceDescription = helpers.ReconcileOptionalStringPointerTrimmed(ss.SelfServiceDescription, state.SelfServiceDescription)
 	state.EnsureUsersViewDescription = helpers.ReconcileOptionalBoolPointer(ss.ForceUsersToViewDescription, state.EnsureUsersViewDescription)
 	state.FeatureOnMainPage = helpers.ReconcileOptionalBoolPointer(ss.FeatureOnMainPage, state.FeatureOnMainPage)
-	state.NotificationSubject = helpers.PreserveStringWhenWireEmpty(ss.NotificationSubject, state.NotificationSubject)
-	state.NotificationMessage = helpers.PreserveStringWhenWireEmpty(ss.NotificationMessage, state.NotificationMessage)
+	state.NotificationSubject = helpers.PreserveStringWhenWireEmptyTrimmed(ss.NotificationSubject, state.NotificationSubject)
+	state.NotificationMessage = helpers.PreserveStringWhenWireEmptyTrimmed(ss.NotificationMessage, state.NotificationMessage)
 
 	if ss.Notification != nil {
 		state.DisplayNotifications = helpers.ReconcileOptionalBoolPointer(ss.Notification.Enabled, state.DisplayNotifications)
-		state.NotificationLocation = helpers.ReconcileOptionalStringPointer(ss.Notification.Method, state.NotificationLocation)
+		state.NotificationLocation = helpers.ReconcileOptionalStringPointerTrimmed(ss.Notification.Method, state.NotificationLocation)
 	}
 
 	if ss.Security != nil {
-		state.RemovalDisallowed = helpers.ReconcileOptionalStringPointer(ss.Security.RemovalDisallowed, state.RemovalDisallowed)
+		state.RemovalDisallowed = helpers.ReconcileOptionalStringPointerTrimmed(ss.Security.RemovalDisallowed, state.RemovalDisallowed)
 	}
 
 	// categories is ownership-gated like every sibling above it. It used not to
