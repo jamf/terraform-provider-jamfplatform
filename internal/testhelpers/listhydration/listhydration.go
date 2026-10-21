@@ -16,6 +16,7 @@ import (
 	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 var xmlNameType = reflect.TypeOf(xml.Name{})
@@ -124,12 +125,8 @@ func walk(v reflect.Value, path string, skip map[string]bool, out *[]string) {
 }
 
 func isCollection(v attr.Value) bool {
-	switch v.Type(nil).String() {
-	case "types.StringType", "types.BoolType", "types.Int64Type", "types.Int32Type", "types.Float64Type", "types.NumberType":
-		return false
-	}
-	switch reflect.TypeOf(v).String() {
-	case "basetypes.SetValue", "basetypes.ListValue", "basetypes.MapValue", "basetypes.ObjectValue":
+	switch v.(type) {
+	case basetypes.SetValue, basetypes.ListValue, basetypes.MapValue, basetypes.ObjectValue:
 		return true
 	}
 	return false
