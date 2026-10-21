@@ -287,6 +287,19 @@ hydrated object (`include_resource = true`) that name the specific attribute whi
 back empty. And the step needs the object to **exist on the estate**, so it cannot be a generic
 sweep over every construct: it is applied per resource, to the state that actually broke.
 
+**List-path hydration guard (no estate needed).** Every package whose list resource flattens through
+an `assign*Model` function carries a `list_hydration_test.go`. It fills the SDK wire type with
+`internal/testhelpers/listhydration.Fill` (every scalar set, every pointer allocated, every slice
+one element), flattens it into an **empty** model exactly as the list resource does, and fails on
+`listhydration.NilBlocks` — any nested block or collection left null. That is the shape of #520: a
+flattener that fills a container only when state already holds one returns null on the list path,
+and `-generate-config-out` drops the value without a diagnostic. A new list resource adds the same
+test; where a block is legitimately null for the fixture (a popup-only field, say), set the
+discriminating wire field in the test rather than allow-listing the path. Not covered: constructs
+whose list state is built by something other than a single `assign*` call (`cloud_identity_provider`,
+`patch_software_title`, the prestage enrollments, `enrollment_customization`) — those take the
+`querycheck` route above.
+
 Prefer fixing the resource over passing `ExpectNonEmptyPlan` — a non-empty plan here is the defect
 the step exists to report.
 
