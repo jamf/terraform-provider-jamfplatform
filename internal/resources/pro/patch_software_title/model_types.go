@@ -26,6 +26,7 @@ type PatchSoftwareTitleResourceModel struct {
 	ID                        types.String           `tfsdk:"id"`
 	Name                      types.String           `tfsdk:"name"`
 	NameID                    types.String           `tfsdk:"name_id"`
+	SoftwareTitleName         types.String           `tfsdk:"software_title_name"`
 	SourceID                  types.Int64            `tfsdk:"source_id"`
 	CategoryID                types.String           `tfsdk:"category_id"`
 	SiteID                    types.String           `tfsdk:"site_id"`
@@ -77,6 +78,7 @@ type PatchSoftwareTitleDataSourceModel struct {
 	ID                types.String             `tfsdk:"id"`
 	Name              types.String             `tfsdk:"name"`
 	NameID            types.String             `tfsdk:"name_id"`
+	SoftwareTitleName types.String             `tfsdk:"software_title_name"`
 	SourceID          types.Int64              `tfsdk:"source_id"`
 	CategoryID        types.String             `tfsdk:"category_id"`
 	SiteID            types.String             `tfsdk:"site_id"`
@@ -84,6 +86,7 @@ type PatchSoftwareTitleDataSourceModel struct {
 	EmailNotification types.Bool               `tfsdk:"email_notification"`
 	VersionPackages   types.Map                `tfsdk:"version_packages"`
 	AvailableVersions types.List               `tfsdk:"available_versions"`
+	KillApps          types.List               `tfsdk:"kill_apps"`
 	Timeouts          datasourceTimeouts.Value `tfsdk:"timeouts"`
 }
 

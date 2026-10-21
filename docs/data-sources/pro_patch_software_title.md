@@ -63,8 +63,10 @@ output "patch_software_title_version_packages" {
 - `available_versions` (List of String) All software_version strings the patch source publishes for this title.
 - `category_id` (String) Jamf Pro category ID.
 - `email_notification` (Boolean) Whether Jamf Pro sends an email notification for new versions.
+- `kill_apps` (List of String) Apps a patch policy quits before installing this title, across all versions. Process names that can change when the patch source updates; they do not match bundle names.
 - `name_id` (String) Patch catalog key that defines the title.
 - `site_id` (String) Jamf Pro site ID.
+- `software_title_name` (String) Name the patch source's catalog gives this title, such as `Audacity 4`. A smart group criterion named `Patch Reporting: <title>` matches this value, not `name`.
 - `source_id` (Number) Patch source ID this title is sourced from. Jamf Pro reports the source by name here, so the provider matches that name against the tenant's internal and external patch sources: the value is null, with a warning, when the name matches none of them, matches both an internal and an external source, or those sources cannot be read.
 - `version_packages` (Map of String) Every version→package assignment on the title (software_version → package ID).
 - `web_notification` (Boolean) Whether a Jamf Pro notification is raised for new versions.

@@ -5,11 +5,14 @@ package patch_software_title
 
 import (
 	"context"
+	"slices"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
 // assignPatchSoftwareTitleResourceModel populates a resource model from a v3
@@ -39,6 +42,7 @@ func assignPatchSoftwareTitleResourceModel(ctx context.Context, state *PatchSoft
 	if s.SoftwareTitleNameID != "" {
 		state.NameID = types.StringValue(s.SoftwareTitleNameID)
 	}
+	state.SoftwareTitleName = helpers.StringValueOrNull(s.SoftwareTitleName)
 
 	state.CategoryID = refIDValue(s.CategoryID)
 	state.SiteID = refIDValue(s.SiteID)
@@ -67,7 +71,7 @@ func assignPatchSoftwareTitleResourceModel(ctx context.Context, state *PatchSoft
 // every assignment the configuration reports (no managed-subset gating — there
 // is no prior state to scope against). sourceID is resolved by the caller from
 // the configuration's patch source name.
-func assignPatchSoftwareTitleDataSourceModel(ctx context.Context, state *PatchSoftwareTitleDataSourceModel, s *pro.PatchSoftwareTitleConfiguration, availableVersions []string, sourceID types.Int64) diag.Diagnostics {
+func assignPatchSoftwareTitleDataSourceModel(ctx context.Context, state *PatchSoftwareTitleDataSourceModel, s *pro.PatchSoftwareTitleConfiguration, availableVersions, killApps []string, sourceID types.Int64) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if s == nil {
 		return diags
@@ -75,6 +79,7 @@ func assignPatchSoftwareTitleDataSourceModel(ctx context.Context, state *PatchSo
 	state.ID = types.StringValue(s.ID)
 	state.Name = types.StringValue(s.DisplayName)
 	state.NameID = types.StringValue(s.SoftwareTitleNameID)
+	state.SoftwareTitleName = helpers.StringValueOrNull(s.SoftwareTitleName)
 	state.SourceID = sourceID
 
 	state.CategoryID = refIDValue(s.CategoryID)
@@ -88,6 +93,13 @@ func assignPatchSoftwareTitleDataSourceModel(ctx context.Context, state *PatchSo
 		return diags
 	}
 	state.AvailableVersions = availList
+
+	killList, d := types.ListValueFrom(ctx, types.StringType, orEmpty(killApps))
+	diags.Append(d...)
+	if diags.HasError() {
+		return diags
+	}
+	state.KillApps = killList
 
 	vpMap, d := types.MapValueFrom(ctx, types.StringType, assignedPackagesByVersion(s.Packages))
 	diags.Append(d...)
@@ -127,6 +139,28 @@ func definitionVersions(defs []pro.PatchSoftwareTitleDefinition) []string {
 			out = append(out, defs[i].Version)
 		}
 	}
+	return out
+}
+
+// definitionKillApps returns the sorted, de-duplicated set of app names the
+// patch source lists as quit-before-install across every version of the title.
+// The catalog repeats the same names on most versions, and an older version can
+// name an app a newer one no longer does, so the union is the stable answer and
+// the per-version order carries no meaning.
+func definitionKillApps(defs []pro.PatchSoftwareTitleDefinition) []string {
+	seen := map[string]struct{}{}
+	for i := range defs {
+		for _, k := range defs[i].KillApps {
+			if k.AppName != "" {
+				seen[k.AppName] = struct{}{}
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for name := range seen {
+		out = append(out, name)
+	}
+	slices.Sort(out)
 	return out
 }
 

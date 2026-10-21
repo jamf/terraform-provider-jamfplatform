@@ -59,3 +59,19 @@ resource "jamfplatform_pro_patch_software_title" "adobe_air" {
 output "adobe_air_extension_attributes" {
   value = jamfplatform_pro_patch_software_title.adobe_air.extension_attributes
 }
+
+# A smart group criterion named "Patch Reporting: <title>" matches the catalog
+# name in software_title_name, not the name label. Referencing it also makes
+# Terraform create the title before the group.
+resource "jamfplatform_pro_smart_computer_group" "eight_by_eight_outdated" {
+  name = "8x8 Work out of date"
+  criteria = [
+    {
+      priority    = 0
+      name        = "Patch Reporting: ${jamfplatform_pro_patch_software_title.eight_by_eight.software_title_name}"
+      search_type = "less than"
+      value       = "Latest Version"
+      and_or      = "and"
+    },
+  ]
+}

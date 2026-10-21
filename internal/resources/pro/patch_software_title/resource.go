@@ -127,6 +127,13 @@ func (r *PatchSoftwareTitleResource) Schema(ctx context.Context, req resource.Sc
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"software_title_name": schema.StringAttribute{
+				MarkdownDescription: "Name the patch source's catalog gives this title, such as `Audacity 4`. Read-only. A smart group criterion named `Patch Reporting: <title>` matches this value, not `name`.",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseNonNullStateForUnknown(),
+				},
+			},
 			"source_id": schema.Int64Attribute{
 				MarkdownDescription: "Patch source ID this title is sourced from. Immutable: changing it forces replacement.",
 				Required:            true,

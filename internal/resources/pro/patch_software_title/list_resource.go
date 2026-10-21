@@ -206,6 +206,7 @@ func (r *PatchSoftwareTitleListResource) List(ctx context.Context, req list.List
 				ID:                        id,
 				Name:                      types.StringValue(s.DisplayName),
 				NameID:                    types.StringValue(s.SoftwareTitleNameID),
+				SoftwareTitleName:         helpers.StringValueOrNull(s.SoftwareTitleName),
 				SourceID:                  sourceID,
 				CategoryID:                refIDValue(s.CategoryID),
 				SiteID:                    refIDValue(s.SiteID),

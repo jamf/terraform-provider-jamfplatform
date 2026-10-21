@@ -62,7 +62,7 @@ func TestPatchSoftwareTitleResource_Schema(t *testing.T) {
 	}
 
 	s := resp.Schema
-	want := []string{"id", "name", "name_id", "source_id", "category_id", "site_id", "web_notification", "email_notification", "version_packages", "available_versions", "accept_extension_attributes", "extension_attributes", "timeouts"}
+	want := []string{"id", "name", "name_id", "software_title_name", "source_id", "category_id", "site_id", "web_notification", "email_notification", "version_packages", "available_versions", "accept_extension_attributes", "extension_attributes", "timeouts"}
 	for _, name := range want {
 		if _, ok := s.Attributes[name]; !ok {
 			t.Errorf("missing attribute %q", name)
@@ -90,7 +90,7 @@ func TestPatchSoftwareTitleResource_Schema(t *testing.T) {
 		}
 	}
 
-	for _, c := range []string{"available_versions", "extension_attributes"} {
+	for _, c := range []string{"software_title_name", "available_versions", "extension_attributes"} {
 		a := s.Attributes[c]
 		if a.IsOptional() || a.IsRequired() || !a.IsComputed() {
 			t.Errorf("%q must be computed-only, got optional=%v required=%v computed=%v", c, a.IsOptional(), a.IsRequired(), a.IsComputed())
@@ -167,7 +167,7 @@ func TestPatchSoftwareTitleDataSource_Schema(t *testing.T) {
 		}
 	}
 
-	for _, c := range []string{"name_id", "source_id", "category_id", "site_id", "web_notification", "email_notification", "version_packages", "available_versions"} {
+	for _, c := range []string{"name_id", "software_title_name", "source_id", "category_id", "site_id", "web_notification", "email_notification", "version_packages", "available_versions", "kill_apps"} {
 		a, ok := s.Attributes[c]
 		if !ok {
 			t.Errorf("missing attribute %q", c)

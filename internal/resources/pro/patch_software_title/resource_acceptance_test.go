@@ -38,11 +38,12 @@ import (
 )
 
 const (
-	accTitleNameID     = "285" // 8x8 Work
-	accTitleSourceID   = 1
-	accTitleVersion    = "8.33.2.2"
-	accTitleVersionAlt = "8.32.2.10"
-	patchSoftwareType  = "jamfplatform_pro_patch_software_title"
+	accTitleNameID      = "285" // 8x8 Work
+	accTitleCatalogName = "8x8 Work"
+	accTitleSourceID    = 1
+	accTitleVersion     = "8.33.2.2"
+	accTitleVersionAlt  = "8.32.2.10"
+	patchSoftwareType   = "jamfplatform_pro_patch_software_title"
 )
 
 // testAccCheckPatchSoftwareTitleDestroy verifies titles created during the test
@@ -210,6 +211,7 @@ func TestAccResource_ProPatchSoftwareTitle_Basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet(patchSoftwareType+".test", "id"),
 					resource.TestCheckResourceAttr(patchSoftwareType+".test", "name_id", accTitleNameID),
+					resource.TestCheckResourceAttr(patchSoftwareType+".test", "software_title_name", accTitleCatalogName),
 					resource.TestCheckResourceAttr(patchSoftwareType+".test", "source_id", "1"),
 					// Server defaults. v3 reports an unassigned category or site as
 					// the literal "-1", the only non-positive id it accepts on a
@@ -616,11 +618,70 @@ func TestAccDataSource_ProPatchSoftwareTitle_ByIDAndName(t *testing.T) {
 					resource.TestCheckResourceAttrPair("data.jamfplatform_pro_patch_software_title.by_id", "name_id", "jamfplatform_pro_patch_software_title.src", "name_id"),
 					resource.TestCheckResourceAttr("data.jamfplatform_pro_patch_software_title.by_id", "name_id", accTitleNameID),
 					resource.TestCheckResourceAttr("data.jamfplatform_pro_patch_software_title.by_id", "name", name),
+					resource.TestCheckResourceAttr("data.jamfplatform_pro_patch_software_title.by_id", "software_title_name", accTitleCatalogName),
+					resource.TestCheckResourceAttrSet("data.jamfplatform_pro_patch_software_title.by_id", "kill_apps.#"),
 					resource.TestCheckResourceAttrSet("data.jamfplatform_pro_patch_software_title.by_id", "available_versions.#"),
 
 					resource.TestCheckResourceAttrPair("data.jamfplatform_pro_patch_software_title.by_name", "id", "jamfplatform_pro_patch_software_title.src", "id"),
 					resource.TestCheckResourceAttr("data.jamfplatform_pro_patch_software_title.by_name", "name_id", accTitleNameID),
 					resource.TestCheckResourceAttrSet("data.jamfplatform_pro_patch_software_title.by_name", "available_versions.#"),
+				),
+			},
+		},
+	})
+}
+
+// TestAccResource_ProPatchSoftwareTitle_SoftwareTitleNameDrivesCriterion builds a
+// smart group's "Patch Reporting: <title>" criterion from software_title_name on
+// a title whose display name differs from its catalog name, then renames the
+// display name. Jamf Pro matches the criterion against the catalog name, so the
+// group must apply on a first run with no ordering hint and survive the rename,
+// and software_title_name must not move.
+func TestAccResource_ProPatchSoftwareTitle_SoftwareTitleNameDrivesCriterion(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	groupName := "tf-acc-pst-criterion-" + suffix
+
+	config := func(displayName, groupName string) string {
+		return fmt.Sprintf(`
+			resource "jamfplatform_pro_patch_software_title" "test" {
+				name      = %q
+				name_id   = %q
+				source_id = %d
+			}
+
+			resource "jamfplatform_pro_smart_computer_group" "test" {
+				name = %q
+				criteria = [
+					{
+						priority    = 0
+						name        = "Patch Reporting: ${jamfplatform_pro_patch_software_title.test.software_title_name}"
+						search_type = "less than"
+						value       = "Latest Version"
+						and_or      = "and"
+					},
+				]
+			}
+		`, displayName, accTitleNameID, accTitleSourceID, groupName)
+	}
+	wantCriterion := "Patch Reporting: " + accTitleCatalogName
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckPatchSoftwareTitleDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: config("tf-acc Team Chat "+suffix, groupName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(patchSoftwareType+".test", "software_title_name", accTitleCatalogName),
+					resource.TestCheckResourceAttr("jamfplatform_pro_smart_computer_group.test", "criteria.0.name", wantCriterion),
+				),
+			},
+			{
+				Config: config("tf-acc Team Chat renamed "+suffix, groupName+"-renamed"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(patchSoftwareType+".test", "software_title_name", accTitleCatalogName),
+					resource.TestCheckResourceAttr("jamfplatform_pro_smart_computer_group.test", "criteria.0.name", wantCriterion),
 				),
 			},
 		},
