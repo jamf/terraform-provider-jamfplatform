@@ -199,7 +199,7 @@ func TestFlattenEbookSelfService_CategoriesPreserveAuthoredValuesByID(t *testing
 			{ID: types.StringValue("3"), DisplayIn: types.BoolValue(true), FeatureIn: types.BoolValue(false)},
 		},
 	}
-	flattenEbookSelfService(ss, state)
+	flattenEbookSelfService(ss, state, false)
 
 	if state.NotificationEnabled.IsNull() || !state.NotificationEnabled.ValueBool() {
 		t.Errorf("notification_enabled not flattened")
@@ -276,5 +276,25 @@ func TestExtractEbookID_PrefersTopLevel(t *testing.T) {
 	e = &proclassic.Ebook{General: &proclassic.EbookGeneral{ID: new(9)}}
 	if got := extractEbookID(e); got != "9" {
 		t.Errorf("want general id 9 fallback, got %q", got)
+	}
+}
+
+// TestFlattenEbookSelfService_ListHydratesCategories pins the list-path half
+// of issue #520: with empty state, includeUnmanaged must allocate categories.
+func TestFlattenEbookSelfService_ListHydratesCategories(t *testing.T) {
+	wire := &proclassic.EbookSelfService{
+		SelfServiceCategories: &proclassic.EbookSelfServiceSelfServiceCategories{
+			Category: &[]proclassic.EbookSelfServiceSelfServiceCategoriesCategoryItem{{ID: new(7), Name: new("Utilities")}},
+		},
+	}
+	state := &EbookSelfServiceModel{}
+	flattenEbookSelfService(wire, state, true)
+	if len(state.Categories) != 1 || state.Categories[0].ID.ValueString() != "7" {
+		t.Errorf("categories not hydrated: %+v", state.Categories)
+	}
+	managed := &EbookSelfServiceModel{}
+	flattenEbookSelfService(wire, managed, false)
+	if managed.Categories != nil {
+		t.Error("managed read must not populate unconfigured categories")
 	}
 }

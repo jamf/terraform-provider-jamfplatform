@@ -85,7 +85,7 @@ func TestFlattenEbook_StickyFieldsIgnoreDrift(t *testing.T) {
 		NotificationSubject: types.StringValue("state subject"),
 		NotificationMessage: types.StringValue("state message"),
 	}
-	flattenEbookSelfService(&proclassic.EbookSelfService{}, ss)
+	flattenEbookSelfService(&proclassic.EbookSelfService{}, ss, false)
 	for _, tc := range []struct{ name, want, got string }{
 		{"notification_method", "Self Service", ss.NotificationMethod.ValueString()},
 		{"notification_subject", "state subject", ss.NotificationSubject.ValueString()},
@@ -116,7 +116,7 @@ func TestFlattenEbookSelfService_NotificationDriftWhenEchoed(t *testing.T) {
 		Notification:        &proclassic.NotificationValue{Enabled: new(false), Method: new("Self Service and Notification Center")},
 		NotificationSubject: new("wire subject"),
 		NotificationMessage: new("wire message"),
-	}, ss)
+	}, ss, false)
 	for _, tc := range []struct{ name, want, got string }{
 		{"notification_method", "Self Service and Notification Center", ss.NotificationMethod.ValueString()},
 		{"notification_subject", "wire subject", ss.NotificationSubject.ValueString()},

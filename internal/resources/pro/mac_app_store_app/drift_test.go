@@ -45,7 +45,7 @@ func TestFlattenMacApp_ReportsDrift(t *testing.T) {
 	flattenMacAppSelfService(&proclassic.MacApplicationSelfService{
 		InstallButtonText: new("wire install"),
 		FeatureOnMainPage: new(true),
-	}, ss)
+	}, ss, false)
 	if got := ss.InstallButtonText.ValueString(); got != "wire install" {
 		t.Errorf("self_service.install_button_text: wire value must win, got %q", got)
 	}
@@ -94,7 +94,7 @@ func TestFlattenMacApp_StickyFieldsIgnoreDrift(t *testing.T) {
 		NotificationSubject: types.StringValue("state subject"),
 		NotificationMessage: types.StringValue("state message"),
 	}
-	flattenMacAppSelfService(&proclassic.MacApplicationSelfService{}, ss)
+	flattenMacAppSelfService(&proclassic.MacApplicationSelfService{}, ss, false)
 	for _, tc := range []struct{ name, want, got string }{
 		{"notification_method", "Self Service", ss.NotificationMethod.ValueString()},
 		{"notification_subject", "state subject", ss.NotificationSubject.ValueString()},
@@ -125,7 +125,7 @@ func TestFlattenMacAppSelfService_NotificationDriftWhenEchoed(t *testing.T) {
 		Notification:        &proclassic.NotificationValue{Enabled: new(false), Method: new("Self Service and Notification Center")},
 		NotificationSubject: new("wire subject"),
 		NotificationMessage: new("wire message"),
-	}, ss)
+	}, ss, false)
 	for _, tc := range []struct{ name, want, got string }{
 		{"notification_method", "Self Service and Notification Center", ss.NotificationMethod.ValueString()},
 		{"notification_subject", "wire subject", ss.NotificationSubject.ValueString()},

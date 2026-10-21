@@ -56,7 +56,7 @@ func assignMacAppResourceModel(ctx context.Context, state *MacAppResourceModel, 
 		state.SelfService = &MacAppSelfServiceModel{}
 	}
 	if state.SelfService != nil && a.SelfService != nil {
-		flattenMacAppSelfService(a.SelfService, state.SelfService)
+		flattenMacAppSelfService(a.SelfService, state.SelfService, includeUnmanaged)
 	}
 	if includeUnmanaged && state.Vpp == nil && a.Vpp != nil {
 		state.Vpp = &MacAppVppModel{}
@@ -174,7 +174,15 @@ func flattenMacAppScope(ctx context.Context, s *proclassic.MacApplicationScope, 
 // The rest of the block, the icon included, is echoed unconditionally and reads
 // from the wire. Wire-probed against Jamf Pro 11.31.1 on 2026-09-06; see issue
 // #387.
-func flattenMacAppSelfService(ss *proclassic.MacApplicationSelfService, state *MacAppSelfServiceModel) {
+func flattenMacAppSelfService(ss *proclassic.MacApplicationSelfService, state *MacAppSelfServiceModel, includeUnmanaged bool) {
+	if includeUnmanaged {
+		if state.SelfServiceIcon == nil && ss.SelfServiceIcon != nil {
+			state.SelfServiceIcon = &MacAppSelfServiceIconModel{}
+		}
+		if state.SelfServiceCategories == nil && ss.SelfServiceCategories != nil && ss.SelfServiceCategories.Category != nil {
+			state.SelfServiceCategories = []MacAppSelfServiceCategoryModel{}
+		}
+	}
 	state.InstallButtonText = helpers.ReconcileOptionalStringPointerTrimmed(ss.InstallButtonText, state.InstallButtonText)
 	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmptyTrimmed(ss.SelfServiceDescription, state.SelfServiceDescription)
 	state.ForceUsersToViewDescription = helpers.BoolPointerValueOrNull(ss.ForceUsersToViewDescription)
