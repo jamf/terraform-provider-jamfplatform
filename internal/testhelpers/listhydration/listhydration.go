@@ -19,7 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
-var xmlNameType = reflect.TypeOf(xml.Name{})
+var xmlNameType = reflect.TypeFor[xml.Name]()
 
 // Fill populates every field of the struct target points at: scalars take a
 // fixed non-zero value, pointers are allocated, and each slice carries one
@@ -45,8 +45,8 @@ func fill(v reflect.Value, depth int) {
 		if v.Type() == xmlNameType {
 			return
 		}
-		for i := 0; i < v.NumField(); i++ {
-			if f := v.Field(i); f.CanSet() {
+		for _, f := range v.Fields() {
+			if f.CanSet() {
 				fill(f, depth+1)
 			}
 		}
