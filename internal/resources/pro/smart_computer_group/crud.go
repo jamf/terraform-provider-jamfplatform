@@ -56,6 +56,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
@@ -228,7 +229,12 @@ func (r *SmartComputerGroupResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	got, err := r.client.GetSmartComputerGroupV3(createCtx, plan.ID.ValueString())
+	got, err := progroups.ReadBackAfterWrite(createCtx,
+		func(ctx context.Context) (*pro.SmartComputerGroupV3, error) {
+			return r.client.GetSmartComputerGroupV3(ctx, plan.ID.ValueString())
+		},
+		func(got *pro.SmartComputerGroupV3) bool { return smartComputerGroupReflectsPlan(plan, got) },
+	)
 	if err != nil {
 		plan.Criteria = criteria.RestoreAuthoredDSGroupCriteria(plan.Criteria, authored)
 		recordCreatedGroup(ctx, plan, resp)
@@ -321,7 +327,7 @@ func (r *SmartComputerGroupResource) createThroughOlderInterface(ctx context.Con
 		)
 		return true
 	}
-	if err := r.setDescription(ctx, plan.PlatformID.ValueString(), plan.Description); err != nil {
+	if err := r.setDescription(ctx, *plan); err != nil {
 		deferred.AddError(
 			"Created the "+groupLabel+" but could not save its description",
 			"The group exists in Jamf Pro with its name, site and criteria, and Terraform has recorded it. The separate write that saves the description failed, so the description is still unset. Apply again to finish it — nothing needs changing in the configuration."+
@@ -340,10 +346,25 @@ func (r *SmartComputerGroupResource) createThroughOlderInterface(ctx context.Con
 // write. The body carries the description and nothing else; see
 // buildDescriptionPatch for why criteria must never join it.
 //
-// It takes the platform identifier. A Jamf Pro identifier on this route answers
-// 404.
-func (r *SmartComputerGroupResource) setDescription(ctx context.Context, platformID string, planned types.String) error {
-	return r.client.PatchGroupV2(ctx, platformID, buildDescriptionPatch(planned))
+// It patches by the platform identifier, since a Jamf Pro identifier on this
+// route answers 404.
+//
+// It waits first for the fallback write to be readable. On Jamf Pro 11.32.0 the
+// patch read-modify-writes the whole group from the same lagging read
+// progroups.ReadBackAfterWrite outlasts, so a patch sent straight after the
+// classic write stores the group as it was before that write: name, site and
+// criteria revert, permanently, and only the description survives
+// (reproduced 2026-10-20, 2 of 2 runs with no gap, 0 of 4 with 300 ms or more).
+// A read that fails or never settles does not block the patch, which is what
+// was sent before this wait existed.
+func (r *SmartComputerGroupResource) setDescription(ctx context.Context, plan SmartComputerGroupResourceModel) error {
+	_, _ = progroups.ReadBackAfterWrite(ctx,
+		func(ctx context.Context) (*pro.SmartComputerGroupV3, error) {
+			return r.client.GetSmartComputerGroupV3(ctx, plan.ID.ValueString())
+		},
+		func(got *pro.SmartComputerGroupV3) bool { return fallbackWriteReflectsPlan(plan, got) },
+	)
+	return r.client.PatchGroupV2(ctx, plan.PlatformID.ValueString(), buildDescriptionPatch(plan.Description))
 }
 
 // Read refreshes state from Jamf Pro.
@@ -489,7 +510,12 @@ func (r *SmartComputerGroupResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	got, err := r.client.GetSmartComputerGroupV3(updateCtx, plan.ID.ValueString())
+	got, err := progroups.ReadBackAfterWrite(updateCtx,
+		func(ctx context.Context) (*pro.SmartComputerGroupV3, error) {
+			return r.client.GetSmartComputerGroupV3(ctx, plan.ID.ValueString())
+		},
+		func(got *pro.SmartComputerGroupV3) bool { return smartComputerGroupReflectsPlan(plan, got) },
+	)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading the updated Jamf Pro "+groupLabel, helpers.APIErrorDetail(err))
 		return
@@ -543,7 +569,7 @@ func (r *SmartComputerGroupResource) updateThroughOlderInterface(ctx context.Con
 		)
 		return true
 	}
-	if err := r.setDescription(ctx, plan.PlatformID.ValueString(), plan.Description); err != nil {
+	if err := r.setDescription(ctx, *plan); err != nil {
 		deferred.AddError(
 			"Updated the "+groupLabel+" but could not save its description",
 			"The group's name, site and criteria are saved. The separate write that saves the description failed, so the description still reads as it did before. Apply again to finish it — nothing needs changing in the configuration."+
@@ -585,5 +611,10 @@ func (r *SmartComputerGroupResource) Delete(ctx context.Context, req resource.De
 			return
 		}
 		resp.Diagnostics.Append(progroups.DeleteDiagnostics(err, groupLabel)...)
+		return
 	}
+	progroups.WaitUntilGone(deleteCtx, func(ctx context.Context) error {
+		_, err := r.client.GetSmartComputerGroupV3(ctx, state.ID.ValueString())
+		return err
+	})
 }
