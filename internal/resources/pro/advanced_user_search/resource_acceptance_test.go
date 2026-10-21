@@ -399,3 +399,39 @@ func TestAccListResource_ProAdvancedUserSearch_Basic(t *testing.T) {
 		},
 	})
 }
+
+// TestAccResource_ProAdvancedUserSearch_CriteriaWhitespaceKept covers issue #517: classic saves
+// a criterion's name and value without their outer whitespace, leading included
+// (wire-verified 2026-10-20), and the authored values must survive the apply
+// with an empty re-plan.
+func TestAccResource_ProAdvancedUserSearch_CriteriaWhitespaceKept(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-advanced-user-search-ws-" + testhelpers.RunSuffix()
+	cfg := fmt.Sprintf(`
+		resource "jamfplatform_pro_advanced_user_search" "test" {
+			name = %q
+
+			criteria = [
+				{
+					name        = "Full Name "
+					search_type = "like"
+					value       = " lab\n"
+				},
+			]
+
+			display_fields = ["Full Name"]
+		}
+	`, name)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAUSDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: cfg, Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("jamfplatform_pro_advanced_user_search.test", "criteria.0.name", "Full Name "),
+				resource.TestCheckResourceAttr("jamfplatform_pro_advanced_user_search.test", "criteria.0.value", " lab\n"),
+			)},
+			{Config: cfg, PlanOnly: true},
+		},
+	})
+}

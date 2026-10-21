@@ -247,3 +247,35 @@ func TestAccResource_ProDiskEncryptionConfiguration_InstitutionalRequiresData(t 
 		},
 	})
 }
+
+// TestAccResource_ProDiskEncryptionConfiguration_IRKDataWhitespaceKept covers
+// issue #517: classic saves the recovery certificate data without its outer
+// whitespace (wire-verified 2026-10-20), and a base64 payload read with file()
+// ends in a newline. The authored value must survive the apply with an empty
+// re-plan.
+func TestAccResource_ProDiskEncryptionConfiguration_IRKDataWhitespaceKept(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-disk-encryption-ws-" + testhelpers.RunSuffix()
+	data := loadDERFixture(t) + "\n"
+	cfg := fmt.Sprintf(`
+		resource "jamfplatform_pro_disk_encryption_configuration" "test" {
+			name                     = %q
+			key_type                 = "Individual and Institutional"
+			file_vault_enabled_users = "Current or Next User"
+
+			institutional_recovery_key = {
+				certificate_type = "DER"
+				data             = %q
+			}
+		}
+	`, name, data)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckDiskEncryptionConfigurationDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: cfg, Check: resource.TestCheckResourceAttr("jamfplatform_pro_disk_encryption_configuration.test", "institutional_recovery_key.data", data)},
+			{Config: cfg, PlanOnly: true},
+		},
+	})
+}

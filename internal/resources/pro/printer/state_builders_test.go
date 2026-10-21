@@ -256,3 +256,30 @@ func TestAssignPrinterDataSourceModel_NilAPIIsNoop(t *testing.T) {
 		t.Errorf("expected state preserved, got %q", state.ID.ValueString())
 	}
 }
+
+// TestAssignPrinterResourceModel_KeepsPPDPathTheServerTrims covers issue #517:
+// classic saves ppd_path without its outer whitespace (probed 2026-10-20), so
+// the planned value must survive the read-back, while a genuinely different
+// server path wins.
+func TestAssignPrinterResourceModel_KeepsPPDPathTheServerTrims(t *testing.T) {
+	planned := "/Library/Printers/PPDs/Contents/Resources/HP.ppd \n"
+	state := PrinterResourceModel{PPDPath: types.StringValue(planned)}
+	api := &proclassic.Printer{
+		UseGeneric: new(false),
+		PpdPath:    new("/Library/Printers/PPDs/Contents/Resources/HP.ppd"),
+	}
+	if diags := assignPrinterResourceModel(&state, api); diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if !state.PPDPath.Equal(types.StringValue(planned)) {
+		t.Errorf("a ppd_path the server trimmed must keep the planned value, got %q", state.PPDPath.ValueString())
+	}
+
+	api.PpdPath = new("/Library/Printers/PPDs/Contents/Resources/Other.ppd")
+	if diags := assignPrinterResourceModel(&state, api); diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if state.PPDPath.ValueString() != "/Library/Printers/PPDs/Contents/Resources/Other.ppd" {
+		t.Errorf("a different server ppd_path must win, got %q", state.PPDPath.ValueString())
+	}
+}

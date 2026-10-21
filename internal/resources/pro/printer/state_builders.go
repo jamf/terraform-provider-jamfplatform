@@ -48,7 +48,7 @@ func assignPrinterResourceModel(state *PrinterResourceModel, p *proclassic.Print
 	state.Notes = helpers.ReconcileOptionalStringPointerTrimmed(p.Notes, state.Notes)
 	state.MakeDefault = helpers.BoolPointerValueOrNull(p.MakeDefault)
 	state.UseGeneric = helpers.BoolPointerValueOrNull(p.UseGeneric)
-	state.PPD, state.PPDPath, state.PPDContents = ppdTrioValues(p, state.PPD)
+	state.PPD, state.PPDPath, state.PPDContents = ppdTrioValues(p, state.PPD, state.PPDPath)
 	state.Shared = helpers.BoolPointerValueOrNull(p.Shared)
 	state.OSRequirements = helpers.ReconcileOptionalStringPointerTrimmed(p.OsRequirements, state.OSRequirements)
 	return diags
@@ -61,13 +61,16 @@ func assignPrinterResourceModel(state *PrinterResourceModel, p *proclassic.Print
 // forbids the trio in that mode — so a faithful read must null it to round-trip.
 // In custom mode `ppd` is reconciled against currentPPD rather than copied,
 // because the input builder always emits it and an omitted `ppd` comes back
-// as "" beside a populated `ppd_path`.
-func ppdTrioValues(p *proclassic.Printer, currentPPD types.String) (ppd, ppdPath types.String, ppdContents trimmedStringValue) {
+// as "" beside a populated `ppd_path`. `ppd_path` is kept as currentPPDPath when
+// the server returns it with outer whitespace removed: classic saves every
+// string trimmed (wire-verified 2026-10-20), so a planned path ending in
+// whitespace would otherwise read back different and fail the apply.
+func ppdTrioValues(p *proclassic.Printer, currentPPD, currentPPDPath types.String) (ppd, ppdPath types.String, ppdContents trimmedStringValue) {
 	if p.UseGeneric == nil || *p.UseGeneric {
 		return types.StringNull(), types.StringNull(), trimmedStringValueFromPtr(nil)
 	}
 	return helpers.ReconcileOptionalStringPointerTrimmed(p.Ppd, currentPPD),
-		helpers.StringPointerValueOrNull(p.PpdPath),
+		helpers.StringPointerValueOrNullTrimmed(p.PpdPath, currentPPDPath),
 		trimmedStringValueFromPtr(p.PpdContents)
 }
 
@@ -93,7 +96,7 @@ func assignPrinterDataSourceModel(state *PrinterDataSourceModel, p *proclassic.P
 	state.Notes = helpers.StringPointerValueOrNullTrimmed(p.Notes, state.Notes)
 	state.MakeDefault = helpers.BoolPointerValueOrNull(p.MakeDefault)
 	state.UseGeneric = helpers.BoolPointerValueOrNull(p.UseGeneric)
-	state.PPD, state.PPDPath, state.PPDContents = ppdTrioValues(p, types.StringNull())
+	state.PPD, state.PPDPath, state.PPDContents = ppdTrioValues(p, types.StringNull(), types.StringNull())
 	state.Shared = helpers.BoolPointerValueOrNull(p.Shared)
 	state.OSRequirements = helpers.StringPointerValueOrNull(p.OsRequirements)
 	return diags

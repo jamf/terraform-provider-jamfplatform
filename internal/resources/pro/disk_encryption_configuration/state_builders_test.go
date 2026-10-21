@@ -255,3 +255,36 @@ func TestIrkIsWireEmpty(t *testing.T) {
 		})
 	}
 }
+
+// TestAssign_IRKData_KeepsValueTheServerTrims covers issue #517: classic saves
+// the recovery certificate data without its outer whitespace (probed
+// 2026-10-20), and a base64 payload read with file() or a heredoc ends in a
+// newline. The planned value must survive the read-back, while a genuinely
+// different server value wins.
+func TestAssign_IRKData_KeepsValueTheServerTrims(t *testing.T) {
+	planned := "base64-cert-payload\n"
+	state := DiskEncryptionConfigurationResourceModel{
+		InstitutionalRecoveryKey: &diskEncryptionConfigurationIRKModel{Data: types.StringValue(planned)},
+	}
+	in := &proclassic.DiskEncryptionConfiguration{
+		InstitutionalRecoveryKey: &proclassic.DiskEncryptionConfigurationInstitutionalRecoveryKey{
+			Key:             new("C=US, O=jamf-tf-provider, CN=tf-audit-probe"),
+			CertificateType: new("DER"),
+			Data:            new("base64-cert-payload"),
+		},
+	}
+	if diags := assignDiskEncryptionConfigurationResourceModel(&state, in); diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if !state.InstitutionalRecoveryKey.Data.Equal(types.StringValue(planned)) {
+		t.Errorf("data the server trimmed must keep the planned value, got %q", state.InstitutionalRecoveryKey.Data.ValueString())
+	}
+
+	in.InstitutionalRecoveryKey.Data = new("other-payload")
+	if diags := assignDiskEncryptionConfigurationResourceModel(&state, in); diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if state.InstitutionalRecoveryKey.Data.ValueString() != "other-payload" {
+		t.Errorf("a different server data must win, got %q", state.InstitutionalRecoveryKey.Data.ValueString())
+	}
+}

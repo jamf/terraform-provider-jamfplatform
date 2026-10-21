@@ -137,7 +137,20 @@ func BuildCriterionSlice(models []CriterionModel) []proclassic.Criterion {
 // criterion compared against "" round-trips instead of failing the post-apply
 // consistency check.
 // Returns nil for an empty or absent slice (a null list in state).
-func FlattenCriterionSlice(src *[]proclassic.Criterion) []CriterionModel {
+//
+// name and value are the exception: classic saves both with their outer
+// whitespace removed, leading included (wire-verified 2026-10-20 on
+// advancedcomputersearches, advancedusersearches and usergroups), so an authored
+// "Computer Name " or a heredoc value ending in "\n" would read back different
+// and fail the apply. Each is kept as its counterpart in prior (the plan on
+// write, the prior state on refresh) when the wire value is that with its outer
+// whitespace removed. Criteria carry no id, so prior is matched by position,
+// which holds because the slice is returned in priority order and priority
+// defaults to the element index; a criterion with no counterpart in prior, as on
+// import or in a data source, takes the wire value as it is. Only classic
+// consumers may pass a prior: a Pro JSON endpoint stores both verbatim, so there
+// the tolerance would hide an out-of-band edit.
+func FlattenCriterionSlice(src *[]proclassic.Criterion, prior []CriterionModel) []CriterionModel {
 	if src == nil || len(*src) == 0 {
 		return nil
 	}
@@ -148,11 +161,15 @@ func FlattenCriterionSlice(src *[]proclassic.Criterion) []CriterionModel {
 		if c.Priority != nil {
 			priority = types.Int64Value(int64(*c.Priority))
 		}
+		var priorName, priorValue types.String
+		if i < len(prior) {
+			priorName, priorValue = prior[i].Name, prior[i].Value
+		}
 		out[i] = CriterionModel{
 			Priority:              priority,
-			Name:                  helpers.StringPointerValueOrNull(c.Name),
+			Name:                  helpers.StringPointerValueOrNullTrimmed(c.Name, priorName),
 			SearchType:            helpers.StringPointerValueOrNull(c.SearchType),
-			Value:                 helpers.StringPointerValueOrEmpty(c.Value),
+			Value:                 helpers.StringValueTrimmed(helpers.DerefString(c.Value), priorValue),
 			AndOr:                 helpers.StringPointerValueOrNull(c.AndOr),
 			HasOpeningParenthesis: helpers.BoolPointerValueOrNull(c.OpeningParen),
 			HasClosingParenthesis: helpers.BoolPointerValueOrNull(c.ClosingParen),

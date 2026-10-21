@@ -59,7 +59,7 @@ func assignUserGroupResourceModel(
 	state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(siteID, state.SiteID)
 	state.SiteName = helpers.StringPointerValueOrNull(siteName)
 
-	state.Criteria = flattenCriteria(ug.Criteria)
+	state.Criteria = flattenCriteria(ug.Criteria, state.Criteria)
 
 	memberIDs, memberCount := flattenMembers(ug.Users)
 	state.MemberCount = types.Int64Value(int64(memberCount))
@@ -124,7 +124,7 @@ func assignUserGroupDataSourceModel(state *UserGroupDataSourceModel, ug *proclas
 	state.SiteID = helpers.StringPointerValueOrNull(siteID)
 	state.SiteName = helpers.StringPointerValueOrNull(siteName)
 
-	state.Criteria = flattenCriteria(ug.Criteria)
+	state.Criteria = flattenCriteria(ug.Criteria, nil)
 	state.Users = flattenUsers(ug.Users)
 
 	_, memberCount := flattenMembers(ug.Users)
@@ -150,13 +150,28 @@ func groupTypeFromIsSmart(isSmart *bool) types.String {
 // previously null, which is exactly the import path — and that mismatches
 // the post-apply refresh path which sees the same API value but had a
 // configured-default state. Direct copy keeps both paths in sync.
-func flattenCriteria(wrapper *proclassic.UserGroupCriteria) []UserGroupCriterionModel {
+//
+// name and value are the exception: Jamf Pro classic saves both with their outer
+// whitespace removed (wire-verified 2026-10-20, leading and trailing, POST), so a
+// planned "Email Address " or a heredoc value ending in "\n" would read back
+// different and fail the apply. Each is kept as prior (the plan on write, the
+// prior state on refresh) when the wire value is that with its outer whitespace
+// removed. Criteria carry no id, so prior is matched by position, which holds
+// because Jamf returns them in priority order and priority defaults to the
+// element index; a criterion with no counterpart in prior, as on import or in a
+// data source, takes the wire value as it is.
+func flattenCriteria(wrapper *proclassic.UserGroupCriteria, prior []UserGroupCriterionModel) []UserGroupCriterionModel {
 	if wrapper == nil || wrapper.Criterion == nil || len(*wrapper.Criterion) == 0 {
 		return nil
 	}
 	src := *wrapper.Criterion
 	out := make([]UserGroupCriterionModel, len(src))
 	for i, c := range src {
+		var priorName, priorValue types.String
+		if i < len(prior) {
+			priorName, priorValue = prior[i].Name, prior[i].Value
+		}
+
 		// priority is Computed — server is authoritative and always returns it
 		// (Jamf orders criteria by priority internally). Direct copy.
 		priority := types.Int64Null()
@@ -164,12 +179,7 @@ func flattenCriteria(wrapper *proclassic.UserGroupCriteria) []UserGroupCriterion
 			priority = types.Int64Value(int64(*c.Priority))
 		}
 
-		var name types.String
-		if c.Name != nil && *c.Name != "" {
-			name = types.StringValue(*c.Name)
-		} else {
-			name = types.StringNull()
-		}
+		name := helpers.StringPointerValueOrNullTrimmed(c.Name, priorName)
 
 		var searchType types.String
 		if c.SearchType != nil && *c.SearchType != "" {
@@ -182,10 +192,7 @@ func flattenCriteria(wrapper *proclassic.UserGroupCriteria) []UserGroupCriterion
 		// empty for criteria like an unset "before (yyyy-mm-dd)" date. Copy it
 		// verbatim (mapping a nil/empty echo to "" rather than null) so Required
 		// stays satisfied and import lands the same value as a post-apply refresh.
-		value := types.StringValue("")
-		if c.Value != nil {
-			value = types.StringValue(*c.Value)
-		}
+		value := helpers.StringValueTrimmed(helpers.DerefString(c.Value), priorValue)
 
 		var andOr types.String
 		if c.AndOr != nil && *c.AndOr != "" {

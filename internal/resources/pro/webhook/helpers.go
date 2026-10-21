@@ -9,6 +9,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
 // extractWebhookID returns the assigned ID as a string from a Create/GET
@@ -34,12 +36,11 @@ func smartGroupIDToState(p *int) types.Int64 {
 
 // emptyStringToNull maps a server-echoed empty string to null. Used for
 // `username` / `header`, which the server returns as "" when the active auth
-// type does not use them, so config-null == state-null.
-func emptyStringToNull(p *string) types.String {
-	if p == nil || *p == "" {
-		return types.StringNull()
-	}
-	return types.StringValue(*p)
+// type does not use them, so config-null == state-null. Both are saved with
+// their outer whitespace removed (wire-verified 2026-10-20), so a value that
+// is current trimmed keeps current rather than reading back different.
+func emptyStringToNull(p *string, current types.String) types.String {
+	return helpers.StringPointerValueOrNullTrimmed(p, current)
 }
 
 // displayFieldNames extracts the <display_field><name> values from the server

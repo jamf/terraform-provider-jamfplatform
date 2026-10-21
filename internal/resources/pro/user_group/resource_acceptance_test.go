@@ -754,3 +754,44 @@ func TestAccListResource_ProUserGroup_Basic(t *testing.T) {
 		},
 	})
 }
+
+// TestAccResource_ProUserGroup_CriteriaWhitespaceKept covers issue #517: classic
+// saves a criterion's name and value without their outer whitespace, leading
+// included (wire-verified 2026-10-20), and the authored values must survive the
+// apply with an empty re-plan.
+func TestAccResource_ProUserGroup_CriteriaWhitespaceKept(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-user-group-ws-" + testhelpers.RunSuffix()
+	cfg := fmt.Sprintf(`
+		resource "jamfplatform_pro_user_group" "test" {
+			name       = %q
+			group_type = "smart"
+
+			criteria = [
+				{
+					name        = "Email Address "
+					search_type = "like"
+					value       = " @example.com\n"
+				},
+				{
+					name        = "Full Name"
+					search_type = "is not"
+					value       = "Test User "
+				},
+			]
+		}
+	`, name)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckUserGroupDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: cfg, Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("jamfplatform_pro_user_group.test", "criteria.0.name", "Email Address "),
+				resource.TestCheckResourceAttr("jamfplatform_pro_user_group.test", "criteria.0.value", " @example.com\n"),
+				resource.TestCheckResourceAttr("jamfplatform_pro_user_group.test", "criteria.1.value", "Test User "),
+			)},
+			{Config: cfg, PlanOnly: true},
+		},
+	})
+}
