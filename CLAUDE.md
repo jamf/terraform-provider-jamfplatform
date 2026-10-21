@@ -129,7 +129,7 @@ and the file has never heard of), and `catalogue.golden` pins the rendered tripl
 reviewable diff. `.github/workflows/permissions-map.yml` refetches monthly and opens a pull request
 — red, with the failures in its body, when the catalogue no longer agrees. What nothing here can
 prove is that the article matches what Jamf Account's picker actually prints; the same pattern lives
-in `jamfplatform-go-sdk` (capability and actions only, as a privilege oracle) and in `jamfpro-cli`.
+in `jamfplatform-go-sdk` (capability and actions only, as a privilege oracle) and in `jamf-cli`.
 
 ## Apple profile schemas — one-paragraph orientation
 
