@@ -14,7 +14,7 @@
 // resolved via fixturePath / fixtureSHA3 / downloadAndHashURL in
 // fixtures_acceptance_test.go.
 //
-// Every test that uploads a binary gates on testhelpers.RequireJCDSUploads:
+// Every test that uploads a binary gates on testhelpers.RequireDirectUploads:
 // without a Jamf Cloud distribution point the upload's verification poll can
 // never converge, so the test would spend the resource's full create timeout
 // before failing on something that is an estate condition, not a defect.
@@ -60,10 +60,12 @@ func testAccCheckPackageDestroy(t *testing.T) resource.TestCheckFunc {
 }
 
 // testCheckPackageHashConverged verifies via a direct SDK GET that the
-// post-upload hash on the server exactly matches the closure-captured
-// expected SHA-3-512 digest. Load-bearing post-condition for every JCDS
-// upload step — without it the test wouldn't catch a "verification poll
-// declared success on the wrong hash" regression.
+// post-upload digest on the server matches the closure-captured expected
+// SHA-3-512 digest. A Jamf Cloud distribution point reports SHA-3-512, and the
+// check requires it. An Amazon S3 distribution point never computes SHA-3-512,
+// so the check requires the fixture's MD5 instead. Load-bearing post-condition
+// for every upload step — without it the test wouldn't catch a "verification
+// poll declared success on the wrong hash" regression.
 func testCheckPackageHashConverged(t *testing.T, resourceName string, expectFn func() string) resource.TestCheckFunc {
 	t.Helper()
 	return func(s *terraform.State) error {
@@ -84,12 +86,24 @@ func testCheckPackageHashConverged(t *testing.T, resourceName string, expectFn f
 		}
 
 		want := strings.ToLower(expectFn())
-		got := strings.ToLower(helpers.DerefString(p.HashValue))
-		if got != want {
-			return fmt.Errorf("hash mismatch on %s: server reports %q, expected %q", rs.Primary.ID, got, want)
-		}
-		if hashType := helpers.DerefString(p.HashType); hashType != "SHA3_512" {
-			return fmt.Errorf("hash_type mismatch on %s: server reports %q, expected %q", rs.Primary.ID, hashType, "SHA3_512")
+		if got := strings.ToLower(helpers.DerefString(p.Sha3512)); got != "" {
+			if got != want {
+				return fmt.Errorf("hash mismatch on %s: server reports %q, expected %q", rs.Primary.ID, got, want)
+			}
+			if hashType := helpers.DerefString(p.HashType); hashType != "SHA3_512" {
+				return fmt.Errorf("hash_type mismatch on %s: server reports %q, expected %q", rs.Primary.ID, hashType, "SHA3_512")
+			}
+		} else {
+			wantMD5 := expectedMD5(want)
+			if wantMD5 == "" {
+				return fmt.Errorf("no MD5 recorded for the expected SHA-3-512 %q on %s", want, rs.Primary.ID)
+			}
+			if got := strings.ToLower(helpers.DerefString(p.Md5)); got != wantMD5 {
+				return fmt.Errorf("md5 mismatch on %s: server reports %q, expected %q", rs.Primary.ID, got, wantMD5)
+			}
+			if hashType := helpers.DerefString(p.HashType); hashType != "MD5" {
+				return fmt.Errorf("hash_type mismatch on %s: server reports %q, expected %q", rs.Primary.ID, hashType, "MD5")
+			}
 		}
 		if status := helpers.DerefString(p.CloudTransferStatus); status != "READY" {
 			return fmt.Errorf("cloud_transfer_status mismatch on %s: server reports %q, expected %q", rs.Primary.ID, status, "READY")
@@ -115,9 +129,16 @@ func testCheckPackageHashEquals(t *testing.T, resourceName string, expectFn func
 			return fmt.Errorf("fetching package %s: %w", rs.Primary.ID, err)
 		}
 		want := strings.ToLower(expectFn())
-		got := strings.ToLower(helpers.DerefString(p.HashValue))
-		if got != want {
-			return fmt.Errorf("hash drift on %s: server reports %q, expected %q (re-upload should NOT have triggered)", rs.Primary.ID, got, want)
+		if got := strings.ToLower(helpers.DerefString(p.Sha3512)); got != "" {
+			if got != want {
+				return fmt.Errorf("hash drift on %s: server reports %q, expected %q (re-upload should NOT have triggered)", rs.Primary.ID, got, want)
+			}
+			return nil
+		}
+		// An S3 distribution point computes MD5 only, so compare that.
+		wantMD5 := expectedMD5(want)
+		if got := strings.ToLower(helpers.DerefString(p.Md5)); wantMD5 == "" || got != wantMD5 {
+			return fmt.Errorf("hash drift on %s: server md5 %q, expected %q (re-upload should NOT have triggered)", rs.Primary.ID, got, wantMD5)
 		}
 		return nil
 	}
@@ -198,7 +219,7 @@ resource "jamfplatform_pro_package" "test" {
 // metadata-only step (no re-upload).
 func TestAccResource_ProPackage_LocalUploadCreateAndUpdate(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	testhelpers.RequireJCDSUploads(t)
+	testhelpers.RequireDirectUploads(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-package-local-" + suffix
 	fileName := name + ".pkg"
@@ -220,7 +241,6 @@ func TestAccResource_ProPackage_LocalUploadCreateAndUpdate(t *testing.T) {
 					resource.TestCheckResourceAttr(packageResourceAddr, "display_name", name),
 					resource.TestCheckResourceAttr(packageResourceAddr, "file_name", fileName),
 					resource.TestCheckResourceAttr(packageResourceAddr, "info", "initial create"),
-					resource.TestCheckResourceAttr(packageResourceAddr, "hash_type", "SHA3_512"),
 					resource.TestCheckResourceAttr(packageResourceAddr, "cloud_transfer_status", "READY"),
 					// Jamf Pro derives size from the uploaded binary; it must be
 					// populated after a JCDS upload.
@@ -270,7 +290,7 @@ func TestAccResource_ProPackage_LocalUploadCreateAndUpdate(t *testing.T) {
 // exercised in TestAccResource_ProPackage_URLStreamingUpload below.
 func TestAccResource_ProPackage_URLUploadCreateAndUpdate(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	testhelpers.RequireJCDSUploads(t)
+	testhelpers.RequireDirectUploads(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-package-url-" + suffix
 	fileName := name + ".pkg"
@@ -286,7 +306,6 @@ func TestAccResource_ProPackage_URLUploadCreateAndUpdate(t *testing.T) {
 				Config: hclURLUpload(name, fileName, urlFixture170, "url-create", false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet(packageResourceAddr, "id"),
-					resource.TestCheckResourceAttr(packageResourceAddr, "hash_type", "SHA3_512"),
 					resource.TestCheckResourceAttr(packageResourceAddr, "cloud_transfer_status", "READY"),
 					testCheckPackageHashConverged(t, packageResourceAddr, staticDigest(sha170)),
 				),
@@ -320,7 +339,7 @@ func TestAccResource_ProPackage_URLUploadCreateAndUpdate(t *testing.T) {
 // the inline tee.
 func TestAccResource_ProPackage_URLStreamingUploadCreateAndUpdate(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	testhelpers.RequireJCDSUploads(t)
+	testhelpers.RequireDirectUploads(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-package-stream-" + suffix
 	fileName := name + ".pkg"
@@ -337,7 +356,6 @@ func TestAccResource_ProPackage_URLStreamingUploadCreateAndUpdate(t *testing.T) 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet(packageResourceAddr, "id"),
 					resource.TestCheckResourceAttr(packageResourceAddr, "stream_url_directly", "true"),
-					resource.TestCheckResourceAttr(packageResourceAddr, "hash_type", "SHA3_512"),
 					resource.TestCheckResourceAttr(packageResourceAddr, "cloud_transfer_status", "READY"),
 					testCheckPackageHashConverged(t, packageResourceAddr, staticDigest(sha170)),
 				),
@@ -362,7 +380,7 @@ func TestAccResource_ProPackage_URLStreamingUploadCreateAndUpdate(t *testing.T) 
 // streaming test above.
 func TestAccResource_ProPackage_MixedSourceSwap(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	testhelpers.RequireJCDSUploads(t)
+	testhelpers.RequireDirectUploads(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-package-mixed-" + suffix
 	fileName := name + ".pkg"
@@ -470,7 +488,6 @@ func TestAccResource_ProPackage_FSDPUserSuppliedHashes(t *testing.T) {
 				Config: hclFSDPWithHashes(name, fileName, "SHA3_512", sha3Hex, md5Hex, sha256Hex, sha3Hex),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet(packageResourceAddr, "id"),
-					resource.TestCheckResourceAttr(packageResourceAddr, "hash_type", "SHA3_512"),
 					resource.TestCheckResourceAttr(packageResourceAddr, "hash_value", sha3Hex),
 					resource.TestCheckResourceAttr(packageResourceAddr, "md5", md5Hex),
 					resource.TestCheckResourceAttr(packageResourceAddr, "sha256", sha256Hex),
@@ -490,7 +507,7 @@ func TestAccResource_ProPackage_FSDPUserSuppliedHashes(t *testing.T) {
 // the test does not depend on a real .plist on disk.
 func TestAccResource_ProPackage_ManifestLifecycle(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	testhelpers.RequireJCDSUploads(t)
+	testhelpers.RequireDirectUploads(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-package-manifest-" + suffix
 	fileName := name + ".pkg"

@@ -20,8 +20,6 @@ package pkg
 
 import (
 	"context"
-	"crypto/sha3"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -87,12 +85,12 @@ func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest
 
 	if isConfiguredString(plan.PackageFileSource) {
 		if streamingURLEnabled(plan) {
-			if diags := streamURLUploadAndVerify(createCtx, r.client, &plan, ""); diags.HasError() {
+			if diags := streamURLUploadAndVerify(createCtx, r.client, &plan, fileDigests{}); diags.HasError() {
 				resp.Diagnostics.Append(diags...)
 				return
 			}
 		} else {
-			resp.Diagnostics.Append(openHashUploadVerify(createCtx, r.client, &plan, "")...)
+			resp.Diagnostics.Append(openHashUploadVerify(createCtx, r.client, &plan, fileDigests{})...)
 			if resp.Diagnostics.HasError() {
 				return
 			}
@@ -242,7 +240,7 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 		}
 		// Upload + verify FIRST so JCDS has recomputed hashes when the
 		// metadata PUT lands (see disk-staging path for full rationale).
-		previous := strings.ToLower(state.Sha3512.ValueString())
+		previous := recordedDigestsFromState(&state)
 		if diags := streamURLUploadAndVerify(updateCtx, r.client, &plan, previous); diags.HasError() {
 			resp.Diagnostics.Append(diags...)
 			return
@@ -290,9 +288,9 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 		uploadName   string
 		cleanup      = func() {}
 		willReupload bool
-		localSha3    string
+		local        fileDigests
 		localSize    int64
-		previousHash string
+		previous     fileDigests
 	)
 	if isConfiguredString(plan.PackageFileSource) {
 		if diags := preflightUploadDestination(updateCtx, r.client); diags.HasError() {
@@ -307,34 +305,33 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 		}
 		cleanup = c
 
-		sha, sz, hashErr := HashStreamSHA3(f)
+		digests, sz, hashErr := hashStream(f)
 		if hashErr != nil {
 			cleanup()
 			resp.Diagnostics.AddError("Error hashing package binary", helpers.APIErrorDetail(hashErr))
 			return
 		}
-		localSha3 = sha
+		local = digests
 		localSize = sz
 
 		if isConfiguredString(plan.PackageFileSourceChecksum) {
 			declared := strings.ToLower(plan.PackageFileSourceChecksum.ValueString())
-			if declared != strings.ToLower(localSha3) {
+			if declared != strings.ToLower(local.sha3) {
 				cleanup()
 				resp.Diagnostics.AddError(
 					"package_file_source_checksum did not match local SHA-3-512",
-					fmt.Sprintf("%v: expected %s, computed %s", errLocalChecksumMismatch, declared, localSha3),
+					fmt.Sprintf("%v: expected %s, computed %s", errLocalChecksumMismatch, declared, local.sha3),
 				)
 				return
 			}
 		}
 
-		stateSha := strings.ToLower(state.Sha3512.ValueString())
-		willReupload = stateSha == "" || stateSha != strings.ToLower(localSha3)
-		previousHash = stateSha
+		previous = recordedDigestsFromState(&state)
+		willReupload = !previous.matches(local)
 
 		tflog.Info(ctx, "package update reupload decision", map[string]any{
-			"state_sha3":    stateSha,
-			"local_sha3":    localSha3,
+			"state_sha3":    previous.sha3,
+			"local_sha3":    local.sha3,
 			"will_reupload": willReupload,
 			"source":        plan.PackageFileSource.ValueString(),
 			"file_name":     plan.FileName.ValueString(),
@@ -353,7 +350,7 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	// Binary re-upload + verification FIRST (before metadata PUT). Spike
 	// §13.3 / §13.5: the server does not validate user-supplied hashValue
-	// PUTs, so injecting localSha3 into a pre-upload PUT body silently
+	// PUTs, so injecting the local digest into a pre-upload PUT body silently
 	// short-circuits the verification poll — the poll sees the user-PUT
 	// hash on the very first tick and declares convergence while JCDS is
 	// still serving the old binary. Upload first, let JCDS recompute,
@@ -368,7 +365,7 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 		if fileName == "" {
 			fileName = uploadName
 		}
-		if diags := uploadAndPoll(updateCtx, r.client, plan.ID.ValueString(), fileName, uploadFile, localSha3, localSize, previousHash); diags.HasError() {
+		if diags := uploadAndPoll(updateCtx, r.client, plan.ID.ValueString(), fileName, uploadFile, local, localSize, previous); diags.HasError() {
 			resp.Diagnostics.Append(diags...)
 			return
 		}
@@ -506,26 +503,26 @@ func isConfiguredString(v types.String) bool {
 // openHashUploadVerify drives the JCDS upload + verification poll for
 // Create. Opens the source exactly once, hashes from the open handle,
 // validates the optional user-supplied checksum, rewinds, streams to
-// UploadPackageV1, and polls until convergence. previousHash is empty
+// UploadPackageV1, and polls until convergence. previous is empty
 // on Create.
-func openHashUploadVerify(ctx context.Context, client *pro.Client, plan *PackageResourceModel, previousHash string) diag.Diagnostics {
+func openHashUploadVerify(ctx context.Context, client *pro.Client, plan *PackageResourceModel, previous fileDigests) diag.Diagnostics {
 	file, filename, cleanup, err := files.OpenUploadSource(ctx, plan.PackageFileSource.ValueString(), files.DefaultMaxBytes)
 	if err != nil {
 		return errorDiag("Error opening package binary", err.Error())
 	}
 	defer cleanup()
 
-	sha, sz, hashErr := HashStreamSHA3(file)
+	local, sz, hashErr := hashStream(file)
 	if hashErr != nil {
 		return errorDiag("Error hashing package binary", hashErr.Error())
 	}
 
 	if isConfiguredString(plan.PackageFileSourceChecksum) {
 		declared := strings.ToLower(plan.PackageFileSourceChecksum.ValueString())
-		if declared != strings.ToLower(sha) {
+		if declared != strings.ToLower(local.sha3) {
 			return errorDiag(
 				"package_file_source_checksum did not match local SHA-3-512",
-				fmt.Sprintf("%v: expected %s, computed %s", errLocalChecksumMismatch, declared, sha),
+				fmt.Sprintf("%v: expected %s, computed %s", errLocalChecksumMismatch, declared, local.sha3),
 			)
 		}
 	}
@@ -538,7 +535,7 @@ func openHashUploadVerify(ctx context.Context, client *pro.Client, plan *Package
 	if fileName == "" {
 		fileName = filename
 	}
-	return uploadAndPoll(ctx, client, plan.ID.ValueString(), fileName, file, sha, sz, previousHash)
+	return uploadAndPoll(ctx, client, plan.ID.ValueString(), fileName, file, local, sz, previous)
 }
 
 // preflightUploadDestination refuses an upload the tenant has nowhere to put.
@@ -614,7 +611,7 @@ const maxUploadAttempts = 5
 // from the open/hash phase lets Update reuse the open handle from the hash
 // decision; file must be seekable so a retry can rewind and resend the same
 // bytes.
-func uploadAndPoll(ctx context.Context, client *pro.Client, id, fileName string, file io.ReadSeeker, localSha3 string, localSize int64, previousHash string) diag.Diagnostics {
+func uploadAndPoll(ctx context.Context, client *pro.Client, id, fileName string, file io.ReadSeeker, local fileDigests, localSize int64, previous fileDigests) diag.Diagnostics {
 	for attempt := 1; ; attempt++ {
 		if attempt > 1 {
 			if _, seekErr := file.Seek(0, io.SeekStart); seekErr != nil {
@@ -625,9 +622,9 @@ func uploadAndPoll(ctx context.Context, client *pro.Client, id, fileName string,
 		tflog.Info(ctx, "package upload starting", map[string]any{
 			"id":            id,
 			"file_name":     fileName,
-			"local_sha3":    localSha3,
+			"local_sha3":    local.sha3,
 			"local_size":    localSize,
-			"previous_hash": previousHash,
+			"previous_sha3": previous.sha3,
 			"attempt":       attempt,
 		})
 		href, err := client.UploadPackageV1(ctx, id, fileName, file)
@@ -641,23 +638,15 @@ func uploadAndPoll(ctx context.Context, client *pro.Client, id, fileName string,
 		}
 		tflog.Info(ctx, "package upload returned", map[string]any{"id": id, "href": hrefStr, "attempt": attempt})
 
-		convergedPkg, pollErr := PollPackageVerification(ctx, client, id, fileName, localSha3, localSize, previousHash)
+		convergedPkg, pollErr := PollPackageVerification(ctx, client, id, fileName, local, localSize, previous)
 		if pollErr == nil {
-			convergedHash := ""
-			convergedStatus := ""
-			if convergedPkg != nil {
-				if convergedPkg.HashValue != nil {
-					convergedHash = *convergedPkg.HashValue
-				}
-				if convergedPkg.CloudTransferStatus != nil {
-					convergedStatus = *convergedPkg.CloudTransferStatus
-				}
-			}
+			converged := recordedDigests(convergedPkg)
 			tflog.Info(ctx, "package poll converged", map[string]any{
 				"id":                  id,
-				"converged_hash":      convergedHash,
-				"converged_status":    convergedStatus,
-				"expected_local_sha3": localSha3,
+				"converged_sha3":      converged.sha3,
+				"converged_sha256":    converged.sha256,
+				"converged_md5":       converged.md5,
+				"expected_local_sha3": local.sha3,
 				"attempt":             attempt,
 			})
 			return nil
@@ -669,16 +658,16 @@ func uploadAndPoll(ctx context.Context, client *pro.Client, id, fileName string,
 				"attempt": attempt,
 				"max":     maxUploadAttempts,
 			})
-			// Baseline the next poll off whatever hash the server holds now
-			// (possibly this failed attempt's own transient value) so it is
-			// not mistaken for the pre-upload previousHash. A failed GET here
-			// is non-fatal — the retry proceeds with the stale baseline — but
+			// Baseline the next poll off whatever digests the server holds now
+			// (possibly this failed attempt's own transient value) so they are
+			// not mistaken for the pre-upload previous. A failed GET here is
+			// non-fatal — the retry proceeds with the stale baseline — but
 			// worth surfacing since it weakens the next attempt's ability to
 			// tell "still the old failed hash" apart from "genuinely new".
 			if cur, getErr := client.GetPackageV1(ctx, id); getErr == nil {
-				previousHash = strings.ToLower(helpers.DerefString(cur.HashValue))
+				previous = recordedDigests(cur)
 			} else {
-				tflog.Warn(ctx, "could not refresh previousHash baseline before upload retry", map[string]any{"id": id, "attempt": attempt, "err": getErr.Error()})
+				tflog.Warn(ctx, "could not refresh previous baseline before upload retry", map[string]any{"id": id, "attempt": attempt, "err": getErr.Error()})
 			}
 			continue
 		}
@@ -696,6 +685,12 @@ func classifyUploadPollError(pollErr error, attempt int) diag.Diagnostics {
 	if errors.Is(pollErr, errUploadFailed) {
 		return errorDiag(
 			"Package upload failed (server reported size=0)",
+			fmt.Sprintf("%v — gave up after %d attempt(s). Check the Jamf Pro admin console for Cloud Distribution Point status.", pollErr, attempt),
+		)
+	}
+	if errors.Is(pollErr, errTransferFailed) {
+		return errorDiag(
+			"Package upload transfer failed",
 			fmt.Sprintf("%v — gave up after %d attempt(s). Check the Jamf Pro admin console for Cloud Distribution Point status.", pollErr, attempt),
 		)
 	}
@@ -765,9 +760,9 @@ func streamingURLEnabled(plan PackageResourceModel) bool {
 // Trade is intentional: see schema description for the user-facing
 // rationale. Caller has already enforced `package_file_source` is a URL
 // (streamingURLEnabled guards entry).
-func streamURLUploadAndVerify(ctx context.Context, client *pro.Client, plan *PackageResourceModel, previousHash string) diag.Diagnostics {
+func streamURLUploadAndVerify(ctx context.Context, client *pro.Client, plan *PackageResourceModel, previous fileDigests) diag.Diagnostics {
 	for attempt := 1; ; attempt++ {
-		diags, pollErr := streamURLUploadOnce(ctx, client, plan, previousHash, attempt)
+		diags, pollErr := streamURLUploadOnce(ctx, client, plan, previous, attempt)
 		if diags.HasError() {
 			return diags
 		}
@@ -781,14 +776,14 @@ func streamURLUploadAndVerify(ctx context.Context, client *pro.Client, plan *Pac
 				"attempt": attempt,
 				"max":     maxUploadAttempts,
 			})
-			// Baseline the next poll off whatever hash the server holds now
-			// so it is not mistaken for the pre-upload previousHash. See
+			// Baseline the next poll off whatever digests the server holds now
+			// so they are not mistaken for the pre-upload previous. See
 			// uploadAndPoll's matching rebaseline for why a failed GET here
 			// is logged rather than silently ignored.
 			if cur, getErr := client.GetPackageV1(ctx, plan.ID.ValueString()); getErr == nil {
-				previousHash = strings.ToLower(helpers.DerefString(cur.HashValue))
+				previous = recordedDigests(cur)
 			} else {
-				tflog.Warn(ctx, "could not refresh previousHash baseline before streamed upload retry", map[string]any{"id": plan.ID.ValueString(), "attempt": attempt, "err": getErr.Error()})
+				tflog.Warn(ctx, "could not refresh previous baseline before streamed upload retry", map[string]any{"id": plan.ID.ValueString(), "attempt": attempt, "err": getErr.Error()})
 			}
 			continue
 		}
@@ -802,7 +797,7 @@ func streamURLUploadAndVerify(ctx context.Context, client *pro.Client, plan *Pac
 // diagnostics for anything that fails before the poll (opening the URL,
 // streaming the upload itself); otherwise returns the poll's error (nil on
 // convergence) for the caller's retry decision.
-func streamURLUploadOnce(ctx context.Context, client *pro.Client, plan *PackageResourceModel, previousHash string, attempt int) (diag.Diagnostics, error) {
+func streamURLUploadOnce(ctx context.Context, client *pro.Client, plan *PackageResourceModel, previous fileDigests, attempt int) (diag.Diagnostics, error) {
 	body, urlFilename, err := files.OpenURLStream(ctx, plan.PackageFileSource.ValueString(), files.DefaultMaxBytes)
 	if err != nil {
 		return errorDiag("Error opening package URL stream", err.Error()), nil
@@ -810,14 +805,14 @@ func streamURLUploadOnce(ctx context.Context, client *pro.Client, plan *PackageR
 	defer func() { _ = body.Close() }()
 
 	pr, pw := io.Pipe()
-	hasher := sha3.New512()
+	digests := newDigester()
 	var bytesStreamed int64
 
-	// Drive the URL → (hasher, pipe-writer) tee on a goroutine so the SDK
+	// Drive the URL → (digester, pipe-writer) tee on a goroutine so the SDK
 	// can read from pr concurrently. Errors propagate through
 	// pw.CloseWithError so the SDK upload terminates with the right cause.
 	go func() {
-		n, copyErr := io.Copy(io.MultiWriter(pw, hasher), body)
+		n, copyErr := io.Copy(io.MultiWriter(pw, digests.writer()), body)
 		bytesStreamed = n
 		if copyErr != nil {
 			_ = pw.CloseWithError(fmt.Errorf("streaming URL body: %w", copyErr))
@@ -841,10 +836,10 @@ func streamURLUploadOnce(ctx context.Context, client *pro.Client, plan *PackageR
 		return errorDiag("Error streaming Jamf Pro package upload", err.Error()), nil
 	}
 
-	localSha3 := hex.EncodeToString(hasher.Sum(nil))
+	local := digests.sum()
 	localSize := bytesStreamed
 
-	_, pollErr := PollPackageVerification(ctx, client, plan.ID.ValueString(), fileName, localSha3, localSize, previousHash)
+	_, pollErr := PollPackageVerification(ctx, client, plan.ID.ValueString(), fileName, local, localSize, previous)
 	return nil, pollErr
 }
 

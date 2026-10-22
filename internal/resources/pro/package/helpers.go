@@ -6,10 +6,13 @@ package pkg
 import (
 	"bytes"
 	"context"
+	"crypto/md5" //nolint:gosec // MD5 is an integrity value the server reports, not a security control
+	"crypto/sha256"
 	"crypto/sha3"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"os"
 	"strconv"
@@ -29,10 +32,11 @@ import (
 // bound via the `timeouts` block.
 const pollInterval = 10 * time.Second
 
-// Hash algorithm tags as the server reports them post-JCDS upload.
-const (
-	hashTypeSHA3512  = "SHA3_512"
-	cloudStatusReady = "READY"
+// The cloudTransferStatus values the verification poll acts on. Any other
+// status is still in flight.
+var (
+	cloudStatusReady = string(pro.CloudDistributionPointInventoryFileInfoStatusReady)
+	cloudStatusError = string(pro.CloudDistributionPointInventoryFileInfoStatusError)
 )
 
 // errLocalChecksumMismatch is returned when the user-supplied
@@ -41,10 +45,15 @@ const (
 var errLocalChecksumMismatch = errors.New("package_file_source_checksum did not match locally computed SHA-3-512")
 
 // errCorruption is returned when the verification poll observes a non-empty
-// server hash that matches neither the expected upload hash nor the
-// pre-upload `previousHash`. This indicates the file uploaded differs from
-// what we hashed locally.
-var errCorruption = errors.New("server-computed package hash did not match locally computed SHA-3-512")
+// server digest that matches neither the locally computed digest nor the
+// pre-upload one. This indicates the file uploaded differs from what we
+// hashed locally.
+var errCorruption = errors.New("server-computed package hash did not match the locally computed digest")
+
+// errTransferFailed is returned when the distribution point reports the
+// transfer of the uploaded file as ERROR. Nothing further will arrive, so
+// the poll fails rather than waiting out its budget.
+var errTransferFailed = errors.New("distribution point reported the package transfer as ERROR")
 
 // errUploadFailed is returned when the verification poll observes a
 // server-reported `size` of "0" in the same tick the hash first changes away
@@ -58,53 +67,149 @@ var errUploadFailed = errors.New("server reported size=0 immediately after the u
 
 // errVerificationTimeout is returned when the verification poll's context
 // deadline fires before convergence.
-var errVerificationTimeout = errors.New("verification poll timed out waiting for JCDS hash convergence")
+var errVerificationTimeout = errors.New("verification poll timed out waiting for the distribution point to compute a hash")
 
-// HashFileSHA3 streams the local file through sha3.New512 once, returning
-// the hex digest and byte count. The provider needs SHA-3-512 for the
-// convergence check and the optional `package_file_source_checksum`
-// integrity hint; MD5/SHA-256 are server-computed by JCDS.
+// fileDigests holds the digests of one package file. Locally all three are
+// computed. On the server each is filled only by the distribution points that
+// compute it: JCDS fills all three, an Amazon S3 distribution point MD5 only.
+type fileDigests struct {
+	sha3, sha256, md5 string
+}
+
+// digestPair is one algorithm's digest, labelled for diagnostics.
+type digestPair struct {
+	label, value string
+}
+
+// pairs returns the digests strongest first. Index i means the same algorithm
+// in every fileDigests, so a server value and a local value at one index are
+// comparable.
+func (d fileDigests) pairs() []digestPair {
+	return []digestPair{{"SHA3-512", d.sha3}, {"SHA-256", d.sha256}, {"MD5", d.md5}}
+}
+
+// strongest returns the index into pairs of the first populated digest, or -1
+// when none is populated.
+func (d fileDigests) strongest() int {
+	for i, p := range d.pairs() {
+		if p.value != "" {
+			return i
+		}
+	}
+	return -1
+}
+
+// matches reports whether the strongest digest recorded in d equals the same
+// algorithm's digest of local. An empty record matches nothing.
+func (d fileDigests) matches(local fileDigests) bool {
+	i := d.strongest()
+	if i < 0 {
+		return false
+	}
+	return strings.EqualFold(d.pairs()[i].value, local.pairs()[i].value)
+}
+
+// recordedDigests reads the digests the package record holds, lowercased.
+func recordedDigests(p *pro.Package) fileDigests {
+	return fileDigests{
+		sha3:   strings.ToLower(helpers.DerefString(p.Sha3512)),
+		sha256: strings.ToLower(helpers.DerefString(p.Sha256)),
+		md5:    strings.ToLower(helpers.DerefString(p.Md5)),
+	}
+}
+
+// recordedDigestsFromState reads the digests held in state, lowercased.
+func recordedDigestsFromState(m *PackageResourceModel) fileDigests {
+	return fileDigests{
+		sha3:   strings.ToLower(m.Sha3512.ValueString()),
+		sha256: strings.ToLower(m.Sha256.ValueString()),
+		md5:    strings.ToLower(m.Md5.ValueString()),
+	}
+}
+
+// digester computes all three digests of a stream in one pass.
+type digester struct {
+	sha3, sha256, md5 hash.Hash
+}
+
+func newDigester() digester {
+	return digester{sha3: sha3.New512(), sha256: sha256.New(), md5: md5.New()} //nolint:gosec // see the md5 import
+}
+
+// writer returns a writer that feeds every digest.
+func (d digester) writer() io.Writer {
+	return io.MultiWriter(d.sha3, d.sha256, d.md5)
+}
+
+// sum returns the digests of everything written so far.
+func (d digester) sum() fileDigests {
+	return fileDigests{
+		sha3:   hex.EncodeToString(d.sha3.Sum(nil)),
+		sha256: hex.EncodeToString(d.sha256.Sum(nil)),
+		md5:    hex.EncodeToString(d.md5.Sum(nil)),
+	}
+}
+
+// HashFileSHA3 returns the SHA-3-512 hex digest and byte count of a local file.
+// Exported for the acceptance fixtures, which compare against the server's
+// SHA-3-512 on Jamf Cloud.
 func HashFileSHA3(path string) (string, int64, error) {
+	d, n, err := hashFile(path)
+	return d.sha3, n, err
+}
+
+// HashFileDigests returns the SHA-3-512 and MD5 hex digests and byte count of
+// a local file. Exported for the acceptance fixtures, which check the digest a
+// distribution point reports for the file it holds.
+func HashFileDigests(path string) (string, string, int64, error) {
+	d, n, err := hashFile(path)
+	return d.sha3, d.md5, n, err
+}
+
+// hashFile streams the local file once, returning every digest and the byte
+// count.
+func hashFile(path string) (fileDigests, int64, error) {
 	f, err := os.Open(path) //nolint:gosec // user-supplied path is intentional
 	if err != nil {
-		return "", 0, fmt.Errorf("opening %q for hashing: %w", path, err)
+		return fileDigests{}, 0, fmt.Errorf("opening %q for hashing: %w", path, err)
 	}
 	defer func() { _ = f.Close() }()
 
-	return HashStreamSHA3(f)
+	return hashStream(f)
 }
 
-// HashStreamSHA3 streams r through sha3.New512 once. Lets callers that
-// already hold an open *os.File hash the bytes without reopening the
-// file — critical for URL-source uploads where reopening would force a
-// second download.
-func HashStreamSHA3(r io.Reader) (string, int64, error) {
-	h := sha3.New512()
-	n, err := io.Copy(h, r)
+// hashStream streams r once through every digest. Lets callers that already
+// hold an open *os.File hash the bytes without reopening the file — critical
+// for URL-source uploads where reopening would force a second download.
+func hashStream(r io.Reader) (fileDigests, int64, error) {
+	d := newDigester()
+	n, err := io.Copy(d.writer(), r)
 	if err != nil {
-		return "", n, fmt.Errorf("hashing stream: %w", err)
+		return fileDigests{}, n, fmt.Errorf("hashing stream: %w", err)
 	}
-	return hex.EncodeToString(h.Sum(nil)), n, nil
+	return d.sum(), n, nil
 }
 
-// PollPackageVerification nudges the cloud distribution point and polls
-// the package record until JCDS has finished committing the uploaded
-// binary. Convergence requires server-reported `hashValue`, `size`, AND
-// `cloudTransferStatus=READY` to all line up with the locally-computed
-// expectations. The size gate is critical: acceptance traces showed JCDS
-// briefly returning a transient `hashValue` matching the new bytes while
-// `size` was still the old binary's, then reverting — a hash-only
-// convergence check would falsely declare success on that transient view.
+// PollPackageVerification nudges the cloud distribution point and polls the
+// package record until the distribution point has finished committing the
+// uploaded binary. Convergence requires the strongest digest the server holds
+// to equal the locally computed one, with `size` and `cloudTransferStatus=READY`
+// lining up too. The size gate is critical: acceptance traces showed JCDS
+// briefly returning a transient hash matching the new bytes while `size` was
+// still the old binary's, then reverting — a hash-only convergence check would
+// falsely declare success on that transient view.
+//
+// Which digests exist depends on the distribution point: JCDS fills SHA3-512,
+// an Amazon S3 distribution point MD5 only. The check compares the strongest
+// one populated, so it never waits for a digest that will not arrive.
 //
 // Returns errUploadFailed as soon as a server-reported `size` of "0" shows
-// up alongside a hash change — a definitive failed-upload signal that would
-// otherwise stall out the full poll budget before timing out. uploadAndPoll
-// retries the whole upload when it sees this error.
+// up alongside a digest change, and errTransferFailed as soon as the transfer
+// reports ERROR. uploadAndPoll retries the whole upload when it sees the former.
 //
-// expectSha3 / expectSize describe the locally-computed digest + byte
-// count of the file we just uploaded. previousHash is the SHA-3 digest
-// stored before the upload so a "still-recomputing" view does not trip
-// the corruption check.
+// local is the digest set of the file we just uploaded; previous is the digest
+// set stored before the upload, so a "still-recomputing" view does not trip the
+// corruption check.
 //
 // Each tick performs:
 //
@@ -113,12 +218,10 @@ func HashStreamSHA3(r io.Reader) (string, int64, error) {
 //  2. GetPackageV1(id) — observe convergence.
 //
 // Returns the converged *pro.Package on success.
-func PollPackageVerification(ctx context.Context, client *pro.Client, id, fileName, expectSha3 string, expectSize int64, previousHash string) (*pro.Package, error) {
+func PollPackageVerification(ctx context.Context, client *pro.Client, id, fileName string, local fileDigests, expectSize int64, previous fileDigests) (*pro.Package, error) {
 	if client == nil {
 		return nil, errors.New("PollPackageVerification: nil client")
 	}
-	expectLower := strings.ToLower(expectSha3)
-	previousLower := strings.ToLower(previousHash)
 
 	// First iteration runs immediately — no initial wait. Subsequent ticks
 	// honour pollInterval.
@@ -146,31 +249,33 @@ func PollPackageVerification(ctx context.Context, client *pro.Client, id, fileNa
 			return nil, fmt.Errorf("polling package %s: %w", id, err)
 		}
 
-		cur := strings.ToLower(helpers.DerefString(pkg.HashValue))
-		hashType := helpers.DerefString(pkg.HashType)
+		server := recordedDigests(pkg)
 		status := helpers.DerefString(pkg.CloudTransferStatus)
 		sizeStr := helpers.DerefString(pkg.Size)
 
 		tflog.Info(ctx, "package poll tick", map[string]any{
 			"tick":           tick,
 			"id":             id,
-			"cur_hash":       cur,
-			"expect_hash":    expectLower,
-			"previous_hash":  previousLower,
-			"hash_type":      hashType,
+			"cur_sha3":       server.sha3,
+			"cur_sha256":     server.sha256,
+			"cur_md5":        server.md5,
+			"expect_sha3":    local.sha3,
+			"previous_sha3":  previous.sha3,
 			"transfer_state": status,
 			"cur_size":       sizeStr,
 			"expect_size":    expectSize,
 		})
 
-		decision := classifyPollTick(cur, expectLower, previousLower, hashType, status, sizeStr, expectSize)
+		decision := classifyPollTick(server, local, previous, status, sizeStr, expectSize)
 		switch decision {
 		case pollDecisionConverged:
 			return pkg, nil
 		case pollDecisionUploadFailed:
 			return nil, fmt.Errorf("%w: package %s", errUploadFailed, id)
+		case pollDecisionTransferFailed:
+			return nil, fmt.Errorf("%w: package %s", errTransferFailed, id)
 		case pollDecisionCorruption:
-			return nil, fmt.Errorf("%w: expected %s, server reported %s", errCorruption, expectLower, cur)
+			return nil, fmt.Errorf("%w: expected %s, server reported %s", errCorruption, local.sha3, server.sha3)
 		}
 
 		// Wait for the next tick. The first iteration's refresh+GET has
@@ -306,6 +411,7 @@ const (
 	pollDecisionContinue pollDecision = iota
 	pollDecisionConverged
 	pollDecisionUploadFailed
+	pollDecisionTransferFailed
 	pollDecisionCorruption
 )
 
@@ -322,43 +428,53 @@ func isZeroSize(curSize string) bool {
 }
 
 // classifyPollTick decides what to do with the server's response on a
-// single verification poll tick. expectHash + expectSize describe the
-// locally-known bytes; previousHash is the digest stored before the
-// upload (used to swallow the "still recomputing" transient view).
+// single verification poll tick. server is the digests the package record
+// holds, local those of the bytes uploaded, previous those stored before the
+// upload; curSize is the record's size and expectSize the local byte count.
 //
-//   - UploadFailed: the hash just changed away from previousHash AND size
-//     reads back "0" while the upload itself is NOT actually zero bytes.
-//     Checked before anything else — a zero-byte binary is a definitive
-//     failed-upload signal regardless of what the hash looks like, and
-//     waiting out the rest of the poll budget only delays the retry.
-//     Mirrors jamf-cli/jamf-upload's `size_is_zero` check. Gated on
-//     expectSize != 0 so a genuinely empty `package_file_source` (size "0"
-//     really is correct) still converges normally below instead of being
-//     misread as a failed upload.
-//   - Converged: hash matches expected, hashType is SHA3_512, status is
-//     READY, AND size matches expected. The size gate catches the
-//     transient JCDS window where hash flips to new while size still
-//     shows the old binary — also covers the "package being updated"
-//     case, where a lingering size only matches the previous package's
-//     byte count, never the new upload's.
-//   - Corruption: server reported a SHA3_512 hash that is neither
-//     expected nor previousHash AND size matches expected (corrupt bytes
-//     would still report their own size). Skip the corruption branch
-//     when size has not yet caught up — that is the transient window,
-//     not a real mismatch.
-//   - Continue: everything else.
-func classifyPollTick(cur, expectHash, previousHash, hashType, status, curSize string, expectSize int64) pollDecision {
-	hashChanged := cur != "" && cur != previousHash
-	if hashChanged && expectSize != 0 && isZeroSize(curSize) {
+// The comparison uses the strongest digest the server populated, at the same
+// algorithm on both sides, so a distribution point that computes only MD5 is
+// judged on MD5.
+//
+//   - TransferFailed: status is ERROR. Checked first; nothing further arrives.
+//   - UploadFailed: the digest just changed away from previous AND size reads
+//     back "0" while the upload itself is NOT actually zero bytes. Checked
+//     before the match branches — a zero-byte binary is a definitive
+//     failed-upload signal regardless of the digest, and waiting out the
+//     rest of the poll budget only delays the retry. Gated on expectSize != 0
+//     so a genuinely empty package_file_source (size "0" really is correct)
+//     still converges normally below.
+//   - Converged: digest matches local, status is READY, AND size matches
+//     expected. The size gate catches the transient JCDS window where the
+//     digest flips to new while size still shows the old binary — also covers
+//     the "package being updated" case, where a lingering size only matches
+//     the previous package's byte count, never the new upload's.
+//   - Corruption: server reported a digest that is neither local nor previous
+//     AND size matches expected (corrupt bytes would still report their own
+//     size). Skip when size has not yet caught up — that is the transient
+//     window, not a real mismatch.
+//   - Continue: everything else, including no digest populated yet.
+func classifyPollTick(server, local, previous fileDigests, status, curSize string, expectSize int64) pollDecision {
+	if status == cloudStatusError {
+		return pollDecisionTransferFailed
+	}
+	i := server.strongest()
+	if i < 0 {
+		return pollDecisionContinue
+	}
+	cur := server.pairs()[i].value
+	localVal := local.pairs()[i].value
+	prevVal := previous.pairs()[i].value
+
+	if cur != prevVal && expectSize != 0 && isZeroSize(curSize) {
 		return pollDecisionUploadFailed
 	}
 
 	sizeMatch := curSize != "" && curSize == strconv.FormatInt(expectSize, 10)
-	hashMatch := cur != "" && cur == expectHash && hashType == hashTypeSHA3512 && status == cloudStatusReady
-	if hashMatch && sizeMatch {
+	if cur == localVal && status == cloudStatusReady && sizeMatch {
 		return pollDecisionConverged
 	}
-	if cur != "" && cur != expectHash && cur != previousHash && hashType == hashTypeSHA3512 && sizeMatch {
+	if cur != localVal && cur != prevVal && sizeMatch {
 		return pollDecisionCorruption
 	}
 	return pollDecisionContinue

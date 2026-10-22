@@ -6,6 +6,7 @@
 package pkg_test
 
 import (
+	"crypto/md5" //nolint:gosec // see downloadAndHashURL
 	"crypto/sha3"
 	"encoding/hex"
 	"io"
@@ -58,11 +59,31 @@ func fixturePath(t *testing.T, name string) string {
 // hashes against the locally computed digest.
 func fixtureSHA3(t *testing.T, path string) string {
 	t.Helper()
-	digest, _, err := pkg.HashFileSHA3(path)
+	sha3, md5, _, err := pkg.HashFileDigests(path)
 	if err != nil {
 		t.Fatalf("hashing fixture %q: %v", path, err)
 	}
-	return strings.ToLower(digest)
+	recordMD5(sha3, md5)
+	return strings.ToLower(sha3)
+}
+
+// md5BySHA3 maps each fixture's SHA-3-512 to its MD5. An Amazon S3 distribution
+// point computes MD5 only, so the convergence check uses this to find what the
+// server should report for a fixture whose SHA-3-512 it never computes.
+var md5BySHA3 sync.Map
+
+func recordMD5(sha3, md5 string) {
+	md5BySHA3.Store(strings.ToLower(sha3), strings.ToLower(md5))
+}
+
+// expectedMD5 returns the MD5 recorded for a fixture's SHA-3-512, or "" when
+// the fixture was never hashed through this file.
+func expectedMD5(sha3 string) string {
+	v, ok := md5BySHA3.Load(strings.ToLower(sha3))
+	if !ok {
+		return ""
+	}
+	return v.(string)
 }
 
 // urlFixtureCache memoises URL → (localPath, sha3) so each URL fixture is
@@ -110,12 +131,15 @@ func downloadAndHashURL(t *testing.T, url string) (string, string) {
 	}
 
 	hasher := sha3.New512()
-	if _, err := io.Copy(io.MultiWriter(tmp, hasher), resp.Body); err != nil {
+	md5Hasher := md5.New() //nolint:gosec // matches the MD5 the distribution point reports
+	if _, err := io.Copy(io.MultiWriter(tmp, hasher, md5Hasher), resp.Body); err != nil {
 		_ = os.Remove(tmp.Name())
 		t.Fatalf("streaming URL fixture %q: %v", url, err)
 	}
+	md5Hex := hex.EncodeToString(md5Hasher.Sum(nil))
 
 	digest := strings.ToLower(hex.EncodeToString(hasher.Sum(nil)))
+	recordMD5(digest, md5Hex)
 	urlFixtureCache[url] = urlFixtureRecord{path: tmp.Name(), sha3: digest}
 	return tmp.Name(), digest
 }

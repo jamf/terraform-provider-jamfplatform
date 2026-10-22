@@ -20,123 +20,124 @@ func TestClassifyPollTick(t *testing.T) {
 	const (
 		expectHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 		prevHash   = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-		corrupt    = "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+		corrupt    = "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+		expectMD5  = "11111111111111111111111111111111"
+		prevMD5    = "22222222222222222222222222222222"
 		expectSize = int64(11806221)
 	)
 	expectSizeStr := "11806221"
 	oldSizeStr := "11774769"
 
+	local := fileDigests{sha3: expectHash, md5: expectMD5}
+	previous := fileDigests{sha3: prevHash, md5: prevMD5}
+	jcds := func(v string) fileDigests { return fileDigests{sha3: v, md5: "", sha256: ""} }
+	s3 := func(v string) fileDigests { return fileDigests{md5: v} }
+
 	cases := []struct {
 		name      string
-		cur       string
-		hashType  string
+		server    fileDigests
 		status    string
 		curSize   string
+		local     fileDigests
 		want      pollDecision
 		wantNotes string
 	}{
 		{
-			name:     "converged",
-			cur:      expectHash,
-			hashType: "SHA3_512",
-			status:   "READY",
-			curSize:  expectSizeStr,
-			want:     pollDecisionConverged,
+			name:   "converged on JCDS SHA3-512",
+			server: jcds(expectHash),
+			status: "READY", curSize: expectSizeStr, local: local,
+			want: pollDecisionConverged,
 		},
 		{
-			name:      "still recomputing — previous hash",
-			cur:       prevHash,
-			hashType:  "SHA3_512",
-			status:    "READY",
-			curSize:   oldSizeStr,
+			name:   "converged on S3 MD5 only",
+			server: s3(expectMD5),
+			status: "READY", curSize: expectSizeStr, local: local,
+			want:      pollDecisionConverged,
+			wantNotes: "an S3 distribution point never fills sha3512; the MD5 is the strongest populated digest",
+		},
+		{
+			name:   "strongest populated decides over a weaker wrong one",
+			server: fileDigests{sha3: expectHash, md5: "wrong"},
+			status: "READY", curSize: expectSizeStr, local: local,
+			want: pollDecisionConverged,
+		},
+		{
+			name:   "wrong SHA3-512 fails despite a matching MD5",
+			server: fileDigests{sha3: corrupt, md5: expectMD5},
+			status: "READY", curSize: expectSizeStr, local: local,
+			want: pollDecisionCorruption,
+		},
+		{
+			name:   "PENDING does not converge",
+			server: s3(expectMD5),
+			status: "PENDING", curSize: expectSizeStr, local: local,
+			want: pollDecisionContinue,
+		},
+		{
+			name:   "ERROR fails at once",
+			server: s3(""),
+			status: "ERROR", curSize: "", local: local,
+			want: pollDecisionTransferFailed,
+		},
+		{
+			name:   "previous file's digest still served — keep polling",
+			server: s3(prevMD5),
+			status: "READY", curSize: expectSizeStr, local: local,
 			want:      pollDecisionContinue,
-			wantNotes: "previousHash branch — JCDS still serving old bytes",
+			wantNotes: "server has not recomputed from the new file yet",
 		},
 		{
-			name:      "transient hash flip — size still old",
-			cur:       expectHash,
-			hashType:  "SHA3_512",
-			status:    "READY",
-			curSize:   oldSizeStr,
+			name:   "size still the old binary's — not converged",
+			server: jcds(expectHash),
+			status: "READY", curSize: oldSizeStr, local: local,
 			want:      pollDecisionContinue,
 			wantNotes: "size guard — JCDS in commit window; hash flipped but size hasn't",
 		},
 		{
-			name:      "corruption — bogus hash, size matches upload",
-			cur:       corrupt,
-			hashType:  "SHA3_512",
-			status:    "READY",
-			curSize:   expectSizeStr,
+			name:   "corruption — bogus digest, size matches upload",
+			server: jcds(corrupt),
+			status: "READY", curSize: expectSizeStr, local: local,
 			want:      pollDecisionCorruption,
 			wantNotes: "server stored bytes whose hash differs from what we sent",
 		},
 		{
-			name:      "corruption skipped while size still in flight",
-			cur:       corrupt,
-			hashType:  "SHA3_512",
-			status:    "READY",
-			curSize:   oldSizeStr,
+			name:   "corruption skipped while size still in flight",
+			server: jcds(corrupt),
+			status: "READY", curSize: oldSizeStr, local: local,
 			want:      pollDecisionContinue,
 			wantNotes: "do not flag corruption during the transient size window",
 		},
 		{
-			name:     "empty server response — still warming up",
-			cur:      "",
-			hashType: "",
-			status:   "",
-			curSize:  "",
-			want:     pollDecisionContinue,
+			name:   "no digest populated yet — still warming up",
+			server: fileDigests{},
+			status: "", curSize: "", local: local,
+			want: pollDecisionContinue,
 		},
 		{
-			name:      "legacy SHA_512 algorithm tag — not converged",
-			cur:       expectHash,
-			hashType:  "SHA_512",
-			status:    "READY",
-			curSize:   expectSizeStr,
-			want:      pollDecisionContinue,
-			wantNotes: "pre-upload default — must wait for hashType to flip to SHA3_512",
-		},
-		{
-			name:     "status not READY — not converged",
-			cur:      expectHash,
-			hashType: "SHA3_512",
-			status:   "IN_PROGRESS",
-			curSize:  expectSizeStr,
-			want:     pollDecisionContinue,
-		},
-		{
-			name:      "upload failed — size=0 with expected hash",
-			cur:       expectHash,
-			hashType:  "SHA3_512",
-			status:    "READY",
-			curSize:   "0",
+			name:   "upload failed — size=0 with a new digest",
+			server: jcds(expectHash),
+			status: "READY", curSize: "0", local: local,
 			want:      pollDecisionUploadFailed,
-			wantNotes: "definitive failed-upload signal, checked before the hash/size match branches",
+			wantNotes: "definitive failed-upload signal, checked before the match branches",
 		},
 		{
-			name:      "upload failed — size=0 with a bogus hash",
-			cur:       corrupt,
-			hashType:  "SHA3_512",
-			status:    "IN_PROGRESS",
-			curSize:   "0",
+			name:   "upload failed — size=0 with a bogus digest",
+			server: jcds(corrupt),
+			status: "IN_PROGRESS", curSize: "0", local: local,
 			want:      pollDecisionUploadFailed,
 			wantNotes: "size=0 wins over corruption — do not wait out the poll budget to report the wrong failure mode",
 		},
 		{
-			name:      "size=0 but hash has not changed yet — still warming up",
-			cur:       prevHash,
-			hashType:  "SHA3_512",
-			status:    "READY",
-			curSize:   "0",
+			name:   "size=0 but digest has not changed yet — still warming up",
+			server: s3(prevMD5),
+			status: "READY", curSize: "0", local: local,
 			want:      pollDecisionContinue,
-			wantNotes: "hash still equals previousHash — not yet a signal either way",
+			wantNotes: "digest still equals previous — not yet a signal either way",
 		},
 		{
-			name:      "empty size is not zero size",
-			cur:       expectHash,
-			hashType:  "SHA3_512",
-			status:    "READY",
-			curSize:   "",
+			name:   "empty size is not zero size",
+			server: jcds(expectHash),
+			status: "READY", curSize: "", local: local,
 			want:      pollDecisionContinue,
 			wantNotes: "\"\" means not-yet-computed, not a failed upload",
 		},
@@ -145,7 +146,7 @@ func TestClassifyPollTick(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := classifyPollTick(tc.cur, expectHash, prevHash, tc.hashType, tc.status, tc.curSize, expectSize)
+			got := classifyPollTick(tc.server, tc.local, previous, tc.status, tc.curSize, expectSize)
 			if got != tc.want {
 				t.Fatalf("decision = %v, want %v (%s)", got, tc.want, tc.wantNotes)
 			}
@@ -165,7 +166,7 @@ func TestClassifyPollTick_ZeroByteUpload(t *testing.T) {
 		prevHash   = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	)
 
-	got := classifyPollTick(expectHash, expectHash, prevHash, "SHA3_512", "READY", "0", 0)
+	got := classifyPollTick(fileDigests{sha3: expectHash}, fileDigests{sha3: expectHash}, fileDigests{sha3: prevHash}, "READY", "0", 0)
 	if got != pollDecisionConverged {
 		t.Fatalf("decision = %v, want %v — a zero-byte upload must converge, not be flagged as a failed upload", got, pollDecisionConverged)
 	}
@@ -320,6 +321,57 @@ func TestRetryableUploadFailure(t *testing.T) {
 			t.Parallel()
 			if got := retryableUploadFailure(tc.err, tc.attempt, tc.maxAttempts); got != tc.want {
 				t.Errorf("retryableUploadFailure(%v, %d, %d) = %v, want %v", tc.err, tc.attempt, tc.maxAttempts, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestHashFile_AllDigests checks every digest against known vectors for
+// "hello world", the same payload the SHA-3-512 test uses.
+func TestHashFile_AllDigests(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fixture.pkg")
+	if err := os.WriteFile(path, []byte("hello world"), 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	got, size, err := hashFile(path)
+	if err != nil {
+		t.Fatalf("hashFile: %v", err)
+	}
+	if size != 11 {
+		t.Errorf("size = %d, want 11", size)
+	}
+	if got.md5 != "5eb63bbbe01eeed093cb22bb8f5acdc3" {
+		t.Errorf("md5 = %q", got.md5)
+	}
+	if got.sha256 != "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9" {
+		t.Errorf("sha256 = %q", got.sha256)
+	}
+	if got.sha3 == "" {
+		t.Errorf("sha3 empty")
+	}
+}
+
+func TestFileDigests_Matches(t *testing.T) {
+	t.Parallel()
+
+	local := fileDigests{sha3: "s", sha256: "b", md5: "m"}
+	tests := []struct {
+		name     string
+		recorded fileDigests
+		want     bool
+	}{
+		{"empty record never matches", fileDigests{}, false},
+		{"JCDS sha3 record", fileDigests{sha3: "s"}, true},
+		{"S3 md5-only record", fileDigests{md5: "m"}, true},
+		{"strongest recorded decides", fileDigests{sha3: "s", md5: "other"}, true},
+		{"different md5 only", fileDigests{md5: "other"}, false},
+		{"different sha3 wins over matching md5", fileDigests{sha3: "other", md5: "m"}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.recorded.matches(local); got != tc.want {
+				t.Fatalf("matches = %v, want %v", got, tc.want)
 			}
 		})
 	}

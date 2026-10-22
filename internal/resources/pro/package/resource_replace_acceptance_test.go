@@ -29,7 +29,7 @@ import (
 // the converged state plans nothing.
 func TestAccResource_ProPackage_LocalReplaceAtSamePath(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	testhelpers.RequireJCDSUploads(t)
+	testhelpers.RequireDirectUploads(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-package-replace-" + suffix
 	fileName := name + ".pkg"

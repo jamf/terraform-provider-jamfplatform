@@ -221,7 +221,7 @@ func (r *PackageResource) Schema(ctx context.Context, req resource.SchemaRequest
 			// cloud distribution point upload, or the user supplies them when
 			// managing a record without an uploaded file.
 			"sha3_512": schema.StringAttribute{
-				MarkdownDescription: "SHA-3-512 hex digest of the package file. Calculated by Jamf Pro after a cloud distribution point upload, or set directly when managing the record without an uploaded file. Cannot be combined with `package_file_source`.",
+				MarkdownDescription: "SHA-3-512 hex digest of the package file. Calculated by Jamf Pro after a Jamf Cloud distribution point upload, or set directly when managing the record without an uploaded file. An Amazon S3 distribution point does not calculate it, so the value stays empty there; the upload is verified against the strongest digest the distribution point reports. Cannot be combined with `package_file_source`.",
 				Optional:            true,
 				Computed:            true,
 				Validators: []validator.String{

@@ -5,7 +5,6 @@ package pkg
 
 import (
 	"context"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -41,15 +40,18 @@ func planUploadedContentChange(ctx context.Context, req resource.ModifyPlanReque
 		return
 	}
 
-	var source, stateSha3 types.String
+	var source types.String
 	if diags := req.Plan.GetAttribute(ctx, path.Root("package_file_source"), &source); diags.HasError() {
 		return
 	}
 	if !isConfiguredString(source) || files.URLSource(source.ValueString()) {
 		return
 	}
-	if diags := req.State.GetAttribute(ctx, path.Root("sha3_512"), &stateSha3); diags.HasError() {
-		return
+	var stateSha3, stateSha256, stateMD5 types.String
+	for name, dst := range map[string]*types.String{"sha3_512": &stateSha3, "sha256": &stateSha256, "md5": &stateMD5} {
+		if diags := req.State.GetAttribute(ctx, path.Root(name), dst); diags.HasError() {
+			return
+		}
 	}
 
 	file, _, cleanup, err := files.OpenUploadSource(ctx, source.ValueString(), files.DefaultMaxBytes)
@@ -59,12 +61,13 @@ func planUploadedContentChange(ctx context.Context, req resource.ModifyPlanReque
 	}
 	defer cleanup()
 
-	localSha3, _, err := HashStreamSHA3(file)
+	local, _, err := hashStream(file)
 	if err != nil {
 		tflog.Debug(ctx, "package content check skipped: source not hashable at plan time", map[string]any{"err": err.Error()})
 		return
 	}
-	if !stateSha3.IsNull() && !stateSha3.IsUnknown() && strings.EqualFold(stateSha3.ValueString(), localSha3) {
+	recorded := fileDigests{sha3: stateSha3.ValueString(), sha256: stateSha256.ValueString(), md5: stateMD5.ValueString()}
+	if recorded.matches(local) {
 		return
 	}
 

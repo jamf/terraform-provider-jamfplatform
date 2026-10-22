@@ -82,11 +82,11 @@ func TestPlanUploadedContentChange_ChangedBytesGoUnknown(t *testing.T) {
 
 func TestPlanUploadedContentChange_UnchangedBytesCarryForward(t *testing.T) {
 	src := writeContentFile(t, "same bytes")
-	sha, _, err := HashStreamSHA3(mustOpen(t, src))
+	digests, _, err := hashStream(mustOpen(t, src))
 	if err != nil {
 		t.Fatal(err)
 	}
-	req, resp := contentPlanFixture(t, sha, src)
+	req, resp := contentPlanFixture(t, digests.sha3, src)
 
 	planUploadedContentChange(context.Background(), req, resp)
 
