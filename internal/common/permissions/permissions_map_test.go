@@ -77,10 +77,52 @@ var publishedMapOmissions = map[string]bool{
 	"platform-environments": true,
 }
 
+// publishedMapActionOmissions are {capability}:{action} requirements the SDK
+// declares on a capability the article does list, for an action the article's
+// row for it leaves out. Self-expiring like publishedMapOmissions: the day the
+// article's row carries the action the entry must go.
+//
+// recovery-lock:execute: the article lists recovery-lock as {r} only, over
+// /view-recovery-lock-password. POST /pro/v2/mdm/commands enforces
+// recovery-lock:execute for SET_RECOVERY_LOCK (SDK v1.9.0 WIRE-FACTS,
+// 2026-10-22: a credential without it is refused 403 BAD_PERMISSIONS for that
+// one command type and accepted for the other 34). The SDK reports it as
+// enforced but unpublished, so the rendered table names it from the SDK and
+// this entry records that the article cannot confirm it.
+var publishedMapActionOmissions = map[string]bool{
+	"recovery-lock:execute": true,
+}
+
 // publishedRow is one parsed article row.
 type publishedRow struct {
 	section string
 	name    string
+	actions map[string]bool
+}
+
+// mapActionCodes translates the article's one- and three-letter action codes
+// into the slugs the SDK emits.
+var mapActionCodes = map[string]string{
+	"c":   "create",
+	"r":   "read",
+	"u":   "update",
+	"d":   "delete",
+	"dep": "deploy",
+	"x":   "execute",
+}
+
+func parseActionCodes(t *testing.T, slug, codes string) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	for code := range strings.SplitSeq(codes, ",") {
+		action, ok := mapActionCodes[code]
+		if !ok {
+			t.Errorf("%s declares action code %q, which mapActionCodes does not know", slug, code)
+			continue
+		}
+		out[action] = true
+	}
+	return out
 }
 
 func parsePublishedMap(t *testing.T) map[string]publishedRow {
@@ -126,7 +168,7 @@ func parsePublishedMap(t *testing.T) map[string]publishedRow {
 		// /baselines. The first wins, which is the row carrying the wider
 		// action set and the one the catalogue transcribed.
 		if _, seen := rows[m[2]]; !seen {
-			rows[m[2]] = publishedRow{section: section, name: m[1]}
+			rows[m[2]] = publishedRow{section: section, name: m[1], actions: parseActionCodes(t, m[2], m[3])}
 		}
 	}
 
@@ -189,6 +231,51 @@ func TestCatalogueMatchesThePublishedMap(t *testing.T) {
 			t.Errorf("%s name = %q, article says %q\n"+
 				"The picker is searched BY NAME, so a name expanded or abbreviated here is a "+
 				"name that finds nothing in the box.", slug, got.name, want.name)
+		}
+	}
+}
+
+// TestSDKActionsAreDeclaredByThePublishedMap asserts the action half of every
+// SDK requirement against the article. TestCatalogueMatchesThePublishedMap
+// compares section and name only, so a capability the article lists for read
+// alone passes it while a rendered table tells an operator to tick Execute on a
+// row whose picker has no such box.
+func TestSDKActionsAreDeclaredByThePublishedMap(t *testing.T) {
+	published := parsePublishedMap(t)
+
+	required := map[string]string{}
+	for pkgName, reg := range sdkRegistries() {
+		for method, mp := range reg {
+			for _, scoped := range mp.Scoped {
+				if _, _, ok := splitScoped(scoped); !ok {
+					continue
+				}
+				if _, dup := required[scoped]; !dup {
+					required[scoped] = pkgName + "." + method
+				}
+			}
+		}
+	}
+
+	for scoped, where := range required {
+		capability, action, _ := splitScoped(scoped)
+		row, ok := published[capability]
+		if !ok {
+			continue // publishedMapOmissions or the coverage test reports it
+		}
+		declared := row.actions[action]
+		switch {
+		case !declared && !publishedMapActionOmissions[scoped]:
+			t.Errorf("%s requires %s, which the article's row for %q does not declare — "+
+				"record it in publishedMapActionOmissions with the evidence, or the SDK is wrong",
+				where, scoped, capability)
+		case declared && publishedMapActionOmissions[scoped]:
+			t.Errorf("publishedMapActionOmissions still excuses %q, which the article now declares — delete the entry", scoped)
+		}
+	}
+	for scoped := range publishedMapActionOmissions {
+		if _, ok := required[scoped]; !ok {
+			t.Errorf("publishedMapActionOmissions excuses %q, which no SDK method requires — delete the entry", scoped)
 		}
 	}
 }

@@ -175,12 +175,30 @@ func splitScoped(scoped string) (capability, action string, ok bool) {
 	return capability, action, true
 }
 
+// collection is what collect resolves from a list of SDK methods.
+//
+// reqs holds the capabilities every named method needs together. alternatives
+// holds those of a method whose MethodPrivileges.ScopedAlternatives is set,
+// where the request selects which ONE applies and holding the rest is never
+// required (POST /pro/v2/mdm/commands chooses among four from commandType).
+// They are kept apart because the two read opposite ways to an operator, and
+// folding an alternatives set into reqs would tell them to grant all four to
+// send one lock command.
+//
+// noPrivilege reports that every method that did resolve requires no
+// permission at all, which is a different answer from none of them resolving.
+// missing names the methods absent from the registry, so a caller (and the
+// drift-guard test) can detect one renamed or removed in the SDK.
+type collection struct {
+	reqs         []requirement
+	alternatives []requirement
+	noPrivilege  bool
+	missing      []string
+	scopes       []jamfplatform.ScopeKind
+}
+
 // collect returns the deduplicated capability requirements across the named
-// methods, plus the names not found in the registry. A missing slice lets the
-// caller (and the drift-guard test) detect a method that was renamed or removed
-// in the SDK. noPrivilege reports that every method that did resolve requires
-// no permission at all, which is a different answer from none of them
-// resolving.
+// methods.
 //
 // Rows are ordered by section name and then by permission name, alphabetically.
 // The order is therefore derived from the catalogue itself rather than from a
@@ -191,6 +209,10 @@ func splitScoped(scoped string) (capability, action string, ok bool) {
 // resolved row — neither has picker names to sort on, and both render as
 // visibly incomplete.
 //
+// A capability two methods require together and one offers as an alternative
+// appears in both lists, since the operator needs it for the first reason
+// whatever the second says.
+//
 // A method absent from the registry suppresses the scope claim as well as
 // marking the row set incomplete, for the same reason intersectScopes treats an
 // entry declaring no scope as narrowing the result to nothing: the intersection
@@ -200,42 +222,64 @@ func splitScoped(scoped string) (capability, action string, ok bool) {
 // safe rendering of a partial fold is none. It is a separate condition from
 // known == 0 because a mixed list still resolves methods, which is exactly the
 // case a count of resolutions cannot see.
-func collect(reg Registry, methods []string) (reqs []requirement, noPrivilege bool, missing []string, scopes []jamfplatform.ScopeKind) {
-	seen := make(map[string]int)
+func collect(reg Registry, methods []string) collection {
+	var c collection
+	all := rowSet{seen: map[string]int{}}
+	alt := rowSet{seen: map[string]int{}}
 	known := 0
-	scopes = slices.Clone(scopeOrder)
+	c.scopes = slices.Clone(scopeOrder)
 	for _, name := range methods {
 		mp, ok := reg[name]
 		if !ok {
-			missing = append(missing, name)
+			c.missing = append(c.missing, name)
 			continue
 		}
 		known++
-		scopes = intersectScopes(scopes, mp.Scopes)
-		for _, scoped := range mp.Scoped {
-			capability, action, parsed := splitScoped(scoped)
-			key := capability
-			if !parsed {
-				capability, action = scoped, malformedAction
-				key = malformedAction + "\x00" + capability
-			}
-			idx, dup := seen[key]
-			if !dup {
-				idx = len(reqs)
-				seen[key] = idx
-				reqs = append(reqs, requirement{
-					capability: capability,
-					actions:    map[string]bool{},
-					malformed:  !parsed,
-				})
-			}
-			reqs[idx].actions[action] = true
+		c.scopes = intersectScopes(c.scopes, mp.Scopes)
+		if mp.ScopedAlternatives {
+			alt.add(mp.Scoped)
+		} else {
+			all.add(mp.Scoped)
 		}
 	}
-	noPrivilege = known > 0 && len(reqs) == 0
-	if known == 0 || len(missing) > 0 {
-		scopes = nil
+	c.reqs, c.alternatives = all.sorted(), alt.sorted()
+	c.noPrivilege = known > 0 && len(c.reqs) == 0 && len(c.alternatives) == 0
+	if known == 0 || len(c.missing) > 0 {
+		c.scopes = nil
 	}
+	return c
+}
+
+// rowSet accumulates deduplicated requirements in first-seen order.
+type rowSet struct {
+	reqs []requirement
+	seen map[string]int
+}
+
+func (r *rowSet) add(scopedValues []string) {
+	for _, scoped := range scopedValues {
+		capability, action, parsed := splitScoped(scoped)
+		key := capability
+		if !parsed {
+			capability, action = scoped, malformedAction
+			key = malformedAction + "\x00" + capability
+		}
+		idx, dup := r.seen[key]
+		if !dup {
+			idx = len(r.reqs)
+			r.seen[key] = idx
+			r.reqs = append(r.reqs, requirement{
+				capability: capability,
+				actions:    map[string]bool{},
+				malformed:  !parsed,
+			})
+		}
+		r.reqs[idx].actions[action] = true
+	}
+}
+
+func (r *rowSet) sorted() []requirement {
+	reqs := r.reqs
 	sort.Slice(reqs, func(i, j int) bool {
 		ci, ni, ki := rowKey(reqs[i])
 		cj, nj, kj := rowKey(reqs[j])
@@ -250,7 +294,7 @@ func collect(reg Registry, methods []string) (reqs []requirement, noPrivilege bo
 		}
 		return reqs[i].capability < reqs[j].capability
 	})
-	return reqs, noPrivilege, missing, scopes
+	return reqs
 }
 
 // intersectScopes narrows have to the kinds also present in add, preserving
@@ -377,16 +421,22 @@ func actionList(actions map[string]bool) string {
 // package never read, so a list mixing the two renders nothing rather than an
 // assurance it cannot support.
 //
+// A method whose privileges are an alternatives set (ScopedAlternatives) is
+// rendered as "grant at least one of these", in a second table after any
+// capabilities every method needs, rather than as a conjunction: the request
+// picks which one applies, so asking an operator for all of them would hand a
+// credential more than any single call needs.
+//
 // A row whose capability has no catalogue entry, or whose scoped value
 // splitScoped rejected, prints "—" in both name columns and triggers the
 // footnote. The footnote exists because the two look identical in a table: a
 // dash means this provider's copy of Jamf's permissions map does not cover the
 // row, not that the permission is ungrantable.
 func Section(reg Registry, methods ...string) string {
-	reqs, noPrivilege, missing, scopes := collect(reg, methods)
-	phrase := scopePhrase(scopes)
+	c := collect(reg, methods)
+	phrase := scopePhrase(c.scopes)
 
-	if noPrivilege && len(missing) == 0 {
+	if c.noPrivilege && len(c.missing) == 0 {
 		none := "None — any authenticated Jamf Platform API integration may call the underlying endpoints."
 		if phrase != "" {
 			none = "None beyond scope. Jamf lists this under " + phrase +
@@ -394,14 +444,16 @@ func Section(reg Registry, methods ...string) string {
 		}
 		return "\n\n**Required Jamf permissions**\n\n" + none
 	}
-	if len(reqs) == 0 {
+	if len(c.reqs) == 0 && len(c.alternatives) == 0 {
 		return ""
 	}
 
 	lead := "Grant the API integration the following permissions in Jamf Account — see "
+	if len(c.reqs) == 0 {
+		lead = "Grant the API integration at least one of the following permissions in Jamf Account — see "
+	}
 	if phrase != "" {
-		lead = "Jamf lists this under " + phrase + ". " + scopeCaveat +
-			" Grant the API integration the following permissions in Jamf Account — see "
+		lead = "Jamf lists this under " + phrase + ". " + scopeCaveat + " " + lead
 	}
 
 	var b strings.Builder
@@ -410,15 +462,12 @@ func Section(reg Registry, methods ...string) string {
 		"[Getting started with the Platform API](" + platformAPIGettingStartedURL + "). " +
 		"`Category` and `Permission` name the section and row of the permission picker; " +
 		"`Actions` are the boxes to tick within that row.\n\n")
-	b.WriteString("| Category | Permission | Actions | API capability |\n|---|---|---|---|\n")
-	unknown := false
-	for _, r := range reqs {
-		e, ok := catalogue[r.capability]
-		if !ok || r.malformed {
-			unknown = true
-			e = entry{category: "—", name: "—"}
+	unknown := writeRows(&b, c.reqs)
+	if len(c.alternatives) > 0 {
+		if len(c.reqs) > 0 {
+			b.WriteString("\nAlso grant at least one of these:\n\n")
 		}
-		fmt.Fprintf(&b, "| %s | %s | %s | `%s` |\n", e.category, e.name, actionList(r.actions), r.capability)
+		unknown = writeRows(&b, c.alternatives) || unknown
 	}
 	if unknown {
 		b.WriteString("\n`—` marks a row this provider release has no Jamf Account name recorded for: " +
@@ -429,12 +478,29 @@ func Section(reg Registry, methods ...string) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+// writeRows writes one permission table and reports whether any row had no
+// recorded Jamf Account name. Nothing is written for an empty set.
+func writeRows(b *strings.Builder, reqs []requirement) (unknown bool) {
+	if len(reqs) == 0 {
+		return false
+	}
+	b.WriteString("| Category | Permission | Actions | API capability |\n|---|---|---|---|\n")
+	for _, r := range reqs {
+		e, ok := catalogue[r.capability]
+		if !ok || r.malformed {
+			unknown = true
+			e = entry{category: "—", name: "—"}
+		}
+		fmt.Fprintf(b, "| %s | %s | %s | `%s` |\n", e.category, e.name, actionList(r.actions), r.capability)
+	}
+	return unknown
+}
+
 // Missing resolves the named methods against the registry and returns those
 // absent from it. Drift-guard tests call this to assert a construct's declared
 // SDK method list stays in sync with the SDK.
 func Missing(reg Registry, methods ...string) []string {
-	_, _, missing, _ := collect(reg, methods)
-	return missing
+	return collect(reg, methods).missing
 }
 
 // Renders reports whether a Section-rendered block grants scoped, a GA
