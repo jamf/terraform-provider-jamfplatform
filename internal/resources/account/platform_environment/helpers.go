@@ -10,6 +10,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/accounttenant"
 )
 
 // maxListedTenants bounds how many tenants a diagnostic names, so an environment
@@ -40,33 +42,6 @@ func findEnvironmentsByName(environments []account.Environment, name string) []a
 	return matches
 }
 
-// tenantsInEnvironment returns the tenants whose environment is id. Membership
-// is recorded on the tenant, not on the environment, so this is the only way to
-// know what an environment holds.
-func tenantsInEnvironment(tenants []account.Tenant, id string) []account.Tenant {
-	var held []account.Tenant
-	for _, t := range tenants {
-		if t.EnvironmentID != nil && *t.EnvironmentID == id {
-			held = append(held, t)
-		}
-	}
-	return held
-}
-
-// describeTenant renders a tenant for a diagnostic: its name where Jamf Account
-// holds one, its product, and its identifier.
-func describeTenant(t account.Tenant) string {
-	name := "(unnamed)"
-	if t.Name != nil && *t.Name != "" {
-		name = *t.Name
-	}
-	product := ""
-	if t.Product != nil && *t.Product != "" {
-		product = ", " + *t.Product
-	}
-	return fmt.Sprintf("%s (%s%s)", name, t.ID, product)
-}
-
 // appendHeldTenantsDiagnostics refuses to delete an environment that still holds
 // tenants, and reports whether it did.
 //
@@ -85,7 +60,7 @@ func appendHeldTenantsDiagnostics(diags *diag.Diagnostics, environment string, h
 			listed = append(listed, fmt.Sprintf("and %d more", len(held)-maxListedTenants))
 			break
 		}
-		listed = append(listed, describeTenant(t))
+		listed = append(listed, accounttenant.Describe(t))
 	}
 	diags.AddError(
 		"Platform environment still holds tenants",

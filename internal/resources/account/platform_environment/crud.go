@@ -29,6 +29,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/accounttenant"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -242,7 +243,7 @@ func (r *PlatformEnvironmentResource) Delete(ctx context.Context, req resource.D
 		resp.Diagnostics.AddError("Error reading Jamf Account tenants", helpers.APIErrorDetail(err))
 		return
 	}
-	if appendHeldTenantsDiagnostics(&resp.Diagnostics, state.Name.ValueString(), tenantsInEnvironment(tenants, id)) {
+	if appendHeldTenantsDiagnostics(&resp.Diagnostics, state.Name.ValueString(), accounttenant.InEnvironment(tenants, id)) {
 		return
 	}
 

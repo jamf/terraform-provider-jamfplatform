@@ -60,16 +60,6 @@ func TestBuildResultRow(t *testing.T) {
 	}
 }
 
-func TestDescribeTenant(t *testing.T) {
-	name, product := "Corp", "pro"
-	if got := describeTenant(account.Tenant{ID: "t-1", Name: &name, Product: &product}); got != "Corp (t-1, pro)" {
-		t.Errorf("got %q", got)
-	}
-	if got := describeTenant(account.Tenant{ID: "t-2"}); got != "(unnamed) (t-2)" {
-		t.Errorf("got %q", got)
-	}
-}
-
 func TestAppendHeldTenantsDiagnostics_CapsTheListing(t *testing.T) {
 	env := "env-1"
 	tenants := make([]account.Tenant, 0, 13)
