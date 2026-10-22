@@ -265,3 +265,38 @@ func TestImportHydration(t *testing.T) {
 		t.Error("a genuine refresh must not hydrate")
 	}
 }
+
+// TestAssignUserGroupResourceModel_KeepsCriterionNameAndValueTheServerTrims
+// covers issue #517: classic saves a criterion's name and value without their
+// outer whitespace, leading included (probed 2026-10-20). Criteria are matched
+// to the prior ones by position; a genuinely different server value wins, and a
+// criterion with no prior counterpart takes the wire value.
+func TestAssignUserGroupResourceModel_KeepsCriterionNameAndValueTheServerTrims(t *testing.T) {
+	ug := &proclassic.UserGroup{
+		IsSmart: new(true),
+		Criteria: &proclassic.UserGroupCriteria{Criterion: &[]proclassic.Criterion{
+			{Name: new("Email Address"), Priority: new(0), AndOr: new("and"), SearchType: new("like"), Value: new("probe@example.com"), OpeningParen: new(false), ClosingParen: new(false)},
+			{Name: new("Username"), Priority: new(1), AndOr: new("and"), SearchType: new("is"), Value: new("renamed"), OpeningParen: new(false), ClosingParen: new(false)},
+			{Name: new("Full Name"), Priority: new(2), AndOr: new("and"), SearchType: new("is"), Value: new("x"), OpeningParen: new(false), ClosingParen: new(false)},
+		}},
+	}
+	state := &UserGroupResourceModel{Criteria: []UserGroupCriterionModel{
+		{Name: types.StringValue("Email Address "), Value: types.StringValue(" probe@example.com\n")},
+		{Name: types.StringValue("Username"), Value: types.StringValue("x ")},
+	}}
+	if diags := assignUserGroupResourceModel(context.Background(), state, ug, false, false); diags.HasError() {
+		t.Fatalf("diagnostics: %v", diags)
+	}
+	if len(state.Criteria) != 3 {
+		t.Fatalf("Criteria expected 3, got %d", len(state.Criteria))
+	}
+	if got := state.Criteria[0]; got.Name.ValueString() != "Email Address " || got.Value.ValueString() != " probe@example.com\n" {
+		t.Errorf("trimmed name/value must keep the planned ones, got %q / %q", got.Name.ValueString(), got.Value.ValueString())
+	}
+	if got := state.Criteria[1].Value.ValueString(); got != "renamed" {
+		t.Errorf("a different server value must win, got %q", got)
+	}
+	if got := state.Criteria[2]; got.Name.ValueString() != "Full Name" || got.Value.ValueString() != "x" {
+		t.Errorf("a criterion with no prior must take the wire value, got %q / %q", got.Name.ValueString(), got.Value.ValueString())
+	}
+}

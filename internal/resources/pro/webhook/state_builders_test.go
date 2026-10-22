@@ -109,3 +109,33 @@ func TestAssignWebhookResourceModel_DisplayFieldsNeverNull(t *testing.T) {
 		t.Errorf("display_fields must be a known (empty) set, not null")
 	}
 }
+
+// TestAssignWebhookResourceModel_KeepsUsernameAndHeaderTheServerTrims covers
+// issue #517: classic saves both without their outer whitespace (probed
+// 2026-10-20), so the planned values must survive the read-back, while a
+// genuinely different server value wins.
+func TestAssignWebhookResourceModel_KeepsUsernameAndHeaderTheServerTrims(t *testing.T) {
+	ctx := context.Background()
+	state := WebhookResourceModel{
+		Username: types.StringValue("  bob  "),
+		Header:   types.StringValue("{\"X-A\":\"b\"}\n"),
+	}
+	w := &proclassic.Webhook{Username: new("bob"), Header: new("{\"X-A\":\"b\"}")}
+	if diags := assignWebhookResourceModel(ctx, &state, w); diags.HasError() {
+		t.Fatalf("unexpected diags: %v", diags)
+	}
+	if !state.Username.Equal(types.StringValue("  bob  ")) {
+		t.Errorf("a username the server trimmed must keep the planned value, got %q", state.Username.ValueString())
+	}
+	if !state.Header.Equal(types.StringValue("{\"X-A\":\"b\"}\n")) {
+		t.Errorf("a header the server trimmed must keep the planned value, got %q", state.Header.ValueString())
+	}
+
+	w = &proclassic.Webhook{Username: new("alice"), Header: new("{\"X-A\":\"c\"}")}
+	if diags := assignWebhookResourceModel(ctx, &state, w); diags.HasError() {
+		t.Fatalf("unexpected diags: %v", diags)
+	}
+	if state.Username.ValueString() != "alice" || state.Header.ValueString() != "{\"X-A\":\"c\"}" {
+		t.Errorf("different server values must win, got %q / %q", state.Username.ValueString(), state.Header.ValueString())
+	}
+}

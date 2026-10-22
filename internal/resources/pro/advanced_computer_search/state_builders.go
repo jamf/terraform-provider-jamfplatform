@@ -33,7 +33,7 @@ func assignAdvancedComputerSearchResourceModel(ctx context.Context, state *Advan
 	state.SiteID = helpers.ReconcileOptionalStringPointerTrimmed(siteID, state.SiteID)
 	state.SiteName = helpers.StringPointerValueOrNull(siteName)
 
-	state.Criteria = criteria.FlattenCriterionSlice(criterionSlice(search.Criteria))
+	state.Criteria = criteria.FlattenCriterionSlice(criterionSlice(search.Criteria), state.Criteria)
 
 	displayFields, dfDiags := flattenDisplayFields(ctx, search.DisplayFields)
 	diags.Append(dfDiags...)
@@ -62,7 +62,7 @@ func assignAdvancedComputerSearchDataSourceModel(ctx context.Context, state *Adv
 	state.SiteID = helpers.StringPointerValueOrNull(siteID)
 	state.SiteName = helpers.StringPointerValueOrNull(siteName)
 
-	state.Criteria = criteria.FlattenCriterionSlice(criterionSlice(search.Criteria))
+	state.Criteria = criteria.FlattenCriterionSlice(criterionSlice(search.Criteria), nil)
 
 	displayFields, dfDiags := flattenDisplayFields(ctx, search.DisplayFields)
 	diags.Append(dfDiags...)

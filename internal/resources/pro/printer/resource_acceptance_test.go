@@ -356,3 +356,31 @@ func TestAccResource_ProPrinter_PPDValidator_CustomRequiresPath(t *testing.T) {
 		},
 	})
 }
+
+// TestAccResource_ProPrinter_PPDPathWhitespaceKept covers issue #517: classic
+// saves ppd_path without its outer whitespace (wire-verified 2026-10-20), and
+// the authored value must survive the apply with an empty re-plan.
+func TestAccResource_ProPrinter_PPDPathWhitespaceKept(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-printer-ws-" + testhelpers.RunSuffix()
+	path := "/Library/Printers/PPDs/Contents/Resources/HP DeskJet 2600 series.ppd \n"
+	cfg := fmt.Sprintf(`
+		resource "jamfplatform_pro_printer" "test" {
+			name        = %q
+			uri         = "ipp://printer.example.com/queue1"
+			cups_name   = "tf_acc_ws"
+			use_generic = false
+			ppd         = "HP DeskJet 2600 series.ppd"
+			ppd_path    = %q
+		}
+	`, name, path)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckPrinterDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: cfg, Check: resource.TestCheckResourceAttr("jamfplatform_pro_printer.test", "ppd_path", path)},
+			{Config: cfg, PlanOnly: true},
+		},
+	})
+}

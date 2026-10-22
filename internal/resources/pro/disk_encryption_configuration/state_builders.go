@@ -44,7 +44,11 @@ func assignDiskEncryptionConfigurationResourceModel(state *DiskEncryptionConfigu
 		preservedWoVersion = state.InstitutionalRecoveryKey.PasswordWoVersion
 	}
 
-	state.InstitutionalRecoveryKey = assignIRKResourceModel(c.InstitutionalRecoveryKey)
+	var priorData types.String
+	if state.InstitutionalRecoveryKey != nil {
+		priorData = state.InstitutionalRecoveryKey.Data
+	}
+	state.InstitutionalRecoveryKey = assignIRKResourceModel(c.InstitutionalRecoveryKey, priorData)
 	if state.InstitutionalRecoveryKey != nil {
 		state.InstitutionalRecoveryKey.PasswordWoVersion = preservedWoVersion
 	}
@@ -93,7 +97,13 @@ func assignDiskEncryptionConfigurationDataSourceModel(state *DiskEncryptionConfi
 // A non-empty wire block — meaning the server actually has IRK material
 // — surfaces as a populated TF model so out-of-band cert uploads are
 // observable.
-func assignIRKResourceModel(k *proclassic.DiskEncryptionConfigurationInstitutionalRecoveryKey) *diskEncryptionConfigurationIRKModel {
+//
+// data is kept as priorData when the server returns it with outer whitespace
+// removed: classic saves the element trimmed (wire-verified 2026-10-20), and
+// a base64 certificate read with file() or a heredoc ends in a newline.
+// certificate_type is an enum validated at plan time and key is Computed from
+// the certificate, so neither can plan outer whitespace.
+func assignIRKResourceModel(k *proclassic.DiskEncryptionConfigurationInstitutionalRecoveryKey, priorData types.String) *diskEncryptionConfigurationIRKModel {
 	if k == nil {
 		return nil
 	}
@@ -103,7 +113,7 @@ func assignIRKResourceModel(k *proclassic.DiskEncryptionConfigurationInstitution
 	return &diskEncryptionConfigurationIRKModel{
 		Key:             helpers.StringPointerValueOrNull(k.Key),
 		CertificateType: helpers.StringPointerValueOrNull(k.CertificateType),
-		Data:            helpers.StringPointerValueOrNull(k.Data),
+		Data:            helpers.StringPointerValueOrNullTrimmed(k.Data, priorData),
 		// Password is WriteOnly — framework strips it from state; the
 		// builder leaves it zero. PasswordWoVersion is restored by the
 		// caller (assignDiskEncryptionConfigurationResourceModel) from

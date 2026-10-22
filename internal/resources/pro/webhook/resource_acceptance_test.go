@@ -579,3 +579,35 @@ func TestAccResource_ProWebhook_ValidatorErrors(t *testing.T) {
 		})
 	}
 }
+
+// TestAccResource_ProWebhook_UsernameAndHeaderWhitespaceKept covers issue #517:
+// classic saves username and header without their outer whitespace
+// (wire-verified 2026-10-20), and the authored values must survive the apply
+// with an empty re-plan.
+func TestAccResource_ProWebhook_UsernameAndHeaderWhitespaceKept(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	username := "  tf-acc-user  "
+	header := "{\"Authorization\":\"Bearer abc123\"}\n"
+	basic := webhookBasicConfig("tf-acc-webhook-ws-basic-"+suffix, username, "secretsecret1", 1)
+	headerCfg := fmt.Sprintf(`
+		resource "jamfplatform_pro_webhook" "test" {
+			name                = %q
+			url                 = "https://example.com/header"
+			event               = "MobileDeviceEnrolled"
+			authentication_type = "HEADER"
+			header              = %q
+		}
+	`, "tf-acc-webhook-ws-header-"+suffix, header)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckWebhookDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: basic, Check: resource.TestCheckResourceAttr("jamfplatform_pro_webhook.test", "username", username)},
+			{Config: basic, PlanOnly: true},
+			{Config: headerCfg, Check: resource.TestCheckResourceAttr("jamfplatform_pro_webhook.test", "header", header)},
+			{Config: headerCfg, PlanOnly: true},
+		},
+	})
+}

@@ -86,11 +86,11 @@ func TestBuildCriterionSlice_EmptyInputReturnsNonNilEmptySlice(t *testing.T) {
 }
 
 func TestFlattenCriterionSlice_NilAndEmptyReturnNil(t *testing.T) {
-	if got := FlattenCriterionSlice(nil); got != nil {
+	if got := FlattenCriterionSlice(nil, nil); got != nil {
 		t.Errorf("nil wrapper should flatten to nil, got %v", got)
 	}
 	empty := []proclassic.Criterion{}
-	if got := FlattenCriterionSlice(&empty); got != nil {
+	if got := FlattenCriterionSlice(&empty, nil); got != nil {
 		t.Errorf("empty slice should flatten to nil, got %v", got)
 	}
 }
@@ -113,7 +113,7 @@ func TestFlattenCriterionSlice_CopiesFields(t *testing.T) {
 		ClosingParen: &closeP,
 	}}
 
-	out := FlattenCriterionSlice(&src)
+	out := FlattenCriterionSlice(&src, nil)
 	if len(out) != 1 {
 		t.Fatalf("expected 1 criterion, got %d", len(out))
 	}
@@ -143,10 +143,39 @@ func TestFlattenCriterionSlice_EmptyValueReadsAsEmptyString(t *testing.T) {
 		{Name: &name},
 	}
 
-	out := FlattenCriterionSlice(&src)
+	out := FlattenCriterionSlice(&src, nil)
 	for i, c := range out {
 		if c.Value.IsNull() || c.Value.ValueString() != "" {
 			t.Errorf("criterion %d: expected value \"\", got %s", i, c.Value)
 		}
+	}
+}
+
+// TestFlattenCriterionSlice_KeepsNameAndValueTheServerTrims covers issue #517:
+// classic saves a criterion's name and value without their outer whitespace
+// (probed 2026-10-20). Prior criteria are matched by position; a different
+// server value wins, and a criterion with no prior takes the wire value.
+func TestFlattenCriterionSlice_KeepsNameAndValueTheServerTrims(t *testing.T) {
+	src := []proclassic.Criterion{
+		{Name: new("Computer Name"), SearchType: new("like"), Value: new("lab")},
+		{Name: new("Username"), SearchType: new("is"), Value: new("renamed")},
+		{Name: new("Full Name"), SearchType: new("is"), Value: new("x")},
+	}
+	prior := []CriterionModel{
+		{Name: types.StringValue("Computer Name "), Value: types.StringValue(" lab\n")},
+		{Name: types.StringValue("Username"), Value: types.StringValue("x ")},
+	}
+	out := FlattenCriterionSlice(&src, prior)
+	if len(out) != 3 {
+		t.Fatalf("expected 3 criteria, got %d", len(out))
+	}
+	if out[0].Name.ValueString() != "Computer Name " || out[0].Value.ValueString() != " lab\n" {
+		t.Errorf("trimmed name/value must keep the planned ones, got %q / %q", out[0].Name.ValueString(), out[0].Value.ValueString())
+	}
+	if out[1].Value.ValueString() != "renamed" {
+		t.Errorf("a different server value must win, got %q", out[1].Value.ValueString())
+	}
+	if out[2].Name.ValueString() != "Full Name" || out[2].Value.ValueString() != "x" {
+		t.Errorf("a criterion with no prior must take the wire value, got %q / %q", out[2].Name.ValueString(), out[2].Value.ValueString())
 	}
 }
