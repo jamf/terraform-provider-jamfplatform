@@ -7,15 +7,17 @@
 //
 // Fourteen of those per-command actions were removed at the Platform API GA
 // because the endpoint was withdrawn (commit 3825dbe7), and the endpoint was
-// routed again at Jamf Pro v2508 (SDK v1.9.0, wire-probed 2026-10-22). They are
-// being rebuilt in tranches, each command keeping its own action rather than a
+// routed again at Jamf Pro v2508 (SDK v1.9.0, wire-probed 2026-10-22). They were
+// rebuilt in tranches, each command keeping its own action rather than a
 // generic one taking a command type: a command's parameters, secrets and
 // batchability are its own, and so is the one capability the gateway checks for
 // it. The gateway picks that capability from the body, which the SDK registry can
 // only express as "any of four", so each action narrows the registry with
 // permissions.Narrow to the single one it can need.
 //
-// Built so far: enable_lost_mode, disable_lost_mode, play_lost_mode_sound.
+// Rebuilt: the fourteen removed commands plus set_wallpaper (Classic), set_recovery_lock
+// and clear_recovery_lock. Not rebuilt, because the Platform device actions in
+// internal/actions/device already cover them: erase, restart, shut down, unmanage.
 //
 // Three wire facts shape every one of them, all probed on 2026-10-22. The server
 // does not check the device platform (a Mac accepts a lost-mode command and the
@@ -52,6 +54,14 @@ import (
 // minJamfProVersion is empty: these management commands ride continuously
 // deployed Jamf Pro endpoints with no meaningful version floor.
 const minJamfProVersion = ""
+
+// minJamfProVersionEnhancedLogCollection gates the two enhanced-log-collection
+// actions, the exception to the empty floor above. TRIGGER_ and CANCEL_ENHANCED_LOG_COLLECTION
+// arrived with Jamf Pro 11.30; an older tenant rejects them at the command
+// discriminator with a Jackson error that lists every type it does know, which
+// reads as a provider bug rather than a tenant too old for the feature. Both
+// types appear in that list on 11.30.2 (wire-probed 2026-08-04).
+const minJamfProVersionEnhancedLogCollection = "11.30.0"
 
 // batchNote is appended to the description of every command action that targets
 // devices in bulk, so the single-request behaviour and its all-or-nothing failure
@@ -112,11 +122,17 @@ type mdmAction struct {
 	devices *devSDK.Client
 }
 
-// configure binds the provider-supplied clients to the action. Every remaining
-// action in this package shares the empty version floor, so there is no
-// per-action override: the two enhanced-log-collection actions that needed one
-// (11.30) went with POST /v2/mdm/commands at the Platform API GA.
+// configure binds the provider-supplied clients to the action using the package
+// default floor (none).
 func (a *mdmAction) configure(ctx context.Context, req action.ConfigureRequest, resp *action.ConfigureResponse) {
+	a.configureWithFloor(ctx, req, resp, minJamfProVersion, "mdm")
+}
+
+// configureWithFloor is configure with an explicit minimum Jamf Pro version and
+// diagnostic label, for the commands that only exist on newer tenants. A non-empty
+// floor turns an unsupported tenant into a clear version error at Configure time
+// instead of an opaque rejection at Invoke.
+func (a *mdmAction) configureWithFloor(ctx context.Context, req action.ConfigureRequest, resp *action.ConfigureResponse, minVer, label string) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -130,7 +146,7 @@ func (a *mdmAction) configure(ctx context.Context, req action.ConfigureRequest, 
 		return
 	}
 
-	client, diags := providerdata.ConfigurePro(ctx, req.ProviderData, minJamfProVersion, "mdm")
+	client, diags := providerdata.ConfigurePro(ctx, req.ProviderData, minVer, label)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

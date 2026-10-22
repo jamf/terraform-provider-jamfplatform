@@ -143,6 +143,14 @@ func batchActions() map[string]action.Action {
 		"clear_recovery_lock":  NewClearRecoveryLockAction(),
 		"device_lock":          NewDeviceLockAction(),
 		"delete_user":          NewDeleteUserAction(),
+
+		"enable_remote_desktop":           NewEnableRemoteDesktopAction(),
+		"disable_remote_desktop":          NewDisableRemoteDesktopAction(),
+		"clear_restrictions_password":     NewClearRestrictionsPasswordAction(),
+		"log_out_user":                    NewLogOutUserAction(),
+		"unlock_user_account":             NewUnlockUserAccountAction(),
+		"trigger_enhanced_log_collection": NewTriggerEnhancedLogCollectionAction(),
+		"cancel_enhanced_log_collection":  NewCancelEnhancedLogCollectionAction(),
 	}
 }
 

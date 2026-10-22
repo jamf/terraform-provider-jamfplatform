@@ -54,14 +54,14 @@ var deviceActionsCommandRegistry = permissions.Narrow(resolveSerialMerged, "Send
 
 // The lost-mode actions send one command and resolve serial numbers through the
 // Platform devices inventory, in helpers.go.
-var lostModeSDKMethods = []string{
+var deviceActionsCommandSDKMethods = []string{
 	"SendMdmCommandV2",
 	"ListDevices",
 }
 var (
-	enableLostModePrivileges    = permissions.Section(deviceActionsCommandRegistry, lostModeSDKMethods...)
-	disableLostModePrivileges   = permissions.Section(deviceActionsCommandRegistry, lostModeSDKMethods...)
-	playLostModeSoundPrivileges = permissions.Section(deviceActionsCommandRegistry, lostModeSDKMethods...)
+	enableLostModePrivileges    = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	disableLostModePrivileges   = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	playLostModeSoundPrivileges = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
 )
 
 // set_wallpaper rides the Classic mobile device command endpoint and, when it is
@@ -114,4 +114,15 @@ var destructiveCommandSDKMethods = []string{
 var (
 	deviceLockPrivileges = permissions.Section(destructiveCommandRegistry, destructiveCommandSDKMethods...)
 	deleteUserPrivileges = permissions.Section(destructiveCommandRegistry, destructiveCommandSDKMethods...)
+)
+
+// The last tranche of commands all sit under device-actions:execute, like lost mode.
+var (
+	enableRemoteDesktopPrivileges          = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	disableRemoteDesktopPrivileges         = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	clearRestrictionsPasswordPrivileges    = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	logOutUserPrivileges                   = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	unlockUserAccountPrivileges            = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	triggerEnhancedLogCollectionPrivileges = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	cancelEnhancedLogCollectionPrivileges  = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
 )

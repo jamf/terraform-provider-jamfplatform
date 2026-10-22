@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"os"
 	"strings"
 	"testing"
 
@@ -419,16 +420,18 @@ func TestSingleActions_TakeOneDevice(t *testing.T) {
 
 func TestSecretAttributes_SayTheyAppearInPlanOutput(t *testing.T) {
 	cases := map[string][]string{
-		"set_recovery_lock":       {"password"},
-		"device_lock":             {"pin"},
-		"set_auto_admin_password": {"password"},
-		"clear_passcode":          {"unlock_token"},
+		"set_recovery_lock":               {"password"},
+		"device_lock":                     {"pin"},
+		"trigger_enhanced_log_collection": {"apple_care_token"},
+		"set_auto_admin_password":         {"password"},
+		"clear_passcode":                  {"unlock_token"},
 	}
 	actions := map[string]action.Action{
-		"set_recovery_lock":       NewSetRecoveryLockAction(),
-		"device_lock":             NewDeviceLockAction(),
-		"set_auto_admin_password": NewSetAutoAdminPasswordAction(),
-		"clear_passcode":          NewClearPasscodeAction(),
+		"set_recovery_lock":               NewSetRecoveryLockAction(),
+		"device_lock":                     NewDeviceLockAction(),
+		"trigger_enhanced_log_collection": NewTriggerEnhancedLogCollectionAction(),
+		"set_auto_admin_password":         NewSetAutoAdminPasswordAction(),
+		"clear_passcode":                  NewClearPasscodeAction(),
 	}
 	for name, attrs := range cases {
 		schema := schemaOf(t, actions[name])
@@ -547,6 +550,87 @@ func TestDestructiveCommands_MarshalTheWireBody(t *testing.T) {
 		"delete all users": {
 			deleteUserCommand(DeleteUserActionModel{DeleteAllUsers: types.BoolValue(true)}),
 			`{"commandType":"DELETE_USER","deleteAllUsers":true}`,
+		},
+	}
+	for name, c := range cases {
+		out, err := json.Marshal(c.got)
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+			continue
+		}
+		if string(out) != c.want {
+			t.Errorf("%s:\n got %s\nwant %s", name, out, c.want)
+		}
+	}
+}
+
+// --- tranche 4: the remaining commands ---
+
+func TestSimpleCommandActions_Metadata(t *testing.T) {
+	cases := map[string]func(context.Context, action.MetadataRequest, *action.MetadataResponse){
+		"jamfplatform_pro_enable_remote_desktop":           NewEnableRemoteDesktopAction().(*EnableRemoteDesktopAction).Metadata,
+		"jamfplatform_pro_disable_remote_desktop":          NewDisableRemoteDesktopAction().(*DisableRemoteDesktopAction).Metadata,
+		"jamfplatform_pro_clear_restrictions_password":     NewClearRestrictionsPasswordAction().(*ClearRestrictionsPasswordAction).Metadata,
+		"jamfplatform_pro_log_out_user":                    NewLogOutUserAction().(*LogOutUserAction).Metadata,
+		"jamfplatform_pro_unlock_user_account":             NewUnlockUserAccountAction().(*UnlockUserAccountAction).Metadata,
+		"jamfplatform_pro_trigger_enhanced_log_collection": NewTriggerEnhancedLogCollectionAction().(*TriggerEnhancedLogCollectionAction).Metadata,
+		"jamfplatform_pro_cancel_enhanced_log_collection":  NewCancelEnhancedLogCollectionAction().(*CancelEnhancedLogCollectionAction).Metadata,
+	}
+	for want, meta := range cases {
+		assertTypeName(t, meta, want)
+	}
+}
+
+func TestUnlockUserAccountAction_RequiresAUserName(t *testing.T) {
+	assertRequired(t, NewUnlockUserAccountAction().(*UnlockUserAccountAction).Schema, []string{"user_name"})
+}
+
+func TestTriggerEnhancedLogCollectionAction_RequiresAToken(t *testing.T) {
+	assertRequired(t, NewTriggerEnhancedLogCollectionAction().(*TriggerEnhancedLogCollectionAction).Schema, []string{"apple_care_token"})
+	desc := schemaOf(t, NewTriggerEnhancedLogCollectionAction()).MarkdownDescription
+	for _, want := range []string{"Requires Jamf Pro 11.30", "same `apple_care_token`"} {
+		if !strings.Contains(desc, want) {
+			t.Errorf("description is missing %q:\n%s", want, desc)
+		}
+	}
+}
+
+// TestEnhancedLogCollection_DeclaresTheVersionFloor guards the one command pair
+// with a version floor. Without it an older tenant answers with a raw type-id
+// error that reads as a provider bug, and nothing else in the unit suite
+// exercises Configure.
+func TestEnhancedLogCollection_DeclaresTheVersionFloor(t *testing.T) {
+	if minJamfProVersionEnhancedLogCollection != "11.30.0" {
+		t.Fatalf("floor = %q, want 11.30.0", minJamfProVersionEnhancedLogCollection)
+	}
+	for _, file := range []string{"trigger_enhanced_log_collection.go", "cancel_enhanced_log_collection.go"} {
+		src, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(src), "configureWithFloor(ctx, req, resp, minJamfProVersionEnhancedLogCollection") {
+			t.Errorf("%s does not configure with the enhanced log collection floor", file)
+		}
+	}
+}
+
+func TestTranche4Commands_MarshalTheWireBody(t *testing.T) {
+	cases := map[string]struct {
+		got  *pro.MDMCommandRequestCommandData
+		want string
+	}{
+		"enable remote desktop":  {enableRemoteDesktopCommand(), `{"commandType":"ENABLE_REMOTE_DESKTOP"}`},
+		"disable remote desktop": {disableRemoteDesktopCommand(), `{"commandType":"DISABLE_REMOTE_DESKTOP"}`},
+		"clear restrictions":     {clearRestrictionsPasswordCommand(), `{"commandType":"CLEAR_RESTRICTIONS_PASSWORD"}`},
+		"log out user":           {logOutUserCommand(), `{"commandType":"LOG_OUT_USER"}`},
+		"cancel log collection":  {cancelEnhancedLogCollectionCommand(), `{"commandType":"CANCEL_ENHANCED_LOG_COLLECTION"}`},
+		"unlock user account": {
+			unlockUserAccountCommand(UnlockUserAccountActionModel{UserName: types.StringValue("alex")}),
+			`{"commandType":"UNLOCK_USER_ACCOUNT","userName":"alex"}`,
+		},
+		"trigger log collection": {
+			triggerEnhancedLogCollectionCommand("dG9rZW4="),
+			`{"appleCareToken":"dG9rZW4=","commandType":"TRIGGER_ENHANCED_LOG_COLLECTION"}`,
 		},
 	}
 	for name, c := range cases {

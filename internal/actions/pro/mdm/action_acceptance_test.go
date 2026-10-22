@@ -762,3 +762,159 @@ action "jamfplatform_pro_delete_user" "remove" {
 		}},
 	})
 }
+
+func TestAccAction_ProEnableRemoteDesktop_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_enable_remote_desktop" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_enable_remote_desktop.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProDisableRemoteDesktop_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_disable_remote_desktop" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_disable_remote_desktop.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProClearRestrictionsPassword_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_clear_restrictions_password" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_clear_restrictions_password.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProLogOutUser_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_log_out_user" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_log_out_user.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProUnlockUserAccount_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_unlock_user_account" "cmd" {
+  config {
+    serial_numbers = [%q]
+    user_name      = "tf-acc-user"
+  }
+}`, serial), "action.jamfplatform_pro_unlock_user_account.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProTriggerEnhancedLogCollection_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_trigger_enhanced_log_collection" "cmd" {
+  config {
+    serial_numbers = [%q]
+    apple_care_token = "dGYtYWNjLXRva2Vu"
+  }
+}`, serial), "action.jamfplatform_pro_trigger_enhanced_log_collection.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProCancelEnhancedLogCollection_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_cancel_enhanced_log_collection" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_cancel_enhanced_log_collection.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProEnableRemoteDesktop_MobileDeviceFails covers the one
+// platform check Jamf Pro makes on these commands: Remote Desktop is for
+// computers, and a mobile device is refused with a message that says so.
+func TestAccAction_ProEnableRemoteDesktop_MobileDeviceFails(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_enable_remote_desktop" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_enable_remote_desktop.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)only supported for computers`),
+		}},
+	})
+}
+
+func TestAccAction_ProUnlockUserAccount_BlankNameFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_unlock_user_account" "cmd" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    user_name      = "  "
+  }
+}`, "action.jamfplatform_pro_unlock_user_account.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value.*visible`),
+		}},
+	})
+}

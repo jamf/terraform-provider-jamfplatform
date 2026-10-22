@@ -26,8 +26,8 @@ func TestSendBlankPushSDKMethods_KnownToSDK(t *testing.T) {
 }
 
 func TestLostModeSDKMethods_KnownToSDK(t *testing.T) {
-	if missing := permissions.Missing(deviceActionsCommandRegistry, lostModeSDKMethods...); len(missing) > 0 {
-		t.Fatalf("lostModeSDKMethods not present in the narrowed registry (drift): %v", missing)
+	if missing := permissions.Missing(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...); len(missing) > 0 {
+		t.Fatalf("deviceActionsCommandSDKMethods not present in the narrowed registry (drift): %v", missing)
 	}
 }
 
@@ -194,7 +194,7 @@ func TestSendBlankPushSDKMethods_MatchFile(t *testing.T) {
 
 func TestLostModeSDKMethods_MatchFile(t *testing.T) {
 	for _, file := range []string{"enable_lost_mode.go", "disable_lost_mode.go", "play_lost_mode_sound.go"} {
-		assertMatch(t, file, lostModeSDKMethods)
+		assertMatch(t, file, deviceActionsCommandSDKMethods)
 	}
 }
 
@@ -209,6 +209,16 @@ func TestTranche3SDKMethods_MatchFile(t *testing.T) {
 	assertMatch(t, "set_auto_admin_password.go", setAutoAdminPasswordSDKMethods)
 	assertMatch(t, "device_lock.go", destructiveCommandSDKMethods)
 	assertMatch(t, "delete_user.go", destructiveCommandSDKMethods)
+}
+
+func TestSimpleCommandActions_MatchFile(t *testing.T) {
+	for _, file := range []string{
+		"enable_remote_desktop.go", "disable_remote_desktop.go", "clear_restrictions_password.go",
+		"log_out_user.go", "unlock_user_account.go", "trigger_enhanced_log_collection.go",
+		"cancel_enhanced_log_collection.go",
+	} {
+		assertMatch(t, file, deviceActionsCommandSDKMethods)
+	}
 }
 
 func TestRenewMdmProfileSDKMethods_MatchFile(t *testing.T) {
@@ -288,12 +298,19 @@ func TestCommandPrivileges_NameOnlyTheirOwnCapability(t *testing.T) {
 		want    string
 		other   []string
 	}{
-		"clear_passcode":          {clearPasscodePrivileges, "device-actions:execute", []string{"mobile-devices:read"}},
-		"set_recovery_lock":       {setRecoveryLockPrivileges, "recovery-lock:execute", nil},
-		"clear_recovery_lock":     {clearRecoveryLockPrivileges, "recovery-lock:execute", nil},
-		"set_auto_admin_password": {setAutoAdminPasswordPrivileges, "local-admin-passwords:execute", nil},
-		"device_lock":             {deviceLockPrivileges, "destructive-device-actions:execute", nil},
-		"delete_user":             {deleteUserPrivileges, "destructive-device-actions:execute", nil},
+		"clear_passcode":                  {clearPasscodePrivileges, "device-actions:execute", []string{"mobile-devices:read"}},
+		"set_recovery_lock":               {setRecoveryLockPrivileges, "recovery-lock:execute", nil},
+		"clear_recovery_lock":             {clearRecoveryLockPrivileges, "recovery-lock:execute", nil},
+		"set_auto_admin_password":         {setAutoAdminPasswordPrivileges, "local-admin-passwords:execute", nil},
+		"enable_remote_desktop":           {enableRemoteDesktopPrivileges, "device-actions:execute", nil},
+		"disable_remote_desktop":          {disableRemoteDesktopPrivileges, "device-actions:execute", nil},
+		"clear_restrictions_password":     {clearRestrictionsPasswordPrivileges, "device-actions:execute", nil},
+		"log_out_user":                    {logOutUserPrivileges, "device-actions:execute", nil},
+		"unlock_user_account":             {unlockUserAccountPrivileges, "device-actions:execute", nil},
+		"trigger_enhanced_log_collection": {triggerEnhancedLogCollectionPrivileges, "device-actions:execute", nil},
+		"cancel_enhanced_log_collection":  {cancelEnhancedLogCollectionPrivileges, "device-actions:execute", nil},
+		"device_lock":                     {deviceLockPrivileges, "destructive-device-actions:execute", nil},
+		"delete_user":                     {deleteUserPrivileges, "destructive-device-actions:execute", nil},
 	}
 	for name, c := range cases {
 		if !permissions.Renders(c.section, c.want) {
