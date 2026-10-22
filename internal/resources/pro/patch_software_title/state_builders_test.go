@@ -299,7 +299,7 @@ func TestAssignResourceModel_NilAPIIsNoop(t *testing.T) {
 func TestAssignDataSourceModel_FullServerView(t *testing.T) {
 	state := PatchSoftwareTitleDataSourceModel{}
 
-	diags := assignPatchSoftwareTitleDataSourceModel(context.Background(), &state, decodeLiveConfig(t), definitionVersions(decodeLiveDefinitions(t)), types.Int64Value(1))
+	diags := assignPatchSoftwareTitleDataSourceModel(context.Background(), &state, decodeLiveConfig(t), definitionVersions(decodeLiveDefinitions(t)), definitionKillApps(decodeLiveDefinitions(t)), types.Int64Value(1))
 	if diags.HasError() {
 		t.Fatalf("diags: %v", diags)
 	}
@@ -327,13 +327,93 @@ func TestAssignDataSourceModel_FullServerView(t *testing.T) {
 	if len(av) != 2 || av[0] != "8.36.2.3" {
 		t.Errorf("available_versions wrong: %+v", av)
 	}
+	if state.SoftwareTitleName.ValueString() != "8x8 Work" {
+		t.Errorf("software_title_name: %q", state.SoftwareTitleName.ValueString())
+	}
+	if ka := stateStrings(t, state.KillApps); len(ka) != 1 || ka[0] != "8x8 Work" {
+		t.Errorf("kill_apps wrong: %+v", ka)
+	}
+}
+
+// TestAssignModels_SoftwareTitleNameIsNotTheDisplayName pins that the catalog
+// name is read from its own field and not from the display name, which is a
+// freeform label. A smart group's "Patch Reporting: <title>" criterion matches
+// the catalog name, so reading the label here would build a criterion Jamf Pro
+// rejects.
+func TestAssignModels_SoftwareTitleNameIsNotTheDisplayName(t *testing.T) {
+	cfg := decodeLiveConfig(t)
+	cfg.DisplayName = "Team Chat"
+
+	var res PatchSoftwareTitleResourceModel
+	if d := assignPatchSoftwareTitleResourceModel(context.Background(), &res, cfg, nil, nil); d.HasError() {
+		t.Fatalf("resource diags: %v", d)
+	}
+	var ds PatchSoftwareTitleDataSourceModel
+	if d := assignPatchSoftwareTitleDataSourceModel(context.Background(), &ds, cfg, nil, nil, types.Int64Null()); d.HasError() {
+		t.Fatalf("data source diags: %v", d)
+	}
+
+	for name, got := range map[string]string{"resource": res.SoftwareTitleName.ValueString(), "data source": ds.SoftwareTitleName.ValueString()} {
+		if got != "8x8 Work" {
+			t.Errorf("%s software_title_name: %q, want the catalog name", name, got)
+		}
+	}
+	if res.Name.ValueString() != "Team Chat" || ds.Name.ValueString() != "Team Chat" {
+		t.Errorf("name must stay the display name, got %q / %q", res.Name.ValueString(), ds.Name.ValueString())
+	}
+}
+
+// TestAssignModels_EmptySoftwareTitleNameIsNull pins that a response carrying no
+// catalog name lands as null rather than an empty string, so a criterion built
+// from it fails loudly at plan instead of naming nothing.
+func TestAssignModels_EmptySoftwareTitleNameIsNull(t *testing.T) {
+	cfg := decodeLiveConfig(t)
+	cfg.SoftwareTitleName = ""
+
+	var res PatchSoftwareTitleResourceModel
+	if d := assignPatchSoftwareTitleResourceModel(context.Background(), &res, cfg, nil, nil); d.HasError() {
+		t.Fatalf("diags: %v", d)
+	}
+	if !res.SoftwareTitleName.IsNull() {
+		t.Errorf("empty catalog name must be null, got %q", res.SoftwareTitleName.ValueString())
+	}
+}
+
+// TestDefinitionKillApps pins the union across versions: sorted, de-duplicated,
+// empty names dropped, and a non-nil empty list when no version names an app.
+func TestDefinitionKillApps(t *testing.T) {
+	app := func(names ...string) []pro.PatchSoftwareTitleConfigurationDefinitionKillApp {
+		out := make([]pro.PatchSoftwareTitleConfigurationDefinitionKillApp, 0, len(names))
+		for _, n := range names {
+			out = append(out, pro.PatchSoftwareTitleConfigurationDefinitionKillApp{AppName: n})
+		}
+		return out
+	}
+	defs := []pro.PatchSoftwareTitleDefinition{
+		{Version: "7", KillApps: app("1Password 7", "1Password")},
+		{Version: "8", KillApps: app("1Password", "", "1Password 8")},
+		{Version: "9"},
+	}
+	got := definitionKillApps(defs)
+	want := []string{"1Password", "1Password 7", "1Password 8"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+	if none := definitionKillApps([]pro.PatchSoftwareTitleDefinition{{Version: "1"}}); none == nil || len(none) != 0 {
+		t.Errorf("no kill apps must be an empty non-nil slice, got %#v", none)
+	}
 }
 
 // TestAssignDataSourceModel_NilAPIIsNoop pins the same defensive no-op as the
 // resource path, so a failed lookup cannot half-populate a data source result.
 func TestAssignDataSourceModel_NilAPIIsNoop(t *testing.T) {
 	state := PatchSoftwareTitleDataSourceModel{ID: types.StringValue("7")}
-	diags := assignPatchSoftwareTitleDataSourceModel(context.Background(), &state, nil, nil, types.Int64Null())
+	diags := assignPatchSoftwareTitleDataSourceModel(context.Background(), &state, nil, nil, nil, types.Int64Null())
 	if diags.HasError() {
 		t.Fatalf("diags: %v", diags)
 	}

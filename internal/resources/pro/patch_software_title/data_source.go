@@ -116,6 +116,10 @@ func (d *PatchSoftwareTitleDataSource) Schema(ctx context.Context, req datasourc
 				MarkdownDescription: "Patch catalog key that defines the title.",
 				Computed:            true,
 			},
+			"software_title_name": schema.StringAttribute{
+				MarkdownDescription: "Name the patch source's catalog gives this title, such as `Audacity 4`. A smart group criterion named `Patch Reporting: <title>` matches this value, not `name`.",
+				Computed:            true,
+			},
 			"source_id": schema.Int64Attribute{
 				MarkdownDescription: "Patch source ID this title is sourced from. Jamf Pro reports the source by name here, so the provider matches that name against the tenant's internal and external patch sources: the value is null, with a warning, when the name matches none of them, matches both an internal and an external source, or those sources cannot be read.",
 				Computed:            true,
@@ -143,6 +147,11 @@ func (d *PatchSoftwareTitleDataSource) Schema(ctx context.Context, req datasourc
 			},
 			"available_versions": schema.ListAttribute{
 				MarkdownDescription: "All software_version strings the patch source publishes for this title.",
+				Computed:            true,
+				ElementType:         types.StringType,
+			},
+			"kill_apps": schema.ListAttribute{
+				MarkdownDescription: "Apps a patch policy quits before installing this title, across all versions. Process names that can change when the patch source updates; they do not match bundle names.",
 				Computed:            true,
 				ElementType:         types.StringType,
 			},
@@ -239,7 +248,7 @@ func (d *PatchSoftwareTitleDataSource) Read(ctx context.Context, req datasource.
 		)
 	}
 
-	resp.Diagnostics.Append(assignPatchSoftwareTitleDataSourceModel(readCtx, &data, got, definitionVersions(defs), sourceID)...)
+	resp.Diagnostics.Append(assignPatchSoftwareTitleDataSourceModel(readCtx, &data, got, definitionVersions(defs), definitionKillApps(defs), sourceID)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
