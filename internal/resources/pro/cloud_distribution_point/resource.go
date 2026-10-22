@@ -108,7 +108,7 @@ func (r *CloudDistributionPointResource) Schema(ctx context.Context, req resourc
 				},
 			},
 			"master": schema.BoolAttribute{
-				MarkdownDescription: "Whether this is the master (primary) distribution point. Omit to leave the current value untouched; set `true`/`false` to change it.",
+				MarkdownDescription: "Whether this is the master (primary) distribution point. Omit to leave the current value untouched; set `true`/`false` to change it. Jamf Pro makes a new cloud distribution point the master regardless of this setting; the provider then applies the configured value.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers: []planmodifier.Bool{
@@ -130,9 +130,12 @@ func (r *CloudDistributionPointResource) Schema(ctx context.Context, req resourc
 				WriteOnly:           true,
 			},
 			"directory": schema.StringAttribute{
-				MarkdownDescription: "Directory / bucket path on the distribution point. Used by non-JCDS types. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it.",
+				MarkdownDescription: "Directory path on an Akamai distribution point. Not used by `AMAZON_S3`, which rejects it. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it.",
 				Optional:            true,
 				Computed:            true,
+				Validators: []validator.String{
+					s3DirectoryRefused{},
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -172,6 +175,9 @@ func (r *CloudDistributionPointResource) Schema(ctx context.Context, req resourc
 				MarkdownDescription: "AWS CloudFront key pair identifier used to sign URLs. Used by `AMAZON_S3` when `require_signed_urls` is enabled. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it.",
 				Optional:            true,
 				Computed:            true,
+				Validators: []validator.String{
+					s3SignedURLOnlyString{},
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -181,13 +187,17 @@ func (r *CloudDistributionPointResource) Schema(ctx context.Context, req resourc
 				Optional:            true,
 				Sensitive:           true,
 				WriteOnly:           true,
+				Validators: []validator.String{
+					s3SignedURLOnlyString{},
+				},
 			},
 			"expiration_seconds": schema.Int64Attribute{
-				MarkdownDescription: "AWS CloudFront signed-URL expiration window in seconds. Used by `AMAZON_S3`. Must be at least 1. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.",
+				MarkdownDescription: "AWS CloudFront signed-URL expiration window in seconds. Used by `AMAZON_S3` when `require_signed_urls` is enabled; Jamf Pro ignores it otherwise. Must be at least 1. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.",
 				Optional:            true,
 				Computed:            true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
+					s3SignedURLOnlyInt64{},
 				},
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),

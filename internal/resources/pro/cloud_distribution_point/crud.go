@@ -19,6 +19,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
+
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -67,6 +69,24 @@ func (r *CloudDistributionPointResource) Create(ctx context.Context, req resourc
 		}
 		resp.Diagnostics.AddError("Error creating Jamf Pro cloud distribution point", helpers.APIErrorDetail(err))
 		return
+	}
+
+	// The server makes a sole cloud distribution point principal on create and
+	// ignores a configured master = false, so it reads back true. A PATCH sets the
+	// configured value (wire-verified 2026-10-22: PATCH master=false on the sole
+	// JCDS point reads back false), so state matches config.
+	if !plan.Master.IsNull() && !plan.Master.IsUnknown() && (got.Master == nil || *got.Master != plan.Master.ValueBool()) {
+		master := plan.Master.ValueBool()
+		patched, err := r.client.UpdateCloudDistributionPointV1(createCtx, &pro.CloudDistributionPoint{
+			CdnType:  got.CdnType,
+			Username: got.Username,
+			Master:   &master,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("Error setting master on new cloud distribution point", helpers.APIErrorDetail(err))
+			return
+		}
+		got = patched
 	}
 
 	assignCloudDistributionPointResourceModel(&plan, got)
