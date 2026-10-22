@@ -102,3 +102,16 @@ var setAutoAdminPasswordSDKMethods = []string{
 	"ListDevices",
 }
 var setAutoAdminPasswordPrivileges = permissions.Section(localAdminPasswordRegistry, setAutoAdminPasswordSDKMethods...)
+
+// DEVICE_LOCK and DELETE_USER are the destructive-device-actions commands
+// POST /v2/mdm/commands authorises (with ERASE_DEVICE, which the Platform erase
+// action already covers).
+var destructiveCommandRegistry = permissions.Narrow(resolveSerialMerged, "SendMdmCommandV2", "destructive-device-actions:execute")
+var destructiveCommandSDKMethods = []string{
+	"SendMdmCommandV2",
+	"ListDevices",
+}
+var (
+	deviceLockPrivileges = permissions.Section(destructiveCommandRegistry, destructiveCommandSDKMethods...)
+	deleteUserPrivileges = permissions.Section(destructiveCommandRegistry, destructiveCommandSDKMethods...)
+)

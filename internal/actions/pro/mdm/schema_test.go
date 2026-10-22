@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/action"
+	actionschema "github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -419,11 +420,13 @@ func TestSingleActions_TakeOneDevice(t *testing.T) {
 func TestSecretAttributes_SayTheyAppearInPlanOutput(t *testing.T) {
 	cases := map[string][]string{
 		"set_recovery_lock":       {"password"},
+		"device_lock":             {"pin"},
 		"set_auto_admin_password": {"password"},
 		"clear_passcode":          {"unlock_token"},
 	}
 	actions := map[string]action.Action{
 		"set_recovery_lock":       NewSetRecoveryLockAction(),
+		"device_lock":             NewDeviceLockAction(),
 		"set_auto_admin_password": NewSetAutoAdminPasswordAction(),
 		"clear_passcode":          NewClearPasscodeAction(),
 	}
@@ -461,6 +464,89 @@ func TestTranche3Commands_MarshalTheWireBody(t *testing.T) {
 		"set auto admin password": {
 			setAutoAdminPasswordCommand(SetAutoAdminPasswordActionModel{Guid: types.StringValue("G-1"), Password: types.StringValue("pw")}),
 			`{"commandType":"SET_AUTO_ADMIN_PASSWORD","guid":"G-1","password":"pw"}`,
+		},
+	}
+	for name, c := range cases {
+		out, err := json.Marshal(c.got)
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+			continue
+		}
+		if string(out) != c.want {
+			t.Errorf("%s:\n got %s\nwant %s", name, out, c.want)
+		}
+	}
+}
+
+// --- tranche 2: destructive commands ---
+
+func TestDestructiveActions_Metadata(t *testing.T) {
+	assertTypeName(t, NewDeviceLockAction().(*DeviceLockAction).Metadata, "jamfplatform_pro_device_lock")
+	assertTypeName(t, NewDeleteUserAction().(*DeleteUserAction).Metadata, "jamfplatform_pro_delete_user")
+}
+
+func TestDeviceLockAction_PinMustBeSixCharacters(t *testing.T) {
+	pin := schemaOf(t, NewDeviceLockAction()).Attributes["pin"].(actionschema.StringAttribute)
+	for value, wantErr := range map[string]bool{"123456": false, "abcdef": false, "12345": true, "1234567": true, "": true} {
+		var resp validator.StringResponse
+		for _, v := range pin.Validators {
+			v.ValidateString(context.Background(), validator.StringRequest{ConfigValue: types.StringValue(value)}, &resp)
+		}
+		if resp.Diagnostics.HasError() != wantErr {
+			t.Errorf("pin %q error = %v, want %v", value, resp.Diagnostics.HasError(), wantErr)
+		}
+	}
+}
+
+func TestDeleteUserAction_ExactlyOneOfUserOrAll(t *testing.T) {
+	var described strings.Builder
+	for _, v := range NewDeleteUserAction().(action.ActionWithConfigValidators).ConfigValidators(context.Background()) {
+		described.WriteString(v.Description(context.Background()) + "\n")
+	}
+	for _, want := range []string{"user_name", "delete_all_users", "management_ids", "serial_numbers"} {
+		if !strings.Contains(described.String(), want) {
+			t.Errorf("no ConfigValidator names %q:\n%s", want, described.String())
+		}
+	}
+}
+
+func TestDeleteUserAction_DeleteAllCanOnlyBeTrue(t *testing.T) {
+	attr := schemaOf(t, NewDeleteUserAction()).Attributes["delete_all_users"].(actionschema.BoolAttribute)
+	for value, wantErr := range map[bool]bool{true: false, false: true} {
+		var resp validator.BoolResponse
+		for _, v := range attr.Validators {
+			v.ValidateBool(context.Background(), validator.BoolRequest{ConfigValue: types.BoolValue(value)}, &resp)
+		}
+		if resp.Diagnostics.HasError() != wantErr {
+			t.Errorf("delete_all_users = %v error = %v, want %v", value, resp.Diagnostics.HasError(), wantErr)
+		}
+	}
+}
+
+func TestDeleteUserAction_WarnsThatARepeatCommandIsDropped(t *testing.T) {
+	desc := schemaOf(t, NewDeleteUserAction()).MarkdownDescription
+	if !strings.Contains(desc, "already has this command waiting") {
+		t.Errorf("the pending-command behaviour is not documented:\n%s", desc)
+	}
+}
+
+func TestDestructiveCommands_MarshalTheWireBody(t *testing.T) {
+	cases := map[string]struct {
+		got  *pro.MDMCommandRequestCommandData
+		want string
+	}{
+		"lock, everything": {
+			deviceLockCommand(DeviceLockActionModel{Message: types.StringValue("m"), PhoneNumber: types.StringValue("+1 555 0100"), Pin: types.StringValue("123456")}),
+			`{"commandType":"DEVICE_LOCK","message":"m","phoneNumber":"+1 555 0100","pin":"123456"}`,
+		},
+		"lock, nothing": {deviceLockCommand(DeviceLockActionModel{}), `{"commandType":"DEVICE_LOCK"}`},
+		"delete one user": {
+			deleteUserCommand(DeleteUserActionModel{UserName: types.StringValue("alex"), ForceDeletion: types.BoolValue(true)}),
+			`{"commandType":"DELETE_USER","forceDeletion":true,"userName":"alex"}`,
+		},
+		"delete all users": {
+			deleteUserCommand(DeleteUserActionModel{DeleteAllUsers: types.BoolValue(true)}),
+			`{"commandType":"DELETE_USER","deleteAllUsers":true}`,
 		},
 	}
 	for name, c := range cases {

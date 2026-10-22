@@ -655,3 +655,110 @@ action "jamfplatform_pro_set_auto_admin_password" "admin" {
 		}},
 	})
 }
+
+func TestAccAction_ProDeviceLock_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_device_lock" "lock" {
+  config {
+    serial_numbers = [%q]
+    message        = "This device is locked."
+    phone_number   = "+1 555 0100"
+    pin            = "123456"
+  }
+}`, serial), "action.jamfplatform_pro_device_lock.lock")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProDeviceLock_ShortPinFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_device_lock" "lock" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    pin            = "12345"
+  }
+}`, "action.jamfplatform_pro_device_lock.lock")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value Length.*6`),
+		}},
+	})
+}
+
+func TestAccAction_ProDeleteUser_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_delete_user" "remove" {
+  config {
+    serial_numbers = [%q]
+    user_name      = "tf-acc-user"
+    force_deletion = true
+  }
+}`, serial), "action.jamfplatform_pro_delete_user.remove")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProDeleteUser_NeedsOneChoice asserts the plan-time rule that
+// stands in for validation Jamf Pro does not do: it accepted neither a user nor
+// delete-all, and both together.
+func TestAccAction_ProDeleteUser_NeedsOneChoice(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	for name, body := range map[string]string{
+		"neither": ``,
+		"both":    `user_name = "tf-acc-user"` + "\n    " + `delete_all_users = true`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_delete_user" "remove" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    %s
+  }
+}`, body), "action.jamfplatform_pro_delete_user.remove")
+
+			resource.Test(t, resource.TestCase{
+				ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+				Steps: []resource.TestStep{{
+					Config:      config,
+					ExpectError: regexp.MustCompile(`(?s)(Missing Attribute Configuration|Invalid Attribute Combination).*\[user_name,delete_all_users\]`),
+				}},
+			})
+		})
+	}
+}
+
+func TestAccAction_ProDeleteUser_DeleteAllFalseFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_delete_user" "remove" {
+  config {
+    serial_numbers   = ["NOSUCHSERIAL0001"]
+    delete_all_users = false
+  }
+}`, "action.jamfplatform_pro_delete_user.remove")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value.*true`),
+		}},
+	})
+}

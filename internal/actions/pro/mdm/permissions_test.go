@@ -45,6 +45,7 @@ func TestTranche3SDKMethods_KnownToSDK(t *testing.T) {
 		"clear_passcode":          {deviceActionsCommandRegistry, clearPasscodeSDKMethods},
 		"recovery lock":           {recoveryLockRegistry, recoveryLockSDKMethods},
 		"set_auto_admin_password": {localAdminPasswordRegistry, setAutoAdminPasswordSDKMethods},
+		"destructive commands":    {destructiveCommandRegistry, destructiveCommandSDKMethods},
 	} {
 		if missing := permissions.Missing(c.reg, c.methods...); len(missing) > 0 {
 			t.Errorf("%s: SDK methods not present in the narrowed registry (drift): %v", name, missing)
@@ -206,6 +207,8 @@ func TestTranche3SDKMethods_MatchFile(t *testing.T) {
 	assertMatch(t, "set_recovery_lock.go", recoveryLockSDKMethods)
 	assertMatch(t, "clear_recovery_lock.go", recoveryLockSDKMethods)
 	assertMatch(t, "set_auto_admin_password.go", setAutoAdminPasswordSDKMethods)
+	assertMatch(t, "device_lock.go", destructiveCommandSDKMethods)
+	assertMatch(t, "delete_user.go", destructiveCommandSDKMethods)
 }
 
 func TestRenewMdmProfileSDKMethods_MatchFile(t *testing.T) {
@@ -289,6 +292,8 @@ func TestCommandPrivileges_NameOnlyTheirOwnCapability(t *testing.T) {
 		"set_recovery_lock":       {setRecoveryLockPrivileges, "recovery-lock:execute", nil},
 		"clear_recovery_lock":     {clearRecoveryLockPrivileges, "recovery-lock:execute", nil},
 		"set_auto_admin_password": {setAutoAdminPasswordPrivileges, "local-admin-passwords:execute", nil},
+		"device_lock":             {deviceLockPrivileges, "destructive-device-actions:execute", nil},
+		"delete_user":             {deleteUserPrivileges, "destructive-device-actions:execute", nil},
 	}
 	for name, c := range cases {
 		if !permissions.Renders(c.section, c.want) {
