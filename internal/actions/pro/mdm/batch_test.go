@@ -139,6 +139,17 @@ func batchActions() map[string]action.Action {
 		"disable_lost_mode":    NewDisableLostModeAction(),
 		"play_lost_mode_sound": NewPlayLostModeSoundAction(),
 		"set_wallpaper":        NewSetWallpaperAction(),
+		"set_recovery_lock":    NewSetRecoveryLockAction(),
+		"clear_recovery_lock":  NewClearRecoveryLockAction(),
+	}
+}
+
+// singleActions is every command action that takes one device because its
+// payload carries a value specific to that device.
+func singleActions() map[string]action.Action {
+	return map[string]action.Action{
+		"clear_passcode":          NewClearPasscodeAction(),
+		"set_auto_admin_password": NewSetAutoAdminPasswordAction(),
 	}
 }
 

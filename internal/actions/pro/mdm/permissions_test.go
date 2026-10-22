@@ -37,6 +37,21 @@ func TestSetWallpaperSDKMethods_KnownToSDK(t *testing.T) {
 	}
 }
 
+func TestTranche3SDKMethods_KnownToSDK(t *testing.T) {
+	for name, c := range map[string]struct {
+		reg     permissions.Registry
+		methods []string
+	}{
+		"clear_passcode":          {deviceActionsCommandRegistry, clearPasscodeSDKMethods},
+		"recovery lock":           {recoveryLockRegistry, recoveryLockSDKMethods},
+		"set_auto_admin_password": {localAdminPasswordRegistry, setAutoAdminPasswordSDKMethods},
+	} {
+		if missing := permissions.Missing(c.reg, c.methods...); len(missing) > 0 {
+			t.Errorf("%s: SDK methods not present in the narrowed registry (drift): %v", name, missing)
+		}
+	}
+}
+
 func TestRenewMdmProfileSDKMethods_KnownToSDK(t *testing.T) {
 	if missing := permissions.Missing(pro.Privileges, renewMdmProfileSDKMethods...); len(missing) > 0 {
 		t.Fatalf("renewMdmProfileSDKMethods not present in the pro registry (drift): %v", missing)
@@ -70,6 +85,9 @@ var helperSDKMethods = map[string][]string{
 	"resolveSerialNumbers":           {"ListDevices"},
 	"resolveSerialsForManagementIDs": {"ListDevices"},
 	"sendCommandBatch":               {"SendMdmCommandV2"},
+	"sendCommand":                    {"SendMdmCommandV2"},
+	"resolveManagementID":            {"ListDevices"},
+	"resolveUnlockToken":             {"ListMobileDevicesDetailV2", "GetMobileDeviceDetailV2"},
 }
 
 // directSDKAliases maps SDK methods callable directly in an action file to their
@@ -183,6 +201,13 @@ func TestSetWallpaperSDKMethods_MatchFile(t *testing.T) {
 	assertMatch(t, "set_wallpaper.go", setWallpaperSDKMethods)
 }
 
+func TestTranche3SDKMethods_MatchFile(t *testing.T) {
+	assertMatch(t, "clear_passcode.go", clearPasscodeSDKMethods)
+	assertMatch(t, "set_recovery_lock.go", recoveryLockSDKMethods)
+	assertMatch(t, "clear_recovery_lock.go", recoveryLockSDKMethods)
+	assertMatch(t, "set_auto_admin_password.go", setAutoAdminPasswordSDKMethods)
+}
+
 func TestRenewMdmProfileSDKMethods_MatchFile(t *testing.T) {
 	assertMatch(t, "renew_mdm_profile.go", renewMdmProfileSDKMethods)
 }
@@ -246,6 +271,40 @@ func TestSetWallpaperPrivileges_Rendered(t *testing.T) {
 	for _, want := range []string{"destructive-device-actions:execute", "devices:read"} {
 		if !permissions.Renders(setWallpaperPrivileges, want) {
 			t.Errorf("setWallpaperPrivileges did not render %q:\n%s", want, setWallpaperPrivileges)
+		}
+	}
+}
+
+// TestCommandPrivileges_NameOnlyTheirOwnCapability pins each action to the one
+// capability the gateway checks for its command type, and to none of the other
+// three the endpoint's alternatives set offers.
+func TestCommandPrivileges_NameOnlyTheirOwnCapability(t *testing.T) {
+	all := []string{"device-actions", "destructive-device-actions", "local-admin-passwords", "recovery-lock"}
+	cases := map[string]struct {
+		section string
+		want    string
+		other   []string
+	}{
+		"clear_passcode":          {clearPasscodePrivileges, "device-actions:execute", []string{"mobile-devices:read"}},
+		"set_recovery_lock":       {setRecoveryLockPrivileges, "recovery-lock:execute", nil},
+		"clear_recovery_lock":     {clearRecoveryLockPrivileges, "recovery-lock:execute", nil},
+		"set_auto_admin_password": {setAutoAdminPasswordPrivileges, "local-admin-passwords:execute", nil},
+	}
+	for name, c := range cases {
+		if !permissions.Renders(c.section, c.want) {
+			t.Errorf("%s did not render %q:\n%s", name, c.want, c.section)
+		}
+		if !permissions.Renders(c.section, "devices:read") {
+			t.Errorf("%s did not render devices:read:\n%s", name, c.section)
+		}
+		wantCap, _, _ := strings.Cut(c.want, ":")
+		for _, capability := range all {
+			if capability != wantCap && strings.Contains(c.section, "`"+capability+"`") {
+				t.Errorf("%s names %s, which its command does not need:\n%s", name, capability, c.section)
+			}
+		}
+		if strings.Contains(c.section, "at least one of") {
+			t.Errorf("%s still renders an alternatives set:\n%s", name, c.section)
 		}
 	}
 }

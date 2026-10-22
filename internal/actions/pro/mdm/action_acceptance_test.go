@@ -474,3 +474,184 @@ action "jamfplatform_pro_set_wallpaper" "paper" {
 		}},
 	})
 }
+
+// accComputerSerial skips the test unless a disposable computer is declared.
+func accComputerSerial(t *testing.T) string {
+	t.Helper()
+	serial := testhelpers.AccEnv(envComputerSerial)
+	if serial == "" {
+		t.Skipf("%s not set; skipping computer command acceptance test", envComputerSerial)
+	}
+	testhelpers.AccPreCheck(t)
+	return serial
+}
+
+// TestAccAction_ProClearPasscode_LooksUpTheToken leaves unlock_token out, so the
+// action reads it from the device's inventory. A simulated device holds one.
+func TestAccAction_ProClearPasscode_LooksUpTheToken(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_clear_passcode" "clear" {
+  config {
+    serial_number = %q
+  }
+}`, serial), "action.jamfplatform_pro_clear_passcode.clear")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProClearPasscode_ExplicitToken skips the lookup. Jamf Pro does
+// not validate the token, so a placeholder is accepted.
+func TestAccAction_ProClearPasscode_ExplicitToken(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_clear_passcode" "clear" {
+  config {
+    serial_number = %q
+    unlock_token  = "dGVzdA=="
+  }
+}`, serial), "action.jamfplatform_pro_clear_passcode.clear")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProClearPasscode_BothSelectorsFail(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_clear_passcode" "clear" {
+  config {
+    serial_number = "NOSUCHSERIAL0001"
+    management_id = "00000000-0000-0000-0000-000000000000"
+  }
+}`, "action.jamfplatform_pro_clear_passcode.clear")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Combination.*\[management_id,serial_number\]`),
+		}},
+	})
+}
+
+func TestAccAction_ProClearPasscode_UnknownSerialFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_clear_passcode" "clear" {
+  config {
+    serial_number = "NOSUCHSERIAL0001"
+  }
+}`, "action.jamfplatform_pro_clear_passcode.clear")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`NOSUCHSERIAL0001`),
+		}},
+	})
+}
+
+func TestAccAction_ProSetRecoveryLock_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_recovery_lock" "lock" {
+  config {
+    serial_numbers = [%q]
+    password       = "tf-acc-Recovery-1"
+  }
+}`, serial), "action.jamfplatform_pro_set_recovery_lock.lock")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProClearRecoveryLock_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_clear_recovery_lock" "unlock" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_clear_recovery_lock.unlock")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProSetRecoveryLock_EmptyPasswordFails asserts that an empty
+// password is refused here. Jamf Pro would take it as a request to clear the
+// lock, so clearing has its own action.
+func TestAccAction_ProSetRecoveryLock_EmptyPasswordFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_set_recovery_lock" "lock" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    password       = ""
+  }
+}`, "action.jamfplatform_pro_set_recovery_lock.lock")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value.*at least 1`),
+		}},
+	})
+}
+
+func TestAccAction_ProSetAutoAdminPassword_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_auto_admin_password" "admin" {
+  config {
+    serial_number = %q
+    guid          = "00000000-0000-0000-0000-000000000000"
+    password      = "tf-acc-Admin-1"
+  }
+}`, serial), "action.jamfplatform_pro_set_auto_admin_password.admin")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProSetAutoAdminPassword_NeedsAGUID(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_set_auto_admin_password" "admin" {
+  config {
+    serial_number = "NOSUCHSERIAL0001"
+    password      = "tf-acc-Admin-1"
+  }
+}`, "action.jamfplatform_pro_set_auto_admin_password.admin")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Missing required argument.*guid`),
+		}},
+	})
+}

@@ -74,3 +74,31 @@ var setWallpaperSDKMethods = []string{
 	"ListDevices",
 }
 var setWallpaperPrivileges = permissions.Section(wallpaperRegistry, setWallpaperSDKMethods...)
+
+// The remaining commands are authorised under a capability of their own, so each
+// narrows SendMdmCommandV2 to it. clear_passcode shares the device-actions
+// capability with lost mode and adds the inventory reads behind its token lookup.
+var clearPasscodeSDKMethods = []string{
+	"SendMdmCommandV2",
+	"ListDevices",
+	"ListMobileDevicesDetailV2",
+	"GetMobileDeviceDetailV2",
+}
+var clearPasscodePrivileges = permissions.Section(deviceActionsCommandRegistry, clearPasscodeSDKMethods...)
+
+var recoveryLockRegistry = permissions.Narrow(resolveSerialMerged, "SendMdmCommandV2", "recovery-lock:execute")
+var recoveryLockSDKMethods = []string{
+	"SendMdmCommandV2",
+	"ListDevices",
+}
+var (
+	setRecoveryLockPrivileges   = permissions.Section(recoveryLockRegistry, recoveryLockSDKMethods...)
+	clearRecoveryLockPrivileges = permissions.Section(recoveryLockRegistry, recoveryLockSDKMethods...)
+)
+
+var localAdminPasswordRegistry = permissions.Narrow(resolveSerialMerged, "SendMdmCommandV2", "local-admin-passwords:execute")
+var setAutoAdminPasswordSDKMethods = []string{
+	"SendMdmCommandV2",
+	"ListDevices",
+}
+var setAutoAdminPasswordPrivileges = permissions.Section(localAdminPasswordRegistry, setAutoAdminPasswordSDKMethods...)

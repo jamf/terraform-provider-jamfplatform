@@ -374,3 +374,103 @@ func TestPositiveInteger(t *testing.T) {
 		}
 	}
 }
+
+// --- tranche 3: single-device and secret-carrying commands ---
+
+func TestTranche3Actions_Metadata(t *testing.T) {
+	assertTypeName(t, NewClearPasscodeAction().(*ClearPasscodeAction).Metadata, "jamfplatform_pro_clear_passcode")
+	assertTypeName(t, NewSetAutoAdminPasswordAction().(*SetAutoAdminPasswordAction).Metadata, "jamfplatform_pro_set_auto_admin_password")
+	assertTypeName(t, NewSetRecoveryLockAction().(*SetRecoveryLockAction).Metadata, "jamfplatform_pro_set_recovery_lock")
+	assertTypeName(t, NewClearRecoveryLockAction().(*ClearRecoveryLockAction).Metadata, "jamfplatform_pro_clear_recovery_lock")
+}
+
+// TestSingleActions_TakeOneDevice guards the asymmetry with the batch actions:
+// a payload with a per-device value must not accept a list, or one device's
+// value would be applied to all of them.
+func TestSingleActions_TakeOneDevice(t *testing.T) {
+	for name, a := range singleActions() {
+		schema := schemaOf(t, a)
+		for _, attr := range []string{"management_id", "serial_number"} {
+			if _, ok := schema.Attributes[attr]; !ok {
+				t.Errorf("%s: missing %q", name, attr)
+			}
+		}
+		for _, gone := range []string{"management_ids", "serial_numbers"} {
+			if _, ok := schema.Attributes[gone]; ok {
+				t.Errorf("%s: carries a per-device value but accepts the list %q", name, gone)
+			}
+		}
+		if !strings.Contains(schema.MarkdownDescription, "targets one device") {
+			t.Errorf("%s: does not say it targets one device", name)
+		}
+		validators := a.(action.ActionWithConfigValidators).ConfigValidators(context.Background())
+		var described strings.Builder
+		for _, v := range validators {
+			described.WriteString(v.Description(context.Background()))
+		}
+		for _, selector := range []string{"management_id", "serial_number"} {
+			if !strings.Contains(described.String(), selector) {
+				t.Errorf("%s: no ConfigValidator names %q", name, selector)
+			}
+		}
+	}
+}
+
+func TestSecretAttributes_SayTheyAppearInPlanOutput(t *testing.T) {
+	cases := map[string][]string{
+		"set_recovery_lock":       {"password"},
+		"set_auto_admin_password": {"password"},
+		"clear_passcode":          {"unlock_token"},
+	}
+	actions := map[string]action.Action{
+		"set_recovery_lock":       NewSetRecoveryLockAction(),
+		"set_auto_admin_password": NewSetAutoAdminPasswordAction(),
+		"clear_passcode":          NewClearPasscodeAction(),
+	}
+	for name, attrs := range cases {
+		schema := schemaOf(t, actions[name])
+		for _, attr := range attrs {
+			if desc := schema.Attributes[attr].GetMarkdownDescription(); !strings.Contains(desc, "appears in Terraform plan output") {
+				t.Errorf("%s.%s carries a secret without saying it is plan-visible:\n%s", name, attr, desc)
+			}
+		}
+	}
+}
+
+func TestSetAutoAdminPasswordAction_RequiresBothFields(t *testing.T) {
+	assertRequired(t, NewSetAutoAdminPasswordAction().(*SetAutoAdminPasswordAction).Schema, []string{"guid", "password"})
+}
+
+func TestSetRecoveryLockAction_RequiresAPassword(t *testing.T) {
+	assertRequired(t, NewSetRecoveryLockAction().(*SetRecoveryLockAction).Schema, []string{"password"})
+	assertAttrsPresent(t, NewClearRecoveryLockAction().(*ClearRecoveryLockAction).Schema, []string{"management_ids", "serial_numbers"})
+	if _, ok := schemaOf(t, NewClearRecoveryLockAction()).Attributes["password"]; ok {
+		t.Error("clear_recovery_lock must take no password")
+	}
+}
+
+func TestTranche3Commands_MarshalTheWireBody(t *testing.T) {
+	cases := map[string]struct {
+		got  *pro.MDMCommandRequestCommandData
+		want string
+	}{
+		"clear passcode":    {clearPasscodeCommand("dG9rZW4="), `{"commandType":"CLEAR_PASSCODE","unlockToken":"dG9rZW4="}`},
+		"set recovery lock": {setRecoveryLockCommand("s3cret"), `{"commandType":"SET_RECOVERY_LOCK","newPassword":"s3cret"}`},
+		// An empty password clears the lock, so it must be sent, not omitted.
+		"clear recovery lock": {setRecoveryLockCommand(""), `{"commandType":"SET_RECOVERY_LOCK","newPassword":""}`},
+		"set auto admin password": {
+			setAutoAdminPasswordCommand(SetAutoAdminPasswordActionModel{Guid: types.StringValue("G-1"), Password: types.StringValue("pw")}),
+			`{"commandType":"SET_AUTO_ADMIN_PASSWORD","guid":"G-1","password":"pw"}`,
+		},
+	}
+	for name, c := range cases {
+		out, err := json.Marshal(c.got)
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+			continue
+		}
+		if string(out) != c.want {
+			t.Errorf("%s:\n got %s\nwant %s", name, out, c.want)
+		}
+	}
+}
