@@ -65,7 +65,7 @@ func cdpMasterPatch(current *pro.CloudDistributionPoint, master bool) *pro.Cloud
 	}
 }
 
-// RequireJCDSUploads skips the calling test unless the tenant can actually take
+// RequireDirectUploads skips the calling test unless the tenant can actually take
 // a package upload to the Jamf Cloud Distribution Point.
 //
 // Every upload the provider performs ends in a verification poll that waits for
@@ -100,7 +100,7 @@ func cdpMasterPatch(current *pro.CloudDistributionPoint, master bool) *pro.Cloud
 // missing secret — but it means a green pro lane says nothing about the upload
 // path. TESTING.md §Tenant-prerequisite fixtures records the same caveat for a
 // reader who only ever sees the lane result.
-func RequireJCDSUploads(t *testing.T) {
+func RequireDirectUploads(t *testing.T) {
 	t.Helper()
 	client := pro.New(NewAcceptanceClient(t))
 	ctx := context.Background()
@@ -111,9 +111,16 @@ func RequireJCDSUploads(t *testing.T) {
 	}
 	switch {
 	case cdp == nil || strings.EqualFold(cdp.CdnType, pro.CloudDistributionPointCdnTypeNone):
-		t.Skip("skipping: no cloud distribution point configured on this tenant, so a package upload can never converge; configure Jamf Cloud (JCDS) in Settings → Server infrastructure → Cloud distribution point")
-	case !strings.EqualFold(cdp.CdnType, pro.CloudDistributionPointCdnTypeJamfCloud):
-		t.Skipf("skipping: this tenant's cloud distribution point is %s, and these tests upload to Jamf Cloud (JCDS)", cdp.CdnType)
+		t.Skip("skipping: no cloud distribution point configured on this tenant, so a package upload can never converge; configure a cloud distribution point in Settings → Server infrastructure → Cloud distribution point")
+	case !strings.EqualFold(cdp.CdnType, pro.CloudDistributionPointCdnTypeJamfCloud) && !strings.EqualFold(cdp.CdnType, pro.CloudDistributionPointCdnTypeAmazonS3):
+		t.Skipf("skipping: this tenant's cloud distribution point is %s, and these tests upload to Jamf Cloud (JCDS) or Amazon S3", cdp.CdnType)
+	}
+
+	// An Amazon S3 distribution point reports directUploadCapable false, yet
+	// accepts UploadPackageV1 and reaches READY with its md5 and size computed
+	// (wire-verified 2026-10-22), so the flag is checked for Jamf Cloud only.
+	if strings.EqualFold(cdp.CdnType, pro.CloudDistributionPointCdnTypeAmazonS3) {
+		return
 	}
 
 	capability, err := client.GetCloudDistributionPointUploadCapabilityV1(ctx)

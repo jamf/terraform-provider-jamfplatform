@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
@@ -137,4 +138,143 @@ func validateCdnTypeRequiredFields(data CloudDistributionPointResourceModel) dia
 		}
 	}
 	return diags
+}
+
+// Amazon S3 attribute rules. The admin UI shows the CloudFront key pair, the
+// private key and the signed-URL expiration only once "Require signed URLs" is
+// ticked, and shows no directory at all for S3 (directory is Akamai's). Jamf Pro
+// ignores expiration_seconds when signed URLs are off (wire-verified 2026-10-22:
+// a PATCH of 7200 read back 3600), and assigns its own directory on create, so a
+// configured value apply-fails with "inconsistent result". Both are refused at
+// plan time, attached to the offending attribute per STYLE_GUIDE §Cross-field
+// validation.
+//
+// The attributes are refused unless require_signed_urls is explicitly true, so
+// a configuration that omits it has to say so. An unset value would otherwise
+// pass on create, where the server defaults to unsigned, and on update, where
+// the stored setting is left alone and the plan cannot see it.
+
+// s3UnsignedConflict reports whether the attribute is set on an Amazon S3
+// distribution point that does not explicitly require signed URLs. An unknown
+// cdn_type or require_signed_urls defers, since the value is not yet known.
+func s3UnsignedConflict(cdnType types.String, requireSigned types.Bool) bool {
+	if cdnType.IsUnknown() || cdnType.IsNull() || cdnType.ValueString() != pro.CloudDistributionPointCdnTypeAmazonS3 {
+		return false
+	}
+	if requireSigned.IsUnknown() {
+		return false
+	}
+	return requireSigned.IsNull() || !requireSigned.ValueBool()
+}
+
+// s3DirectoryConflict reports whether directory is refused on this cdn_type.
+func s3DirectoryConflict(cdnType types.String) bool {
+	return !cdnType.IsUnknown() && !cdnType.IsNull() && cdnType.ValueString() == pro.CloudDistributionPointCdnTypeAmazonS3
+}
+
+// s3SignedURLDiagnostic builds the error for an attribute set on an unsigned
+// Amazon S3 distribution point.
+func s3SignedURLDiagnostic(attr path.Path) diag.Diagnostics {
+	return diag.Diagnostics{diag.NewAttributeErrorDiagnostic(
+		attr,
+		fmt.Sprintf("%s requires require_signed_urls = true when cdn_type = \"AMAZON_S3\"", attr),
+		"Jamf Pro ignores this setting unless Amazon S3 signed URLs are enabled. Set require_signed_urls = true, or remove this attribute.",
+	)}
+}
+
+// s3SignedURLOnlyString refuses a set string attribute on an unsigned Amazon S3
+// distribution point.
+type s3SignedURLOnlyString struct{}
+
+// Description returns a plain-text description.
+func (s3SignedURLOnlyString) Description(context.Context) string {
+	return "may only be set on an AMAZON_S3 distribution point when require_signed_urls is true"
+}
+
+// MarkdownDescription returns the markdown description.
+func (v s3SignedURLOnlyString) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+// ValidateString reads cdn_type and require_signed_urls from the configuration
+// and refuses the value when the conflict holds.
+func (s3SignedURLOnlyString) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	var cdnType types.String
+	var requireSigned types.Bool
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("cdn_type"), &cdnType)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("require_signed_urls"), &requireSigned)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if s3UnsignedConflict(cdnType, requireSigned) {
+		resp.Diagnostics.Append(s3SignedURLDiagnostic(req.Path)...)
+	}
+}
+
+// s3SignedURLOnlyInt64 refuses a set integer attribute on an unsigned Amazon S3
+// distribution point.
+type s3SignedURLOnlyInt64 struct{}
+
+// Description returns a plain-text description.
+func (s3SignedURLOnlyInt64) Description(context.Context) string {
+	return "may only be set on an AMAZON_S3 distribution point when require_signed_urls is true"
+}
+
+// MarkdownDescription returns the markdown description.
+func (v s3SignedURLOnlyInt64) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+// ValidateInt64 reads cdn_type and require_signed_urls from the configuration
+// and refuses the value when the conflict holds.
+func (s3SignedURLOnlyInt64) ValidateInt64(ctx context.Context, req validator.Int64Request, resp *validator.Int64Response) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	var cdnType types.String
+	var requireSigned types.Bool
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("cdn_type"), &cdnType)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("require_signed_urls"), &requireSigned)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if s3UnsignedConflict(cdnType, requireSigned) {
+		resp.Diagnostics.Append(s3SignedURLDiagnostic(req.Path)...)
+	}
+}
+
+// s3DirectoryRefused refuses directory on an Amazon S3 distribution point.
+type s3DirectoryRefused struct{}
+
+// Description returns a plain-text description.
+func (s3DirectoryRefused) Description(context.Context) string {
+	return "is not used by an AMAZON_S3 distribution point; only Akamai uses it"
+}
+
+// MarkdownDescription returns the markdown description.
+func (v s3DirectoryRefused) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+// ValidateString reads cdn_type from the configuration and refuses directory
+// when it is AMAZON_S3.
+func (s3DirectoryRefused) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	var cdnType types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("cdn_type"), &cdnType)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if s3DirectoryConflict(cdnType) {
+		resp.Diagnostics.Append(diag.NewAttributeErrorDiagnostic(
+			req.Path,
+			"directory is not used when cdn_type = \"AMAZON_S3\"",
+			"Jamf Pro assigns the directory of an Amazon S3 distribution point, so a configured value is rejected. Remove it. Only AKAMAI uses directory.",
+		))
+	}
 }

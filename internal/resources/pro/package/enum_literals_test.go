@@ -26,8 +26,7 @@ func TestEnumLiteralsComeFromTheSDK(t *testing.T) {
 			pro.CloudDistributionPointInventoryFileInfoStatusValues(),
 		),
 		Ignore: map[string]string{
-			"MD5":   "hash_type is the package hash vocabulary (MD5 / SHA_256 / SHA_512 / SHA3_512), wire-probed; pro.PackageManifestHashType is the *manifest* hash type and spells its SHA member SHA256, so only MD5 collides and borrowing it would tie this set to an unrelated vocabulary",
-			"READY": "cloudTransferStatus has no generated enum; pro.CloudDistributionPointInventoryFileInfoStatus is the CDP inventory file status, a different field",
+			"MD5": "hash_type is the package hash vocabulary (MD5 / SHA_256 / SHA_512 / SHA3_512), wire-probed; pro.PackageManifestHashType is the *manifest* hash type and spells its SHA member SHA256, so only MD5 collides and borrowing it would tie this set to an unrelated vocabulary",
 		},
 	})
 	if err != nil {
