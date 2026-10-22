@@ -62,6 +62,21 @@ const (
 // capabilities on 2026-09-03.
 const minDeclaredCapabilities = 100
 
+// publishedMapOmissions are capabilities the SDK requires and Jamf Account
+// offers that the article does not yet declare. Each is self-expiring: the day
+// the article declares the slug the entry must be deleted, so the article's own
+// section and name take over and this file never shadows it.
+//
+// platform-environments: the gateway's authorization policy gates the six
+// /organization/v1/{environments,tenants} routes on it (SDK v1.9.0,
+// account-organization), and Jamf Account's integration form offers it as an
+// Organization permission named "Platform Environments" with
+// create/read/update/delete (SDK-recorded 2026-10-21). The article's 2026-10-22
+// snapshot omits it.
+var publishedMapOmissions = map[string]bool{
+	"platform-environments": true,
+}
+
 // publishedRow is one parsed article row.
 type publishedRow struct {
 	section string
@@ -129,8 +144,16 @@ func TestCatalogueMatchesThePublishedMap(t *testing.T) {
 
 	var onlyHere, onlyThere []string
 	for slug := range catalogue {
-		if _, ok := published[slug]; !ok {
+		if _, ok := published[slug]; !ok && !publishedMapOmissions[slug] {
 			onlyHere = append(onlyHere, slug)
+		}
+	}
+	for slug := range publishedMapOmissions {
+		if _, ok := published[slug]; ok {
+			t.Errorf("publishedMapOmissions still excuses %q, which the article now declares — delete the entry", slug)
+		}
+		if _, ok := catalogue[slug]; !ok {
+			t.Errorf("publishedMapOmissions excuses %q, which catalogue.go does not carry", slug)
 		}
 	}
 	for slug := range published {

@@ -78,6 +78,8 @@ var catalogue = map[string]entry{
 	"distributor-actions": {catOrganizationManagement, "Distributor actions"},
 	"sso-connections":     {catOrganizationManagement, "SSO connections"},
 	"sso-domains":         {catOrganizationManagement, "SSO domains"},
+	// Not in the published map: see publishedMapOmissions.
+	"platform-environments": {catOrganizationManagement, "Platform Environments"},
 
 	// Inventory.
 	"devices":                   {catInventory, "Devices"},

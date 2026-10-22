@@ -19,7 +19,7 @@ func fullLdapServerResponse() *proclassic.LdapServer {
 			ID:                 new(31),
 			IsEnabled:          new(true),
 			MigratedToID:       new(0),
-			CertificatesUsed:   new(""),
+			CertificatesUsed:   nil,
 			Name:               new("corp-ad"),
 			Hostname:           new("ldap.example.com"),
 			ServerType:         new(serverTypeActiveDirectory),
