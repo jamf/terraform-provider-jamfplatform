@@ -96,6 +96,7 @@ func (a *SetWallpaperAction) Schema(ctx context.Context, req action.SchemaReques
 	}
 	resp.Schema = actionschema.Schema{
 		MarkdownDescription: "Sets the wallpaper on one or more supervised iPhones and iPads. Choose the picture with `image` or `icon_id`, and where it appears with `location`." +
+			"\n\nJamf has deprecated this command and has not named a replacement. Jamf Pro still accepts it." +
 			"\n\nIf a device already has this command waiting, for example because it is offline, Jamf Pro keeps that command and queues no other, so a changed picture or location does not reach the device." +
 			batchNote + setWallpaperPrivileges,
 		Attributes: attrs,

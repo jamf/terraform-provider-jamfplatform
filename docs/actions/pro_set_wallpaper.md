@@ -4,6 +4,7 @@ page_title: "jamfplatform_pro_set_wallpaper Action - terraform-provider-jamfplat
 subcategory: ""
 description: |-
   Sets the wallpaper on one or more supervised iPhones and iPads. Choose the picture with image or icon_id, and where it appears with location.
+  Jamf has deprecated this command and has not named a replacement. Jamf Pro still accepts it.
   If a device already has this command waiting, for example because it is offline, Jamf Pro keeps that command and queues no other, so a changed picture or location does not reach the device.
   The action commands every targeted device in a single request. If Jamf Pro cannot match one device, the whole request fails, no device is commanded and the error does not say which device it was, so a large batch is harder to diagnose than several small ones. Jamf Pro documents no maximum batch size.
   Required Jamf permissions
@@ -17,6 +18,8 @@ description: |-
 # jamfplatform_pro_set_wallpaper (Action)
 
 Sets the wallpaper on one or more supervised iPhones and iPads. Choose the picture with `image` or `icon_id`, and where it appears with `location`.
+
+Jamf has deprecated this command and has not named a replacement. Jamf Pro still accepts it.
 
 If a device already has this command waiting, for example because it is offline, Jamf Pro keeps that command and queues no other, so a changed picture or location does not reach the device.
 
