@@ -43,3 +43,23 @@ var flushMdmCommandsSDKMethods = []string{
 	"DeleteCommandFlushByIDTypeIDStatus",
 }
 var flushMdmCommandsPrivileges = permissions.Section(proclassic.Privileges, flushMdmCommandsSDKMethods...)
+
+// deviceActionsCommandRegistry is the registry for a command action whose
+// command type the gateway authorises under device-actions:execute, which is
+// every type except ERASE_DEVICE, DEVICE_LOCK, DELETE_USER (destructive),
+// SET_AUTO_ADMIN_PASSWORD (local admin passwords) and SET_RECOVERY_LOCK
+// (recovery lock). Wire-probed 2026-10-22 and stated in the SDK's own godoc for
+// SendMdmCommandV2.
+var deviceActionsCommandRegistry = permissions.Narrow(resolveSerialMerged, "SendMdmCommandV2", "device-actions:execute")
+
+// The lost-mode actions send one command and resolve serial numbers through the
+// Platform devices inventory, in helpers.go.
+var lostModeSDKMethods = []string{
+	"SendMdmCommandV2",
+	"ListDevices",
+}
+var (
+	enableLostModePrivileges    = permissions.Section(deviceActionsCommandRegistry, lostModeSDKMethods...)
+	disableLostModePrivileges   = permissions.Section(deviceActionsCommandRegistry, lostModeSDKMethods...)
+	playLostModeSoundPrivileges = permissions.Section(deviceActionsCommandRegistry, lostModeSDKMethods...)
+)

@@ -5,10 +5,15 @@ package mdmactions
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/action"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 )
 
 func assertAttrsPresent(t *testing.T, schema func(context.Context, action.SchemaRequest, *action.SchemaResponse), want []string) {
@@ -119,4 +124,95 @@ func TestSendBlankPushValidatorsWired(t *testing.T) {
 			t.Errorf("no ConfigValidator names %q; the at-least-one-of rule is not wired to both selectors:\n%s", selector, described.String())
 		}
 	}
+}
+
+// --- lost mode ---
+
+func TestLostModeActions_Metadata(t *testing.T) {
+	assertTypeName(t, NewEnableLostModeAction().(*EnableLostModeAction).Metadata, "jamfplatform_pro_enable_lost_mode")
+	assertTypeName(t, NewDisableLostModeAction().(*DisableLostModeAction).Metadata, "jamfplatform_pro_disable_lost_mode")
+	assertTypeName(t, NewPlayLostModeSoundAction().(*PlayLostModeSoundAction).Metadata, "jamfplatform_pro_play_lost_mode_sound")
+}
+
+func TestEnableLostModeAction_Schema(t *testing.T) {
+	schema := NewEnableLostModeAction().(*EnableLostModeAction).Schema
+	assertAttrsPresent(t, schema, []string{"management_ids", "serial_numbers", "message", "phone_number", "footnote", "timeouts"})
+
+	var resp action.SchemaResponse
+	schema(context.Background(), action.SchemaRequest{}, &resp)
+	for _, name := range []string{"message", "phone_number", "footnote"} {
+		if !resp.Schema.Attributes[name].IsOptional() {
+			t.Errorf("%s must be optional", name)
+		}
+	}
+}
+
+func TestEnableLostModeAction_AtLeastOneOfMessageOrPhone(t *testing.T) {
+	var described strings.Builder
+	for _, v := range NewEnableLostModeAction().(action.ActionWithConfigValidators).ConfigValidators(context.Background()) {
+		described.WriteString(v.Description(context.Background()) + "\n")
+	}
+	// A footnote alone is refused by Jamf Pro, so the rule must name exactly the
+	// two attributes that satisfy it and not the footnote.
+	for _, want := range []string{"message", "phone_number"} {
+		if !strings.Contains(described.String(), want) {
+			t.Errorf("no ConfigValidator names %q:\n%s", want, described.String())
+		}
+	}
+}
+
+func TestEnableLostModeAction_DocumentsTheDuplicateCommandTrap(t *testing.T) {
+	desc := schemaOf(t, NewEnableLostModeAction()).MarkdownDescription
+	if !strings.Contains(desc, "already has this command waiting") {
+		t.Errorf("the pending-command behaviour is not documented:\n%s", desc)
+	}
+}
+
+func TestHasVisibleText_RejectsBlank(t *testing.T) {
+	for value, wantErr := range map[string]bool{"Call me": false, " x ": false, "   ": true, "\t\n": true} {
+		var resp validatorResponse
+		validateString(hasVisibleText, value, &resp)
+		if resp.hasError != wantErr {
+			t.Errorf("hasVisibleText(%q) error = %v, want %v", value, resp.hasError, wantErr)
+		}
+	}
+}
+
+// TestLostModeCommands_MarshalTheWireBody pins the request body the SDK's union
+// marshaller produces against what was accepted on the wire (2026-10-22).
+func TestLostModeCommands_MarshalTheWireBody(t *testing.T) {
+	message, phone := "Call me", "+15555550100"
+	cases := map[string]struct {
+		got  *pro.MDMCommandRequestCommandData
+		want string
+	}{
+		"enable, message and phone": {
+			enableLostModeCommand(EnableLostModeActionModel{Message: types.StringValue(message), PhoneNumber: types.StringValue(phone)}),
+			`{"commandType":"ENABLE_LOST_MODE","lostModeMessage":"Call me","lostModePhone":"+15555550100"}`,
+		},
+		"enable, unset fields are omitted": {
+			enableLostModeCommand(EnableLostModeActionModel{Message: types.StringValue(message)}),
+			`{"commandType":"ENABLE_LOST_MODE","lostModeMessage":"Call me"}`,
+		},
+		"disable": {disableLostModeCommand(), `{"commandType":"DISABLE_LOST_MODE"}`},
+		"play":    {playLostModeSoundCommand(), `{"commandType":"PLAY_LOST_MODE_SOUND"}`},
+	}
+	for name, c := range cases {
+		out, err := json.Marshal(c.got)
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+			continue
+		}
+		if string(out) != c.want {
+			t.Errorf("%s:\n got %s\nwant %s", name, out, c.want)
+		}
+	}
+}
+
+type validatorResponse struct{ hasError bool }
+
+func validateString(v validator.String, value string, out *validatorResponse) {
+	var resp validator.StringResponse
+	v.ValidateString(context.Background(), validator.StringRequest{ConfigValue: types.StringValue(value)}, &resp)
+	out.hasError = resp.Diagnostics.HasError()
 }

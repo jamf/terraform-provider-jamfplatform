@@ -1,27 +1,29 @@
 // Copyright Jamf Software LLC 2026
 // SPDX-License-Identifier: MPL-2.0
 
-// Package mdmactions holds the Jamf Pro MDM command actions. Three remain:
-// send_blank_push, renew_mdm_profile and flush_mdm_commands.
+// Package mdmactions holds the Jamf Pro MDM command actions: send_blank_push,
+// renew_mdm_profile, flush_mdm_commands, and one action per command sent through
+// POST /pro/v2/mdm/commands.
 //
-// Fourteen others were removed at the Platform API GA — device_lock, the lost
-// mode trio, the remote desktop pair, clear_restrictions_password,
-// clear_passcode, delete_user, log_out_user, unlock_user_account,
-// set_auto_admin_password and the enhanced-log-collection pair — because
-// POST /v2/mdm/commands was withdrawn. Only the send verb went: the GET side of
-// /v1 and /v2 survives, which is why the three above are unaffected.
+// Fourteen of those per-command actions were removed at the Platform API GA
+// because the endpoint was withdrawn (commit 3825dbe7), and the endpoint was
+// routed again at Jamf Pro v2508 (SDK v1.9.0, wire-probed 2026-10-22). They are
+// being rebuilt in tranches, each command keeping its own action rather than a
+// generic one taking a command type: a command's parameters, secrets and
+// batchability are its own, and so is the one capability the gateway checks for
+// it. The gateway picks that capability from the body, which the SDK registry can
+// only express as "any of four", so each action narrows the registry with
+// permissions.Narrow to the single one it can need.
 //
-// Why there is no replacement, recorded here because it is the first question
-// anyone will ask. The capability did not go away with the endpoint: the Classic
-// API still serves these commands on both /computercommands and
-// /mobiledevicecommands, and Jamf Pro v1872 actively *re-privileged* the five
-// mobile-device command POSTs (destructive-device-actions:execute and
-// device-actions:execute), which is not what a withdrawal looks like. Rebuilding
-// on Classic is therefore viable but is a different construct surface, not a
-// port: the command name is path-encoded rather than carried in the body, targets
-// are id lists rather than a clientData array, and the payload is XML. It wants
-// its own change with its own wire probes rather than being smuggled into a
-// removal.
+// Built so far: enable_lost_mode, disable_lost_mode, play_lost_mode_sound.
+//
+// Three wire facts shape every one of them, all probed on 2026-10-22. The server
+// does not check the device platform (a Mac accepts a lost-mode command and the
+// command can only fail on the device). It deduplicates by command type per
+// device: re-sending one while the first is pending answers 201 with the FIRST
+// command's id and discards the new settings, so a changed message sent to an
+// offline device silently changes nothing (batchNote says so to the user). And an
+// unknown management id fails the whole batch with a 404 that names no device.
 package mdmactions
 
 import (
@@ -50,6 +52,29 @@ import (
 // minJamfProVersion is empty: these management commands ride continuously
 // deployed Jamf Pro endpoints with no meaningful version floor.
 const minJamfProVersion = ""
+
+// batchNote is appended to the description of every command action that targets
+// devices in bulk, so the single-request behaviour and its all-or-nothing failure
+// mode are visible in the rendered docs rather than buried in this package.
+const batchNote = "\n\n" +
+	"All targeted devices are commanded in a single request. If any one device cannot be " +
+	"resolved the whole invocation fails and no device is commanded, so a large batch is " +
+	"harder to diagnose than several smaller ones. Jamf Pro publishes no maximum batch size."
+
+// batchWarnThreshold is the batch size above which sendCommandBatch warns.
+//
+// POST /v2/mdm/commands takes clientData as an array and Jamf Pro documents no
+// maximum for it: the shipped spec carries no maxItems, and wire probes were
+// accepted at 5,000 entries (the sibling blank-push endpoint was accepted at
+// 10,000). Where a real cap does exist Jamf documents it — GET /v1/mdm/commands
+// states "Limited to 40 UUIDs" and defines a 414 for breaching it — so the
+// absence here is meaningful rather than an omission.
+//
+// The threshold is therefore not a limit but a diagnosability warning: the POST
+// is all-or-nothing, and an unresolvable managementId fails the entire request
+// with an error that names no id. The larger the batch, the harder that is to
+// attribute.
+const batchWarnThreshold = 500
 
 // blankPushBatchNote documents send_blank_push's batch semantics. That endpoint
 // reports per-device outcomes: it accepts the request and names the devices that
@@ -129,6 +154,70 @@ func (a *mdmAction) ensureClassicClient(resp *action.InvokeResponse) bool {
 		"The Jamf Platform client was not configured. Re-run terraform init/apply so the provider can configure successfully.",
 	)
 	return false
+}
+
+// sendCommandBatch queues one command for every management id in a single
+// POST /v2/mdm/commands.
+//
+// Only a command whose payload is the same for every device may go through here:
+// commandData is shared across the whole clientData array, so a per-device field
+// (an unlock token, a local-admin guid) would be applied to all of them. Such a
+// command takes one id per invocation instead.
+//
+// The request is all-or-nothing — see batchWarnThreshold.
+func (a *mdmAction) sendCommandBatch(ctx context.Context, resp *action.InvokeResponse, managementIDs []string, commandData *pro.MDMCommandRequestCommandData, label string) bool {
+	if len(managementIDs) > batchWarnThreshold {
+		resp.Diagnostics.AddWarning(
+			"Large Command Batch",
+			fmt.Sprintf(
+				"%s targets %d devices in a single request. Jamf Pro documents no maximum, but the request is all-or-nothing: if any one device cannot be resolved the whole batch fails with an error that does not identify which. Consider splitting this into smaller invocations.",
+				label, len(managementIDs),
+			),
+		)
+	}
+
+	clients := buildClientData(managementIDs)
+
+	resp.SendProgress(action.InvokeProgressEvent{Message: fmt.Sprintf("Requesting %s for %d device(s)", label, len(managementIDs))})
+
+	commands, err := a.client.SendMdmCommandV2(ctx, &pro.MDMCommandRequest{ClientData: &clients, CommandData: commandData})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			fmt.Sprintf("%s Failed", label),
+			fmt.Sprintf("Unable to queue %s for %d device(s)%s: %s", label, len(managementIDs), batchTargetSuffix(managementIDs), helpers.APIErrorDetail(err)),
+		)
+		return false
+	}
+
+	resp.SendProgress(action.InvokeProgressEvent{Message: fmt.Sprintf("%s accepted for %d device(s) (%d command(s) queued)", label, len(managementIDs), len(commands))})
+	return true
+}
+
+// buildClientData turns management ids into the per-device clientData entries
+// the batched command request carries.
+//
+// Each entry holds a POINTER to its id, so every element must reference a
+// distinct string. Getting that wrong would not fail loudly: the request would
+// stay well-formed and simply command one device N times while leaving the rest
+// untouched. Extracted as a pure function so that contract is directly testable.
+func buildClientData(managementIDs []string) []pro.MDMCommandClientRequest {
+	clients := make([]pro.MDMCommandClientRequest, 0, len(managementIDs))
+	for _, id := range managementIDs {
+		clients = append(clients, pro.MDMCommandClientRequest{ManagementID: &id})
+	}
+	return clients
+}
+
+// batchTargetSuffix names the targeted devices in an error message when the
+// batch is small enough to be useful. The failure response identifies no
+// individual device, so echoing the batch back is the only attribution a user
+// gets; beyond a handful of ids it becomes noise rather than help.
+func batchTargetSuffix(managementIDs []string) string {
+	const maxNamed = 10
+	if len(managementIDs) == 0 || len(managementIDs) > maxNamed {
+		return ""
+	}
+	return " (" + strings.Join(managementIDs, ", ") + ")"
 }
 
 // serialFilterBudgetBytes bounds the URL-encoded length of the RSQL filter

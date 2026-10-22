@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 	"testing"
 
 	devSDK "github.com/jamf/jamfplatform-go-sdk/jamfplatform/devices"
@@ -21,6 +22,12 @@ import (
 func TestSendBlankPushSDKMethods_KnownToSDK(t *testing.T) {
 	if missing := permissions.Missing(resolveSerialMerged, sendBlankPushSDKMethods...); len(missing) > 0 {
 		t.Fatalf("sendBlankPushSDKMethods not present in SDK registries (drift): %v", missing)
+	}
+}
+
+func TestLostModeSDKMethods_KnownToSDK(t *testing.T) {
+	if missing := permissions.Missing(deviceActionsCommandRegistry, lostModeSDKMethods...); len(missing) > 0 {
+		t.Fatalf("lostModeSDKMethods not present in the narrowed registry (drift): %v", missing)
 	}
 }
 
@@ -55,6 +62,7 @@ func TestFlushMdmCommandsSDKMethods_KnownToSDK(t *testing.T) {
 var helperSDKMethods = map[string][]string{
 	"resolveManagementIDs": {"ListDevices"}, // serial path -> resolveSerialNumbers -> ListDevices (RSQL in= set)
 	"resolveSerialNumbers": {"ListDevices"},
+	"sendCommandBatch":     {"SendMdmCommandV2"},
 }
 
 // directSDKAliases maps SDK methods callable directly in an action file to their
@@ -158,6 +166,12 @@ func TestSendBlankPushSDKMethods_MatchFile(t *testing.T) {
 	assertMatch(t, "send_blank_push.go", sendBlankPushSDKMethods)
 }
 
+func TestLostModeSDKMethods_MatchFile(t *testing.T) {
+	for _, file := range []string{"enable_lost_mode.go", "disable_lost_mode.go", "play_lost_mode_sound.go"} {
+		assertMatch(t, file, lostModeSDKMethods)
+	}
+}
+
 func TestRenewMdmProfileSDKMethods_MatchFile(t *testing.T) {
 	assertMatch(t, "renew_mdm_profile.go", renewMdmProfileSDKMethods)
 }
@@ -190,5 +204,29 @@ func TestRenewMdmProfilePrivileges_Rendered(t *testing.T) {
 func TestFlushMdmCommandsPrivileges_Rendered(t *testing.T) {
 	if !permissions.Renders(flushMdmCommandsPrivileges, "device-actions:delete") {
 		t.Fatalf("flushMdmCommandsPrivileges did not render the expected privilege:\n%s", flushMdmCommandsPrivileges)
+	}
+}
+
+// TestLostModePrivileges_NameOnlyTheCapabilityTheCommandNeeds is the guard that
+// the narrowing took effect. SendMdmCommandV2's registry entry lists four
+// alternatives; a table that rendered them all would send an operator to grant
+// recovery lock and destructive device actions for a command that needs neither.
+func TestLostModePrivileges_NameOnlyTheCapabilityTheCommandNeeds(t *testing.T) {
+	sections := map[string]string{
+		"enable_lost_mode":     enableLostModePrivileges,
+		"disable_lost_mode":    disableLostModePrivileges,
+		"play_lost_mode_sound": playLostModeSoundPrivileges,
+	}
+	for name, section := range sections {
+		for _, want := range []string{"device-actions:execute", "devices:read"} {
+			if !permissions.Renders(section, want) {
+				t.Errorf("%s did not render %q:\n%s", name, want, section)
+			}
+		}
+		for _, banned := range []string{"destructive-device-actions", "local-admin-passwords", "recovery-lock", "at least one of"} {
+			if strings.Contains(section, banned) {
+				t.Errorf("%s still mentions %q, so the alternatives set was not narrowed:\n%s", name, banned, section)
+			}
+		}
 	}
 }

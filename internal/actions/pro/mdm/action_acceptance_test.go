@@ -29,9 +29,18 @@ import (
 //	JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL   — a disposable enrolled computer
 //	JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL_2 — a SECOND disposable enrolled computer,
 //	                                     needed only by the mixed-selector test
+//	JAMFPLATFORM_ACC_PRO_MOBILE_SERIAL     — a disposable supervised iPhone or iPad,
+//	                                     for the lost-mode actions
+//
+// The lost-mode tests prove only that Jamf Pro accepted the command: a
+// simulated device never acknowledges, so nothing here can observe Lost Mode
+// switching on. Jamf Pro also folds a repeat of the same command into the one
+// already waiting for that device, so a re-run answers success without queuing
+// anything new.
 const (
 	envComputerSerial  = "JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL"
 	envComputerSerial2 = "JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL_2"
+	envMobileSerial    = "JAMFPLATFORM_ACC_PRO_MOBILE_SERIAL"
 )
 
 // fireConfig wraps an action block with a terraform_data trigger that invokes it
@@ -173,6 +182,133 @@ action "jamfplatform_pro_send_blank_push" "push" {
 		Steps: []resource.TestStep{{
 			Config:      config,
 			ExpectError: regexp.MustCompile(`NOSUCHSERIAL0001`),
+		}},
+	})
+}
+
+// accMobileSerial skips the test unless a disposable mobile device is declared.
+func accMobileSerial(t *testing.T) string {
+	t.Helper()
+	serial := testhelpers.AccEnv(envMobileSerial)
+	if serial == "" {
+		t.Skipf("%s not set; skipping lost mode acceptance test", envMobileSerial)
+	}
+	testhelpers.AccPreCheck(t)
+	return serial
+}
+
+func TestAccAction_ProEnableLostMode_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_enable_lost_mode" "lost" {
+  config {
+    serial_numbers = [%q]
+    message        = "This device is lost. Please call the number below."
+    phone_number   = "+1 555 0100"
+    footnote       = "Reward offered"
+  }
+}`, serial), "action.jamfplatform_pro_enable_lost_mode.lost")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProEnableLostMode_PhoneOnly covers the other half of the
+// at-least-one rule: a phone number with no message is accepted.
+func TestAccAction_ProEnableLostMode_PhoneOnly(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_enable_lost_mode" "lost" {
+  config {
+    serial_numbers = [%q]
+    phone_number   = "+1 555 0100"
+  }
+}`, serial), "action.jamfplatform_pro_enable_lost_mode.lost")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProDisableLostMode_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_disable_lost_mode" "found" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_disable_lost_mode.found")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProPlayLostModeSound_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_play_lost_mode_sound" "ping" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_play_lost_mode_sound.ping")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProEnableLostMode_FootnoteAloneFails asserts the plan-time rule
+// Jamf Pro enforces at the end of an apply: a footnote does not satisfy the
+// message-or-phone requirement. Needs no device, since it fails at validation.
+func TestAccAction_ProEnableLostMode_FootnoteAloneFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_enable_lost_mode" "lost" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    footnote       = "Reward offered"
+  }
+}`, "action.jamfplatform_pro_enable_lost_mode.lost")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Missing Attribute Configuration.*\[message,phone_number\]`),
+		}},
+	})
+}
+
+// TestAccAction_ProEnableLostMode_BlankMessageFails asserts that whitespace is
+// not a message: Jamf Pro itself accepts it, so only plan-time validation stops
+// a device locking behind an empty screen.
+func TestAccAction_ProEnableLostMode_BlankMessageFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_enable_lost_mode" "lost" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    message        = "   "
+  }
+}`, "action.jamfplatform_pro_enable_lost_mode.lost")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value.*visible`),
 		}},
 	})
 }

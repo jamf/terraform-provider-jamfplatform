@@ -129,13 +129,15 @@ func TestSortedKeys_IsStable(t *testing.T) {
 
 // --- schema/doc guards for the batch conversion ---
 
-// batchActions is every action that targets devices in bulk. send_blank_push is
-// the only one left: the twelve that batched through POST /v2/mdm/commands went
-// with that endpoint at the Platform API GA. Kept as a map so the guards below
-// stay generic for the next batch action.
+// batchActions is every action that targets devices in bulk. The guards below
+// run over all of them, so a new batch command action is added here and nowhere
+// else.
 func batchActions() map[string]action.Action {
 	return map[string]action.Action{
-		"send_blank_push": NewSendBlankPushAction(),
+		"send_blank_push":      NewSendBlankPushAction(),
+		"enable_lost_mode":     NewEnableLostModeAction(),
+		"disable_lost_mode":    NewDisableLostModeAction(),
+		"play_lost_mode_sound": NewPlayLostModeSoundAction(),
 	}
 }
 
@@ -233,5 +235,34 @@ func TestBatchActions_SelectorsCrossReference(t *testing.T) {
 				t.Errorf("%s: %s description tells the user to set the attribute in terms of itself", name, attrName)
 			}
 		}
+	}
+}
+
+// TestBuildClientData_EveryEntryPointsAtItsOwnID is the contract buildClientData
+// documents: entries hold pointers, so one shared string would command a single
+// device N times and leave the rest alone while the request stayed well-formed.
+func TestBuildClientData_EveryEntryPointsAtItsOwnID(t *testing.T) {
+	ids := []string{"a", "b", "c"}
+	clients := buildClientData(ids)
+	if len(clients) != len(ids) {
+		t.Fatalf("got %d entries, want %d", len(clients), len(ids))
+	}
+	for i, c := range clients {
+		if c.ManagementID == nil || *c.ManagementID != ids[i] {
+			t.Errorf("entry %d = %v, want %q", i, c.ManagementID, ids[i])
+		}
+	}
+}
+
+func TestBatchTargetSuffix(t *testing.T) {
+	if got := batchTargetSuffix(nil); got != "" {
+		t.Errorf("empty batch named devices: %q", got)
+	}
+	if got := batchTargetSuffix([]string{"a", "b"}); got != " (a, b)" {
+		t.Errorf("small batch = %q", got)
+	}
+	many := make([]string, 11)
+	if got := batchTargetSuffix(many); got != "" {
+		t.Errorf("a batch past the naming limit must stay quiet, got %q", got)
 	}
 }
