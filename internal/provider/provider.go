@@ -26,6 +26,7 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/appstore"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
+	platformenvironmentactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/account/platform_environment"
 	ssodomainactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/account/sso_domain"
 	deviceactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/device"
 	appinstalleractions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/pro/app_installers"
@@ -892,6 +893,7 @@ func (p *JamfPlatformProvider) Actions(ctx context.Context) []func() action.Acti
 		appinstalleractions.NewUpdateVersionAction,
 		jamfprotectactions.NewSyncPlansAction,
 		jamfprotectactions.NewRetryDeploymentAction,
+		platformenvironmentactions.NewAssignTenantsAction,
 		ssodomainactions.NewVerifySSODomainAction,
 	}
 }

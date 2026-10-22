@@ -25,7 +25,7 @@ internal/
 ├── providerdata/      # Shared Data{} carrying SDK client + cached Pro version
 ├── resources/
 │   ├── account/       # Jamf Account — organization-level, flat single tier   (Jamf Account)
-│   │                  #   sso_domain/
+│   │                  #   platform_environment/, sso_domain/, tenants/ (plural DS only)
 │   │                  #   (folder name = Terraform slug minus `jamfplatform_account_`)
 │   ├── ai_governance/ # policy/, tool/                                      (Jamf AI Governance)
 │   │                  #   (folder name = Terraform slug minus `jamfplatform_ai_governance_`)
@@ -45,13 +45,14 @@ internal/
 │                      #   (folder name = Terraform slug minus `jamfplatform_pro_`, snake_case). No domain tier.
 │                      #   ~115 packages, fully flat (e.g. the five PKI constructs are pki_adcs/, pki_venafi/, pki_digicert/, … — no pki/ grouping dir).
 ├── actions/
-│   ├── account/       # sso_domain/ (verify)                                 (Jamf Account)
+│   ├── account/       # platform_environment/ (assign_tenants), sso_domain/ (verify)   (Jamf Account)
 │   ├── device/        # erase, restart, shutdown, unmanage                       (Platform Device Actions API)
 │   └── pro/           # managed_software_updates (plan + abandon), maintenance/ (flush_policy_logs, redeploy_management_framework), mdm/ (send_blank_push, renew_mdm_profile, flush_mdm_commands), patch/ (retry_patch_policy_logs)   (Jamf Pro)
 ├── functions/         # Provider-defined functions (offline; no SDK client, no provider config)
 │   ├── mobileconfig/       # mobileconfig(profile) — build a full .mobileconfig from HCL payloads; also holds the shared Assemble core
 │   └── mcx_forced_payload/ # mcx_forced_payload(domain, prefs) — MCX "Custom Settings" envelope; thin wrapper over mobileconfig.Assemble
 ├── common/
+│   ├── accounttenant/ # Tenant-list lookups shared by the platform environment resource and assign_tenants action
 │   ├── aischemas/     # Vendor JSON Schema fetch/cache/validate for AI Governance policy settings
 │   ├── availabletitles/ # Shared patch available-titles lookup (patch_external_source, patch_internal_source)
 │   ├── criteria/      # Shared smart-group / advanced-search criteria operator vocabulary (device_group, user_group, future searches)
