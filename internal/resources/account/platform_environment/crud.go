@@ -86,7 +86,7 @@ func (r *PlatformEnvironmentResource) Read(ctx context.Context, req resource.Rea
 		if req.Identity == nil {
 			resp.Diagnostics.AddError(
 				"Missing resource identity",
-				"Terraform requested a refresh for this Jamf Account platform environment without existing state or identity data, so the provider cannot determine which platform environment to read.",
+				"Terraform asked for a refresh without state or identity, so the provider cannot tell which platform environment to read.",
 			)
 			return
 		}
@@ -98,7 +98,7 @@ func (r *PlatformEnvironmentResource) Read(ctx context.Context, req resource.Rea
 		if identity.ID.IsNull() || identity.ID.IsUnknown() || identity.ID.ValueString() == "" {
 			resp.Diagnostics.AddError(
 				"Missing platform environment identifier",
-				"The resource identity did not include an 'id' attribute, so the provider cannot refresh the Jamf Account platform environment.",
+				"The resource identity has no 'id', so the provider cannot refresh the platform environment.",
 			)
 			return
 		}
@@ -180,8 +180,8 @@ func (r *PlatformEnvironmentResource) Update(ctx context.Context, req resource.U
 		if listErr == nil && findEnvironmentByID(environments, id) == nil {
 			resp.Diagnostics.AddError(
 				"Jamf Account platform environment no longer exists",
-				"The platform environment \""+id+"\" is no longer in this organization, so it cannot be updated. "+
-					"Run `terraform apply -refresh-only` to drop it from state, then apply again to create it afresh.",
+				"The platform environment \""+id+"\" is no longer in this organization, so Terraform cannot update "+
+					"it. Run `terraform apply -refresh-only` to drop it from state, then apply to create it again.",
 			)
 			return
 		}
@@ -198,8 +198,8 @@ func (r *PlatformEnvironmentResource) Update(ctx context.Context, req resource.U
 	if found == nil {
 		resp.Diagnostics.AddError(
 			"Jamf Account platform environment no longer exists",
-			"The platform environment \""+id+"\" was updated but is no longer listed. Run `terraform apply "+
-				"-refresh-only` to drop it from state.",
+			"Jamf Account accepted the update, but the platform environment is no longer listed. Run "+
+				"`terraform apply -refresh-only` to drop it from state.",
 		)
 		return
 	}

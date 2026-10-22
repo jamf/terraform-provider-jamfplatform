@@ -4,7 +4,7 @@ page_title: "jamfplatform_account_platform_environments Data Source - terraform-
 subcategory: ""
 description: |-
   Lists every platform environment your Jamf Account organization holds. Jamf Account offers no search arguments for them, so this data source takes none. Filter the result in Terraform.
-  The tenants each platform environment holds are not reported. Read them with the jamfplatform_account_tenants data source.
+  This data source does not report tenants. Read them with the jamfplatform_account_tenants data source.
   Required Jamf permissions
   Jamf lists this under Organization management scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
@@ -16,7 +16,7 @@ description: |-
 
 Lists every platform environment your Jamf Account organization holds. Jamf Account offers no search arguments for them, so this data source takes none. Filter the result in Terraform.
 
-The tenants each platform environment holds are not reported. Read them with the `jamfplatform_account_tenants` data source.
+This data source does not report tenants. Read them with the `jamfplatform_account_tenants` data source.
 
 **Required Jamf permissions**
 
@@ -66,7 +66,7 @@ Optional:
 
 Read-Only:
 
-- `id` (String) Identifier Jamf Account assigned to the platform environment.
+- `id` (String) Identifier Jamf Account assigns to the platform environment.
 - `name` (String) **"Name"** in the Jamf Account console.
 - `region` (String) Region every tenant in the platform environment must be in. Null for a global platform environment.
 - `type` (String) **"Type"** in the Jamf Account console, such as `PRODUCTION` or `SANDBOX`.

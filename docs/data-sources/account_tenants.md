@@ -4,7 +4,7 @@ page_title: "jamfplatform_account_tenants Data Source - terraform-provider-jamfp
 subcategory: ""
 description: |-
   Lists every tenant your Jamf Account organization holds. A tenant is one Jamf service instance, such as a Jamf Pro or Jamf Protect instance.
-  A tenant belongs to at most one platform environment, and platform_environment_id is null while it is unassigned. Use this data source to find the unassigned tenants to pass to the jamfplatform_account_platform_environment_assign_tenants action, and to see which tenants a platform environment holds. Jamf Account offers no search arguments for tenants, so this data source takes none. Filter the result in Terraform.
+  A tenant belongs to at most one platform environment, and platform_environment_id is null while it is unassigned. Use this data source to find unassigned tenants for the jamfplatform_account_platform_environment_assign_tenants action and to see what a platform environment holds. Jamf Account offers no search arguments for tenants, so this data source takes none. Filter the result in Terraform.
   Required Jamf permissions
   Jamf lists this under Organization management scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
@@ -16,7 +16,7 @@ description: |-
 
 Lists every tenant your Jamf Account organization holds. A tenant is one Jamf service instance, such as a Jamf Pro or Jamf Protect instance.
 
-A tenant belongs to at most one platform environment, and `platform_environment_id` is null while it is unassigned. Use this data source to find the unassigned tenants to pass to the `jamfplatform_account_platform_environment_assign_tenants` action, and to see which tenants a platform environment holds. Jamf Account offers no search arguments for tenants, so this data source takes none. Filter the result in Terraform.
+A tenant belongs to at most one platform environment, and `platform_environment_id` is null while it is unassigned. Use this data source to find unassigned tenants for the `jamfplatform_account_platform_environment_assign_tenants` action and to see what a platform environment holds. Jamf Account offers no search arguments for tenants, so this data source takes none. Filter the result in Terraform.
 
 **Required Jamf permissions**
 
@@ -32,8 +32,8 @@ Jamf lists this under **Organization management** scope. You choose an integrati
 # Every tenant the organization holds.
 data "jamfplatform_account_tenants" "all" {}
 
-# Tenants not yet in a platform environment, grouped by product. These are the
-# ones the assign_tenants action can add to one.
+# Tenants not yet in a platform environment, with their product and region. The
+# assign_tenants action can add these to one.
 output "unassigned_tenants" {
   value = {
     for t in data.jamfplatform_account_tenants.all.tenants :
@@ -42,7 +42,7 @@ output "unassigned_tenants" {
 }
 
 # What a platform environment holds. The platform environment itself reports no
-# tenants, because membership is recorded on the tenant.
+# tenants, because each tenant records its own membership.
 data "jamfplatform_account_platform_environment" "production" {
   name = "Production"
 }
@@ -80,10 +80,10 @@ Optional:
 
 Read-Only:
 
-- `id` (String) Identifier Jamf Account assigned to the tenant. This is the value the assign tenants action takes.
-- `name` (String) Display name of the tenant. Null for a tenant Jamf Account holds no name for.
+- `id` (String) Identifier Jamf Account assigns to the tenant. The assign tenants action takes this value.
+- `name` (String) Display name of the tenant. Null when Jamf Account has no name for it.
 - `platform_environment_id` (String) Identifier of the platform environment the tenant belongs to. Null while the tenant is unassigned.
-- `product` (String) Code of the Jamf product the tenant is an instance of, such as `pro` for Jamf Pro, `school` or `protect`. Jamf adds a code with each new product, so treat the set as open.
-- `region` (String) **"Region"** in the Jamf Account console: where the tenant is hosted, such as `US`, `EU` or `APAC`. A tenant can only join a platform environment pinned to the same region, or a global one.
-- `type` (String) Classification of the product, such as `management` for products that manage devices and `security` for the security products. An open set. Null for a product Jamf Account holds no classification for.
-- `url` (String) Address the tenant is reached at. Null for a product whose tenants have no address of their own.
+- `product` (String) Code for the Jamf product the tenant runs, such as `pro` for Jamf Pro, `school` or `protect`. Each new product adds a code, so the set is open.
+- `region` (String) **"Region"** in the Jamf Account console: where the tenant is hosted, such as `US`, `EU` or `APAC`. A tenant joins only a platform environment in the same region, or a global one.
+- `type` (String) Class of the product, such as `management` for products that manage devices and `security` for security products. The set is open. Null when Jamf Account has no class for the product.
+- `url` (String) Address of the tenant. Null for a product whose tenants have no address of their own.

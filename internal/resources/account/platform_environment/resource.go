@@ -116,21 +116,19 @@ func (r *PlatformEnvironmentResource) IdentitySchema(_ context.Context, _ resour
 func (r *PlatformEnvironmentResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a platform environment in Jamf Account: a named group of your organization's " +
-			"tenants that together make up one deployment of Jamf. Platform environments are listed under " +
-			"**Platform Environments** in the Jamf Account console.\n\nA platform environment is created empty. " +
-			"Tenants are added to it with the `jamfplatform_account_platform_environment_assign_tenants` " +
-			"action, and the assignment cannot be undone. This resource reports no tenants; read them with the " +
-			"`jamfplatform_account_tenants` data source, which names the platform environment each tenant " +
-			"belongs to.\n\nA platform environment that holds tenants cannot be deleted. Terraform refuses to " +
-			"destroy one and names the tenants, so remove it from state instead with `terraform state rm`.\n\n" +
-			"`name` does not have to be unique. `region` is fixed when the platform environment is created, " +
-			"and changing it replaces the platform environment.\n\nNeeds an organization-scoped API " +
-			"integration, created against neither a platform environment nor a tenant, and is reachable only in " +
-			"the United States region." +
+			"tenants that together make up one deployment of Jamf. The Jamf Account console lists them under " +
+			"**Platform Environments**.\n\nA new platform environment holds no tenants. Add tenants with the " +
+			"`jamfplatform_account_platform_environment_assign_tenants` action. You cannot undo an assignment, and " +
+			"this resource reports no tenants. Read them with the `jamfplatform_account_tenants` data source, " +
+			"which gives each tenant's platform environment.\n\nTerraform refuses to destroy a platform " +
+			"environment that holds tenants and names them. Run `terraform state rm` to stop managing it.\n\n" +
+			"`name` does not have to be unique. Changing `region` replaces the platform environment, because " +
+			"Jamf Account fixes it at creation.\n\nNeeds an organization-scoped API integration, created " +
+			"against neither a platform environment nor a tenant. Available only in the United States region." +
 			resourcePrivileges,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "Identifier Jamf Account assigned to the platform environment. It does not change " +
+				MarkdownDescription: "Identifier Jamf Account assigns to the platform environment. It stays the same " +
 					"for the life of the platform environment.",
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
@@ -138,8 +136,8 @@ func (r *PlatformEnvironmentResource) Schema(ctx context.Context, _ resource.Sch
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "**\"Name\"** in the Jamf Account console: the display name shown to " +
-					"administrators. It cannot start or end with whitespace, because Jamf Account trims it.",
+				MarkdownDescription: "**\"Name\"** in the Jamf Account console: the display name administrators " +
+					"see. Leading and trailing whitespace is not allowed, because Jamf Account trims it.",
 				Required: true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
@@ -148,18 +146,18 @@ func (r *PlatformEnvironmentResource) Schema(ctx context.Context, _ resource.Sch
 			},
 			"type": schema.StringAttribute{
 				MarkdownDescription: "**\"Type\"** in the Jamf Account console: what the platform environment is " +
-					"for. One of " + valuesDocs(typeValues()) + ". The console shows these as, for example, " +
-					"\"Production\" and \"Sandbox\". The type is descriptive and does not change which tenants " +
-					"can be assigned.",
+					"for. One of " + valuesDocs(typeValues()) + ". The console shows `PRODUCTION` as " +
+					"\"Production\", `SANDBOX` as \"Sandbox\", and so on. The type describes the platform " +
+					"environment and does not change which tenants can join.",
 				Required: true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(typeValues()...),
 				},
 			},
 			"region": schema.StringAttribute{
-				MarkdownDescription: "Region every tenant assigned to this platform environment must be in. One " +
-					"of " + valuesDocs(regionValues()) + ". Omit it to create a global platform environment, " +
-					"which accepts tenants from any region. Changing it replaces the platform environment.",
+				MarkdownDescription: "Region that every tenant in this platform environment must be in. One " +
+					"of " + valuesDocs(regionValues()) + ". Omit it for a global platform environment, " +
+					"which takes tenants from any region. Changing it replaces the platform environment.",
 				Optional: true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(regionValues()...),

@@ -86,7 +86,7 @@ func TestTenantIDsRejectEmptyAndBlankMembers(t *testing.T) {
 
 func TestDescriptionStatesTheAssignmentIsPermanent(t *testing.T) {
 	description := strings.TrimSuffix(assignSchema(t).MarkdownDescription, assignTenantsPrivileges)
-	for _, want := range []string{"cannot be undone", "cannot be deleted"} {
+	for _, want := range []string{"cannot undo an assignment", "will not delete a platform environment"} {
 		if !strings.Contains(description, want) {
 			t.Errorf("the description does not say %q", want)
 		}

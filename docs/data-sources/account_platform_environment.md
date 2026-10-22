@@ -5,7 +5,7 @@ subcategory: ""
 description: |-
   Looks up a platform environment in Jamf Account by id or by name.
   Names are not unique. A lookup by name that matches more than one platform environment fails and lists their identifiers, so use id where names may collide.
-  The tenants a platform environment holds are not reported here. Read them with the jamfplatform_account_tenants data source.
+  This data source does not report tenants. Read them with the jamfplatform_account_tenants data source.
   Required Jamf permissions
   Jamf lists this under Organization management scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
@@ -19,7 +19,7 @@ Looks up a platform environment in Jamf Account by `id` or by `name`.
 
 Names are not unique. A lookup by `name` that matches more than one platform environment fails and lists their identifiers, so use `id` where names may collide.
 
-The tenants a platform environment holds are not reported here. Read them with the `jamfplatform_account_tenants` data source.
+This data source does not report tenants. Read them with the `jamfplatform_account_tenants` data source.
 
 **Required Jamf permissions**
 
@@ -53,13 +53,13 @@ output "production_environment_id" {
 
 ### Optional
 
-- `id` (String) Identifier Jamf Account assigned to the platform environment. Set either `id` or `name`.
+- `id` (String) Identifier Jamf Account assigns to the platform environment. Set either `id` or `name`.
 - `name` (String) **"Name"** in the Jamf Account console. Set either `id` or `name`.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only
 
-- `region` (String) Region every tenant in the platform environment must be in. Null for a global platform environment, which accepts tenants from any region.
+- `region` (String) Region that every tenant in the platform environment must be in. Null for a global platform environment, which takes tenants from any region.
 - `type` (String) **"Type"** in the Jamf Account console: what the platform environment is for, such as `PRODUCTION` or `SANDBOX`.
 
 <a id="nestedatt--timeouts"></a>

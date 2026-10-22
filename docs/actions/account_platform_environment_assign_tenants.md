@@ -3,9 +3,9 @@
 page_title: "jamfplatform_account_platform_environment_assign_tenants Action - terraform-provider-jamfplatform"
 subcategory: ""
 description: |-
-  Adds tenants to a platform environment, as the Services available to add to this platform environment list on the platform environment's page in Jamf Account does.
-  Assigning a tenant cannot be undone. Neither Jamf Account nor this provider takes a tenant back out of a platform environment, and a platform environment that holds a tenant cannot be deleted. Check tenant_ids before you invoke it.
-  Only an unassigned tenant can be added, and its region has to match the platform environment's region unless the platform environment is global. The action checks both before it sends anything, checks that every tenant exists, and names each tenant that fails. A tenant already in the platform environment is skipped, so invoking the action again changes nothing. Afterwards it reads the tenants back and fails unless each one reports the platform environment.
+  Adds tenants to a platform environment, like the Services available to add to this platform environment list on the platform environment's page in Jamf Account.
+  You cannot undo an assignment. Neither Jamf Account nor this provider takes a tenant out of a platform environment, and Jamf Account will not delete a platform environment that holds one. Check tenant_ids before you invoke the action.
+  Only an unassigned tenant can join, and its region must match the platform environment's region unless the platform environment is global. Before it sends anything, the action checks each tenant's region, checks that the tenant is unassigned and checks that it exists, and it names each tenant that fails. It skips a tenant already in the platform environment, so invoking it again changes nothing. After the write, it reads the tenants back and fails unless each one reports the platform environment.
   Find unassigned tenants with the jamfplatform_account_tenants data source. Invoke the action by name: terraform apply -invoke='action.jamfplatform_account_platform_environment_assign_tenants.prod'.
   Required Jamf permissions
   Jamf lists this under Organization management scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
@@ -16,11 +16,11 @@ description: |-
 
 # jamfplatform_account_platform_environment_assign_tenants (Action)
 
-Adds tenants to a platform environment, as the **Services available to add to this platform environment** list on the platform environment's page in Jamf Account does.
+Adds tenants to a platform environment, like the **Services available to add to this platform environment** list on the platform environment's page in Jamf Account.
 
-Assigning a tenant cannot be undone. Neither Jamf Account nor this provider takes a tenant back out of a platform environment, and a platform environment that holds a tenant cannot be deleted. Check `tenant_ids` before you invoke it.
+You cannot undo an assignment. Neither Jamf Account nor this provider takes a tenant out of a platform environment, and Jamf Account will not delete a platform environment that holds one. Check `tenant_ids` before you invoke the action.
 
-Only an unassigned tenant can be added, and its region has to match the platform environment's region unless the platform environment is global. The action checks both before it sends anything, checks that every tenant exists, and names each tenant that fails. A tenant already in the platform environment is skipped, so invoking the action again changes nothing. Afterwards it reads the tenants back and fails unless each one reports the platform environment.
+Only an unassigned tenant can join, and its region must match the platform environment's region unless the platform environment is global. Before it sends anything, the action checks each tenant's region, checks that the tenant is unassigned and checks that it exists, and it names each tenant that fails. It skips a tenant already in the platform environment, so invoking it again changes nothing. After the write, it reads the tenants back and fails unless each one reports the platform environment.
 
 Find unassigned tenants with the `jamfplatform_account_tenants` data source. Invoke the action by name: `terraform apply -invoke='action.jamfplatform_account_platform_environment_assign_tenants.prod'`.
 
@@ -35,15 +35,15 @@ Jamf lists this under **Organization management** scope. You choose an integrati
 ## Example Usage
 
 ```terraform
-# Adds tenants to a platform environment. Assigning a tenant cannot be undone,
-# and a platform environment that holds a tenant cannot be deleted, so read the
-# list before you invoke it. Invoke the action by name:
+# Adds tenants to a platform environment. You cannot undo an assignment, and
+# Jamf Account will not delete a platform environment that holds a tenant, so
+# read the list before you invoke it. Invoke the action by name:
 #
 #   terraform apply -invoke='action.jamfplatform_account_platform_environment_assign_tenants.prod'
 #
 # Before it sends anything, the action checks that each tenant exists, is
 # unassigned and is in a region the platform environment accepts. It names every
-# tenant that fails. A tenant already in the platform environment is skipped, so
+# tenant that fails. It skips a tenant already in the platform environment, so
 # running it again changes nothing.
 action "jamfplatform_account_platform_environment_assign_tenants" "prod" {
   config {

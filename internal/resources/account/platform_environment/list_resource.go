@@ -83,7 +83,7 @@ func (r *PlatformEnvironmentListResource) List(ctx context.Context, req list.Lis
 		stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
 			diag.NewErrorDiagnostic(
 				"Unconfigured Provider",
-				"The provider has not been configured yet. Re-run the command after `terraform init` completes successfully.",
+				"The provider has not been configured yet. Re-run the command after `terraform init` completes.",
 			),
 		})
 		return

@@ -49,12 +49,12 @@ func (d *PlatformEnvironmentDataSource) Schema(ctx context.Context, _ datasource
 		MarkdownDescription: "Looks up a platform environment in Jamf Account by `id` or by `name`.\n\n" +
 			"Names are not unique. A lookup by `name` that matches more than one platform environment fails " +
 			"and lists their identifiers, so use `id` where names may collide.\n\n" +
-			"The tenants a platform environment holds are not reported here. Read them with the " +
-			"`jamfplatform_account_tenants` data source." +
+			"This data source does not report tenants. Read them with the `jamfplatform_account_tenants` " +
+			"data source." +
 			dataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "Identifier Jamf Account assigned to the platform environment. Set either " +
+				MarkdownDescription: "Identifier Jamf Account assigns to the platform environment. Set either " +
 					"`id` or `name`.",
 				Optional: true,
 				Computed: true,
@@ -76,8 +76,8 @@ func (d *PlatformEnvironmentDataSource) Schema(ctx context.Context, _ datasource
 				Computed: true,
 			},
 			"region": schema.StringAttribute{
-				MarkdownDescription: "Region every tenant in the platform environment must be in. Null for a " +
-					"global platform environment, which accepts tenants from any region.",
+				MarkdownDescription: "Region that every tenant in the platform environment must be in. Null for a " +
+					"global platform environment, which takes tenants from any region.",
 				Computed: true,
 			},
 			"timeouts": timeouts.Attributes(ctx),
@@ -112,7 +112,7 @@ func (d *PlatformEnvironmentDataSource) Read(ctx context.Context, req datasource
 	if d.client == nil {
 		resp.Diagnostics.AddError(
 			"Provider not configured",
-			"The provider client was not configured. Please ensure the provider block is set up correctly.",
+			"The provider client was not configured. Check the provider block.",
 		)
 		return
 	}

@@ -3,11 +3,11 @@
 page_title: "jamfplatform_account_platform_environment Resource - terraform-provider-jamfplatform"
 subcategory: ""
 description: |-
-  Manages a platform environment in Jamf Account: a named group of your organization's tenants that together make up one deployment of Jamf. Platform environments are listed under Platform Environments in the Jamf Account console.
-  A platform environment is created empty. Tenants are added to it with the jamfplatform_account_platform_environment_assign_tenants action, and the assignment cannot be undone. This resource reports no tenants; read them with the jamfplatform_account_tenants data source, which names the platform environment each tenant belongs to.
-  A platform environment that holds tenants cannot be deleted. Terraform refuses to destroy one and names the tenants, so remove it from state instead with terraform state rm.
-  name does not have to be unique. region is fixed when the platform environment is created, and changing it replaces the platform environment.
-  Needs an organization-scoped API integration, created against neither a platform environment nor a tenant, and is reachable only in the United States region.
+  Manages a platform environment in Jamf Account: a named group of your organization's tenants that together make up one deployment of Jamf. The Jamf Account console lists them under Platform Environments.
+  A new platform environment holds no tenants. Add tenants with the jamfplatform_account_platform_environment_assign_tenants action. You cannot undo an assignment, and this resource reports no tenants. Read them with the jamfplatform_account_tenants data source, which gives each tenant's platform environment.
+  Terraform refuses to destroy a platform environment that holds tenants and names them. Run terraform state rm to stop managing it.
+  name does not have to be unique. Changing region replaces the platform environment, because Jamf Account fixes it at creation.
+  Needs an organization-scoped API integration, created against neither a platform environment nor a tenant. Available only in the United States region.
   Required Jamf permissions
   Jamf lists this under Organization management scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
@@ -17,15 +17,15 @@ description: |-
 
 # jamfplatform_account_platform_environment (Resource)
 
-Manages a platform environment in Jamf Account: a named group of your organization's tenants that together make up one deployment of Jamf. Platform environments are listed under **Platform Environments** in the Jamf Account console.
+Manages a platform environment in Jamf Account: a named group of your organization's tenants that together make up one deployment of Jamf. The Jamf Account console lists them under **Platform Environments**.
 
-A platform environment is created empty. Tenants are added to it with the `jamfplatform_account_platform_environment_assign_tenants` action, and the assignment cannot be undone. This resource reports no tenants; read them with the `jamfplatform_account_tenants` data source, which names the platform environment each tenant belongs to.
+A new platform environment holds no tenants. Add tenants with the `jamfplatform_account_platform_environment_assign_tenants` action. You cannot undo an assignment, and this resource reports no tenants. Read them with the `jamfplatform_account_tenants` data source, which gives each tenant's platform environment.
 
-A platform environment that holds tenants cannot be deleted. Terraform refuses to destroy one and names the tenants, so remove it from state instead with `terraform state rm`.
+Terraform refuses to destroy a platform environment that holds tenants and names them. Run `terraform state rm` to stop managing it.
 
-`name` does not have to be unique. `region` is fixed when the platform environment is created, and changing it replaces the platform environment.
+`name` does not have to be unique. Changing `region` replaces the platform environment, because Jamf Account fixes it at creation.
 
-Needs an organization-scoped API integration, created against neither a platform environment nor a tenant, and is reachable only in the United States region.
+Needs an organization-scoped API integration, created against neither a platform environment nor a tenant. Available only in the United States region.
 
 **Required Jamf permissions**
 
@@ -64,17 +64,17 @@ output "sandbox_environment_id" {
 
 ### Required
 
-- `name` (String) **"Name"** in the Jamf Account console: the display name shown to administrators. It cannot start or end with whitespace, because Jamf Account trims it.
-- `type` (String) **"Type"** in the Jamf Account console: what the platform environment is for. One of `BETA`, `NFR`, `PRODUCTION`, `SANDBOX`, `TRIAL`. The console shows these as, for example, "Production" and "Sandbox". The type is descriptive and does not change which tenants can be assigned.
+- `name` (String) **"Name"** in the Jamf Account console: the display name administrators see. Leading and trailing whitespace is not allowed, because Jamf Account trims it.
+- `type` (String) **"Type"** in the Jamf Account console: what the platform environment is for. One of `BETA`, `NFR`, `PRODUCTION`, `SANDBOX`, `TRIAL`. The console shows `PRODUCTION` as "Production", `SANDBOX` as "Sandbox", and so on. The type describes the platform environment and does not change which tenants can join.
 
 ### Optional
 
-- `region` (String) Region every tenant assigned to this platform environment must be in. One of `US`, `EU`, `APAC`, `HIGH_COMPLIANCE`, `FEDRAMP`. Omit it to create a global platform environment, which accepts tenants from any region. Changing it replaces the platform environment.
+- `region` (String) Region that every tenant in this platform environment must be in. One of `US`, `EU`, `APAC`, `HIGH_COMPLIANCE`, `FEDRAMP`. Omit it for a global platform environment, which takes tenants from any region. Changing it replaces the platform environment.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only
 
-- `id` (String) Identifier Jamf Account assigned to the platform environment. It does not change for the life of the platform environment.
+- `id` (String) Identifier Jamf Account assigns to the platform environment. It stays the same for the life of the platform environment.
 
 <a id="nestedatt--timeouts"></a>
 ### Nested Schema for `timeouts`
@@ -96,7 +96,7 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 # Copyright Jamf Software LLC 2026
 # SPDX-License-Identifier: MPL-2.0
 
-# Platform environments are imported by the identifier Jamf Account assigns. The
-# Copy ID button on the platform environment's page in Jamf Account shows it.
+# Platform environments are imported by the identifier Jamf Account assigns. It
+# appears in the address of the platform environment's page in Jamf Account.
 terraform import jamfplatform_account_platform_environment.sandbox 6f1b4d52-2a37-4c0e-9a55-3d7a8c1e90b4
 ```

@@ -1,12 +1,12 @@
-# Adds tenants to a platform environment. Assigning a tenant cannot be undone,
-# and a platform environment that holds a tenant cannot be deleted, so read the
-# list before you invoke it. Invoke the action by name:
+# Adds tenants to a platform environment. You cannot undo an assignment, and
+# Jamf Account will not delete a platform environment that holds a tenant, so
+# read the list before you invoke it. Invoke the action by name:
 #
 #   terraform apply -invoke='action.jamfplatform_account_platform_environment_assign_tenants.prod'
 #
 # Before it sends anything, the action checks that each tenant exists, is
 # unassigned and is in a region the platform environment accepts. It names every
-# tenant that fails. A tenant already in the platform environment is skipped, so
+# tenant that fails. It skips a tenant already in the platform environment, so
 # running it again changes nothing.
 action "jamfplatform_account_platform_environment_assign_tenants" "prod" {
   config {

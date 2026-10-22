@@ -46,9 +46,8 @@ func (v noSurroundingWhitespaceValidator) ValidateString(_ context.Context, req 
 		resp.Diagnostics.AddAttributeError(
 			req.Path,
 			"Name has leading or trailing whitespace",
-			"Jamf Account trims whitespace from the name when it records it, so the stored name would differ "+
-				"from the configuration and Terraform would report every apply as inconsistent. Set `name` to \""+
-				trimmed+"\".",
+			"Jamf Account trims the name when it stores it. The stored name would differ from your "+
+				"configuration, and every apply would fail as inconsistent. Set `name` to \""+trimmed+"\".",
 		)
 	}
 }

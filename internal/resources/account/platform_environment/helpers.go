@@ -65,9 +65,9 @@ func appendHeldTenantsDiagnostics(diags *diag.Diagnostics, environment string, h
 	diags.AddError(
 		"Platform environment still holds tenants",
 		fmt.Sprintf(
-			"The platform environment \"%s\" holds %d tenant(s): %s. Jamf Account does not delete a platform "+
-				"environment that holds tenants, and the provider cannot take tenants out of one. Run "+
-				"`terraform state rm` on this address to stop managing the environment, or leave it in place.",
+			"The platform environment \"%s\" holds %d tenant(s): %s. Jamf Account will not delete a platform "+
+				"environment that holds tenants, and nothing can take a tenant out of one. Run "+
+				"`terraform state rm` on this address to stop managing it, or leave it in place.",
 			environment, len(held), strings.Join(listed, "; "),
 		),
 	)
@@ -87,7 +87,7 @@ func appendDuplicateNameDiagnostics(diags *diag.Diagnostics, name string, matche
 		"More than one platform environment has this name",
 		fmt.Sprintf(
 			"%d platform environments are named \"%s\" (ids: %s). Jamf Account does not require names to be "+
-				"unique. Look the one you want up by `id` instead.",
+				"unique. Look it up by `id` instead.",
 			len(matches), name, strings.Join(ids, ", "),
 		),
 	)

@@ -1,8 +1,8 @@
 # Every tenant the organization holds.
 data "jamfplatform_account_tenants" "all" {}
 
-# Tenants not yet in a platform environment, grouped by product. These are the
-# ones the assign_tenants action can add to one.
+# Tenants not yet in a platform environment, with their product and region. The
+# assign_tenants action can add these to one.
 output "unassigned_tenants" {
   value = {
     for t in data.jamfplatform_account_tenants.all.tenants :
@@ -11,7 +11,7 @@ output "unassigned_tenants" {
 }
 
 # What a platform environment holds. The platform environment itself reports no
-# tenants, because membership is recorded on the tenant.
+# tenants, because each tenant records its own membership.
 data "jamfplatform_account_platform_environment" "production" {
   name = "Production"
 }

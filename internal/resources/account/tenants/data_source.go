@@ -81,10 +81,10 @@ func (d *TenantsDataSource) Schema(ctx context.Context, _ datasource.SchemaReque
 		MarkdownDescription: "Lists every tenant your Jamf Account organization holds. A tenant is one Jamf " +
 			"service instance, such as a Jamf Pro or Jamf Protect instance.\n\n" +
 			"A tenant belongs to at most one platform environment, and `platform_environment_id` is null while " +
-			"it is unassigned. Use this data source to find the unassigned tenants to pass to the " +
-			"`jamfplatform_account_platform_environment_assign_tenants` action, and to see which tenants a " +
-			"platform environment holds. Jamf Account offers no search arguments for tenants, so this data " +
-			"source takes none. Filter the result in Terraform." +
+			"it is unassigned. Use this data source to find unassigned tenants for the " +
+			"`jamfplatform_account_platform_environment_assign_tenants` action and to see what a platform " +
+			"environment holds. Jamf Account offers no search arguments for tenants, so this data source " +
+			"takes none. Filter the result in Terraform." +
 			dataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -97,36 +97,36 @@ func (d *TenantsDataSource) Schema(ctx context.Context, _ datasource.SchemaReque
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							MarkdownDescription: "Identifier Jamf Account assigned to the tenant. This is the value " +
-								"the assign tenants action takes.",
+							MarkdownDescription: "Identifier Jamf Account assigns to the tenant. The assign tenants " +
+								"action takes this value.",
 							Computed: true,
 						},
 						"name": schema.StringAttribute{
-							MarkdownDescription: "Display name of the tenant. Null for a tenant Jamf Account holds no " +
-								"name for.",
+							MarkdownDescription: "Display name of the tenant. Null when Jamf Account has no name " +
+								"for it.",
 							Computed: true,
 						},
 						"product": schema.StringAttribute{
-							MarkdownDescription: "Code of the Jamf product the tenant is an instance of, such as " +
-								"`pro` for Jamf Pro, `school` or `protect`. Jamf adds a code with each new " +
-								"product, so treat the set as open.",
+							MarkdownDescription: "Code for the Jamf product the tenant runs, such as `pro` for " +
+								"Jamf Pro, `school` or `protect`. Each new product adds a code, so the " +
+								"set is open.",
 							Computed: true,
 						},
 						"type": schema.StringAttribute{
-							MarkdownDescription: "Classification of the product, such as `management` for products " +
-								"that manage devices and `security` for the security products. An open set. " +
-								"Null for a product Jamf Account holds no classification for.",
+							MarkdownDescription: "Class of the product, such as `management` for products that " +
+								"manage devices and `security` for security products. The set is open. " +
+								"Null when Jamf Account has no class for the product.",
 							Computed: true,
 						},
 						"url": schema.StringAttribute{
-							MarkdownDescription: "Address the tenant is reached at. Null for a product whose tenants " +
-								"have no address of their own.",
+							MarkdownDescription: "Address of the tenant. Null for a product whose tenants have no " +
+								"address of their own.",
 							Computed: true,
 						},
 						"region": schema.StringAttribute{
 							MarkdownDescription: "**\"Region\"** in the Jamf Account console: where the tenant is " +
-								"hosted, such as `US`, `EU` or `APAC`. A tenant can only join a platform " +
-								"environment pinned to the same region, or a global one.",
+								"hosted, such as `US`, `EU` or `APAC`. A tenant joins only a platform " +
+								"environment in the same region, or a global one.",
 							Computed: true,
 						},
 						"platform_environment_id": schema.StringAttribute{
@@ -158,7 +158,7 @@ func (d *TenantsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	if d.client == nil {
 		resp.Diagnostics.AddError(
 			"Provider not configured",
-			"The provider client was not configured. Please ensure the provider block is set up correctly.",
+			"The provider client was not configured. Check the provider block.",
 		)
 		return
 	}

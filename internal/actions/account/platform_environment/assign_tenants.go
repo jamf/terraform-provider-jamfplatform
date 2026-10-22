@@ -89,16 +89,17 @@ func (a *AssignTenantsAction) Metadata(_ context.Context, req action.MetadataReq
 // Schema returns the action schema.
 func (a *AssignTenantsAction) Schema(ctx context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
 	resp.Schema = actionschema.Schema{
-		MarkdownDescription: "Adds tenants to a platform environment, as the **Services available to add to this " +
-			"platform environment** list on the platform environment's page in Jamf Account does.\n\n" +
-			"Assigning a tenant cannot be undone. Neither Jamf Account nor this provider takes a tenant back out of " +
-			"a platform environment, and a platform environment that holds a tenant cannot be deleted. Check " +
-			"`tenant_ids` before you invoke it.\n\n" +
-			"Only an unassigned tenant can be added, and its region has to match the platform environment's " +
-			"region unless the platform environment is global. The action checks both before it sends anything, " +
-			"checks that every tenant exists, and names each tenant that fails. A tenant already in the platform " +
-			"environment is skipped, so invoking the action again changes nothing. Afterwards it reads the " +
-			"tenants back and fails unless each one reports the platform environment.\n\n" +
+		MarkdownDescription: "Adds tenants to a platform environment, like the **Services available to add to this " +
+			"platform environment** list on the platform environment's page in Jamf Account.\n\n" +
+			"You cannot undo an assignment. Neither Jamf Account nor this provider takes a tenant out of a " +
+			"platform environment, and Jamf Account will not delete a platform environment that holds one. Check " +
+			"`tenant_ids` before you invoke the action.\n\n" +
+			"Only an unassigned tenant can join, and its region must match the platform environment's region " +
+			"unless the platform environment is global. Before it sends anything, the action checks each " +
+			"tenant's region, checks that the tenant is unassigned and checks that it exists, and it names " +
+			"each tenant that fails. It skips a tenant already in the platform environment, so invoking it " +
+			"again changes nothing. After the write, it reads the tenants back and fails unless each one " +
+			"reports the platform environment.\n\n" +
 			"Find unassigned tenants with the `jamfplatform_account_tenants` data source. Invoke the action by " +
 			"name: `terraform apply -invoke='action.jamfplatform_account_platform_environment_assign_tenants.prod'`." +
 			assignTenantsPrivileges,
@@ -158,8 +159,7 @@ func (a *AssignTenantsAction) Invoke(ctx context.Context, req action.InvokeReque
 	if a.client == nil {
 		resp.Diagnostics.AddError(
 			"Provider Not Configured",
-			"The Jamf Account client was not configured. Re-run terraform init/apply so the provider can "+
-				"configure successfully.",
+			"The Jamf Account client was not configured. Re-run terraform init/apply so the provider can configure.",
 		)
 		return
 	}
@@ -244,7 +244,7 @@ func (a *AssignTenantsAction) Invoke(ctx context.Context, req action.InvokeReque
 		resp.Diagnostics.AddError(
 			"The assignment could not be confirmed",
 			fmt.Sprintf("Jamf Account accepted the request to add %d tenant(s) to \"%s\", but reading the tenants "+
-				"back failed, so whether it took is unknown: %s", len(ids), environment.Name, helpers.APIErrorDetail(err)),
+				"back failed, so Terraform cannot tell whether it took: %s", len(ids), environment.Name, helpers.APIErrorDetail(err)),
 		)
 		return
 	}
@@ -253,7 +253,7 @@ func (a *AssignTenantsAction) Invoke(ctx context.Context, req action.InvokeReque
 			"Jamf Account did not report the assignment",
 			fmt.Sprintf("Jamf Account accepted the request, but %d tenant(s) do not report platform environment "+
 				"\"%s\" when read back: %s. Read the `jamfplatform_account_tenants` data source to see where they "+
-				"stand.", len(missing), environment.Name, strings.Join(missing, ", ")),
+				"are.", len(missing), environment.Name, strings.Join(missing, ", ")),
 		)
 		return
 	}

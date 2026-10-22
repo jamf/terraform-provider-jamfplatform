@@ -54,7 +54,7 @@ func (d *PlatformEnvironmentsDataSource) Schema(ctx context.Context, _ datasourc
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Lists every platform environment your Jamf Account organization holds. Jamf Account " +
 			"offers no search arguments for them, so this data source takes none. Filter the result in " +
-			"Terraform.\n\nThe tenants each platform environment holds are not reported. Read them with the " +
+			"Terraform.\n\nThis data source does not report tenants. Read them with the " +
 			"`jamfplatform_account_tenants` data source." +
 			pluralDataSourcePrivileges,
 		Attributes: map[string]schema.Attribute{
@@ -69,7 +69,7 @@ func (d *PlatformEnvironmentsDataSource) Schema(ctx context.Context, _ datasourc
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
-							MarkdownDescription: "Identifier Jamf Account assigned to the platform environment.",
+							MarkdownDescription: "Identifier Jamf Account assigns to the platform environment.",
 							Computed:            true,
 						},
 						"name": schema.StringAttribute{
@@ -110,7 +110,7 @@ func (d *PlatformEnvironmentsDataSource) Read(ctx context.Context, req datasourc
 	if d.client == nil {
 		resp.Diagnostics.AddError(
 			"Provider not configured",
-			"The provider client was not configured. Please ensure the provider block is set up correctly.",
+			"The provider client was not configured. Check the provider block.",
 		)
 		return
 	}
