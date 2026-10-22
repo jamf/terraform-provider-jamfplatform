@@ -3,7 +3,7 @@ variable "lock_pin" {
   sensitive = true
 }
 
-action "jamfplatform_pro_device_lock" "lock" {
+action "jamfplatform_pro_lock_device" "lock" {
   config {
     serial_numbers = ["C02XXXXXXXXX"]
     message        = "This Mac is locked. Please call IT."

@@ -207,7 +207,7 @@ func TestTranche3SDKMethods_MatchFile(t *testing.T) {
 	assertMatch(t, "set_recovery_lock.go", recoveryLockSDKMethods)
 	assertMatch(t, "clear_recovery_lock.go", recoveryLockSDKMethods)
 	assertMatch(t, "set_auto_admin_password.go", setAutoAdminPasswordSDKMethods)
-	assertMatch(t, "device_lock.go", destructiveCommandSDKMethods)
+	assertMatch(t, "lock_device.go", destructiveCommandSDKMethods)
 	assertMatch(t, "delete_user.go", destructiveCommandSDKMethods)
 }
 
@@ -309,7 +309,7 @@ func TestCommandPrivileges_NameOnlyTheirOwnCapability(t *testing.T) {
 		"unlock_user_account":             {unlockUserAccountPrivileges, "device-actions:execute", nil},
 		"trigger_enhanced_log_collection": {triggerEnhancedLogCollectionPrivileges, "device-actions:execute", nil},
 		"cancel_enhanced_log_collection":  {cancelEnhancedLogCollectionPrivileges, "device-actions:execute", nil},
-		"device_lock":                     {deviceLockPrivileges, "destructive-device-actions:execute", nil},
+		"lock_device":                     {lockDevicePrivileges, "destructive-device-actions:execute", nil},
 		"delete_user":                     {deleteUserPrivileges, "destructive-device-actions:execute", nil},
 	}
 	for name, c := range cases {

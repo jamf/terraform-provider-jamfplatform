@@ -421,14 +421,14 @@ func TestSingleActions_TakeOneDevice(t *testing.T) {
 func TestSecretAttributes_SayTheyAppearInPlanOutput(t *testing.T) {
 	cases := map[string][]string{
 		"set_recovery_lock":               {"password"},
-		"device_lock":                     {"pin"},
+		"lock_device":                     {"pin"},
 		"trigger_enhanced_log_collection": {"apple_care_token"},
 		"set_auto_admin_password":         {"password"},
 		"clear_passcode":                  {"unlock_token"},
 	}
 	actions := map[string]action.Action{
 		"set_recovery_lock":               NewSetRecoveryLockAction(),
-		"device_lock":                     NewDeviceLockAction(),
+		"lock_device":                     NewLockDeviceAction(),
 		"trigger_enhanced_log_collection": NewTriggerEnhancedLogCollectionAction(),
 		"set_auto_admin_password":         NewSetAutoAdminPasswordAction(),
 		"clear_passcode":                  NewClearPasscodeAction(),
@@ -484,12 +484,12 @@ func TestTranche3Commands_MarshalTheWireBody(t *testing.T) {
 // --- tranche 2: destructive commands ---
 
 func TestDestructiveActions_Metadata(t *testing.T) {
-	assertTypeName(t, NewDeviceLockAction().(*DeviceLockAction).Metadata, "jamfplatform_pro_device_lock")
+	assertTypeName(t, NewLockDeviceAction().(*LockDeviceAction).Metadata, "jamfplatform_pro_lock_device")
 	assertTypeName(t, NewDeleteUserAction().(*DeleteUserAction).Metadata, "jamfplatform_pro_delete_user")
 }
 
-func TestDeviceLockAction_PinMustBeSixCharacters(t *testing.T) {
-	pin := schemaOf(t, NewDeviceLockAction()).Attributes["pin"].(actionschema.StringAttribute)
+func TestLockDeviceAction_PinMustBeSixCharacters(t *testing.T) {
+	pin := schemaOf(t, NewLockDeviceAction()).Attributes["pin"].(actionschema.StringAttribute)
 	for value, wantErr := range map[string]bool{"123456": false, "abcdef": false, "12345": true, "1234567": true, "": true} {
 		var resp validator.StringResponse
 		for _, v := range pin.Validators {
@@ -539,10 +539,10 @@ func TestDestructiveCommands_MarshalTheWireBody(t *testing.T) {
 		want string
 	}{
 		"lock, everything": {
-			deviceLockCommand(DeviceLockActionModel{Message: types.StringValue("m"), PhoneNumber: types.StringValue("+1 555 0100"), Pin: types.StringValue("123456")}),
+			lockDeviceCommand(LockDeviceActionModel{Message: types.StringValue("m"), PhoneNumber: types.StringValue("+1 555 0100"), Pin: types.StringValue("123456")}),
 			`{"commandType":"DEVICE_LOCK","message":"m","phoneNumber":"+1 555 0100","pin":"123456"}`,
 		},
-		"lock, nothing": {deviceLockCommand(DeviceLockActionModel{}), `{"commandType":"DEVICE_LOCK"}`},
+		"lock, nothing": {lockDeviceCommand(LockDeviceActionModel{}), `{"commandType":"DEVICE_LOCK"}`},
 		"delete one user": {
 			deleteUserCommand(DeleteUserActionModel{UserName: types.StringValue("alex"), ForceDeletion: types.BoolValue(true)}),
 			`{"commandType":"DELETE_USER","forceDeletion":true,"userName":"alex"}`,

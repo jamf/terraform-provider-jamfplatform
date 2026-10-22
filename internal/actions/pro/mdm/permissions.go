@@ -112,7 +112,7 @@ var destructiveCommandSDKMethods = []string{
 	"ListDevices",
 }
 var (
-	deviceLockPrivileges = permissions.Section(destructiveCommandRegistry, destructiveCommandSDKMethods...)
+	lockDevicePrivileges = permissions.Section(destructiveCommandRegistry, destructiveCommandSDKMethods...)
 	deleteUserPrivileges = permissions.Section(destructiveCommandRegistry, destructiveCommandSDKMethods...)
 )
 

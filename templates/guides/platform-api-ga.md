@@ -151,27 +151,32 @@ list. The privileges themselves are retained in a new form, described under
 
 ### Actions (configuration edit only)
 
-**Action needed: delete the blocks, and any trigger referring to them.** `POST /v2/mdm/commands`
-was unpublished, and it was the only means of queuing an MDM command through the Platform API.
-Actions hold no state, so removing the `action` block and any `lifecycle { action_trigger }`
-naming it is the whole of it.
+**Action needed: two renames, nothing else.** `POST /v2/mdm/commands` was unpublished at the
+GA, which removed the fourteen MDM command actions that depended on it. Jamf Pro serves it
+again, and the actions are back. Actions hold no state, so editing the `action` block is the
+whole of the change.
 
-Removed: `jamfplatform_pro_device_lock`, `jamfplatform_pro_enable_lost_mode`,
+- `jamfplatform_pro_device_lock` is now `jamfplatform_pro_lock_device`.
+- On `jamfplatform_pro_enable_lost_mode`, `lost_mode_message`, `lost_mode_phone` and
+  `lost_mode_footnote` are now `message`, `phone_number` and `footnote`.
+
+Every other restored action keeps its name and attributes, except
+`jamfplatform_pro_set_auto_admin_password`, which now requires both `guid` and `password`.
+`jamfplatform_pro_clear_passcode` now fails with a named error when Jamf Pro holds no unlock
+token for the device and you supplied none, because Jamf Pro refuses the command without one.
+
+The restored set is `jamfplatform_pro_lock_device`, `jamfplatform_pro_enable_lost_mode`,
 `jamfplatform_pro_disable_lost_mode`, `jamfplatform_pro_play_lost_mode_sound`,
 `jamfplatform_pro_enable_remote_desktop`, `jamfplatform_pro_disable_remote_desktop`,
 `jamfplatform_pro_clear_restrictions_password`, `jamfplatform_pro_clear_passcode`,
 `jamfplatform_pro_delete_user`, `jamfplatform_pro_log_out_user`,
 `jamfplatform_pro_unlock_user_account`, `jamfplatform_pro_set_auto_admin_password`,
-`jamfplatform_pro_trigger_enhanced_log_collection`,
+`jamfplatform_pro_trigger_enhanced_log_collection` and
 `jamfplatform_pro_cancel_enhanced_log_collection`.
 
-Three MDM actions are unaffected, because none of them used the unpublished endpoint:
-`jamfplatform_pro_send_blank_push`, `jamfplatform_pro_renew_mdm_profile` and
-`jamfplatform_pro_flush_mdm_commands`.
-
-The underlying capability is retained. The Jamf Pro Classic API continues to serve these commands
-on a different request shape, and rebuilding these actions over Classic is planned, subject to
-endpoint availability.
+New with the restoration: `jamfplatform_pro_set_wallpaper`, `jamfplatform_pro_set_recovery_lock`
+and `jamfplatform_pro_clear_recovery_lock`. `jamfplatform_pro_send_blank_push`,
+`jamfplatform_pro_renew_mdm_profile` and `jamfplatform_pro_flush_mdm_commands` were never affected.
 
 ## API integration credentials
 

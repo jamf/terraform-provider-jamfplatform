@@ -889,7 +889,7 @@ func (p *JamfPlatformProvider) Actions(ctx context.Context) []func() action.Acti
 		mdmactions.NewSetAutoAdminPasswordAction,
 		mdmactions.NewSetRecoveryLockAction,
 		mdmactions.NewClearRecoveryLockAction,
-		mdmactions.NewDeviceLockAction,
+		mdmactions.NewLockDeviceAction,
 		mdmactions.NewDeleteUserAction,
 		mdmactions.NewEnableRemoteDesktopAction,
 		mdmactions.NewDisableRemoteDesktopAction,

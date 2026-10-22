@@ -141,7 +141,7 @@ func batchActions() map[string]action.Action {
 		"set_wallpaper":        NewSetWallpaperAction(),
 		"set_recovery_lock":    NewSetRecoveryLockAction(),
 		"clear_recovery_lock":  NewClearRecoveryLockAction(),
-		"device_lock":          NewDeviceLockAction(),
+		"lock_device":          NewLockDeviceAction(),
 		"delete_user":          NewDeleteUserAction(),
 
 		"enable_remote_desktop":           NewEnableRemoteDesktopAction(),

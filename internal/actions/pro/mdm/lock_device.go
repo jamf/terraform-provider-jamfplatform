@@ -17,22 +17,22 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/actiontimeouts"
 )
 
-var _ action.Action = (*DeviceLockAction)(nil)
-var _ action.ActionWithConfigure = (*DeviceLockAction)(nil)
-var _ action.ActionWithConfigValidators = (*DeviceLockAction)(nil)
+var _ action.Action = (*LockDeviceAction)(nil)
+var _ action.ActionWithConfigure = (*LockDeviceAction)(nil)
+var _ action.ActionWithConfigValidators = (*LockDeviceAction)(nil)
 
-// DeviceLockAction locks computers and mobile devices.
+// LockDeviceAction locks computers and mobile devices.
 //
 // Wire-probed 2026-10-22: Jamf Pro accepts the command with no PIN, even for a
 // Mac, and refuses a PIN that is not six characters ("PIN must be 6 characters
 // long"). It does not check what the characters are, so a non-numeric PIN is
 // accepted and the device is the first to object. Every device in the batch gets
 // the same PIN, message and phone number.
-type DeviceLockAction struct {
+type LockDeviceAction struct {
 	mdmAction
 }
 
-type DeviceLockActionModel struct {
+type LockDeviceActionModel struct {
 	ManagementIDs types.List           `tfsdk:"management_ids"`
 	SerialNumbers types.List           `tfsdk:"serial_numbers"`
 	Message       types.String         `tfsdk:"message"`
@@ -41,15 +41,15 @@ type DeviceLockActionModel struct {
 	Timeouts      actiontimeouts.Value `tfsdk:"timeouts"`
 }
 
-func NewDeviceLockAction() action.Action {
-	return &DeviceLockAction{}
+func NewLockDeviceAction() action.Action {
+	return &LockDeviceAction{}
 }
 
-func (a *DeviceLockAction) Metadata(ctx context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_pro_device_lock"
+func (a *LockDeviceAction) Metadata(ctx context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_pro_lock_device"
 }
 
-func (a *DeviceLockAction) Schema(ctx context.Context, req action.SchemaRequest, resp *action.SchemaResponse) {
+func (a *LockDeviceAction) Schema(ctx context.Context, req action.SchemaRequest, resp *action.SchemaResponse) {
 	attrs := targetListAttributes("device")
 	attrs["message"] = actionschema.StringAttribute{
 		Optional:            true,
@@ -69,21 +69,21 @@ func (a *DeviceLockAction) Schema(ctx context.Context, req action.SchemaRequest,
 	resp.Schema = actionschema.Schema{
 		MarkdownDescription: "Locks one or more computers or mobile devices. Every targeted device gets the same `pin`, `message` and `phone_number`." +
 			"\n\nIf a device already has this command waiting, for example because it is offline, Jamf Pro keeps that command and queues no other, so a changed PIN or message does not reach the device." +
-			batchNote + deviceLockPrivileges,
+			batchNote + lockDevicePrivileges,
 		Attributes: attrs,
 	}
 	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)
 }
 
-func (a *DeviceLockAction) ConfigValidators(ctx context.Context) []action.ConfigValidator {
+func (a *LockDeviceAction) ConfigValidators(ctx context.Context) []action.ConfigValidator {
 	return deviceTargetListConfigValidators()
 }
 
-func (a *DeviceLockAction) Configure(ctx context.Context, req action.ConfigureRequest, resp *action.ConfigureResponse) {
+func (a *LockDeviceAction) Configure(ctx context.Context, req action.ConfigureRequest, resp *action.ConfigureResponse) {
 	a.configure(ctx, req, resp)
 }
 
-func (a *DeviceLockAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+func (a *LockDeviceAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
 	ctx, cancel := actiontimeouts.Bound(ctx, req.Config, &resp.Diagnostics, actiontimeouts.DefaultInvoke)
 	defer cancel()
 	if resp.Diagnostics.HasError() {
@@ -94,7 +94,7 @@ func (a *DeviceLockAction) Invoke(ctx context.Context, req action.InvokeRequest,
 		return
 	}
 
-	var data DeviceLockActionModel
+	var data LockDeviceActionModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -105,10 +105,10 @@ func (a *DeviceLockAction) Invoke(ctx context.Context, req action.InvokeRequest,
 		return
 	}
 
-	a.sendCommandBatch(ctx, resp, managementIDs, deviceLockCommand(data), "Device Lock")
+	a.sendCommandBatch(ctx, resp, managementIDs, lockDeviceCommand(data), "Lock Device")
 }
 
-func deviceLockCommand(data DeviceLockActionModel) *pro.MDMCommandRequestCommandData {
+func lockDeviceCommand(data LockDeviceActionModel) *pro.MDMCommandRequestCommandData {
 	return &pro.MDMCommandRequestCommandData{
 		CommandType: string(pro.MDMCommandTypeDeviceLock),
 		DEVICELOCK: &pro.DeviceLockCommand{

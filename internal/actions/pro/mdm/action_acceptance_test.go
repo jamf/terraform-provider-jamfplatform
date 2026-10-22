@@ -656,18 +656,18 @@ action "jamfplatform_pro_set_auto_admin_password" "admin" {
 	})
 }
 
-func TestAccAction_ProDeviceLock_Invoke(t *testing.T) {
+func TestAccAction_ProLockDevice_Invoke(t *testing.T) {
 	serial := accMobileSerial(t)
 
 	config := fireConfig(fmt.Sprintf(`
-action "jamfplatform_pro_device_lock" "lock" {
+action "jamfplatform_pro_lock_device" "lock" {
   config {
     serial_numbers = [%q]
     message        = "This device is locked."
     phone_number   = "+1 555 0100"
     pin            = "123456"
   }
-}`, serial), "action.jamfplatform_pro_device_lock.lock")
+}`, serial), "action.jamfplatform_pro_lock_device.lock")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
@@ -675,16 +675,16 @@ action "jamfplatform_pro_device_lock" "lock" {
 	})
 }
 
-func TestAccAction_ProDeviceLock_ShortPinFails(t *testing.T) {
+func TestAccAction_ProLockDevice_ShortPinFails(t *testing.T) {
 	testhelpers.AccPreCheck(t)
 
 	config := fireConfig(`
-action "jamfplatform_pro_device_lock" "lock" {
+action "jamfplatform_pro_lock_device" "lock" {
   config {
     serial_numbers = ["NOSUCHSERIAL0001"]
     pin            = "12345"
   }
-}`, "action.jamfplatform_pro_device_lock.lock")
+}`, "action.jamfplatform_pro_lock_device.lock")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
