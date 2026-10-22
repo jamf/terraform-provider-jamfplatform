@@ -196,6 +196,7 @@ func (r *DeviceGroupListResource) List(ctx context.Context, req list.ListRequest
 				Timeouts: helpers.NewResourceTimeoutsNullValue(deviceGroupTimeoutAttributeTypes),
 			}
 
+			manageMembers = manageMembersOnRead(true, types.SetNull(types.StringType), members)
 			result.Diagnostics.Append(assignDeviceGroupModel(ctx, &state, detail, members, manageMembers, true)...)
 			if result.Diagnostics.HasError() {
 				stream.Results = list.ListResultsStreamDiagnostics(result.Diagnostics)

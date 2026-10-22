@@ -280,3 +280,27 @@ func TestFlattenDeviceGroupCriteria_NullFields(t *testing.T) {
 		t.Error("expected null JoinType for empty string")
 	}
 }
+
+// TestAssignDeviceGroupModel_ListPathEmptyStaticIsNull pins the list resource's
+// membership decision to the import Read's: an empty static group emits null,
+// so generated config plans clean after import (#524).
+func TestAssignDeviceGroupModel_ListPathEmptyStaticIsNull(t *testing.T) {
+	for _, deviceType := range []string{"COMPUTER", "MOBILE"} {
+		t.Run(deviceType, func(t *testing.T) {
+			model := &DeviceGroupResourceModel{}
+			grp := &devicegroups.DeviceGroupReadRepresentationV1{
+				ID:         "grp-1",
+				Name:       "Empty Static",
+				DeviceType: deviceType,
+				GroupType:  "STATIC",
+			}
+			manage := manageMembersOnRead(true, types.SetNull(types.StringType), nil)
+			if diags := assignDeviceGroupModel(context.Background(), model, grp, nil, manage, true); diags.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			if !model.Members.IsNull() {
+				t.Errorf("Members = %v, want null", model.Members)
+			}
+		})
+	}
+}
