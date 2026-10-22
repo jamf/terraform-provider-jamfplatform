@@ -254,11 +254,38 @@ func TestFlattenMacAppSelfService_Notification(t *testing.T) {
 	ss := &proclassic.MacApplicationSelfService{
 		Notification: &proclassic.NotificationValue{Enabled: new(true), Method: new("Self Service")},
 	}
-	flattenMacAppSelfService(ss, state)
+	flattenMacAppSelfService(ss, state, false)
 	if !state.NotificationEnabled.ValueBool() {
 		t.Errorf("notification_enabled not flattened")
 	}
 	if state.NotificationMethod.ValueString() != "Self Service" {
 		t.Errorf("notification_method: got %q", state.NotificationMethod.ValueString())
+	}
+}
+
+// TestFlattenMacAppSelfService_ListHydratesIconAndCategories pins issue #520:
+// on the list path the state starts empty, so includeUnmanaged must allocate
+// the icon and category containers before the reads.
+func TestFlattenMacAppSelfService_ListHydratesIconAndCategories(t *testing.T) {
+	wire := &proclassic.MacApplicationSelfService{
+		SelfServiceIcon: &proclassic.MacApplicationSelfServiceSelfServiceIcon{ID: new(5268), URI: new("https://example.test/icon")},
+		SelfServiceCategories: &proclassic.MacApplicationSelfServiceSelfServiceCategories{
+			Category: &[]proclassic.MacApplicationSelfServiceSelfServiceCategoriesCategoryItem{{ID: new(7), Name: new("Utilities")}},
+		},
+	}
+
+	state := &MacAppSelfServiceModel{}
+	flattenMacAppSelfService(wire, state, true)
+	if state.SelfServiceIcon == nil || state.SelfServiceIcon.ID.ValueString() != "5268" {
+		t.Errorf("self_service_icon not hydrated: %+v", state.SelfServiceIcon)
+	}
+	if len(state.SelfServiceCategories) != 1 || state.SelfServiceCategories[0].ID.ValueString() != "7" {
+		t.Errorf("self_service_categories not hydrated: %+v", state.SelfServiceCategories)
+	}
+
+	managed := &MacAppSelfServiceModel{}
+	flattenMacAppSelfService(wire, managed, false)
+	if managed.SelfServiceIcon != nil || managed.SelfServiceCategories != nil {
+		t.Error("managed read must not populate unconfigured icon or categories")
 	}
 }

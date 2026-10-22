@@ -55,7 +55,7 @@ func assignEbookResourceModel(ctx context.Context, state *EbookResourceModel, e 
 		state.SelfService = &EbookSelfServiceModel{}
 	}
 	if state.SelfService != nil && e.SelfService != nil {
-		flattenEbookSelfService(e.SelfService, state.SelfService)
+		flattenEbookSelfService(e.SelfService, state.SelfService, includeUnmanaged)
 	}
 
 	return diags
@@ -179,7 +179,10 @@ func flattenEbookScope(ctx context.Context, s *proclassic.EbookScope, state *Ebo
 // The rest of the block, the icon included, is echoed unconditionally and reads
 // from the wire. Wire-probed against Jamf Pro 11.31.1 on 2026-09-06; see issue
 // #387.
-func flattenEbookSelfService(ss *proclassic.EbookSelfService, state *EbookSelfServiceModel) {
+func flattenEbookSelfService(ss *proclassic.EbookSelfService, state *EbookSelfServiceModel, includeUnmanaged bool) {
+	if includeUnmanaged && state.Categories == nil && ss.SelfServiceCategories != nil && ss.SelfServiceCategories.Category != nil {
+		state.Categories = []EbookSelfServiceCategoryModel{}
+	}
 	state.DisplayName = helpers.ReconcileOptionalStringPointerTrimmed(ss.SelfServiceDisplayName, state.DisplayName)
 	state.InstallButtonText = helpers.ReconcileOptionalStringPointerTrimmed(ss.InstallButtonText, state.InstallButtonText)
 	state.SelfServiceDescription = helpers.PreserveStringWhenWireEmptyTrimmed(ss.SelfServiceDescription, state.SelfServiceDescription)

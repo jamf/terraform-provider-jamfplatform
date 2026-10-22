@@ -1,0 +1,27 @@
+// Copyright Jamf Software LLC 2026
+// SPDX-License-Identifier: MPL-2.0
+
+package licensed_software
+
+import (
+	"context"
+	"testing"
+
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/listhydration"
+)
+
+// TestListHydration_LicensedSoftwareResourceModel guards the list resource's config-generation path
+// (#520): every block and collection the wire carries must come back populated
+// from an empty model, or the generated configuration silently drops it.
+func TestListHydration_LicensedSoftwareResourceModel(t *testing.T) {
+	w := &proclassic.LicensedSoftware{}
+	listhydration.Fill(w)
+	state := &LicensedSoftwareResourceModel{}
+	ctx := context.Background()
+	assignLicensedSoftwareResourceModel(ctx, state, w, true)
+	if got := listhydration.NilBlocks(state); len(got) != 0 {
+		t.Errorf("list path left blocks null: %v", got)
+	}
+}
