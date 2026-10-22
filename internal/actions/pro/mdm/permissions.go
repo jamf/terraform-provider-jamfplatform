@@ -63,3 +63,14 @@ var (
 	disableLostModePrivileges   = permissions.Section(deviceActionsCommandRegistry, lostModeSDKMethods...)
 	playLostModeSoundPrivileges = permissions.Section(deviceActionsCommandRegistry, lostModeSDKMethods...)
 )
+
+// set_wallpaper rides the Classic mobile device command endpoint and, when it is
+// given Management IDs, resolves them to serial numbers through the Platform
+// devices inventory.
+var wallpaperRegistry = permissions.Merge(proclassic.Privileges, devSDK.Privileges)
+
+var setWallpaperSDKMethods = []string{
+	"CreateMobileDeviceCommandByCommand",
+	"ListDevices",
+}
+var setWallpaperPrivileges = permissions.Section(wallpaperRegistry, setWallpaperSDKMethods...)

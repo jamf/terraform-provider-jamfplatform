@@ -57,9 +57,10 @@ const minJamfProVersion = ""
 // devices in bulk, so the single-request behaviour and its all-or-nothing failure
 // mode are visible in the rendered docs rather than buried in this package.
 const batchNote = "\n\n" +
-	"All targeted devices are commanded in a single request. If any one device cannot be " +
-	"resolved the whole invocation fails and no device is commanded, so a large batch is " +
-	"harder to diagnose than several smaller ones. Jamf Pro publishes no maximum batch size."
+	"The action commands every targeted device in a single request. If Jamf Pro cannot match one " +
+	"device, the whole request fails, no device is commanded and the error does not say which " +
+	"device it was, so a large batch is harder to diagnose than several small ones. Jamf Pro " +
+	"documents no maximum batch size."
 
 // batchWarnThreshold is the batch size above which sendCommandBatch warns.
 //
@@ -353,6 +354,57 @@ func (a *mdmAction) resolveSerialNumbers(ctx context.Context, resp *action.Invok
 	return ids, true
 }
 
+// resolveSerialsForManagementIDs maps Management IDs to serial numbers through
+// the Platform devices inventory, for a command that addresses devices by serial
+// number. The id is an RSQL-filterable field (wire-probed 2026-10-22), so N ids
+// resolve in ceil(N/chunk) requests, chunked by encoded size like
+// resolveSerialNumbers. Every id that does not resolve is named.
+func (a *mdmAction) resolveSerialsForManagementIDs(ctx context.Context, resp *action.InvokeResponse, ids []string) ([]string, bool) {
+	chunks := chunkSerialsByEncodedSize(ids, serialFilterBudgetBytes)
+
+	found := make(map[string]string, len(ids))
+	for i, chunk := range chunks {
+		resp.SendProgress(action.InvokeProgressEvent{Message: fmt.Sprintf(
+			"Resolving %d Management ID(s) (request %d of %d)", len(chunk), i+1, len(chunks))})
+
+		quoted := make([]string, 0, len(chunk))
+		for _, id := range chunk {
+			quoted = append(quoted, quoteRSQLValue(id))
+		}
+
+		devices, err := a.devices.ListDevices(ctx, nil, "id=in=("+strings.Join(quoted, ",")+")")
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Device Lookup Failed",
+				fmt.Sprintf("Unable to resolve %d Management ID(s) to serial numbers: %s", len(chunk), helpers.APIErrorDetail(err)),
+			)
+			return nil, false
+		}
+		for _, device := range devices {
+			found[device.ID] = device.SerialNumber
+		}
+	}
+
+	serials := make([]string, 0, len(ids))
+	var missing []string
+	for _, id := range ids {
+		serial, ok := found[id]
+		if !ok || serial == "" {
+			missing = append(missing, id)
+			continue
+		}
+		serials = append(serials, serial)
+	}
+	if len(missing) > 0 {
+		resp.Diagnostics.AddError(
+			"Device Not Found",
+			fmt.Sprintf("No device with a serial number matched the Management ID(s) %s.", strings.Join(missing, ", ")),
+		)
+		return nil, false
+	}
+	return serials, true
+}
+
 // chunkSerialsByEncodedSize splits serials into groups whose encoded RSQL `in=`
 // argument stays within budget. A single serial that exceeds the budget on its
 // own still forms a chunk — there is no smaller request to make.
@@ -400,19 +452,41 @@ func sortedKeys(m map[string]bool) []string {
 }
 
 // targetListAttributes returns the shared management_ids / serial_numbers
-// selector used by the one surviving command action that targets devices in bulk.
-// deviceNoun tunes the description (e.g. "computer", "mobile device").
+// selector used by the command actions that target devices in bulk. deviceNoun
+// tunes the description (e.g. "computer", "mobile device").
 //
-// These are lists because the blank-push endpoint takes its devices as an array:
-// one invocation pushes to every listed device in a single request. The two
-// selectors are additive rather than exclusive, so a configuration may mix known
+// These are lists because the command takes its devices as an array: one
+// invocation commands every listed device in a single request. The two selectors
+// are additive rather than exclusive, so a configuration may mix known
 // management ids with serial numbers that need resolving.
 func targetListAttributes(deviceNoun string) map[string]actionschema.Attribute {
+	return selectorAttributes(deviceNoun,
+		"Each is looked up to find its Management ID before the command is sent, so `management_ids` avoids that lookup.",
+		"")
+}
+
+// selectorAttributes builds the two selectors with the lookup sentence that is
+// true for the action: most commands need a Management ID and resolve serials to
+// one, while the wallpaper command takes serials as they are and resolves
+// Management IDs the other way round.
+func selectorAttributes(deviceNoun, serialLookupNote, managementLookupNote string) map[string]actionschema.Attribute {
+	managementDesc := "Jamf Pro Management IDs of the " + deviceNoun + "s to target. These are the `id` values reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. The action commands all listed " + deviceNoun + "s in a single request."
+	if managementLookupNote != "" {
+		managementDesc += " " + managementLookupNote
+	}
+	managementDesc += " Set this and/or `serial_numbers`."
+
+	serialDesc := "Serial numbers of the " + deviceNoun + "s to target (case-sensitive)."
+	if serialLookupNote != "" {
+		serialDesc += " " + serialLookupNote
+	}
+	serialDesc += " Set this and/or `management_ids`."
+
 	return map[string]actionschema.Attribute{
 		"management_ids": actionschema.ListAttribute{
 			Optional:            true,
 			ElementType:         types.StringType,
-			MarkdownDescription: "Jamf Pro Management IDs of the " + deviceNoun + "s to target. These are the `id` values reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. All listed " + deviceNoun + "s are commanded in a single request. Set this and/or `serial_numbers`.",
+			MarkdownDescription: managementDesc,
 			Validators: []validator.List{
 				listvalidator.SizeAtLeast(1),
 				listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
@@ -421,7 +495,7 @@ func targetListAttributes(deviceNoun string) map[string]actionschema.Attribute {
 		"serial_numbers": actionschema.ListAttribute{
 			Optional:            true,
 			ElementType:         types.StringType,
-			MarkdownDescription: "Serial numbers of the " + deviceNoun + "s to target (case-sensitive). Each is looked up to find its Management ID before the command is sent, so `management_ids` avoids that lookup. Set this and/or `management_ids`.",
+			MarkdownDescription: serialDesc,
 			Validators: []validator.List{
 				listvalidator.SizeAtLeast(1),
 				listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),

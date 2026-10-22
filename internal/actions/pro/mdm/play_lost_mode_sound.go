@@ -40,7 +40,7 @@ func (a *PlayLostModeSoundAction) Metadata(ctx context.Context, req action.Metad
 
 func (a *PlayLostModeSoundAction) Schema(ctx context.Context, req action.SchemaRequest, resp *action.SchemaResponse) {
 	resp.Schema = actionschema.Schema{
-		MarkdownDescription: "Plays the Lost Mode sound on one or more supervised iPhones and iPads that are in Lost Mode, to help locate them. If a device already has this command waiting, Jamf Pro does not queue a second copy." + batchNote + playLostModeSoundPrivileges,
+		MarkdownDescription: "Plays a sound on one or more supervised iPhones and iPads in Lost Mode so someone can find them. If a device already has this command waiting, Jamf Pro queues no second copy." + batchNote + playLostModeSoundPrivileges,
 		Attributes:          targetListAttributes("mobile device"),
 	}
 	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)

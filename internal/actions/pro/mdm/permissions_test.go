@@ -31,6 +31,12 @@ func TestLostModeSDKMethods_KnownToSDK(t *testing.T) {
 	}
 }
 
+func TestSetWallpaperSDKMethods_KnownToSDK(t *testing.T) {
+	if missing := permissions.Missing(wallpaperRegistry, setWallpaperSDKMethods...); len(missing) > 0 {
+		t.Fatalf("setWallpaperSDKMethods not present in the registries (drift): %v", missing)
+	}
+}
+
 func TestRenewMdmProfileSDKMethods_KnownToSDK(t *testing.T) {
 	if missing := permissions.Missing(pro.Privileges, renewMdmProfileSDKMethods...); len(missing) > 0 {
 		t.Fatalf("renewMdmProfileSDKMethods not present in the pro registry (drift): %v", missing)
@@ -60,9 +66,10 @@ func TestFlushMdmCommandsSDKMethods_KnownToSDK(t *testing.T) {
 // resolver has no registry entry of its own and hits the same /v1/devices list
 // endpoint, so its required privilege is that of ListDevices.
 var helperSDKMethods = map[string][]string{
-	"resolveManagementIDs": {"ListDevices"}, // serial path -> resolveSerialNumbers -> ListDevices (RSQL in= set)
-	"resolveSerialNumbers": {"ListDevices"},
-	"sendCommandBatch":     {"SendMdmCommandV2"},
+	"resolveManagementIDs":           {"ListDevices"}, // serial path -> resolveSerialNumbers -> ListDevices (RSQL in= set)
+	"resolveSerialNumbers":           {"ListDevices"},
+	"resolveSerialsForManagementIDs": {"ListDevices"},
+	"sendCommandBatch":               {"SendMdmCommandV2"},
 }
 
 // directSDKAliases maps SDK methods callable directly in an action file to their
@@ -172,6 +179,10 @@ func TestLostModeSDKMethods_MatchFile(t *testing.T) {
 	}
 }
 
+func TestSetWallpaperSDKMethods_MatchFile(t *testing.T) {
+	assertMatch(t, "set_wallpaper.go", setWallpaperSDKMethods)
+}
+
 func TestRenewMdmProfileSDKMethods_MatchFile(t *testing.T) {
 	assertMatch(t, "renew_mdm_profile.go", renewMdmProfileSDKMethods)
 }
@@ -227,6 +238,14 @@ func TestLostModePrivileges_NameOnlyTheCapabilityTheCommandNeeds(t *testing.T) {
 			if strings.Contains(section, banned) {
 				t.Errorf("%s still mentions %q, so the alternatives set was not narrowed:\n%s", name, banned, section)
 			}
+		}
+	}
+}
+
+func TestSetWallpaperPrivileges_Rendered(t *testing.T) {
+	for _, want := range []string{"destructive-device-actions:execute", "devices:read"} {
+		if !permissions.Renders(setWallpaperPrivileges, want) {
+			t.Errorf("setWallpaperPrivileges did not render %q:\n%s", want, setWallpaperPrivileges)
 		}
 	}
 }

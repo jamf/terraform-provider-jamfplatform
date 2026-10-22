@@ -884,6 +884,7 @@ func (p *JamfPlatformProvider) Actions(ctx context.Context) []func() action.Acti
 		mdmactions.NewEnableLostModeAction,
 		mdmactions.NewDisableLostModeAction,
 		mdmactions.NewPlayLostModeSoundAction,
+		mdmactions.NewSetWallpaperAction,
 		mdmactions.NewRenewMdmProfileAction,
 		mdmactions.NewFlushMdmCommandsAction,
 		maintenanceactions.NewRedeployManagementFrameworkAction,

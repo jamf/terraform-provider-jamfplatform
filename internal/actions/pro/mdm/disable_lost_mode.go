@@ -40,7 +40,7 @@ func (a *DisableLostModeAction) Metadata(ctx context.Context, req action.Metadat
 
 func (a *DisableLostModeAction) Schema(ctx context.Context, req action.SchemaRequest, resp *action.SchemaResponse) {
 	resp.Schema = actionschema.Schema{
-		MarkdownDescription: "Turns off Lost Mode on one or more supervised iPhones and iPads. If a device already has this command waiting, Jamf Pro does not queue a second copy." + batchNote + disableLostModePrivileges,
+		MarkdownDescription: "Turns off Lost Mode on one or more supervised iPhones and iPads. If a device already has this command waiting, Jamf Pro queues no second copy." + batchNote + disableLostModePrivileges,
 		Attributes:          targetListAttributes("mobile device"),
 	}
 	resp.Schema.Attributes = actiontimeouts.Add(ctx, resp.Schema.Attributes)

@@ -312,3 +312,165 @@ action "jamfplatform_pro_enable_lost_mode" "lost" {
 		}},
 	})
 }
+
+// onePixelPNG is a valid 1x1 PNG, base64-encoded, which is all the wallpaper
+// tests need: Jamf Pro does not look at the image.
+const onePixelPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+
+func TestAccAction_ProSetWallpaper_Image(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = [%q]
+    location       = "lock_screen"
+    image          = %q
+  }
+}`, serial, onePixelPNG), "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProSetWallpaper_IconID names icon 1, which every Jamf Pro tenant
+// holds. Uploading one here would leave it behind: Jamf Pro has no way to delete
+// an icon, and each upload mints a new id.
+func TestAccAction_ProSetWallpaper_IconID(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = [%q]
+    location       = "home_screen"
+    icon_id        = "1"
+  }
+}`, serial), "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProSetWallpaper_ManagementIDs covers the resolution path: the
+// command cannot address a device by Management ID, so the action looks up the
+// serial number first.
+func TestAccAction_ProSetWallpaper_ManagementIDs(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+data "jamfplatform_devices" "targets" {}
+
+locals {
+  device_id = one([
+    for d in data.jamfplatform_devices.targets.devices : d.id
+    if d.serial_number == %q
+  ])
+}
+
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    management_ids = [local.device_id]
+    location       = "lock_and_home_screens"
+    image          = %q
+  }
+}`, serial, onePixelPNG), "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProSetWallpaper_NeedsAnImageSource(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    location       = "lock_screen"
+  }
+}`, "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Missing Attribute Configuration.*\[image,icon_id\]`),
+		}},
+	})
+}
+
+// TestAccAction_ProSetWallpaper_BadImageFails asserts the plan-time image check,
+// which exists because Jamf Pro accepts any bytes and the device is the first to
+// reject them.
+func TestAccAction_ProSetWallpaper_BadImageFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    location       = "lock_screen"
+    image          = base64encode("not an image")
+  }
+}`, "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Wallpaper Image.*PNG`),
+		}},
+	})
+}
+
+func TestAccAction_ProSetWallpaper_BadLocationFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    location       = "desktop"
+    image          = %q
+  }
+}`, onePixelPNG), "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value.*lock_screen`),
+		}},
+	})
+}
+
+// TestAccAction_ProSetWallpaper_UnknownSerialFails covers the failure Jamf Pro
+// cannot attribute: an unmatched device answers "Unable to match mobile_device"
+// without naming it, so the action names the serials it sent.
+func TestAccAction_ProSetWallpaper_UnknownSerialFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    location       = "lock_screen"
+    image          = %q
+  }
+}`, onePixelPNG), "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`NOSUCHSERIAL0001`),
+		}},
+	})
+}

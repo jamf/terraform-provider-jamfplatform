@@ -3,9 +3,9 @@
 page_title: "jamfplatform_pro_enable_lost_mode Action - terraform-provider-jamfplatform"
 subcategory: ""
 description: |-
-  Turns on Lost Mode on one or more supervised iPhones and iPads. Each device locks and shows the message, phone number and footnote you set; every targeted device shows the same text.
-  If a device already has this command waiting, for example because it is offline, Jamf Pro keeps the waiting command and does not queue another. A message or phone number you change in the meantime is not applied to it.
-  All targeted devices are commanded in a single request. If any one device cannot be resolved the whole invocation fails and no device is commanded, so a large batch is harder to diagnose than several smaller ones. Jamf Pro publishes no maximum batch size.
+  Turns on Lost Mode on one or more supervised iPhones and iPads. Each device locks and shows the message, phone number and footnote you set.
+  If a device already has this command waiting, for example because it is offline, Jamf Pro keeps that command and queues no other, so changes to the message or phone number do not reach the device.
+  The action commands every targeted device in a single request. If Jamf Pro cannot match one device, the whole request fails, no device is commanded and the error does not say which device it was, so a large batch is harder to diagnose than several small ones. Jamf Pro documents no maximum batch size.
   Required Jamf permissions
   Jamf lists this under Platform environment scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
@@ -16,11 +16,11 @@ description: |-
 
 # jamfplatform_pro_enable_lost_mode (Action)
 
-Turns on Lost Mode on one or more supervised iPhones and iPads. Each device locks and shows the message, phone number and footnote you set; every targeted device shows the same text.
+Turns on Lost Mode on one or more supervised iPhones and iPads. Each device locks and shows the message, phone number and footnote you set.
 
-If a device already has this command waiting, for example because it is offline, Jamf Pro keeps the waiting command and does not queue another. A message or phone number you change in the meantime is not applied to it.
+If a device already has this command waiting, for example because it is offline, Jamf Pro keeps that command and queues no other, so changes to the message or phone number do not reach the device.
 
-All targeted devices are commanded in a single request. If any one device cannot be resolved the whole invocation fails and no device is commanded, so a large batch is harder to diagnose than several smaller ones. Jamf Pro publishes no maximum batch size.
+The action commands every targeted device in a single request. If Jamf Pro cannot match one device, the whole request fails, no device is commanded and the error does not say which device it was, so a large batch is harder to diagnose than several small ones. Jamf Pro documents no maximum batch size.
 
 **Required Jamf permissions**
 
@@ -38,7 +38,7 @@ action "jamfplatform_pro_enable_lost_mode" "lost" {
   config {
     serial_numbers = ["F2LXXXXXXXXX"]
 
-    # Set message, phone_number, or both. Every targeted device shows the same text.
+    # Set message, phone_number, or both.
     message      = "This iPad is lost. Please call the number below."
     phone_number = "+1 555 0100"
     footnote     = "Reward offered"
@@ -51,8 +51,8 @@ action "jamfplatform_pro_enable_lost_mode" "lost" {
 
 ### Optional
 
-- `footnote` (String) Text shown at the bottom of the Lock Screen. Jamf Pro still needs `message` or `phone_number`; a footnote alone is refused.
-- `management_ids` (List of String) Jamf Pro Management IDs of the mobile devices to target. These are the `id` values reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. All listed mobile devices are commanded in a single request. Set this and/or `serial_numbers`.
+- `footnote` (String) Text shown at the bottom of the Lock Screen. Jamf Pro refuses a footnote on its own, so set `message` or `phone_number` too.
+- `management_ids` (List of String) Jamf Pro Management IDs of the mobile devices to target. These are the `id` values reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. The action commands all listed mobile devices in a single request. Set this and/or `serial_numbers`.
 - `message` (String) Message shown on the Lock Screen. Set this, `phone_number`, or both.
 - `phone_number` (String) Phone number shown on the Lock Screen. Set this, `message`, or both.
 - `serial_numbers` (List of String) Serial numbers of the mobile devices to target (case-sensitive). Each is looked up to find its Management ID before the command is sent, so `management_ids` avoids that lookup. Set this and/or `management_ids`.

@@ -72,12 +72,12 @@ func (a *EnableLostModeAction) Schema(ctx context.Context, req action.SchemaRequ
 	}
 	attrs["footnote"] = actionschema.StringAttribute{
 		Optional:            true,
-		MarkdownDescription: "Text shown at the bottom of the Lock Screen. Jamf Pro still needs `message` or `phone_number`; a footnote alone is refused.",
+		MarkdownDescription: "Text shown at the bottom of the Lock Screen. Jamf Pro refuses a footnote on its own, so set `message` or `phone_number` too.",
 		Validators:          []validator.String{hasVisibleText},
 	}
 	resp.Schema = actionschema.Schema{
-		MarkdownDescription: "Turns on Lost Mode on one or more supervised iPhones and iPads. Each device locks and shows the message, phone number and footnote you set; every targeted device shows the same text." +
-			"\n\nIf a device already has this command waiting, for example because it is offline, Jamf Pro keeps the waiting command and does not queue another. A message or phone number you change in the meantime is not applied to it." +
+		MarkdownDescription: "Turns on Lost Mode on one or more supervised iPhones and iPads. Each device locks and shows the message, phone number and footnote you set." +
+			"\n\nIf a device already has this command waiting, for example because it is offline, Jamf Pro keeps that command and queues no other, so changes to the message or phone number do not reach the device." +
 			batchNote + enableLostModePrivileges,
 		Attributes: attrs,
 	}

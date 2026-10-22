@@ -3,8 +3,8 @@
 page_title: "jamfplatform_pro_play_lost_mode_sound Action - terraform-provider-jamfplatform"
 subcategory: ""
 description: |-
-  Plays the Lost Mode sound on one or more supervised iPhones and iPads that are in Lost Mode, to help locate them. If a device already has this command waiting, Jamf Pro does not queue a second copy.
-  All targeted devices are commanded in a single request. If any one device cannot be resolved the whole invocation fails and no device is commanded, so a large batch is harder to diagnose than several smaller ones. Jamf Pro publishes no maximum batch size.
+  Plays a sound on one or more supervised iPhones and iPads in Lost Mode so someone can find them. If a device already has this command waiting, Jamf Pro queues no second copy.
+  The action commands every targeted device in a single request. If Jamf Pro cannot match one device, the whole request fails, no device is commanded and the error does not say which device it was, so a large batch is harder to diagnose than several small ones. Jamf Pro documents no maximum batch size.
   Required Jamf permissions
   Jamf lists this under Platform environment scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
@@ -15,9 +15,9 @@ description: |-
 
 # jamfplatform_pro_play_lost_mode_sound (Action)
 
-Plays the Lost Mode sound on one or more supervised iPhones and iPads that are in Lost Mode, to help locate them. If a device already has this command waiting, Jamf Pro does not queue a second copy.
+Plays a sound on one or more supervised iPhones and iPads in Lost Mode so someone can find them. If a device already has this command waiting, Jamf Pro queues no second copy.
 
-All targeted devices are commanded in a single request. If any one device cannot be resolved the whole invocation fails and no device is commanded, so a large batch is harder to diagnose than several smaller ones. Jamf Pro publishes no maximum batch size.
+The action commands every targeted device in a single request. If Jamf Pro cannot match one device, the whole request fails, no device is commanded and the error does not say which device it was, so a large batch is harder to diagnose than several small ones. Jamf Pro documents no maximum batch size.
 
 **Required Jamf permissions**
 
@@ -43,7 +43,7 @@ action "jamfplatform_pro_play_lost_mode_sound" "ping" {
 
 ### Optional
 
-- `management_ids` (List of String) Jamf Pro Management IDs of the mobile devices to target. These are the `id` values reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. All listed mobile devices are commanded in a single request. Set this and/or `serial_numbers`.
+- `management_ids` (List of String) Jamf Pro Management IDs of the mobile devices to target. These are the `id` values reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. The action commands all listed mobile devices in a single request. Set this and/or `serial_numbers`.
 - `serial_numbers` (List of String) Serial numbers of the mobile devices to target (case-sensitive). Each is looked up to find its Management ID before the command is sent, so `management_ids` avoids that lookup. Set this and/or `management_ids`.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 

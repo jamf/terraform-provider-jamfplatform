@@ -138,6 +138,7 @@ func batchActions() map[string]action.Action {
 		"enable_lost_mode":     NewEnableLostModeAction(),
 		"disable_lost_mode":    NewDisableLostModeAction(),
 		"play_lost_mode_sound": NewPlayLostModeSoundAction(),
+		"set_wallpaper":        NewSetWallpaperAction(),
 	}
 }
 
