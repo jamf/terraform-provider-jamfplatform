@@ -87,6 +87,37 @@ func Merge(registries ...Registry) Registry {
 	return out
 }
 
+// Narrow returns a copy of reg in which method requires only scoped, for an
+// action that sends one fixed kind of request through an endpoint whose
+// privileges are an alternatives set.
+//
+// POST /pro/v2/mdm/commands is the case: the gateway picks one of four
+// capabilities from the command type, and the SDK registry can only say "any of
+// these", so an action that always sends ENABLE_LOST_MODE would otherwise publish
+// all four, including the recovery-lock one it can never need. The narrowed entry
+// is no longer an alternatives set, so Section renders it as an ordinary row.
+//
+// A scoped value the method does not list removes the method from the returned
+// registry rather than inventing the requirement. Missing then reports it, so a
+// construct's existing drift-guard test fails the day the SDK stops offering
+// that capability, instead of a table naming one the endpoint no longer accepts.
+// Any other method is returned untouched, and reg itself is never modified.
+func Narrow(reg Registry, method, scoped string) Registry {
+	out := maps.Clone(reg)
+	mp, ok := out[method]
+	if !ok {
+		return out
+	}
+	if !slices.Contains(mp.Scoped, scoped) {
+		delete(out, method)
+		return out
+	}
+	mp.Scoped = []string{scoped}
+	mp.ScopedAlternatives = false
+	out[method] = mp
+	return out
+}
+
 // malformedAction is the action recorded for a scoped value splitScoped could
 // not parse. It is prose rather than a slug and has no actionLabels entry, so
 // actionList prints it verbatim: the row's Actions cell says the shape was not

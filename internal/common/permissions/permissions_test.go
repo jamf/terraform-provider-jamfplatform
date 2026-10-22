@@ -759,3 +759,42 @@ func TestSection_ACapabilityBothRequiredAndAlternativeAppearsInBoth(t *testing.T
 		t.Errorf("device-actions is needed for its own reason and offered as an alternative, want 2 rows, got %d\n%s", n, got)
 	}
 }
+
+func TestNarrow_RendersOneOrdinaryRow(t *testing.T) {
+	reg := Narrow(alternativesRegistry(), "Send", "device-actions:execute")
+	got := Section(reg, "Send")
+
+	if !Renders(got, "device-actions:execute") {
+		t.Errorf("the chosen capability is not rendered\n%s", got)
+	}
+	for _, other := range []string{"destructive-device-actions", "local-admin-passwords"} {
+		if strings.Contains(got, other) {
+			t.Errorf("narrowed section still names %s\n%s", other, got)
+		}
+	}
+	if strings.Contains(got, "at least one of") {
+		t.Errorf("a narrowed method is not an alternatives set\n%s", got)
+	}
+}
+
+func TestNarrow_DoesNotModifyTheOriginal(t *testing.T) {
+	orig := alternativesRegistry()
+	Narrow(orig, "Send", "device-actions:execute")
+	if !orig["Send"].ScopedAlternatives || len(orig["Send"].Scoped) != 3 {
+		t.Errorf("Narrow mutated its input: %+v", orig["Send"])
+	}
+}
+
+func TestNarrow_UnlistedCapabilityIsReportedMissing(t *testing.T) {
+	reg := Narrow(alternativesRegistry(), "Send", "recovery-lock:execute")
+	if got := Missing(reg, "Send"); len(got) != 1 || got[0] != "Send" {
+		t.Errorf("a capability the method does not offer must surface as missing, got %v", got)
+	}
+}
+
+func TestNarrow_UnknownMethodIsANoOp(t *testing.T) {
+	reg := Narrow(alternativesRegistry(), "Nope", "device-actions:execute")
+	if len(reg) != len(alternativesRegistry()) {
+		t.Errorf("registry changed for an unknown method: %d entries", len(reg))
+	}
+}
