@@ -42,6 +42,7 @@ import (
 	platformenvironment "github.com/jamf/terraform-provider-jamfplatform/internal/resources/account/platform_environment"
 	ssoconnection "github.com/jamf/terraform-provider-jamfplatform/internal/resources/account/sso_connection"
 	ssodomain "github.com/jamf/terraform-provider-jamfplatform/internal/resources/account/sso_domain"
+	accounttenants "github.com/jamf/terraform-provider-jamfplatform/internal/resources/account/tenants"
 	aigovernancepolicy "github.com/jamf/terraform-provider-jamfplatform/internal/resources/ai_governance/policy"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/ai_governance/tool"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/apple/app_store_app"
@@ -651,6 +652,7 @@ func (p *JamfPlatformProvider) DataSources(ctx context.Context) []func() datasou
 		category.NewCategoryDataSource,
 		platformenvironment.NewPlatformEnvironmentDataSource,
 		platformenvironment.NewPlatformEnvironmentsDataSource,
+		accounttenants.NewTenantsDataSource,
 		ssodomain.NewDomainDataSource,
 		ssodomain.NewDomainsDataSource,
 		ssoconnection.NewConnectionDataSource,
