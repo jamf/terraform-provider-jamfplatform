@@ -110,6 +110,7 @@ Inventory | Users | users
 Organization management scope | Distributor actions | distributor-actions
 Organization management scope | Licensing | licensing
 Organization management scope | Partner deal registration | deal-registration
+Organization management scope | Platform Environments | platform-environments
 Organization management scope | SSO connections | sso-connections
 Organization management scope | SSO domains | sso-domains
 Organizational context | Buildings | buildings

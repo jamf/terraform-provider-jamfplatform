@@ -1,27 +1,31 @@
 // Copyright Jamf Software LLC 2026
 // SPDX-License-Identifier: MPL-2.0
 
-// Package mdmactions holds the Jamf Pro MDM command actions. Three remain:
-// send_blank_push, renew_mdm_profile and flush_mdm_commands.
+// Package mdmactions holds the Jamf Pro MDM command actions: send_blank_push,
+// renew_mdm_profile, flush_mdm_commands, and one action per command sent through
+// POST /pro/v2/mdm/commands.
 //
-// Fourteen others were removed at the Platform API GA — device_lock, the lost
-// mode trio, the remote desktop pair, clear_restrictions_password,
-// clear_passcode, delete_user, log_out_user, unlock_user_account,
-// set_auto_admin_password and the enhanced-log-collection pair — because
-// POST /v2/mdm/commands was withdrawn. Only the send verb went: the GET side of
-// /v1 and /v2 survives, which is why the three above are unaffected.
+// Fourteen of those per-command actions were removed at the Platform API GA
+// because the endpoint was withdrawn (commit 3825dbe7), and the endpoint was
+// routed again at Jamf Pro v2508 (SDK v1.9.0, wire-probed 2026-10-22). They were
+// rebuilt in tranches, each command keeping its own action rather than a
+// generic one taking a command type: a command's parameters, secrets and
+// batchability are its own, and so is the one capability the gateway checks for
+// it. The gateway picks that capability from the body, which the SDK registry can
+// only express as "any of four", so each action narrows the registry with
+// permissions.Narrow to the single one it can need.
 //
-// Why there is no replacement, recorded here because it is the first question
-// anyone will ask. The capability did not go away with the endpoint: the Classic
-// API still serves these commands on both /computercommands and
-// /mobiledevicecommands, and Jamf Pro v1872 actively *re-privileged* the five
-// mobile-device command POSTs (destructive-device-actions:execute and
-// device-actions:execute), which is not what a withdrawal looks like. Rebuilding
-// on Classic is therefore viable but is a different construct surface, not a
-// port: the command name is path-encoded rather than carried in the body, targets
-// are id lists rather than a clientData array, and the payload is XML. It wants
-// its own change with its own wire probes rather than being smuggled into a
-// removal.
+// Rebuilt: the fourteen removed commands plus set_wallpaper (Classic), set_recovery_lock
+// and clear_recovery_lock. Not rebuilt, because the Platform device actions in
+// internal/actions/device already cover them: erase, restart, shut down, unmanage.
+//
+// Three wire facts shape every one of them, all probed on 2026-10-22. The server
+// does not check the device platform (a Mac accepts a lost-mode command and the
+// command can only fail on the device). It deduplicates by command type per
+// device: re-sending one while the first is pending answers 201 with the FIRST
+// command's id and discards the new settings, so a changed message sent to an
+// offline device silently changes nothing (batchNote says so to the user). And an
+// unknown management id fails the whole batch with a 404 that names no device.
 package mdmactions
 
 import (
@@ -51,6 +55,55 @@ import (
 // deployed Jamf Pro endpoints with no meaningful version floor.
 const minJamfProVersion = ""
 
+// minJamfProVersionEnhancedLogCollection gates the two enhanced-log-collection
+// actions, the exception to the empty floor above. TRIGGER_ and CANCEL_ENHANCED_LOG_COLLECTION
+// arrived with Jamf Pro 11.30; an older tenant rejects them at the command
+// discriminator with a Jackson error that lists every type it does know, which
+// reads as a provider bug rather than a tenant too old for the feature. Both
+// types appear in that list on 11.30.2 (wire-probed 2026-08-04).
+const minJamfProVersionEnhancedLogCollection = "11.30.0"
+
+// batchNote is appended to the description of every command action that targets
+// devices in bulk, so the single-request behaviour and its all-or-nothing failure
+// mode are visible in the rendered docs rather than buried in this package.
+const batchNote = "\n\n" +
+	"The action commands every targeted device in a single request. If Jamf Pro cannot match one " +
+	"device, the whole request fails, no device is commanded and the error does not say which " +
+	"device it was, so a large batch is harder to diagnose than several small ones. Jamf Pro " +
+	"documents no maximum batch size."
+
+// secretAttrNote is appended to the description of every action attribute that
+// carries a secret.
+//
+// WriteOnly exists on action attributes and compiles, but the framework hardcodes
+// WriteOnlyAttributesAllowed: false for action config validation while still
+// applying the resource write-only gate, so ANY non-null value fails with
+// "WriteOnly Attribute Not Allowed". Sensitive is refused for actions too. The
+// choice is therefore an attribute that works with its value visible, or one
+// nobody can use, and this package takes the former and says so. Do not re-add
+// WriteOnly: TestActionAttributes_AreNotWriteOnly guards it.
+const secretAttrNote = " This value appears in Terraform plan output, so supply it from a variable or secret store rather than committing it."
+
+// singleTargetNote is appended to the description of a command action that takes
+// one device, because its payload carries a value specific to that device.
+const singleTargetNote = "\n\n" +
+	"This action targets one device. Use `for_each` to cover several devices."
+
+// batchWarnThreshold is the batch size above which sendCommandBatch warns.
+//
+// POST /v2/mdm/commands takes clientData as an array and Jamf Pro documents no
+// maximum for it: the shipped spec carries no maxItems, and wire probes were
+// accepted at 5,000 entries (the sibling blank-push endpoint was accepted at
+// 10,000). Where a real cap does exist Jamf documents it — GET /v1/mdm/commands
+// states "Limited to 40 UUIDs" and defines a 414 for breaching it — so the
+// absence here is meaningful rather than an omission.
+//
+// The threshold is therefore not a limit but a diagnosability warning: the POST
+// is all-or-nothing, and an unresolvable managementId fails the entire request
+// with an error that names no id. The larger the batch, the harder that is to
+// attribute.
+const batchWarnThreshold = 500
+
 // blankPushBatchNote documents send_blank_push's batch semantics. That endpoint
 // reports per-device outcomes: it accepts the request and names the devices that
 // failed, rather than failing wholesale.
@@ -69,11 +122,17 @@ type mdmAction struct {
 	devices *devSDK.Client
 }
 
-// configure binds the provider-supplied clients to the action. Every remaining
-// action in this package shares the empty version floor, so there is no
-// per-action override: the two enhanced-log-collection actions that needed one
-// (11.30) went with POST /v2/mdm/commands at the Platform API GA.
+// configure binds the provider-supplied clients to the action using the package
+// default floor (none).
 func (a *mdmAction) configure(ctx context.Context, req action.ConfigureRequest, resp *action.ConfigureResponse) {
+	a.configureWithFloor(ctx, req, resp, minJamfProVersion, "mdm")
+}
+
+// configureWithFloor is configure with an explicit minimum Jamf Pro version and
+// diagnostic label, for the commands that only exist on newer tenants. A non-empty
+// floor turns an unsupported tenant into a clear version error at Configure time
+// instead of an opaque rejection at Invoke.
+func (a *mdmAction) configureWithFloor(ctx context.Context, req action.ConfigureRequest, resp *action.ConfigureResponse, minVer, label string) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -87,7 +146,7 @@ func (a *mdmAction) configure(ctx context.Context, req action.ConfigureRequest, 
 		return
 	}
 
-	client, diags := providerdata.ConfigurePro(ctx, req.ProviderData, minJamfProVersion, "mdm")
+	client, diags := providerdata.ConfigurePro(ctx, req.ProviderData, minVer, label)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -129,6 +188,172 @@ func (a *mdmAction) ensureClassicClient(resp *action.InvokeResponse) bool {
 		"The Jamf Platform client was not configured. Re-run terraform init/apply so the provider can configure successfully.",
 	)
 	return false
+}
+
+// sendCommand queues one command for one management id, for a command whose
+// payload carries a value specific to that device and so cannot ride a batch.
+func (a *mdmAction) sendCommand(ctx context.Context, resp *action.InvokeResponse, managementID string, commandData *pro.MDMCommandRequestCommandData, label string) bool {
+	resp.SendProgress(action.InvokeProgressEvent{Message: fmt.Sprintf("Requesting %s for device %s", label, managementID)})
+
+	commands, err := a.client.SendMdmCommandV2(ctx, &pro.MDMCommandRequest{
+		ClientData:  &[]pro.MDMCommandClientRequest{{ManagementID: &managementID}},
+		CommandData: commandData,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			fmt.Sprintf("%s Failed", label),
+			fmt.Sprintf("Unable to queue %s for device %s: %s", label, managementID, helpers.APIErrorDetail(err)),
+		)
+		return false
+	}
+
+	resp.SendProgress(action.InvokeProgressEvent{Message: fmt.Sprintf("%s accepted for device %s (%d command(s) queued)", label, managementID, len(commands))})
+	return true
+}
+
+// resolveManagementID ensures exactly one device identifier is provided and
+// returns the client management id. A serial number is resolved through the
+// Platform devices inventory, whose device id is the Jamf Pro managementId.
+func (a *mdmAction) resolveManagementID(ctx context.Context, resp *action.InvokeResponse, managementIDAttr, serialNumberAttr types.String) (string, bool) {
+	hasID := helpers.IsConfiguredValue(managementIDAttr)
+	hasSerial := helpers.IsConfiguredValue(serialNumberAttr)
+
+	switch {
+	case hasID && hasSerial:
+		resp.Diagnostics.AddError(
+			"Multiple Device Identifiers Provided",
+			"Specify only one of management_id or serial_number when invoking this action.",
+		)
+		return "", false
+	case hasID:
+		return managementIDAttr.ValueString(), true
+	case hasSerial:
+		serial := serialNumberAttr.ValueString()
+		resp.SendProgress(action.InvokeProgressEvent{Message: fmt.Sprintf("Resolving serial number %s", serial)})
+
+		id, err := a.devices.ResolveDeviceIDBySerialNumber(ctx, serial)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Device Lookup Failed",
+				fmt.Sprintf("Unable to resolve serial number %s to a management id: %s", serial, helpers.APIErrorDetail(err)),
+			)
+			return "", false
+		}
+		return id, true
+	default:
+		resp.Diagnostics.AddError(
+			"Missing Device Identifier",
+			"Specify either management_id or serial_number to select the device.",
+		)
+		return "", false
+	}
+}
+
+// resolveUnlockToken looks up the unlock token for a mobile device given its
+// management id: the management id maps to the Jamf Pro mobile device id, whose
+// inventory detail carries the token.
+//
+// An empty token is an error here. Jamf Pro refuses CLEAR_PASSCODE without a
+// non-empty one ("Non-empty UnlockToken required", wire-probed 2026-10-22), so
+// the earlier assumption that a supervised device clears with none no longer
+// holds, and failing now names the cause where the command POST would not.
+func (a *mdmAction) resolveUnlockToken(ctx context.Context, resp *action.InvokeResponse, managementID string) (string, bool) {
+	matches, err := a.client.ListMobileDevicesDetailV2(ctx, nil, nil, fmt.Sprintf("managementId==%q", managementID))
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Mobile Device Lookup Failed",
+			fmt.Sprintf("Unable to look up mobile device %s: %s", managementID, helpers.APIErrorDetail(err)),
+		)
+		return "", false
+	}
+	if len(matches) == 0 || matches[0].IOS == nil || matches[0].IOS.MobileDeviceID == "" {
+		resp.Diagnostics.AddError(
+			"Mobile Device Not Found",
+			fmt.Sprintf("No iPhone or iPad matched management id %s.", managementID),
+		)
+		return "", false
+	}
+
+	detail, err := a.client.GetMobileDeviceDetailV2(ctx, matches[0].IOS.MobileDeviceID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Mobile Device Detail Failed",
+			fmt.Sprintf("Unable to read mobile device detail for management id %s: %s", managementID, helpers.APIErrorDetail(err)),
+		)
+		return "", false
+	}
+	if detail.Ios == nil || detail.Ios.UnlockToken == "" {
+		resp.Diagnostics.AddError(
+			"No Unlock Token",
+			fmt.Sprintf("Jamf Pro holds no unlock token for device %s, and clearing the passcode needs one. Set unlock_token if you have it.", managementID),
+		)
+		return "", false
+	}
+	return detail.Ios.UnlockToken, true
+}
+
+// sendCommandBatch queues one command for every management id in a single
+// POST /v2/mdm/commands.
+//
+// Only a command whose payload is the same for every device may go through here:
+// commandData is shared across the whole clientData array, so a per-device field
+// (an unlock token, a local-admin guid) would be applied to all of them. Such a
+// command takes one id per invocation instead.
+//
+// The request is all-or-nothing — see batchWarnThreshold.
+func (a *mdmAction) sendCommandBatch(ctx context.Context, resp *action.InvokeResponse, managementIDs []string, commandData *pro.MDMCommandRequestCommandData, label string) bool {
+	if len(managementIDs) > batchWarnThreshold {
+		resp.Diagnostics.AddWarning(
+			"Large Command Batch",
+			fmt.Sprintf(
+				"%s targets %d devices in a single request. Jamf Pro documents no maximum, but the request is all-or-nothing: if any one device cannot be resolved the whole batch fails with an error that does not identify which. Consider splitting this into smaller invocations.",
+				label, len(managementIDs),
+			),
+		)
+	}
+
+	clients := buildClientData(managementIDs)
+
+	resp.SendProgress(action.InvokeProgressEvent{Message: fmt.Sprintf("Requesting %s for %d device(s)", label, len(managementIDs))})
+
+	commands, err := a.client.SendMdmCommandV2(ctx, &pro.MDMCommandRequest{ClientData: &clients, CommandData: commandData})
+	if err != nil {
+		resp.Diagnostics.AddError(
+			fmt.Sprintf("%s Failed", label),
+			fmt.Sprintf("Unable to queue %s for %d device(s)%s: %s", label, len(managementIDs), batchTargetSuffix(managementIDs), helpers.APIErrorDetail(err)),
+		)
+		return false
+	}
+
+	resp.SendProgress(action.InvokeProgressEvent{Message: fmt.Sprintf("%s accepted for %d device(s) (%d command(s) queued)", label, len(managementIDs), len(commands))})
+	return true
+}
+
+// buildClientData turns management ids into the per-device clientData entries
+// the batched command request carries.
+//
+// Each entry holds a POINTER to its id, so every element must reference a
+// distinct string. Getting that wrong would not fail loudly: the request would
+// stay well-formed and simply command one device N times while leaving the rest
+// untouched. Extracted as a pure function so that contract is directly testable.
+func buildClientData(managementIDs []string) []pro.MDMCommandClientRequest {
+	clients := make([]pro.MDMCommandClientRequest, 0, len(managementIDs))
+	for _, id := range managementIDs {
+		clients = append(clients, pro.MDMCommandClientRequest{ManagementID: &id})
+	}
+	return clients
+}
+
+// batchTargetSuffix names the targeted devices in an error message when the
+// batch is small enough to be useful. The failure response identifies no
+// individual device, so echoing the batch back is the only attribution a user
+// gets; beyond a handful of ids it becomes noise rather than help.
+func batchTargetSuffix(managementIDs []string) string {
+	const maxNamed = 10
+	if len(managementIDs) == 0 || len(managementIDs) > maxNamed {
+		return ""
+	}
+	return " (" + strings.Join(managementIDs, ", ") + ")"
 }
 
 // serialFilterBudgetBytes bounds the URL-encoded length of the RSQL filter
@@ -264,6 +489,57 @@ func (a *mdmAction) resolveSerialNumbers(ctx context.Context, resp *action.Invok
 	return ids, true
 }
 
+// resolveSerialsForManagementIDs maps Management IDs to serial numbers through
+// the Platform devices inventory, for a command that addresses devices by serial
+// number. The id is an RSQL-filterable field (wire-probed 2026-10-22), so N ids
+// resolve in ceil(N/chunk) requests, chunked by encoded size like
+// resolveSerialNumbers. Every id that does not resolve is named.
+func (a *mdmAction) resolveSerialsForManagementIDs(ctx context.Context, resp *action.InvokeResponse, ids []string) ([]string, bool) {
+	chunks := chunkSerialsByEncodedSize(ids, serialFilterBudgetBytes)
+
+	found := make(map[string]string, len(ids))
+	for i, chunk := range chunks {
+		resp.SendProgress(action.InvokeProgressEvent{Message: fmt.Sprintf(
+			"Resolving %d Management ID(s) (request %d of %d)", len(chunk), i+1, len(chunks))})
+
+		quoted := make([]string, 0, len(chunk))
+		for _, id := range chunk {
+			quoted = append(quoted, quoteRSQLValue(id))
+		}
+
+		devices, err := a.devices.ListDevices(ctx, nil, "id=in=("+strings.Join(quoted, ",")+")")
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Device Lookup Failed",
+				fmt.Sprintf("Unable to resolve %d Management ID(s) to serial numbers: %s", len(chunk), helpers.APIErrorDetail(err)),
+			)
+			return nil, false
+		}
+		for _, device := range devices {
+			found[device.ID] = device.SerialNumber
+		}
+	}
+
+	serials := make([]string, 0, len(ids))
+	var missing []string
+	for _, id := range ids {
+		serial, ok := found[id]
+		if !ok || serial == "" {
+			missing = append(missing, id)
+			continue
+		}
+		serials = append(serials, serial)
+	}
+	if len(missing) > 0 {
+		resp.Diagnostics.AddError(
+			"Device Not Found",
+			fmt.Sprintf("No device with a serial number matched the Management ID(s) %s.", strings.Join(missing, ", ")),
+		)
+		return nil, false
+	}
+	return serials, true
+}
+
 // chunkSerialsByEncodedSize splits serials into groups whose encoded RSQL `in=`
 // argument stays within budget. A single serial that exceeds the budget on its
 // own still forms a chunk — there is no smaller request to make.
@@ -311,19 +587,41 @@ func sortedKeys(m map[string]bool) []string {
 }
 
 // targetListAttributes returns the shared management_ids / serial_numbers
-// selector used by the one surviving command action that targets devices in bulk.
-// deviceNoun tunes the description (e.g. "computer", "mobile device").
+// selector used by the command actions that target devices in bulk. deviceNoun
+// tunes the description (e.g. "computer", "mobile device").
 //
-// These are lists because the blank-push endpoint takes its devices as an array:
-// one invocation pushes to every listed device in a single request. The two
-// selectors are additive rather than exclusive, so a configuration may mix known
+// These are lists because the command takes its devices as an array: one
+// invocation commands every listed device in a single request. The two selectors
+// are additive rather than exclusive, so a configuration may mix known
 // management ids with serial numbers that need resolving.
 func targetListAttributes(deviceNoun string) map[string]actionschema.Attribute {
+	return selectorAttributes(deviceNoun,
+		"Each is looked up to find its Management ID before the command is sent, so `management_ids` avoids that lookup.",
+		"")
+}
+
+// selectorAttributes builds the two selectors with the lookup sentence that is
+// true for the action: most commands need a Management ID and resolve serials to
+// one, while the wallpaper command takes serials as they are and resolves
+// Management IDs the other way round.
+func selectorAttributes(deviceNoun, serialLookupNote, managementLookupNote string) map[string]actionschema.Attribute {
+	managementDesc := "Jamf Pro Management IDs of the " + deviceNoun + "s to target. These are the `id` values reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. The action commands all listed " + deviceNoun + "s in a single request."
+	if managementLookupNote != "" {
+		managementDesc += " " + managementLookupNote
+	}
+	managementDesc += " Set this and/or `serial_numbers`."
+
+	serialDesc := "Serial numbers of the " + deviceNoun + "s to target (case-sensitive)."
+	if serialLookupNote != "" {
+		serialDesc += " " + serialLookupNote
+	}
+	serialDesc += " Set this and/or `management_ids`."
+
 	return map[string]actionschema.Attribute{
 		"management_ids": actionschema.ListAttribute{
 			Optional:            true,
 			ElementType:         types.StringType,
-			MarkdownDescription: "Jamf Pro Management IDs of the " + deviceNoun + "s to target. These are the `id` values reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. All listed " + deviceNoun + "s are commanded in a single request. Set this and/or `serial_numbers`.",
+			MarkdownDescription: managementDesc,
 			Validators: []validator.List{
 				listvalidator.SizeAtLeast(1),
 				listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
@@ -332,12 +630,44 @@ func targetListAttributes(deviceNoun string) map[string]actionschema.Attribute {
 		"serial_numbers": actionschema.ListAttribute{
 			Optional:            true,
 			ElementType:         types.StringType,
-			MarkdownDescription: "Serial numbers of the " + deviceNoun + "s to target (case-sensitive). Each is looked up to find its Management ID before the command is sent, so `management_ids` avoids that lookup. Set this and/or `management_ids`.",
+			MarkdownDescription: serialDesc,
 			Validators: []validator.List{
 				listvalidator.SizeAtLeast(1),
 				listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
 			},
 		},
+	}
+}
+
+// targetAttributes returns the management_id / serial_number selector for the
+// command actions that must target exactly one device because their payload
+// carries a per-device field. deviceNoun tunes the description.
+//
+// Exactly-one-of is enforced by deviceTargetConfigValidators rather than by
+// per-attribute ConflictsWith, so that supplying NO identifier also fails at plan
+// time instead of part-way through the apply.
+func targetAttributes(deviceNoun string) map[string]actionschema.Attribute {
+	return map[string]actionschema.Attribute{
+		"management_id": actionschema.StringAttribute{
+			Optional:            true,
+			MarkdownDescription: "Jamf Pro Management ID of the " + deviceNoun + ". This is the `id` reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. Set exactly one of this or `serial_number`.",
+			Validators:          []validator.String{stringvalidator.LengthAtLeast(1)},
+		},
+		"serial_number": actionschema.StringAttribute{
+			Optional:            true,
+			MarkdownDescription: "Serial number of the " + deviceNoun + " (case-sensitive). Set exactly one of this or `management_id`.",
+			Validators:          []validator.String{stringvalidator.LengthAtLeast(1)},
+		},
+	}
+}
+
+// deviceTargetConfigValidators is the plan-time counterpart to targetAttributes.
+func deviceTargetConfigValidators() []action.ConfigValidator {
+	return []action.ConfigValidator{
+		actionvalidator.ExactlyOneOf(
+			path.MatchRoot("management_id"),
+			path.MatchRoot("serial_number"),
+		),
 	}
 }
 

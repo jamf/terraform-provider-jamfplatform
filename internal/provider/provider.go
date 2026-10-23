@@ -26,6 +26,7 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/appstore"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
+	platformenvironmentactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/account/platform_environment"
 	ssodomainactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/account/sso_domain"
 	deviceactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/device"
 	appinstalleractions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/pro/app_installers"
@@ -39,8 +40,10 @@ import (
 	mcxforcedpayload "github.com/jamf/terraform-provider-jamfplatform/internal/functions/mcx_forced_payload"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/functions/mobileconfig"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
+	platformenvironment "github.com/jamf/terraform-provider-jamfplatform/internal/resources/account/platform_environment"
 	ssoconnection "github.com/jamf/terraform-provider-jamfplatform/internal/resources/account/sso_connection"
 	ssodomain "github.com/jamf/terraform-provider-jamfplatform/internal/resources/account/sso_domain"
+	accounttenants "github.com/jamf/terraform-provider-jamfplatform/internal/resources/account/tenants"
 	aigovernancepolicy "github.com/jamf/terraform-provider-jamfplatform/internal/resources/ai_governance/policy"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/ai_governance/tool"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/apple/app_store_app"
@@ -611,6 +614,7 @@ func (p *JamfPlatformProvider) Resources(ctx context.Context) []func() resource.
 		vpp_assignment.NewVPPAssignmentResource,
 		vpp_invitation.NewVPPInvitationResource,
 		webhook.NewWebhookResource,
+		platformenvironment.NewPlatformEnvironmentResource,
 		ssodomain.NewDomainResource,
 		ssoconnection.NewConnectionResource,
 		aigovernancepolicy.NewPolicyResource,
@@ -647,6 +651,9 @@ func (p *JamfPlatformProvider) DataSources(ctx context.Context) []func() datasou
 		building.NewBuildingsDataSource,
 		category.NewCategoriesDataSource,
 		category.NewCategoryDataSource,
+		platformenvironment.NewPlatformEnvironmentDataSource,
+		platformenvironment.NewPlatformEnvironmentsDataSource,
+		accounttenants.NewTenantsDataSource,
 		ssodomain.NewDomainDataSource,
 		ssodomain.NewDomainsDataSource,
 		ssoconnection.NewConnectionDataSource,
@@ -796,6 +803,7 @@ func (p *JamfPlatformProvider) ListResources(ctx context.Context) []func() list.
 		building.NewBuildingListResource,
 		category.NewCategoryListResource,
 		securityclouddevicegroup.NewDeviceGroupListResource,
+		platformenvironment.NewPlatformEnvironmentListResource,
 		ssodomain.NewDomainListResource,
 		ssoconnection.NewConnectionListResource,
 		aigovernancepolicy.NewPolicyListResource,
@@ -873,6 +881,23 @@ func (p *JamfPlatformProvider) Actions(ctx context.Context) []func() action.Acti
 		msuactions.NewPlanAction,
 		msuactions.NewAbandonFeatureToggleAction,
 		mdmactions.NewSendBlankPushAction,
+		mdmactions.NewEnableLostModeAction,
+		mdmactions.NewDisableLostModeAction,
+		mdmactions.NewPlayLostModeSoundAction,
+		mdmactions.NewSetWallpaperAction,
+		mdmactions.NewClearPasscodeAction,
+		mdmactions.NewSetAutoAdminPasswordAction,
+		mdmactions.NewSetRecoveryLockAction,
+		mdmactions.NewClearRecoveryLockAction,
+		mdmactions.NewLockDeviceAction,
+		mdmactions.NewDeleteUserAction,
+		mdmactions.NewEnableRemoteDesktopAction,
+		mdmactions.NewDisableRemoteDesktopAction,
+		mdmactions.NewClearRestrictionsPasswordAction,
+		mdmactions.NewLogOutUserAction,
+		mdmactions.NewUnlockUserAccountAction,
+		mdmactions.NewTriggerEnhancedLogCollectionAction,
+		mdmactions.NewCancelEnhancedLogCollectionAction,
 		mdmactions.NewRenewMdmProfileAction,
 		mdmactions.NewFlushMdmCommandsAction,
 		maintenanceactions.NewRedeployManagementFrameworkAction,
@@ -885,6 +910,7 @@ func (p *JamfPlatformProvider) Actions(ctx context.Context) []func() action.Acti
 		appinstalleractions.NewUpdateVersionAction,
 		jamfprotectactions.NewSyncPlansAction,
 		jamfprotectactions.NewRetryDeploymentAction,
+		platformenvironmentactions.NewAssignTenantsAction,
 		ssodomainactions.NewVerifySSODomainAction,
 	}
 }

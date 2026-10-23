@@ -698,3 +698,103 @@ func TestScopeLabelsCoverEveryKnownKind(t *testing.T) {
 			"either renders unordered or never renders", len(scopeLabels), len(scopeOrder))
 	}
 }
+
+func alternativesRegistry() Registry {
+	both := []jamfplatform.ScopeKind{jamfplatform.ScopeTenant, jamfplatform.ScopeEnvironment}
+	return Registry{
+		"Send": {
+			Method: "Send", Scopes: both, Source: "spec", ScopedAlternatives: true,
+			Scoped: []string{"destructive-device-actions:execute", "local-admin-passwords:execute", "device-actions:execute"},
+		},
+		"Lookup": {Method: "Lookup", Scopes: both, Source: "spec", Scoped: []string{"devices:read"}},
+	}
+}
+
+func TestSection_AlternativesAreNotRenderedAsAConjunction(t *testing.T) {
+	got := Section(alternativesRegistry(), "Send")
+
+	if !strings.Contains(got, "at least one of the following") {
+		t.Errorf("an alternatives-only section must say at least one is needed\n%s", got)
+	}
+	if strings.Contains(got, "Grant the API integration the following permissions") {
+		t.Errorf("an alternatives-only section must not read as a conjunction\n%s", got)
+	}
+	for _, scoped := range []string{"destructive-device-actions:execute", "local-admin-passwords:execute", "device-actions:execute"} {
+		if !Renders(got, scoped) {
+			t.Errorf("alternative %s is not rendered\n%s", scoped, got)
+		}
+	}
+}
+
+func TestSection_AlternativesFollowTheRequiredRows(t *testing.T) {
+	got := Section(alternativesRegistry(), "Send", "Lookup")
+
+	required := strings.Index(got, "`devices`")
+	marker := strings.Index(got, "Also grant at least one of these:")
+	alternative := strings.Index(got, "`destructive-device-actions`")
+	if required < 0 || marker < 0 || alternative < 0 || required >= marker || marker >= alternative {
+		t.Errorf("want required table, then the alternatives marker, then the alternatives; got offsets %d/%d/%d\n%s",
+			required, marker, alternative, got)
+	}
+	if !Renders(got, "devices:read") {
+		t.Errorf("the required row is lost\n%s", got)
+	}
+}
+
+func TestSection_AlternativeOnlyCapabilityStaysOutOfTheRequiredTable(t *testing.T) {
+	got := Section(alternativesRegistry(), "Send", "Lookup")
+	before, _, _ := strings.Cut(got, "Also grant at least one of these:")
+	if strings.Contains(before, "device-actions") {
+		t.Errorf("an alternative leaked into the all-of table\n%s", before)
+	}
+}
+
+func TestSection_ACapabilityBothRequiredAndAlternativeAppearsInBoth(t *testing.T) {
+	reg := alternativesRegistry()
+	reg["Need"] = jamfplatform.MethodPrivileges{
+		Method: "Need", Scopes: reg["Send"].Scopes, Source: "spec", Scoped: []string{"device-actions:read"},
+	}
+	got := Section(reg, "Send", "Need")
+	if n := strings.Count(got, "| `device-actions` |"); n != 2 {
+		t.Errorf("device-actions is needed for its own reason and offered as an alternative, want 2 rows, got %d\n%s", n, got)
+	}
+}
+
+func TestNarrow_RendersOneOrdinaryRow(t *testing.T) {
+	reg := Narrow(alternativesRegistry(), "Send", "device-actions:execute")
+	got := Section(reg, "Send")
+
+	if !Renders(got, "device-actions:execute") {
+		t.Errorf("the chosen capability is not rendered\n%s", got)
+	}
+	for _, other := range []string{"destructive-device-actions", "local-admin-passwords"} {
+		if strings.Contains(got, other) {
+			t.Errorf("narrowed section still names %s\n%s", other, got)
+		}
+	}
+	if strings.Contains(got, "at least one of") {
+		t.Errorf("a narrowed method is not an alternatives set\n%s", got)
+	}
+}
+
+func TestNarrow_DoesNotModifyTheOriginal(t *testing.T) {
+	orig := alternativesRegistry()
+	Narrow(orig, "Send", "device-actions:execute")
+	if !orig["Send"].ScopedAlternatives || len(orig["Send"].Scoped) != 3 {
+		t.Errorf("Narrow mutated its input: %+v", orig["Send"])
+	}
+}
+
+func TestNarrow_UnlistedCapabilityIsReportedMissing(t *testing.T) {
+	reg := Narrow(alternativesRegistry(), "Send", "recovery-lock:execute")
+	if got := Missing(reg, "Send"); len(got) != 1 || got[0] != "Send" {
+		t.Errorf("a capability the method does not offer must surface as missing, got %v", got)
+	}
+}
+
+func TestNarrow_UnknownMethodIsANoOp(t *testing.T) {
+	reg := Narrow(alternativesRegistry(), "Nope", "device-actions:execute")
+	if len(reg) != len(alternativesRegistry()) {
+		t.Errorf("registry changed for an unknown method: %d entries", len(reg))
+	}
+}

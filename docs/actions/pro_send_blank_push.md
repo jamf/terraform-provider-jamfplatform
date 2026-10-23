@@ -49,7 +49,7 @@ action "jamfplatform_pro_send_blank_push" "nudge" {
 
 ### Optional
 
-- `management_ids` (List of String) Jamf Pro Management IDs of the devices to target. These are the `id` values reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. All listed devices are commanded in a single request. Set this and/or `serial_numbers`.
+- `management_ids` (List of String) Jamf Pro Management IDs of the devices to target. These are the `id` values reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. The action commands all listed devices in a single request. Set this and/or `serial_numbers`.
 - `serial_numbers` (List of String) Serial numbers of the devices to target (case-sensitive). Each is looked up to find its Management ID before the command is sent, so `management_ids` avoids that lookup. Set this and/or `management_ids`.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 

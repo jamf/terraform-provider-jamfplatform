@@ -18,6 +18,7 @@ func allMdmActions() map[string]action.Action {
 		"renew_mdm_profile":  NewRenewMdmProfileAction(),
 	}
 	maps.Copy(all, batchActions())
+	maps.Copy(all, singleActions())
 	return all
 }
 

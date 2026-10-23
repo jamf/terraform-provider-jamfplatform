@@ -43,3 +43,86 @@ var flushMdmCommandsSDKMethods = []string{
 	"DeleteCommandFlushByIDTypeIDStatus",
 }
 var flushMdmCommandsPrivileges = permissions.Section(proclassic.Privileges, flushMdmCommandsSDKMethods...)
+
+// deviceActionsCommandRegistry is the registry for a command action whose
+// command type the gateway authorises under device-actions:execute, which is
+// every type except ERASE_DEVICE, DEVICE_LOCK, DELETE_USER (destructive),
+// SET_AUTO_ADMIN_PASSWORD (local admin passwords) and SET_RECOVERY_LOCK
+// (recovery lock). Wire-probed 2026-10-22 and stated in the SDK's own godoc for
+// SendMdmCommandV2.
+var deviceActionsCommandRegistry = permissions.Narrow(resolveSerialMerged, "SendMdmCommandV2", "device-actions:execute")
+
+// The lost-mode actions send one command and resolve serial numbers through the
+// Platform devices inventory, in helpers.go.
+var deviceActionsCommandSDKMethods = []string{
+	"SendMdmCommandV2",
+	"ListDevices",
+}
+var (
+	enableLostModePrivileges    = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	disableLostModePrivileges   = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	playLostModeSoundPrivileges = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+)
+
+// set_wallpaper rides the Classic mobile device command endpoint and, when it is
+// given Management IDs, resolves them to serial numbers through the Platform
+// devices inventory.
+var wallpaperRegistry = permissions.Merge(proclassic.Privileges, devSDK.Privileges)
+
+var setWallpaperSDKMethods = []string{
+	"CreateMobileDeviceCommandByCommand",
+	"ListDevices",
+}
+var setWallpaperPrivileges = permissions.Section(wallpaperRegistry, setWallpaperSDKMethods...)
+
+// The remaining commands are authorised under a capability of their own, so each
+// narrows SendMdmCommandV2 to it. clear_passcode shares the device-actions
+// capability with lost mode and adds the inventory reads behind its token lookup.
+var clearPasscodeSDKMethods = []string{
+	"SendMdmCommandV2",
+	"ListDevices",
+	"ListMobileDevicesDetailV2",
+	"GetMobileDeviceDetailV2",
+}
+var clearPasscodePrivileges = permissions.Section(deviceActionsCommandRegistry, clearPasscodeSDKMethods...)
+
+var recoveryLockRegistry = permissions.Narrow(resolveSerialMerged, "SendMdmCommandV2", "recovery-lock:execute")
+var recoveryLockSDKMethods = []string{
+	"SendMdmCommandV2",
+	"ListDevices",
+}
+var (
+	setRecoveryLockPrivileges   = permissions.Section(recoveryLockRegistry, recoveryLockSDKMethods...)
+	clearRecoveryLockPrivileges = permissions.Section(recoveryLockRegistry, recoveryLockSDKMethods...)
+)
+
+var localAdminPasswordRegistry = permissions.Narrow(resolveSerialMerged, "SendMdmCommandV2", "local-admin-passwords:execute")
+var setAutoAdminPasswordSDKMethods = []string{
+	"SendMdmCommandV2",
+	"ListDevices",
+}
+var setAutoAdminPasswordPrivileges = permissions.Section(localAdminPasswordRegistry, setAutoAdminPasswordSDKMethods...)
+
+// DEVICE_LOCK and DELETE_USER are the destructive-device-actions commands
+// POST /v2/mdm/commands authorises (with ERASE_DEVICE, which the Platform erase
+// action already covers).
+var destructiveCommandRegistry = permissions.Narrow(resolveSerialMerged, "SendMdmCommandV2", "destructive-device-actions:execute")
+var destructiveCommandSDKMethods = []string{
+	"SendMdmCommandV2",
+	"ListDevices",
+}
+var (
+	lockDevicePrivileges = permissions.Section(destructiveCommandRegistry, destructiveCommandSDKMethods...)
+	deleteUserPrivileges = permissions.Section(destructiveCommandRegistry, destructiveCommandSDKMethods...)
+)
+
+// The last tranche of commands all sit under device-actions:execute, like lost mode.
+var (
+	enableRemoteDesktopPrivileges          = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	disableRemoteDesktopPrivileges         = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	clearRestrictionsPasswordPrivileges    = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	logOutUserPrivileges                   = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	unlockUserAccountPrivileges            = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	triggerEnhancedLogCollectionPrivileges = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+	cancelEnhancedLogCollectionPrivileges  = permissions.Section(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...)
+)

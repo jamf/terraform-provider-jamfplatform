@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 	"testing"
 
 	devSDK "github.com/jamf/jamfplatform-go-sdk/jamfplatform/devices"
@@ -21,6 +22,34 @@ import (
 func TestSendBlankPushSDKMethods_KnownToSDK(t *testing.T) {
 	if missing := permissions.Missing(resolveSerialMerged, sendBlankPushSDKMethods...); len(missing) > 0 {
 		t.Fatalf("sendBlankPushSDKMethods not present in SDK registries (drift): %v", missing)
+	}
+}
+
+func TestLostModeSDKMethods_KnownToSDK(t *testing.T) {
+	if missing := permissions.Missing(deviceActionsCommandRegistry, deviceActionsCommandSDKMethods...); len(missing) > 0 {
+		t.Fatalf("deviceActionsCommandSDKMethods not present in the narrowed registry (drift): %v", missing)
+	}
+}
+
+func TestSetWallpaperSDKMethods_KnownToSDK(t *testing.T) {
+	if missing := permissions.Missing(wallpaperRegistry, setWallpaperSDKMethods...); len(missing) > 0 {
+		t.Fatalf("setWallpaperSDKMethods not present in the registries (drift): %v", missing)
+	}
+}
+
+func TestTranche3SDKMethods_KnownToSDK(t *testing.T) {
+	for name, c := range map[string]struct {
+		reg     permissions.Registry
+		methods []string
+	}{
+		"clear_passcode":          {deviceActionsCommandRegistry, clearPasscodeSDKMethods},
+		"recovery lock":           {recoveryLockRegistry, recoveryLockSDKMethods},
+		"set_auto_admin_password": {localAdminPasswordRegistry, setAutoAdminPasswordSDKMethods},
+		"destructive commands":    {destructiveCommandRegistry, destructiveCommandSDKMethods},
+	} {
+		if missing := permissions.Missing(c.reg, c.methods...); len(missing) > 0 {
+			t.Errorf("%s: SDK methods not present in the narrowed registry (drift): %v", name, missing)
+		}
 	}
 }
 
@@ -53,8 +82,13 @@ func TestFlushMdmCommandsSDKMethods_KnownToSDK(t *testing.T) {
 // resolver has no registry entry of its own and hits the same /v1/devices list
 // endpoint, so its required privilege is that of ListDevices.
 var helperSDKMethods = map[string][]string{
-	"resolveManagementIDs": {"ListDevices"}, // serial path -> resolveSerialNumbers -> ListDevices (RSQL in= set)
-	"resolveSerialNumbers": {"ListDevices"},
+	"resolveManagementIDs":           {"ListDevices"}, // serial path -> resolveSerialNumbers -> ListDevices (RSQL in= set)
+	"resolveSerialNumbers":           {"ListDevices"},
+	"resolveSerialsForManagementIDs": {"ListDevices"},
+	"sendCommandBatch":               {"SendMdmCommandV2"},
+	"sendCommand":                    {"SendMdmCommandV2"},
+	"resolveManagementID":            {"ListDevices"},
+	"resolveUnlockToken":             {"ListMobileDevicesDetailV2", "GetMobileDeviceDetailV2"},
 }
 
 // directSDKAliases maps SDK methods callable directly in an action file to their
@@ -158,6 +192,35 @@ func TestSendBlankPushSDKMethods_MatchFile(t *testing.T) {
 	assertMatch(t, "send_blank_push.go", sendBlankPushSDKMethods)
 }
 
+func TestLostModeSDKMethods_MatchFile(t *testing.T) {
+	for _, file := range []string{"enable_lost_mode.go", "disable_lost_mode.go", "play_lost_mode_sound.go"} {
+		assertMatch(t, file, deviceActionsCommandSDKMethods)
+	}
+}
+
+func TestSetWallpaperSDKMethods_MatchFile(t *testing.T) {
+	assertMatch(t, "set_wallpaper.go", setWallpaperSDKMethods)
+}
+
+func TestTranche3SDKMethods_MatchFile(t *testing.T) {
+	assertMatch(t, "clear_passcode.go", clearPasscodeSDKMethods)
+	assertMatch(t, "set_recovery_lock.go", recoveryLockSDKMethods)
+	assertMatch(t, "clear_recovery_lock.go", recoveryLockSDKMethods)
+	assertMatch(t, "set_auto_admin_password.go", setAutoAdminPasswordSDKMethods)
+	assertMatch(t, "lock_device.go", destructiveCommandSDKMethods)
+	assertMatch(t, "delete_user.go", destructiveCommandSDKMethods)
+}
+
+func TestSimpleCommandActions_MatchFile(t *testing.T) {
+	for _, file := range []string{
+		"enable_remote_desktop.go", "disable_remote_desktop.go", "clear_restrictions_password.go",
+		"log_out_user.go", "unlock_user_account.go", "trigger_enhanced_log_collection.go",
+		"cancel_enhanced_log_collection.go",
+	} {
+		assertMatch(t, file, deviceActionsCommandSDKMethods)
+	}
+}
+
 func TestRenewMdmProfileSDKMethods_MatchFile(t *testing.T) {
 	assertMatch(t, "renew_mdm_profile.go", renewMdmProfileSDKMethods)
 }
@@ -190,5 +253,80 @@ func TestRenewMdmProfilePrivileges_Rendered(t *testing.T) {
 func TestFlushMdmCommandsPrivileges_Rendered(t *testing.T) {
 	if !permissions.Renders(flushMdmCommandsPrivileges, "device-actions:delete") {
 		t.Fatalf("flushMdmCommandsPrivileges did not render the expected privilege:\n%s", flushMdmCommandsPrivileges)
+	}
+}
+
+// TestLostModePrivileges_NameOnlyTheCapabilityTheCommandNeeds is the guard that
+// the narrowing took effect. SendMdmCommandV2's registry entry lists four
+// alternatives; a table that rendered them all would send an operator to grant
+// recovery lock and destructive device actions for a command that needs neither.
+func TestLostModePrivileges_NameOnlyTheCapabilityTheCommandNeeds(t *testing.T) {
+	sections := map[string]string{
+		"enable_lost_mode":     enableLostModePrivileges,
+		"disable_lost_mode":    disableLostModePrivileges,
+		"play_lost_mode_sound": playLostModeSoundPrivileges,
+	}
+	for name, section := range sections {
+		for _, want := range []string{"device-actions:execute", "devices:read"} {
+			if !permissions.Renders(section, want) {
+				t.Errorf("%s did not render %q:\n%s", name, want, section)
+			}
+		}
+		for _, banned := range []string{"destructive-device-actions", "local-admin-passwords", "recovery-lock", "at least one of"} {
+			if strings.Contains(section, banned) {
+				t.Errorf("%s still mentions %q, so the alternatives set was not narrowed:\n%s", name, banned, section)
+			}
+		}
+	}
+}
+
+func TestSetWallpaperPrivileges_Rendered(t *testing.T) {
+	for _, want := range []string{"destructive-device-actions:execute", "devices:read"} {
+		if !permissions.Renders(setWallpaperPrivileges, want) {
+			t.Errorf("setWallpaperPrivileges did not render %q:\n%s", want, setWallpaperPrivileges)
+		}
+	}
+}
+
+// TestCommandPrivileges_NameOnlyTheirOwnCapability pins each action to the one
+// capability the gateway checks for its command type, and to none of the other
+// three the endpoint's alternatives set offers.
+func TestCommandPrivileges_NameOnlyTheirOwnCapability(t *testing.T) {
+	all := []string{"device-actions", "destructive-device-actions", "local-admin-passwords", "recovery-lock"}
+	cases := map[string]struct {
+		section string
+		want    string
+		other   []string
+	}{
+		"clear_passcode":                  {clearPasscodePrivileges, "device-actions:execute", []string{"mobile-devices:read"}},
+		"set_recovery_lock":               {setRecoveryLockPrivileges, "recovery-lock:execute", nil},
+		"clear_recovery_lock":             {clearRecoveryLockPrivileges, "recovery-lock:execute", nil},
+		"set_auto_admin_password":         {setAutoAdminPasswordPrivileges, "local-admin-passwords:execute", nil},
+		"enable_remote_desktop":           {enableRemoteDesktopPrivileges, "device-actions:execute", nil},
+		"disable_remote_desktop":          {disableRemoteDesktopPrivileges, "device-actions:execute", nil},
+		"clear_restrictions_password":     {clearRestrictionsPasswordPrivileges, "device-actions:execute", nil},
+		"log_out_user":                    {logOutUserPrivileges, "device-actions:execute", nil},
+		"unlock_user_account":             {unlockUserAccountPrivileges, "device-actions:execute", nil},
+		"trigger_enhanced_log_collection": {triggerEnhancedLogCollectionPrivileges, "device-actions:execute", nil},
+		"cancel_enhanced_log_collection":  {cancelEnhancedLogCollectionPrivileges, "device-actions:execute", nil},
+		"lock_device":                     {lockDevicePrivileges, "destructive-device-actions:execute", nil},
+		"delete_user":                     {deleteUserPrivileges, "destructive-device-actions:execute", nil},
+	}
+	for name, c := range cases {
+		if !permissions.Renders(c.section, c.want) {
+			t.Errorf("%s did not render %q:\n%s", name, c.want, c.section)
+		}
+		if !permissions.Renders(c.section, "devices:read") {
+			t.Errorf("%s did not render devices:read:\n%s", name, c.section)
+		}
+		wantCap, _, _ := strings.Cut(c.want, ":")
+		for _, capability := range all {
+			if capability != wantCap && strings.Contains(c.section, "`"+capability+"`") {
+				t.Errorf("%s names %s, which its command does not need:\n%s", name, capability, c.section)
+			}
+		}
+		if strings.Contains(c.section, "at least one of") {
+			t.Errorf("%s still renders an alternatives set:\n%s", name, c.section)
+		}
 	}
 }

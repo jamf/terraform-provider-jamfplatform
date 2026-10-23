@@ -4,6 +4,8 @@
 package ldap_server
 
 import (
+	"strings"
+
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
@@ -138,8 +140,29 @@ func assignConnectionModel(c *proclassic.LdapServerConnection, existing *ldapCon
 		UseWildcards:       helpers.BoolPointerValueOrNull(c.UseWildcards),
 		IsEnabled:          helpers.BoolPointerValueOrNull(c.IsEnabled),
 		MigratedToID:       helpers.Int64FromIntPtr(c.MigratedToID),
-		CertificatesUsed:   helpers.StringPointerValueOrNull(c.CertificatesUsed),
+		CertificatesUsed:   certificatesUsedSummary(c.CertificatesUsed),
 	}
+}
+
+// certificatesUsedSummary flattens the nested certificate list the server
+// echoes into one "name (issuer)" entry per certificate, comma-separated. A
+// server holding none yields null, matching the empty string it used to report.
+func certificatesUsedSummary(c *proclassic.LdapServerConnectionCertificatesUsed) types.String {
+	if c == nil || c.Certificate == nil || len(*c.Certificate) == 0 {
+		return types.StringNull()
+	}
+	entries := make([]string, 0, len(*c.Certificate))
+	for _, cert := range *c.Certificate {
+		name := ""
+		if cert.ConfigurationName != nil {
+			name = *cert.ConfigurationName
+		}
+		if cert.Issuer != nil && *cert.Issuer != "" {
+			name += " (" + *cert.Issuer + ")"
+		}
+		entries = append(entries, name)
+	}
+	return types.StringValue(strings.Join(entries, ", "))
 }
 
 // assignAccountModel decodes the bind account. An empty distinguished username

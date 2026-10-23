@@ -29,9 +29,18 @@ import (
 //	JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL   — a disposable enrolled computer
 //	JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL_2 — a SECOND disposable enrolled computer,
 //	                                     needed only by the mixed-selector test
+//	JAMFPLATFORM_ACC_PRO_MOBILE_SERIAL     — a disposable supervised iPhone or iPad,
+//	                                     for the lost-mode actions
+//
+// The lost-mode tests prove only that Jamf Pro accepted the command: a
+// simulated device never acknowledges, so nothing here can observe Lost Mode
+// switching on. Jamf Pro also folds a repeat of the same command into the one
+// already waiting for that device, so a re-run answers success without queuing
+// anything new.
 const (
 	envComputerSerial  = "JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL"
 	envComputerSerial2 = "JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL_2"
+	envMobileSerial    = "JAMFPLATFORM_ACC_PRO_MOBILE_SERIAL"
 )
 
 // fireConfig wraps an action block with a terraform_data trigger that invokes it
@@ -173,6 +182,739 @@ action "jamfplatform_pro_send_blank_push" "push" {
 		Steps: []resource.TestStep{{
 			Config:      config,
 			ExpectError: regexp.MustCompile(`NOSUCHSERIAL0001`),
+		}},
+	})
+}
+
+// accMobileSerial skips the test unless a disposable mobile device is declared.
+func accMobileSerial(t *testing.T) string {
+	t.Helper()
+	serial := testhelpers.AccEnv(envMobileSerial)
+	if serial == "" {
+		t.Skipf("%s not set; skipping lost mode acceptance test", envMobileSerial)
+	}
+	testhelpers.AccPreCheck(t)
+	return serial
+}
+
+func TestAccAction_ProEnableLostMode_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_enable_lost_mode" "lost" {
+  config {
+    serial_numbers = [%q]
+    message        = "This device is lost. Please call the number below."
+    phone_number   = "+1 555 0100"
+    footnote       = "Reward offered"
+  }
+}`, serial), "action.jamfplatform_pro_enable_lost_mode.lost")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProEnableLostMode_PhoneOnly covers the other half of the
+// at-least-one rule: a phone number with no message is accepted.
+func TestAccAction_ProEnableLostMode_PhoneOnly(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_enable_lost_mode" "lost" {
+  config {
+    serial_numbers = [%q]
+    phone_number   = "+1 555 0100"
+  }
+}`, serial), "action.jamfplatform_pro_enable_lost_mode.lost")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProDisableLostMode_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_disable_lost_mode" "found" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_disable_lost_mode.found")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProPlayLostModeSound_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_play_lost_mode_sound" "ping" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_play_lost_mode_sound.ping")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProEnableLostMode_FootnoteAloneFails asserts the plan-time rule
+// Jamf Pro enforces at the end of an apply: a footnote does not satisfy the
+// message-or-phone requirement. Needs no device, since it fails at validation.
+func TestAccAction_ProEnableLostMode_FootnoteAloneFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_enable_lost_mode" "lost" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    footnote       = "Reward offered"
+  }
+}`, "action.jamfplatform_pro_enable_lost_mode.lost")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Missing Attribute Configuration.*\[message,phone_number\]`),
+		}},
+	})
+}
+
+// TestAccAction_ProEnableLostMode_BlankMessageFails asserts that whitespace is
+// not a message: Jamf Pro itself accepts it, so only plan-time validation stops
+// a device locking behind an empty screen.
+func TestAccAction_ProEnableLostMode_BlankMessageFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_enable_lost_mode" "lost" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    message        = "   "
+  }
+}`, "action.jamfplatform_pro_enable_lost_mode.lost")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value.*visible`),
+		}},
+	})
+}
+
+// onePixelPNG is a valid 1x1 PNG, base64-encoded, which is all the wallpaper
+// tests need: Jamf Pro does not look at the image.
+const onePixelPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+
+func TestAccAction_ProSetWallpaper_Image(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = [%q]
+    location       = "lock_screen"
+    image          = %q
+  }
+}`, serial, onePixelPNG), "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProSetWallpaper_IconID names icon 1, which every Jamf Pro tenant
+// holds. Uploading one here would leave it behind: Jamf Pro has no way to delete
+// an icon, and each upload mints a new id.
+func TestAccAction_ProSetWallpaper_IconID(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = [%q]
+    location       = "home_screen"
+    icon_id        = "1"
+  }
+}`, serial), "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProSetWallpaper_ManagementIDs covers the resolution path: the
+// command cannot address a device by Management ID, so the action looks up the
+// serial number first.
+func TestAccAction_ProSetWallpaper_ManagementIDs(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+data "jamfplatform_devices" "targets" {}
+
+locals {
+  device_id = one([
+    for d in data.jamfplatform_devices.targets.devices : d.id
+    if d.serial_number == %q
+  ])
+}
+
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    management_ids = [local.device_id]
+    location       = "lock_and_home_screens"
+    image          = %q
+  }
+}`, serial, onePixelPNG), "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProSetWallpaper_NeedsAnImageSource(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    location       = "lock_screen"
+  }
+}`, "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Missing Attribute Configuration.*\[image,icon_id\]`),
+		}},
+	})
+}
+
+// TestAccAction_ProSetWallpaper_BadImageFails asserts the plan-time image check,
+// which exists because Jamf Pro accepts any bytes and the device is the first to
+// reject them.
+func TestAccAction_ProSetWallpaper_BadImageFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    location       = "lock_screen"
+    image          = base64encode("not an image")
+  }
+}`, "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Wallpaper Image.*PNG`),
+		}},
+	})
+}
+
+func TestAccAction_ProSetWallpaper_BadLocationFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    location       = "desktop"
+    image          = %q
+  }
+}`, onePixelPNG), "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value.*lock_screen`),
+		}},
+	})
+}
+
+// TestAccAction_ProSetWallpaper_UnknownSerialFails covers the failure Jamf Pro
+// cannot attribute: an unmatched device answers "Unable to match mobile_device"
+// without naming it, so the action names the serials it sent.
+func TestAccAction_ProSetWallpaper_UnknownSerialFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_wallpaper" "paper" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    location       = "lock_screen"
+    image          = %q
+  }
+}`, onePixelPNG), "action.jamfplatform_pro_set_wallpaper.paper")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`NOSUCHSERIAL0001`),
+		}},
+	})
+}
+
+// accComputerSerial skips the test unless a disposable computer is declared.
+func accComputerSerial(t *testing.T) string {
+	t.Helper()
+	serial := testhelpers.AccEnv(envComputerSerial)
+	if serial == "" {
+		t.Skipf("%s not set; skipping computer command acceptance test", envComputerSerial)
+	}
+	testhelpers.AccPreCheck(t)
+	return serial
+}
+
+// TestAccAction_ProClearPasscode_LooksUpTheToken leaves unlock_token out, so the
+// action reads it from the device's inventory. A simulated device holds one.
+func TestAccAction_ProClearPasscode_LooksUpTheToken(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_clear_passcode" "clear" {
+  config {
+    serial_number = %q
+  }
+}`, serial), "action.jamfplatform_pro_clear_passcode.clear")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProClearPasscode_ExplicitToken skips the lookup. Jamf Pro does
+// not validate the token, so a placeholder is accepted.
+func TestAccAction_ProClearPasscode_ExplicitToken(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_clear_passcode" "clear" {
+  config {
+    serial_number = %q
+    unlock_token  = "dGVzdA=="
+  }
+}`, serial), "action.jamfplatform_pro_clear_passcode.clear")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProClearPasscode_BothSelectorsFail(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_clear_passcode" "clear" {
+  config {
+    serial_number = "NOSUCHSERIAL0001"
+    management_id = "00000000-0000-0000-0000-000000000000"
+  }
+}`, "action.jamfplatform_pro_clear_passcode.clear")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Combination.*\[management_id,serial_number\]`),
+		}},
+	})
+}
+
+func TestAccAction_ProClearPasscode_UnknownSerialFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_clear_passcode" "clear" {
+  config {
+    serial_number = "NOSUCHSERIAL0001"
+  }
+}`, "action.jamfplatform_pro_clear_passcode.clear")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`NOSUCHSERIAL0001`),
+		}},
+	})
+}
+
+func TestAccAction_ProSetRecoveryLock_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_recovery_lock" "lock" {
+  config {
+    serial_numbers = [%q]
+    password       = "tf-acc-Recovery-1"
+  }
+}`, serial), "action.jamfplatform_pro_set_recovery_lock.lock")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProClearRecoveryLock_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_clear_recovery_lock" "unlock" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_clear_recovery_lock.unlock")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProSetRecoveryLock_EmptyPasswordFails asserts that an empty
+// password is refused here. Jamf Pro would take it as a request to clear the
+// lock, so clearing has its own action.
+func TestAccAction_ProSetRecoveryLock_EmptyPasswordFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_set_recovery_lock" "lock" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    password       = ""
+  }
+}`, "action.jamfplatform_pro_set_recovery_lock.lock")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value.*at least 1`),
+		}},
+	})
+}
+
+func TestAccAction_ProSetAutoAdminPassword_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_auto_admin_password" "admin" {
+  config {
+    serial_number = %q
+    guid          = "00000000-0000-0000-0000-000000000000"
+    password      = "tf-acc-Admin-1"
+  }
+}`, serial), "action.jamfplatform_pro_set_auto_admin_password.admin")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProSetAutoAdminPassword_NeedsAGUID(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_set_auto_admin_password" "admin" {
+  config {
+    serial_number = "NOSUCHSERIAL0001"
+    password      = "tf-acc-Admin-1"
+  }
+}`, "action.jamfplatform_pro_set_auto_admin_password.admin")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Missing required argument.*guid`),
+		}},
+	})
+}
+
+func TestAccAction_ProLockDevice_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_lock_device" "lock" {
+  config {
+    serial_numbers = [%q]
+    message        = "This device is locked."
+    phone_number   = "+1 555 0100"
+    pin            = "123456"
+  }
+}`, serial), "action.jamfplatform_pro_lock_device.lock")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProLockDevice_ShortPinFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_lock_device" "lock" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    pin            = "12345"
+  }
+}`, "action.jamfplatform_pro_lock_device.lock")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value Length.*6`),
+		}},
+	})
+}
+
+func TestAccAction_ProDeleteUser_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_delete_user" "remove" {
+  config {
+    serial_numbers = [%q]
+    user_name      = "tf-acc-user"
+    force_deletion = true
+  }
+}`, serial), "action.jamfplatform_pro_delete_user.remove")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProDeleteUser_NeedsOneChoice asserts the plan-time rule that
+// stands in for validation Jamf Pro does not do: it accepted neither a user nor
+// delete-all, and both together.
+func TestAccAction_ProDeleteUser_NeedsOneChoice(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	for name, body := range map[string]string{
+		"neither": ``,
+		"both":    `user_name = "tf-acc-user"` + "\n    " + `delete_all_users = true`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_delete_user" "remove" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    %s
+  }
+}`, body), "action.jamfplatform_pro_delete_user.remove")
+
+			resource.Test(t, resource.TestCase{
+				ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+				Steps: []resource.TestStep{{
+					Config:      config,
+					ExpectError: regexp.MustCompile(`(?s)(Missing Attribute Configuration|Invalid Attribute Combination).*\[user_name,delete_all_users\]`),
+				}},
+			})
+		})
+	}
+}
+
+func TestAccAction_ProDeleteUser_DeleteAllFalseFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_delete_user" "remove" {
+  config {
+    serial_numbers   = ["NOSUCHSERIAL0001"]
+    delete_all_users = false
+  }
+}`, "action.jamfplatform_pro_delete_user.remove")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value.*true`),
+		}},
+	})
+}
+
+func TestAccAction_ProEnableRemoteDesktop_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_enable_remote_desktop" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_enable_remote_desktop.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProDisableRemoteDesktop_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_disable_remote_desktop" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_disable_remote_desktop.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProClearRestrictionsPassword_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_clear_restrictions_password" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_clear_restrictions_password.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProLogOutUser_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_log_out_user" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_log_out_user.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProUnlockUserAccount_Invoke(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_unlock_user_account" "cmd" {
+  config {
+    serial_numbers = [%q]
+    user_name      = "tf-acc-user"
+  }
+}`, serial), "action.jamfplatform_pro_unlock_user_account.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProTriggerEnhancedLogCollection_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_trigger_enhanced_log_collection" "cmd" {
+  config {
+    serial_numbers = [%q]
+    apple_care_token = "dGYtYWNjLXRva2Vu"
+  }
+}`, serial), "action.jamfplatform_pro_trigger_enhanced_log_collection.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProCancelEnhancedLogCollection_Invoke(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_cancel_enhanced_log_collection" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_cancel_enhanced_log_collection.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProEnableRemoteDesktop_MobileDeviceFails covers the one
+// platform check Jamf Pro makes on these commands: Remote Desktop is for
+// computers, and a mobile device is refused with a message that says so.
+func TestAccAction_ProEnableRemoteDesktop_MobileDeviceFails(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_enable_remote_desktop" "cmd" {
+  config {
+    serial_numbers = [%q]
+  }
+}`, serial), "action.jamfplatform_pro_enable_remote_desktop.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)only supported for computers`),
+		}},
+	})
+}
+
+func TestAccAction_ProUnlockUserAccount_BlankNameFails(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := fireConfig(`
+action "jamfplatform_pro_unlock_user_account" "cmd" {
+  config {
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    user_name      = "  "
+  }
+}`, "action.jamfplatform_pro_unlock_user_account.cmd")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Invalid Attribute Value.*visible`),
 		}},
 	})
 }
