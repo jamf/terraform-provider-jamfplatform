@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetZtnaGatewayV1",
 	"UpdateZtnaGatewayV1",
 	"DeleteZtnaGatewayV1",
+	"ListZtnaGatewaysV1",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown section

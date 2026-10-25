@@ -60,3 +60,49 @@ func TestAccResource_SecurityCloudDNSZone_DomainCollision(t *testing.T) {
 		},
 	})
 }
+
+func TestAccResource_SecurityCloudDNSZone_NameCollisionIsStrictOnly(t *testing.T) {
+	testhelpers.AccPreCheckSecurityCloud(t)
+	gateways := testhelpers.RequireSecurityCloudSharedGatewayIDs(t, 1)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-collide-name-" + suffix
+
+	config := func(providerBlock string) string {
+		return providerBlock + fmt.Sprintf(`
+			resource "jamfplatform_security_cloud_dns_zone" "test" {
+				name    = %q
+				domains = [%q]
+
+				authoritative_name_servers = [
+					{
+						ip_address = %q
+						gateway_id = %q
+					},
+				]
+			}
+		`, strings.ToUpper(name), "tf-acc-collide-other-"+suffix+".example.com", testNameServerIPTwo, gateways[0])
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				PreConfig: func() {
+					testhelpers.CreateOutOfBandSecurityCloudDNSZone(t, name, "tf-acc-collide-name-"+suffix+".example.com", gateways[0], testNameServerIPOne)
+				},
+				Config: config(`
+					provider "jamfplatform" {
+						name_collision_check = { include_unenforced = true }
+					}
+				`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+exists\s+in\s+Jamf\s+Security\s+Cloud.*accepts\s+duplicates`),
+			},
+			{
+				Config:             config(""),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
