@@ -4,6 +4,7 @@
 package conformance
 
 import (
+	"context"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -12,6 +13,10 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+
+	jamfprovider "github.com/jamf/terraform-provider-jamfplatform/internal/provider"
 )
 
 var constructRe = regexp.MustCompile("`(jamfplatform_[a-z0-9_]+)`")
@@ -168,13 +173,10 @@ func TestNameCollisionGuide_ListsEveryCheckedConstruct(t *testing.T) {
 	}
 }
 
-// TestNameCollisionGuide_UncheckedTypesHaveNoCheck keeps the "not checked" list
-// honest: a construct named there that later gains a collision.go must move to
-// the checked table.
-func TestNameCollisionGuide_UncheckedTypesHaveNoCheck(t *testing.T) {
-	pkgs := collisionPackages(t)
-	listed := 0
-	for line := range strings.SplitSeq(guideSection(t, "Object types that are not checked"), "\n") {
+func guideUncheckedConstructs(t *testing.T) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	for _, line := range strings.Split(guideSection(t, "Object types that are not checked"), "\n") {
 		if !strings.HasPrefix(line, "|") {
 			continue
 		}
@@ -183,13 +185,85 @@ func TestNameCollisionGuide_UncheckedTypesHaveNoCheck(t *testing.T) {
 			continue
 		}
 		for _, m := range constructRe.FindAllStringSubmatch(cells[1], -1) {
-			listed++
-			if _, ok := pkgs[m[1]]; ok {
-				t.Errorf("%s is listed as not checked but has a collision.go", m[1])
-			}
+			out[m[1]] = true
 		}
 	}
-	if listed == 0 {
+	if len(out) == 0 {
 		t.Fatal("parsed no constructs from the not-checked table; the parser is likely matching nothing")
+	}
+	return out
+}
+
+func registeredResourceTypeNames(t *testing.T) []string {
+	t.Helper()
+	ctx := context.Background()
+	p := jamfprovider.New("test")()
+	var names []string
+	for _, newResource := range p.Resources(ctx) {
+		var resp resource.MetadataResponse
+		newResource().Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "jamfplatform"}, &resp)
+		names = append(names, resp.TypeName)
+	}
+	return names
+}
+
+// TestNameCollisionGuide_CoversEveryRegisteredResource closes the loop the other
+// two tests leave open. Every resource the provider registers must be either
+// checked, with a row in the checked table, or listed in the not-checked table
+// with its reason. A new construct that is neither fails here, so the collision
+// question is asked of it once and the answer is written down. A construct in
+// both tables, or listed but no longer registered, fails too.
+func TestNameCollisionGuide_CoversEveryRegisteredResource(t *testing.T) {
+	checked := nameCollisionGuideRows(t)
+	unchecked := guideUncheckedConstructs(t)
+	registered := registeredResourceTypeNames(t)
+
+	registeredSet := map[string]bool{}
+	var unaccounted []string
+	for _, name := range registered {
+		registeredSet[name] = true
+		_, isChecked := checked[name]
+		if !isChecked && !unchecked[name] {
+			unaccounted = append(unaccounted, name)
+		}
+	}
+	sort.Strings(unaccounted)
+	if len(unaccounted) > 0 {
+		t.Errorf("registered resources in neither guide table. Wire the collision check (STYLE_GUIDE §Plan-time name collision check) or list them under %q: %v", "Object types that are not checked", unaccounted)
+	}
+
+	var both, stale []string
+	for name := range unchecked {
+		if _, ok := checked[name]; ok {
+			both = append(both, name)
+		}
+		if !registeredSet[name] {
+			stale = append(stale, name)
+		}
+	}
+	for name := range checked {
+		if !registeredSet[name] {
+			stale = append(stale, name)
+		}
+	}
+	sort.Strings(both)
+	sort.Strings(stale)
+	if len(both) > 0 {
+		t.Errorf("constructs in both guide tables: %v", both)
+	}
+	if len(stale) > 0 {
+		t.Errorf("guide lists constructs the provider does not register: %v", stale)
+	}
+}
+
+// TestNameCollisionGuide_UncheckedTypesHaveNoCheck keeps the not-checked list
+// honest: a construct named there that later gains a collision.go must move to
+// the checked table.
+func TestNameCollisionGuide_UncheckedTypesHaveNoCheck(t *testing.T) {
+	pkgs := collisionPackages(t)
+	for name := range guideUncheckedConstructs(t) {
+		if _, ok := pkgs[name]; ok {
+			t.Errorf("%s is listed as not checked but has a collision.go", name)
+		}
 	}
 }

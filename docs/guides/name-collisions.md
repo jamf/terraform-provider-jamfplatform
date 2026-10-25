@@ -138,21 +138,20 @@ One row per construct. "Checked by default" lists the keys the service refuses a
 
 ## Object types that are not checked
 
-| Construct | Why |
+Every other construct in the provider is listed here with the reason. A test fails when a construct is in neither table, so a new one has to be wired or listed.
+
+| Constructs | Why |
 |---|---|
-| Settings and branding singletons (access management, app installer, app request, computer check-in and inventory collection, impact alert notifications, Jamf Connect, Jamf Parent and Teacher, local admin password, login page, macOS onboarding, MDM profile, re-enrollment, return to service, self service, service discovery, SMTP server, SSO settings and failover URL, user-initiated enrollment, GSX connection, Jamf Protect, managed software updates, activation code) | One record per tenant, so no second object can take the name. |
+| `jamfplatform_pro_access_management_settings`, `jamfplatform_pro_activation_code`, `jamfplatform_pro_app_installer_settings`, `jamfplatform_pro_app_request_settings`, `jamfplatform_pro_computer_check_in_settings`, `jamfplatform_pro_computer_inventory_collection_settings`, `jamfplatform_pro_gsx_connection_settings`, `jamfplatform_pro_impact_alert_notification_settings`, `jamfplatform_pro_jamf_connect`, `jamfplatform_pro_jamf_parent_settings`, `jamfplatform_pro_jamf_protect`, `jamfplatform_pro_jamf_teacher_settings`, `jamfplatform_pro_local_admin_password_settings`, `jamfplatform_pro_login_page_settings`, `jamfplatform_pro_macos_onboarding`, `jamfplatform_pro_managed_software_update`, `jamfplatform_pro_mdm_profile_settings`, `jamfplatform_pro_re_enrollment_settings`, `jamfplatform_pro_return_to_service`, `jamfplatform_pro_self_service_branding_ios`, `jamfplatform_pro_self_service_branding_macos`, `jamfplatform_pro_self_service_macos_settings`, `jamfplatform_pro_self_service_plus_settings`, `jamfplatform_pro_service_discovery_enrollment`, `jamfplatform_pro_smtp_server`, `jamfplatform_pro_sso_failover_url`, `jamfplatform_pro_sso_settings`, `jamfplatform_pro_user_initiated_enrollment_settings`, `jamfplatform_pro_volume_purchasing_notification` | Settings with one record per tenant, so no second object can take a name. |
 | `jamfplatform_pro_cloud_distribution_point`, `jamfplatform_pro_pki_json_web_token_configuration`, `jamfplatform_security_cloud_uem_connect` | One per tenant. A create against an existing one is refused, and the resources already point you at an import. |
 | `jamfplatform_security_cloud_dns_search_domain`, `jamfplatform_security_cloud_dns_hostname_mappings` | The whole tenant setting is replaced with `PUT`, so there is no create. |
 | `jamfplatform_pro_computer_invitation`, `jamfplatform_pro_mobile_device_invitation` | The service mints the invitation code and ignores the one you supply. |
-| `jamfplatform_pro_automated_device_enrollment`, `jamfplatform_pro_location` | A duplicate collides on the server token or the Apple location behind it, not on the name. |
+| `jamfplatform_pro_automated_device_enrollment`, `jamfplatform_pro_volume_purchasing_location` | A duplicate collides on the server token or the Apple location behind it, not on the name. |
 | `jamfplatform_security_cloud_activation_profile` | A read returns only the profile code, with no name to compare. |
 | `jamfplatform_account_sso_connection` | Jamf Account appends a random suffix to every connection name, so the stored name never equals the planned one. |
 | `jamfplatform_pro_pki_adcs`, `jamfplatform_pro_pki_digicert`, `jamfplatform_pro_pki_venafi` | The provider has no way to list existing integrations, so there is nothing to compare against. |
-| `jamfplatform_pro_mobile_device_provisioning_profile` | Not probed. |
+| `jamfplatform_pro_mobile_device_provisioning_profile` | Not probed. Checking it needs a valid `.mobileprovision` file. |
 | `jamfplatform_pro_icon`, `jamfplatform_pro_self_service_branding_image` | Uploads with no name key. |
-
-
-Smart groups, static groups and Platform device groups of one device type share one pool of names, so a new computer group is checked against all three. Computer groups and mobile device groups are separate pools, so the same name can exist once in each. `jamfplatform_device_group` is checked against the pool for its own `device_type`.
 
 ## Values that are not known at plan time
 
