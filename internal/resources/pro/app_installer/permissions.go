@@ -26,6 +26,7 @@ var resourceSDKMethods = []string{
 	"UpdateAppInstallerDeploymentV1",
 	"DeleteAppInstallerDeploymentV1",
 	"ListAppInstallerTitlesV1",
+	"ListAppInstallerDeploymentsV1",
 }
 
 // resourcePrivileges is the rendered "Required Jamf privileges" Markdown

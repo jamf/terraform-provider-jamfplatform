@@ -7,7 +7,11 @@
 //   pro.UpdateAppInstallerDeploymentV1 (PUT  /v1/app-installers/deployments/{id})
 //   pro.DeleteAppInstallerDeploymentV1 (DELETE)
 //   pro.ListAppInstallerTitlesV1       (whole catalog: name → id and id → name, cached)
-//   pro.ListAppInstallerDeploymentsV1  (list resource / plural data source / name lookup)
+//   pro.ListAppInstallerDeploymentsV1  (list resource / plural data source / name lookup / collision check in collision.go)
+//
+// Uniqueness: name, not enforced; duplicates stored; checked only with
+// include_unenforced. The strict comparison ignores case, trailing spaces and
+// accents.
 //
 // Status: current. Last reviewed 2026-09-03.
 //

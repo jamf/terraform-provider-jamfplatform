@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -51,8 +52,9 @@ const (
 // app_title_id reverse-resolve on refresh — so a plan over N deployments reads the
 // catalog once rather than 2N times.
 type AppInstallerResource struct {
-	client *pro.Client
-	titles *providerdata.AppTitleCatalogCache
+	client     *pro.Client
+	titles     *providerdata.AppTitleCatalogCache
+	collisions *collision.Checker
 }
 
 var (
@@ -324,6 +326,7 @@ func (r *AppInstallerResource) Configure(ctx context.Context, req resource.Confi
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 	r.titles = providerdata.ConfigureAppTitleCatalog(req.ProviderData, readAppTitleCatalog)
 }
 
@@ -339,6 +342,8 @@ func (r *AppInstallerResource) ModifyPlan(ctx context.Context, req resource.Modi
 	if req.Plan.Raw.IsNull() {
 		return
 	}
+
+	r.reportNameCollision(ctx, req, resp)
 
 	var plan AppInstallerResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)

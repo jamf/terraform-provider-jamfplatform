@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
@@ -44,8 +45,9 @@ const minJamfProVersion = ""
 type MobileAppResource struct {
 	// impact backs the plan-time impact alert on scope changes. nil when the
 	// provider's impact_alerts attribute is off, which is the default.
-	impact *impact.Cache
-	client *proclassic.Client
+	impact     *impact.Cache
+	client     *proclassic.Client
+	collisions *collision.Checker
 	// ldapSearcher backs the plan-time directory-service user-group preflight in
 	// ModifyPlan. The LDAP group search is a Pro (v1) endpoint, so it is a
 	// separate client from the ProClassic CRUD client. nil until Configure runs.
@@ -253,6 +255,7 @@ func (r *MobileAppResource) Configure(ctx context.Context, req resource.Configur
 	}
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 
 	proClient, proDiags := providerdata.ConfigurePro(ctx, req.ProviderData, minJamfProVersion, "jamfplatform_pro_mobile_device_app")
 	resp.Diagnostics.Append(proDiags...)
@@ -280,6 +283,7 @@ func (r *MobileAppResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	// Runs ahead of any guard below: an object entering or leaving management
 	// changes what its scope receives, so creates and destroys are reported too.
 	r.reportScopeImpact(ctx, req, resp)
+	r.reportNameCollision(ctx, req, resp)
 
 	if r.ldapSearcher == nil || req.Plan.Raw.IsNull() {
 		return

@@ -10,7 +10,7 @@ import (
 )
 
 // resourceSDKMethods lists the SDK methods the App Request form field resource's
-// CRUD path calls. It mirrors the "SDK endpoints used" block in crud.go and drives
+// CRUD path and collision check call. It mirrors the "SDK endpoints used" block in crud.go and drives
 // the "Required Jamf permissions" table appended to the resource MarkdownDescription.
 // permissions_test.go asserts this list stays in sync with the actual
 // client.<Method> calls in crud.go and with the SDK privilege registry.
@@ -19,6 +19,7 @@ var resourceSDKMethods = []string{
 	"GetAppRequestFormInputFieldV1",
 	"UpdateAppRequestFormInputFieldV1",
 	"DeleteAppRequestFormInputFieldV1",
+	"ListAppRequestFormInputFieldsV1",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown section

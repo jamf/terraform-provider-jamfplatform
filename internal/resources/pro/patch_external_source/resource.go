@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -35,11 +36,13 @@ const minJamfProVersion = ""
 // PatchExternalSourceResource implements the Terraform resource for Jamf ProClassic
 // patch external sources.
 type PatchExternalSourceResource struct {
-	client *proclassic.Client
+	client     *proclassic.Client
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &PatchExternalSourceResource{}
 var _ resource.ResourceWithImportState = &PatchExternalSourceResource{}
+var _ resource.ResourceWithModifyPlan = &PatchExternalSourceResource{}
 var _ resource.ResourceWithIdentity = &PatchExternalSourceResource{}
 
 const (
@@ -147,9 +150,16 @@ func (r *PatchExternalSourceResource) Configure(ctx context.Context, req resourc
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro patch external source ID.
 func (r *PatchExternalSourceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ModifyPlan reports a name that another object of this type already holds, when
+// the provider's name_collision_check enables the strict check.
+func (r *PatchExternalSourceResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 }
