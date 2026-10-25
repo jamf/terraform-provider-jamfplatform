@@ -47,8 +47,8 @@ func planUploadedContentChange(ctx context.Context, req resource.ModifyPlanReque
 	if !isConfiguredString(source) || files.URLSource(source.ValueString()) {
 		return
 	}
-	var stateSha3, stateSha256, stateMD5 types.String
-	for name, dst := range map[string]*types.String{"sha3_512": &stateSha3, "sha256": &stateSha256, "md5": &stateMD5} {
+	var stateSha3, stateSha256, stateMD5, stateSize types.String
+	for name, dst := range map[string]*types.String{"sha3_512": &stateSha3, "sha256": &stateSha256, "md5": &stateMD5, "size": &stateSize} {
 		if diags := req.State.GetAttribute(ctx, path.Root(name), dst); diags.HasError() {
 			return
 		}
@@ -61,13 +61,13 @@ func planUploadedContentChange(ctx context.Context, req resource.ModifyPlanReque
 	}
 	defer cleanup()
 
-	local, _, err := hashStream(file)
+	local, localSize, err := hashStream(file)
 	if err != nil {
 		tflog.Debug(ctx, "package content check skipped: source not hashable at plan time", map[string]any{"err": err.Error()})
 		return
 	}
 	recorded := fileDigests{sha3: stateSha3.ValueString(), sha256: stateSha256.ValueString(), md5: stateMD5.ValueString()}
-	if recorded.matches(local) {
+	if recorded.sameContent(local, stateSize.ValueString(), localSize) {
 		return
 	}
 

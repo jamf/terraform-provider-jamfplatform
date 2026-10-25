@@ -69,6 +69,28 @@ var errUploadFailed = errors.New("server reported size=0 immediately after the u
 // deadline fires before convergence.
 var errVerificationTimeout = errors.New("verification poll timed out waiting for the distribution point to compute a hash")
 
+// verifyGrace is how long a package that is READY at the uploaded file's size
+// gets to show a hash before the upload is reported as unverified. Jamf Pro
+// computes no hash for some large packages, so waiting out the full create or
+// update timeout would only delay an outcome that cannot change. It is a
+// variable so tests can shorten it.
+var verifyGrace = 20 * time.Second
+
+// unverifiedError is a package that uploaded and is READY at the right size
+// but could not be integrity-checked because Jamf Pro computed no hash for it.
+// It is a warning, not a failure: the binary is on the distribution point.
+type unverifiedError struct{ reason string }
+
+func (e *unverifiedError) Error() string { return e.reason }
+
+// packageVerifier is the pair of SDK calls the verification poll makes, named as
+// an interface so the loop is unit-testable without a live tenant. *pro.Client
+// satisfies it.
+type packageVerifier interface {
+	RefreshCloudDistributionPointInventoryV1(ctx context.Context, fileName string) error
+	GetPackageV1(ctx context.Context, id string) (*pro.Package, error)
+}
+
 // fileDigests holds the digests of one package file. Locally all three are
 // computed. On the server each is filled only by the distribution points that
 // compute it: JCDS fills all three, an Amazon S3 distribution point MD5 only.
@@ -125,6 +147,48 @@ func recordedDigestsFromState(m *PackageResourceModel) fileDigests {
 		sha256: strings.ToLower(m.Sha256.ValueString()),
 		md5:    strings.ToLower(m.Md5.ValueString()),
 	}
+}
+
+// sameContent reports whether the record holds the bytes local describes. With
+// a recorded digest the strongest one decides. A record with none, which is what
+// Jamf Pro keeps for a large package it never hashes, can only be judged by
+// size: an identical byte count is taken as unchanged, because nothing else is
+// available to say otherwise, and a record with no size is never a match.
+func (d fileDigests) sameContent(local fileDigests, recordedSize string, localSize int64) bool {
+	if d.strongest() >= 0 {
+		return d.matches(local)
+	}
+	return recordedSize != "" && recordedSize == strconv.FormatInt(localSize, 10)
+}
+
+// unverifiableTick reports whether the record looks like a package Jamf Pro will
+// not hash: the transfer is READY at the uploaded file's size and no digest is
+// populated. A digest that is populated but stale is not matched here, because
+// a hash still arriving is indistinguishable from one that never will, and the
+// poll keeps waiting for it. A zero-byte upload is excluded so the existing
+// empty-package convergence is untouched.
+func unverifiableTick(server fileDigests, status, curSize string, expectSize int64) bool {
+	return expectSize > 0 &&
+		server.strongest() < 0 &&
+		status == cloudStatusReady &&
+		curSize == strconv.FormatInt(expectSize, 10)
+}
+
+// newUnverifiedError explains why a READY package could not be verified, telling
+// a create, a replace that cleared the previous hash, and a replace of identical
+// size apart. previous and previousSize describe the record before the upload.
+func newUnverifiedError(fileName string, size int64, previous fileDigests, previousSize string) *unverifiedError {
+	sizeText := strconv.FormatInt(size, 10)
+	var why string
+	switch {
+	case previousSize == sizeText:
+		why = fmt.Sprintf("Jamf Pro replaced %s with a file of the same size (%s bytes), so the size cannot confirm the replace, and computed no new hash.", fileName, sizeText)
+	case previous.strongest() >= 0:
+		why = fmt.Sprintf("Jamf Pro replaced %s and reports it as ready at the new size (%s bytes) but computed no new hash. The previous hash was cleared.", fileName, sizeText)
+	default:
+		why = fmt.Sprintf("Jamf Pro reports %s as ready at the uploaded size (%s bytes) but computed no hash for it.", fileName, sizeText)
+	}
+	return &unverifiedError{reason: why + " The upload is not integrity-verified. Jamf Pro does not hash some large packages. Compare the file against your source before relying on it."}
 }
 
 // digester computes all three digests of a stream in one pass.
@@ -209,7 +273,14 @@ func hashStream(r io.Reader) (fileDigests, int64, error) {
 //
 // local is the digest set of the file we just uploaded; previous is the digest
 // set stored before the upload, so a "still-recomputing" view does not trip the
-// corruption check.
+// corruption check. previousSize is the record's size before the upload, empty
+// on Create.
+//
+// Jamf Pro computes no hash for some large packages even once they are READY.
+// When the transfer is READY at the uploaded size and the record still holds no
+// digest, the poll allows verifyGrace and then returns an *unverifiedError
+// instead of waiting out the caller's timeout. A digest that is present but
+// wrong is still errCorruption, and a digest that is stale keeps the poll waiting.
 //
 // Each tick performs:
 //
@@ -218,20 +289,23 @@ func hashStream(r io.Reader) (fileDigests, int64, error) {
 //  2. GetPackageV1(id) — observe convergence.
 //
 // Returns the converged *pro.Package on success.
-func PollPackageVerification(ctx context.Context, client *pro.Client, id, fileName string, local fileDigests, expectSize int64, previous fileDigests) (*pro.Package, error) {
+func PollPackageVerification(ctx context.Context, client *pro.Client, id, fileName string, local fileDigests, expectSize int64, previous fileDigests, previousSize string) (*pro.Package, error) {
 	if client == nil {
 		return nil, errors.New("PollPackageVerification: nil client")
 	}
+	return pollPackageVerification(ctx, client, pollInterval, verifyGrace, id, fileName, local, expectSize, previous, previousSize)
+}
 
-	// First iteration runs immediately — no initial wait. Subsequent ticks
-	// honour pollInterval.
-	ticker := time.NewTicker(pollInterval)
+// pollPackageVerification is PollPackageVerification with the cadence and the
+// unverified grace passed in, so the loop is testable against a fake verifier.
+func pollPackageVerification(ctx context.Context, client packageVerifier, interval, grace time.Duration, id, fileName string, local fileDigests, expectSize int64, previous fileDigests, previousSize string) (*pro.Package, error) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	var graceStart time.Time
 	tick := 0
 	for {
 		tick++
-		// Honour ctx cancellation before each tick.
 		if err := ctx.Err(); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				return nil, errVerificationTimeout
@@ -239,9 +313,6 @@ func PollPackageVerification(ctx context.Context, client *pro.Client, id, fileNa
 			return nil, err
 		}
 
-		// Nudge the CDP. fileName drives a targeted recompute; ignore the
-		// error and treat the subsequent GET as authoritative — if the
-		// refresh fails transiently, the next tick will retry.
 		_ = client.RefreshCloudDistributionPointInventoryV1(ctx, fileName)
 
 		pkg, err := client.GetPackageV1(ctx, id)
@@ -278,9 +349,17 @@ func PollPackageVerification(ctx context.Context, client *pro.Client, id, fileNa
 			return nil, fmt.Errorf("%w: expected %s, server reported %s", errCorruption, local.sha3, server.sha3)
 		}
 
-		// Wait for the next tick. The first iteration's refresh+GET has
-		// already fired above; subsequent iterations wait for the ticker
-		// to honour pollInterval before retrying.
+		if unverifiableTick(server, status, sizeStr, expectSize) {
+			if graceStart.IsZero() {
+				graceStart = time.Now()
+			}
+			if time.Since(graceStart) >= grace {
+				return nil, newUnverifiedError(fileName, expectSize, previous, previousSize)
+			}
+		} else {
+			graceStart = time.Time{}
+		}
+
 		select {
 		case <-ctx.Done():
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -288,7 +367,6 @@ func PollPackageVerification(ctx context.Context, client *pro.Client, id, fileNa
 			}
 			return nil, ctx.Err()
 		case <-ticker.C:
-			// next iteration
 		}
 	}
 }
