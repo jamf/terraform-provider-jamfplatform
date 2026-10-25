@@ -80,7 +80,7 @@ A build cannot start from the SDK alone. Gather, and stop and ask for whatever i
 3. **SDK audit** — every function in §1 exists with concrete field types. ProClassic: run the
    payload audit gate before any Terraform code.
 4. **STYLE_GUIDE read** — §5(a) below, *before* the spike, not after.
-5. **Wire-probe** and write a one-page spike doc at `spike/<RESOURCE>_SPIKE.md` (gitignored).
+5. **Wire-probe** (including the uniqueness probe in `references/wire-probes.md`) and write a one-page spike doc at `spike/<RESOURCE>_SPIKE.md` (gitignored).
    Every non-trivial decision **cites the governing STYLE_GUIDE section**; an uncited decision
    is the flag to re-check. Open questions numbered, each with the default you will adopt if
    unanswered. Unrun probes marked NOT-PROBED with the reason — never a plausible-looking
@@ -95,7 +95,9 @@ A build cannot start from the SDK alone. Gather, and stop and ask for whatever i
    schemas at 3 consumers, non-trivial code helpers at 2). If a trigger fires mid-build, ship
    the extraction as a **separate prior commit**. Extracting tends to expose a bug the
    duplication was hiding — expect that, and check for it.
-10. **Register** in `internal/provider/provider.go`.
+10. **Register** in `internal/provider/provider.go`. A construct with a create path also gets its
+    plan-time name collision check (`collision.go`, [STYLE_GUIDE §Plan-time name collision check](../../../STYLE_GUIDE.md#plan-time-name-collision-check))
+    and a row in `templates/guides/name-collisions.md`; a conformance test fails the build without the row.
 11. **Tests** — `references/acceptance.md`. Unit tests always; acceptance coverage per
     [TESTING.md §Writing Acceptance Tests](../../../TESTING.md#writing-acceptance-tests).
 12. **Examples** under `examples/{resources,data-sources,list-resources,actions,functions}/<name>/`.
@@ -119,6 +121,7 @@ Each of these has been paid for late at least once. The right-hand column is wha
 | Wire-probe collection write semantics (omit / `[]` / present) | before modelling any collection | silent data loss, discovered by a user |
 | Enum vocabulary from the SDK's `*Values()` helper | at schema time | a restated list that drifts from the API |
 | `make generate` | after the **last** HCL edit | ships a stale, sometimes invalid, inlined example |
+| Uniqueness probe (create twice; same name, upper case, trailing space, `é`) | with the wire probes | a 409 at apply that `terraform plan` could have named, or two same-named objects nobody was warned about |
 | Description jargon grep | before the PR | wire vocabulary published to the Terraform Registry |
 | Description prose gate (em dash, bold run-in label, stock clause) | before the PR | generated-sounding docs on the Terraform Registry, and a de-slop sweep across every package later |
 | Plumbing (`GNUmakefile`, `.github/workflows/**`, `go.mod`, `scripts/acctargets/**`) in its own PR | from the start | `acctargets` widens CI to `./...` — the full serial suite on the shared tenant |
@@ -186,7 +189,7 @@ mirror the admin UI, §User-facing descriptions are UI-aligned; §Sets vs Lists 
 nested collections are `types.List`**); §Server-derived computed fields & `Optional+Computed`;
 §`SingleNestedAttribute` blocks: Optional-only with typed-pointer models; §Cross-field
 validation; §Plaintext secrets `WriteOnly` / §Server-minted secrets `Computed+Sensitive`;
-§ID type handling; §Import format; §Delete semantics; §Shared abstractions. ProClassic adds
+§ID type handling; §Import format; §Delete semantics; §Plan-time name collision check; §Shared abstractions. ProClassic adds
 §Classic XML PUT merge where empty clears, §Classic sub-collections, §Field-order-sensitive
 classic write payloads, §Form-decoded classic input fields.
 
@@ -211,6 +214,7 @@ Judge the hits: "Jamf Pro rejects…" as product framing is fine, protocol frami
 - ✅ Acceptance coverage complete per `references/acceptance.md` — no "deferred to follow-up".
 - ✅ `make fix fmt lint test` clean; `make generate` run after the last HCL edit; `docs/` committed.
 - ✅ §5(c) re-check passed, including the description grep; quality gate passed.
+- ✅ Name collision check wired (or the reason for none recorded), with its guide row and acceptance test.
 - ✅ Planner row/card flipped; acceptance suite handed to the maintainer to run
   (`feedback_user_runs_acc_tests` — the maintainer runs acceptance, not the agent).
 
