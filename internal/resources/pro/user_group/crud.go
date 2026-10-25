@@ -6,11 +6,13 @@
 //   proclassic.GetUserGroupByID
 //   proclassic.UpdateUserGroupByID
 //   proclassic.DeleteUserGroupByID
-//   proclassic.ListUserGroups            (data source / list resource)
+//   proclassic.ListUserGroups            (data source / list resource / name collision check in collision.go)
 //   proclassic.GetUserGroupByName        (data source name lookup)
 //   proclassic.ResolveUserGroupIDByName  (data source name → ID)
 //
-// Status: current. Last reviewed 2026-05-22.
+// Uniqueness: name, enforced (409 Duplicate name), case-sensitive, surrounding spaces trimmed, accent-sensitive.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package user_group
 
@@ -99,6 +101,8 @@ func (r *UserGroupResource) groupRefWorkaroundApplies(ctx context.Context) bool 
 // Skips create (no prior state) and destroy (no plan); soft — any resolve
 // failure leaves the diff intact.
 func (r *UserGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
+
 	// Runs ahead of the create/destroy guard below: a group entering or leaving
 	// management changes what everything scoped to it applies to.
 	r.reportMembershipImpact(ctx, req, resp)

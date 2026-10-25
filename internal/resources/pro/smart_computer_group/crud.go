@@ -7,13 +7,15 @@
 //   pro.UpdateSmartComputerGroupV3
 //   pro.DeleteSmartComputerGroupV3
 //   pro.GetGroupV2                        (via progroups.JamfProIDForPlatformID, create only)
-//   pro.ListGroupsV2                      (via progroups.PlatformIDsByJamfProID, import and the fallback write)
+//   pro.ListGroupsV2                      (via progroups.PlatformIDsByJamfProID, import and the fallback write; name collision check, via groupcollision)
 //   pro.SearchLdapGroupsV1                (via the shared directory-service group criterion helpers)
 //   proclassic.CreateComputerGroupByID    (fallback create — see below)
 //   proclassic.UpdateComputerGroupByID    (fallback update — see below)
 //   pro.PatchGroupV2                      (fallback description write — see below)
 //   pro.ListSmartComputerGroupsV3         (data sources / list resource)
 //   pro.ResolveSmartComputerGroupV3IDByName (data source name lookup)
+//
+// Uniqueness: name, enforced (422 DUPLICATE_FIELD), case-insensitive only, one pool shared by smart, static and Platform COMPUTER groups. The v3 write is what the check models; the classic fallback trims surrounding spaces and so can only collide more often.
 //
 // Why there are two write paths at all. POST and PUT
 // /pro/v3/computer-groups/smart-groups validate a criterion's name and its
@@ -104,6 +106,7 @@ func classifyWrite(err error) writeOutcome {
 // and destroy cases the suppression pass returns early on. Suppression itself is
 // soft: any resolution failure leaves the diff intact.
 func (r *SmartComputerGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	suppressed := r.suppressEquivalentCriteria(ctx, req, resp)
 	if resp.Diagnostics.HasError() {
 		return

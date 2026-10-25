@@ -39,9 +39,10 @@ import (
 // A rename or a description edit leaves the two sets equal, so Changed stays
 // false and no alert is raised.
 
-// ModifyPlan reports the plan-time impact alert. Nothing else in this resource
-// modifies the plan.
+// ModifyPlan reports a name another computer group already holds, then the
+// plan-time impact alert. Nothing else in this resource modifies the plan.
 func (r *StaticComputerGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	r.reportMembershipImpact(ctx, req, resp)
 }
 

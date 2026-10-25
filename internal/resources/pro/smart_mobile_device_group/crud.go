@@ -11,7 +11,9 @@
 //   pro.PatchGroupV2                              PATCH  /pro/v2/groups/{platformId}              (fallback description write — see below)
 //   pro.ListSmartMobileDeviceGroupsV2                    (plural data source / list resource)
 //   pro.ResolveSmartMobileDeviceGroupV2IDByName          (data source name lookup)
-//   pro.ListGroupsV2                                     (via progroups, platform_id bridge and the fallback create)
+//   pro.ListGroupsV2                                     (via progroups, platform_id bridge and the fallback create; name collision check, via groupcollision)
+//
+// Uniqueness: groupName, enforced (422 DUPLICATE_FIELD), case-, trailing-space- and accent-insensitive, one pool shared by smart, static and Platform MOBILE groups.
 //
 // # Why there are two write paths
 //
@@ -110,6 +112,7 @@ func writeLabel() string {
 // of the resource model cannot carry it. Only the attribute is written back, so
 // a suppression never round-trips the rest of the object.
 func (r *SmartMobileDeviceGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	suppressed := r.suppressEquivalentCriteria(ctx, req, resp)
 	if resp.Diagnostics.HasError() {
 		return
