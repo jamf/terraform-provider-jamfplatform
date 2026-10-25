@@ -98,6 +98,18 @@ Each row is one uniqueness rule. "Refused by the service" says whether the servi
 | `jamfplatform_pro_supervision_identity` | display name | No | case, trailing spaces, accents |
 | `jamfplatform_pro_vpp_assignment` | name | No | case, leading and trailing spaces, accents |
 | `jamfplatform_pro_vpp_invitation` | name | No | case, leading and trailing spaces, accents |
+| `jamfplatform_blueprints_blueprint` | name | No | case, trailing spaces, accents |
+| `jamfplatform_ai_governance_policy` | name | No | case, trailing spaces, accents |
+| `jamfplatform_pro_enrollment_customization` | display name | No | case, trailing spaces, accents |
+| `jamfplatform_pro_computer_prestage_enrollment` | display name | No | case, trailing spaces, accents |
+| `jamfplatform_pro_mobile_device_prestage_enrollment` | display name | No | case, trailing spaces, accents |
+| `jamfplatform_pro_advanced_computer_search` | name | No | case, leading and trailing spaces, accents |
+| `jamfplatform_security_cloud_dns_zone` | name | No | case, trailing spaces, accents |
+| `jamfplatform_security_cloud_ztna_app` | name | No | case, trailing spaces, accents |
+| `jamfplatform_security_cloud_ztna_gateway` | name | No | case, trailing spaces, accents |
+| `jamfplatform_security_cloud_ztna_grouped_gateway` | name | No | case, trailing spaces, accents |
+
+Jamf Security Cloud activation profiles and Jamf Account SSO connections are not checked. An activation profile read returns only its code, with no name to compare, and Jamf Account appends a random suffix to every connection name, so the stored name never equals the planned one.
 
 Smart groups, static groups and Platform device groups of one device type share one pool of names, so a new computer group is checked against all three.
 
