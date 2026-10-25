@@ -17,12 +17,18 @@ import (
 const nameCollisionGuide = "../../templates/guides/name-collisions.md"
 
 var (
-	guideRowRe      = regexp.MustCompile("(?m)^\\|\\s*`(jamfplatform_[a-z0-9_]+)`\\s*\\|[^|]*\\|\\s*(Yes|No)\\s*\\|")
+	guideRowRe      = regexp.MustCompile("(?m)^\\|\\s*`(jamfplatform_[a-z0-9_]+)`\\s*\\|([^|]*)\\|([^|]*)\\|")
 	enforcedLiteral = regexp.MustCompile(`\bEnforced:\s+(true|false)\b`)
 )
 
 type guideRow struct {
-	enforced bool
+	hasDefault bool
+	hasStrict  bool
+}
+
+func keysPresent(cell string) bool {
+	cell = strings.TrimSpace(cell)
+	return cell != "" && cell != "—"
 }
 
 func nameCollisionGuideRows(t *testing.T) map[string][]guideRow {
@@ -33,7 +39,7 @@ func nameCollisionGuideRows(t *testing.T) map[string][]guideRow {
 	}
 	rows := map[string][]guideRow{}
 	for _, m := range guideRowRe.FindAllStringSubmatch(string(body), -1) {
-		rows[m[1]] = append(rows[m[1]], guideRow{enforced: m[2] == "Yes"})
+		rows[m[1]] = append(rows[m[1]], guideRow{hasDefault: keysPresent(m[2]), hasStrict: keysPresent(m[3])})
 	}
 	return rows
 }
@@ -91,15 +97,26 @@ func collisionPackages(t *testing.T) map[string]collisionPackage {
 
 // TestNameCollisionGuide_ListsEveryCheckedConstruct keeps the user guide's table
 // of checked types in step with the code. A package that wires the collision
-// check without a row in the guide, or a row for a construct that no longer has
-// one, fails here, and so does a row whose "Jamf refuses duplicates" cell
-// disagrees with the package's own Enforced setting.
+// check without a row in the guide, a row for a construct that no longer has
+// one, or a second row for one construct, fails here, and so does a row whose
+// key columns disagree with the package's own Enforced settings.
 func TestNameCollisionGuide_ListsEveryCheckedConstruct(t *testing.T) {
 	rows := nameCollisionGuideRows(t)
 	if len(rows) < 10 {
 		t.Fatalf("parsed %d constructs from the guide table; the parser is likely matching nothing", len(rows))
 	}
 	pkgs := collisionPackages(t)
+
+	var duplicated []string
+	for construct, guide := range rows {
+		if len(guide) > 1 {
+			duplicated = append(duplicated, construct)
+		}
+	}
+	sort.Strings(duplicated)
+	if len(duplicated) > 0 {
+		t.Errorf("constructs with more than one row in %s, which keeps one row per construct: %v", nameCollisionGuide, duplicated)
+	}
 
 	var missing, stale []string
 	for construct := range pkgs {
@@ -123,16 +140,14 @@ func TestNameCollisionGuide_ListsEveryCheckedConstruct(t *testing.T) {
 
 	for construct, pkg := range pkgs {
 		guide, ok := rows[construct]
-		if !ok {
+		if !ok || len(guide) == 0 {
 			continue
 		}
-		for _, want := range []bool{true, false} {
-			if !slices.Contains(pkg.enforced, want) {
-				continue
-			}
-			if !slices.ContainsFunc(guide, func(r guideRow) bool { return r.enforced == want }) {
-				t.Errorf("%s sets Enforced: %v but no guide row for it says %s", construct, want, map[bool]string{true: "Yes", false: "No"}[want])
-			}
+		if slices.Contains(pkg.enforced, true) && !guide[0].hasDefault {
+			t.Errorf("%s sets Enforced: true but its guide row lists no key under \"Checked by default\"", construct)
+		}
+		if slices.Contains(pkg.enforced, false) && !guide[0].hasStrict {
+			t.Errorf("%s sets Enforced: false but its guide row lists no key under \"Checked with include_unenforced\"", construct)
 		}
 	}
 }

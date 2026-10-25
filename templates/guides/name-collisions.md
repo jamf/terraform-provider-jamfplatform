@@ -66,48 +66,45 @@ Some object types share one pool of names. Computer groups, for example, share i
 
 ## Checked object types
 
-Each row is one uniqueness rule. "Refused by the service" says whether the service rejects a duplicate. A `Yes` row is checked by default, because the apply would fail anyway. A `No` row is checked only when `include_unenforced` is `true`, and the comparison there is the strict one the provider chose: the service stores every variant.
+One row per construct. "Checked by default" lists the keys the service refuses a duplicate for, so the check is on unless you set `mode = "off"`. "Checked with `include_unenforced`" lists the keys the service accepts duplicates for. The provider compares those strictly, because the service stores every variant.
 
-| Construct | Key | Refused by the service | Compared without regard to |
+| Construct | Checked by default | Checked with `include_unenforced` | Compared without regard to |
 |---|---|---|---|
-| `jamfplatform_pro_category` | name | Yes | case, trailing spaces, accents |
-| `jamfplatform_pro_script` | name | Yes | case, trailing spaces, accents |
-| `jamfplatform_pro_package` | display name | Yes | case, trailing spaces, accents |
-| `jamfplatform_pro_package` | file name | Yes | case, trailing spaces, accents |
-| `jamfplatform_pro_computer_extension_attribute` | name | Yes | case, leading and trailing spaces, accents |
-| `jamfplatform_pro_mobile_device_extension_attribute` | name | Yes | case, leading and trailing spaces, accents |
-| `jamfplatform_pro_macos_configuration_profile` | name | Yes | case, leading and trailing spaces, accents |
-| `jamfplatform_pro_mobile_device_configuration_profile` | name | Yes | case, leading and trailing spaces, accents |
-| `jamfplatform_pro_policy` | name | Yes | case, leading and trailing spaces |
-| `jamfplatform_pro_user_group` | name | Yes | leading and trailing spaces |
-| `jamfplatform_pro_static_computer_group` | name | Yes | case |
-| `jamfplatform_pro_smart_computer_group` | name | Yes | case |
-| `jamfplatform_pro_static_mobile_device_group` | name | Yes | case, trailing spaces, accents |
-| `jamfplatform_pro_smart_mobile_device_group` | name | Yes | case, trailing spaces, accents |
-| `jamfplatform_device_group` | name | Yes | case, plus trailing spaces and accents for mobile groups |
-| `jamfplatform_security_cloud_device_group` | name | Yes | leading and trailing spaces |
-| `jamfplatform_security_cloud_dns_zone` | domain | Yes | case |
-| `jamfplatform_security_cloud_ztna_app` | hostname | Yes | case |
-| `jamfplatform_account_sso_domain` | domain | Yes | case |
-| `jamfplatform_cbengine_benchmark` | title | Yes | case |
-| `jamfplatform_pro_app_installer` | name | No | case, trailing spaces, accents |
-| `jamfplatform_pro_app_request_form_field` | title | No | case, trailing spaces, accents |
-| `jamfplatform_pro_mobile_device_app` | name | No | case, leading and trailing spaces, accents |
-| `jamfplatform_pro_mobile_device_enrollment_profile` | name | No | case, leading and trailing spaces, accents |
-| `jamfplatform_pro_patch_external_source` | name | No | case, leading and trailing spaces, accents |
-| `jamfplatform_pro_supervision_identity` | display name | No | case, trailing spaces, accents |
-| `jamfplatform_pro_vpp_assignment` | name | No | case, leading and trailing spaces, accents |
-| `jamfplatform_pro_vpp_invitation` | name | No | case, leading and trailing spaces, accents |
-| `jamfplatform_blueprints_blueprint` | name | No | case, trailing spaces, accents |
-| `jamfplatform_ai_governance_policy` | name | No | case, trailing spaces, accents |
-| `jamfplatform_pro_enrollment_customization` | display name | No | case, trailing spaces, accents |
-| `jamfplatform_pro_computer_prestage_enrollment` | display name | No | case, trailing spaces, accents |
-| `jamfplatform_pro_mobile_device_prestage_enrollment` | display name | No | case, trailing spaces, accents |
-| `jamfplatform_pro_advanced_computer_search` | name | No | case, leading and trailing spaces, accents |
-| `jamfplatform_security_cloud_dns_zone` | name | No | case, trailing spaces, accents |
-| `jamfplatform_security_cloud_ztna_app` | name | No | case, trailing spaces, accents |
-| `jamfplatform_security_cloud_ztna_gateway` | name | No | case, trailing spaces, accents |
-| `jamfplatform_security_cloud_ztna_grouped_gateway` | name | No | case, trailing spaces, accents |
+| `jamfplatform_pro_category` | name | — | case, trailing spaces, accents |
+| `jamfplatform_pro_script` | name | — | case, trailing spaces, accents |
+| `jamfplatform_pro_package` | display name, file name | — | case, trailing spaces, accents |
+| `jamfplatform_pro_computer_extension_attribute` | name | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_mobile_device_extension_attribute` | name | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_macos_configuration_profile` | name | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_mobile_device_configuration_profile` | name | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_policy` | name | — | case, leading and trailing spaces |
+| `jamfplatform_pro_user_group` | name | — | leading and trailing spaces |
+| `jamfplatform_pro_static_computer_group` | name | — | case |
+| `jamfplatform_pro_smart_computer_group` | name | — | case |
+| `jamfplatform_pro_static_mobile_device_group` | name | — | case, trailing spaces, accents |
+| `jamfplatform_pro_smart_mobile_device_group` | name | — | case, trailing spaces, accents |
+| `jamfplatform_device_group` | name | — | case, plus trailing spaces and accents for mobile groups |
+| `jamfplatform_security_cloud_device_group` | name | — | leading and trailing spaces |
+| `jamfplatform_security_cloud_dns_zone` | domain | name | domain: case; name: case, trailing spaces, accents |
+| `jamfplatform_security_cloud_ztna_app` | hostname | name | hostname: case; name: case, trailing spaces, accents |
+| `jamfplatform_account_sso_domain` | domain | — | case |
+| `jamfplatform_cbengine_benchmark` | title | — | case |
+| `jamfplatform_pro_app_installer` | — | name | case, trailing spaces, accents |
+| `jamfplatform_pro_app_request_form_field` | — | title | case, trailing spaces, accents |
+| `jamfplatform_pro_mobile_device_app` | — | name | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_mobile_device_enrollment_profile` | — | name | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_patch_external_source` | — | name | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_supervision_identity` | — | display name | case, trailing spaces, accents |
+| `jamfplatform_pro_vpp_assignment` | — | name | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_vpp_invitation` | — | name | case, leading and trailing spaces, accents |
+| `jamfplatform_blueprints_blueprint` | — | name | case, trailing spaces, accents |
+| `jamfplatform_ai_governance_policy` | — | name | case, trailing spaces, accents |
+| `jamfplatform_pro_enrollment_customization` | — | display name | case, trailing spaces, accents |
+| `jamfplatform_pro_computer_prestage_enrollment` | — | display name | case, trailing spaces, accents |
+| `jamfplatform_pro_mobile_device_prestage_enrollment` | — | display name | case, trailing spaces, accents |
+| `jamfplatform_pro_advanced_computer_search` | — | name | case, leading and trailing spaces, accents |
+| `jamfplatform_security_cloud_ztna_gateway` | — | name | case, trailing spaces, accents |
+| `jamfplatform_security_cloud_ztna_grouped_gateway` | — | name | case, trailing spaces, accents |
 
 Jamf Security Cloud activation profiles and Jamf Account SSO connections are not checked. An activation profile read returns only its code, with no name to compare, and Jamf Account appends a random suffix to every connection name, so the stored name never equals the planned one.
 
