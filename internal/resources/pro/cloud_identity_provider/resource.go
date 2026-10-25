@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -42,7 +43,8 @@ const minJamfProVersion = ""
 // and Microsoft Entra ID; `provider_name` discriminates and drives CRUD
 // dispatch.
 type CloudIdentityProviderResource struct {
-	client *pro.Client
+	client     *pro.Client
+	collisions *collision.Checker
 }
 
 var (
@@ -285,6 +287,7 @@ func (r *CloudIdentityProviderResource) Configure(ctx context.Context, req resou
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Cloud Identity Provider ID.
