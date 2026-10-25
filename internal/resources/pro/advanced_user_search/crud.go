@@ -6,8 +6,10 @@
 //   proclassic.GetAdvancedUserSearchByID
 //   proclassic.UpdateAdvancedUserSearchByID    (PUT — 201 with empty body; GET after)
 //   proclassic.DeleteAdvancedUserSearchByID
-//   proclassic.ListAdvancedUserSearches        (list resource)
+//   proclassic.ListAdvancedUserSearches        (list resource / collision check in collision.go)
 //   proclassic.GetAdvancedUserSearchByName     (data source name lookup)
+//
+// Uniqueness: name, enforced (409), case-, leading- and trailing-space-insensitive, accent-sensitive.
 //
 // Status: current. Last reviewed 2026-06-02.
 
@@ -27,13 +29,15 @@ import (
 // the per-class directory-service group criterion allowlist.
 const dsGroupObjectType = criteria.ObjectTypeUser
 
-// ModifyPlan suppresses a no-op diff when a directory-service group criterion's
+// ModifyPlan first reports a name another search already holds, then suppresses a
+// no-op diff when a directory-service group criterion's
 // planned value is a different REPRESENTATION of the same group already in state
 // (a raw base64 value swapped for the equivalent group name, or vice versa). It
 // resets such a criterion's planned value to the prior state value so
 // `terraform plan` shows nothing to change. Skips create (no prior state) and
 // destroy (no plan); soft — any resolve failure leaves the diff intact.
 func (r *AdvancedUserSearchResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() || r.ldap == nil {
 		return
 	}

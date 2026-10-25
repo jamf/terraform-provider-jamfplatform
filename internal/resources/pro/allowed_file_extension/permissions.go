@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"CreateAllowedFileExtensionByID",
 	"GetAllowedFileExtensionByID",
 	"DeleteAllowedFileExtensionByID",
+	"ListAllowedFileExtensions",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown section for

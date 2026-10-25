@@ -43,9 +43,12 @@ func sdkCallsIn(t *testing.T, filename string) []string {
 }
 
 // assertMatch fails if the called set and declared set diverge.
-func assertMatch(t *testing.T, filename string, declared []string) {
+func assertMatch(t *testing.T, filename string, declared []string, extraFiles ...string) {
 	t.Helper()
 	called := sdkCallsIn(t, filename)
+	for _, f := range extraFiles {
+		called = append(called, sdkCallsIn(t, f)...)
+	}
 
 	declaredSet := map[string]bool{}
 	for _, m := range declared {
@@ -87,7 +90,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 }
 
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods)
+	assertMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // --- data source (data_source.go) ---

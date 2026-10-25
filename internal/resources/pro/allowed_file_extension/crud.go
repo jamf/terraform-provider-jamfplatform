@@ -6,7 +6,7 @@
 //   proclassic.GetAllowedFileExtensionByID
 //   proclassic.GetAllowedFileExtensionByExtension (data source extension lookup)
 //   proclassic.DeleteAllowedFileExtensionByID     (returns 200)
-//   proclassic.ListAllowedFileExtensions          (data source / list resource)
+//   proclassic.ListAllowedFileExtensions          (data source / list resource / collision check in collision.go)
 //
 // This is a create-and-delete-only record: the classic /allowedfileextensions endpoint
 // exposes GET, POST .../id/{id}, and DELETE .../id/{id} only — there is no PUT (wire-
@@ -17,6 +17,8 @@
 // Create must GET to populate `extension`. The server stores the extension with case and
 // any leading dot preserved but trims surrounding whitespace (handled by a schema
 // validator), and rejects a duplicate value with 409.
+//
+// Uniqueness: extension, enforced (409 "Duplicate extension"), case-, surrounding-space- and accent-insensitive, stored exactly as entered.
 //
 // Status: current. Last reviewed 2026-06-13.
 

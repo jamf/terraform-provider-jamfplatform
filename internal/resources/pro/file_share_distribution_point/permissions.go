@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetDistributionPointV1",
 	"PatchDistributionPointV1",
 	"DeleteDistributionPointV1",
+	"ListDistributionPointsV1",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

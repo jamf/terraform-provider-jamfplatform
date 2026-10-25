@@ -6,7 +6,7 @@
 //   proclassic.GetRemovableMacAddressByID
 //   proclassic.UpdateRemovableMacAddressByID     (PUT — renames in place, returns 201)
 //   proclassic.DeleteRemovableMacAddressByID     (returns 200)
-//   proclassic.ListRemovableMacAddresses         (data source / list resource)
+//   proclassic.ListRemovableMacAddresses         (data source / list resource / collision check in collision.go)
 //   proclassic.GetRemovableMacAddressByName      (data source name lookup)
 //   proclassic.ResolveRemovableMacAddressIDByName (data source name → ID)
 //
@@ -14,6 +14,8 @@
 // body carrying the ID only (no name echo) — Create must GET to populate mac_address.
 // The server stores the MAC verbatim (no case/separator canonicalisation) and rejects
 // a duplicate value with 409, so mac_address is updatable in place and never drifts.
+//
+// Uniqueness: mac_address (the record name), enforced (409), case-, leading- and trailing-space-insensitive, accent-sensitive.
 //
 // Status: current. Last reviewed 2026-06-11.
 

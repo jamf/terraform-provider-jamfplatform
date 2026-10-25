@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetAdvancedUserSearchByID",
 	"UpdateAdvancedUserSearchByID",
 	"DeleteAdvancedUserSearchByID",
+	"ListAdvancedUserSearches",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

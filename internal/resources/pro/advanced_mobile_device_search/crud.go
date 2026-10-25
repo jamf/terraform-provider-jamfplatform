@@ -6,8 +6,10 @@
 //   pro.GetAdvancedMobileDeviceSearchV1
 //   pro.UpdateAdvancedMobileDeviceSearchV1            (PUT — full replace; GET after, response body unreliable)
 //   pro.DeleteAdvancedMobileDeviceSearchV1
-//   pro.ListAdvancedMobileDeviceSearchesV1            (list resource)
+//   pro.ListAdvancedMobileDeviceSearchesV1            (list resource / collision check in collision.go)
 //   pro.ResolveAdvancedMobileDeviceSearchV1ByName     (data source name lookup)
+//
+// Uniqueness: name, enforced (400 DUPLICATE_FIELD), case-insensitive only; leading space, trailing space and accents are distinct.
 //
 // Status: current. Last reviewed 2026-06-02.
 
@@ -28,13 +30,15 @@ import (
 // the per-class directory-service group criterion allowlist.
 const dsGroupObjectType = criteria.ObjectTypeMobile
 
-// ModifyPlan suppresses a no-op diff when a directory-service group criterion's
+// ModifyPlan first reports a name another search already holds, then suppresses a
+// no-op diff when a directory-service group criterion's
 // planned value is a different REPRESENTATION of the same group already in state
 // (a raw base64 value swapped for the equivalent group name, or vice versa). It
 // resets such a criterion's planned value to the prior state value so
 // `terraform plan` shows nothing to change. Skips create (no prior state) and
 // destroy (no plan); soft — any resolve failure leaves the diff intact.
 func (r *AdvancedMobileDeviceSearchResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() || r.client == nil {
 		return
 	}

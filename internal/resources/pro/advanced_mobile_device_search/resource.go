@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
 	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -39,7 +40,8 @@ const minJamfProVersion = ""
 // AdvancedMobileDeviceSearchResource implements the Terraform resource for Jamf
 // Pro advanced mobile device searches.
 type AdvancedMobileDeviceSearchResource struct {
-	client *pro.Client
+	collisions *collision.Checker
+	client     *pro.Client
 }
 
 var _ resource.Resource = &AdvancedMobileDeviceSearchResource{}
@@ -148,6 +150,7 @@ func (r *AdvancedMobileDeviceSearchResource) Configure(ctx context.Context, req 
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState imports an advanced mobile device search by ID.

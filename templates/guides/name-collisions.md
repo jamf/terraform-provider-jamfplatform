@@ -124,8 +124,33 @@ One row per construct. "Checked by default" lists the keys the service refuses a
 | `jamfplatform_pro_ldap_server` | display name | — | case, leading and trailing spaces |
 | `jamfplatform_pro_account_group` | display name | — | case, leading and trailing spaces |
 | `jamfplatform_pro_account` | username, email address | — | case, trailing spaces, accents |
+| `jamfplatform_pro_advanced_user_search` | name | — | case, leading and trailing spaces |
+| `jamfplatform_pro_removable_mac_address` | value | — | case, leading and trailing spaces |
+| `jamfplatform_pro_licensed_software` | name | — | case, leading and trailing spaces |
+| `jamfplatform_pro_allowed_file_extension` | extension | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_mac_app_store_app` | name | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_advanced_mobile_device_search` | name | — | case |
+| `jamfplatform_pro_advanced_volume_purchasing_content_search` | name | — | nothing, names are compared exactly |
+| `jamfplatform_pro_file_share_distribution_point` | name | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_inventory_preload_record` | serial number | — | case, trailing spaces, accents |
+| `jamfplatform_pro_patch_software_title` | name ID, patch source and site | — | nothing, compared exactly |
+| `jamfplatform_pro_patch_policy` | name, within one software title | — | case, leading and trailing spaces, accents |
 
-Jamf Security Cloud activation profiles and Jamf Account SSO connections are not checked. An activation profile read returns only its code, with no name to compare, and Jamf Account appends a random suffix to every connection name, so the stored name never equals the planned one.
+## Object types that are not checked
+
+| Construct | Why |
+|---|---|
+| Settings and branding singletons (access management, app installer, app request, computer check-in and inventory collection, impact alert notifications, Jamf Connect, Jamf Parent and Teacher, local admin password, login page, macOS onboarding, MDM profile, re-enrollment, return to service, self service, service discovery, SMTP server, SSO settings and failover URL, user-initiated enrollment, GSX connection, Jamf Protect, managed software updates, activation code) | One record per tenant, so no second object can take the name. |
+| `jamfplatform_pro_cloud_distribution_point`, `jamfplatform_pro_pki_json_web_token_configuration`, `jamfplatform_security_cloud_uem_connect` | One per tenant. A create against an existing one is refused, and the resources already point you at an import. |
+| `jamfplatform_security_cloud_dns_search_domain`, `jamfplatform_security_cloud_dns_hostname_mappings` | The whole tenant setting is replaced with `PUT`, so there is no create. |
+| `jamfplatform_pro_computer_invitation`, `jamfplatform_pro_mobile_device_invitation` | The service mints the invitation code and ignores the one you supply. |
+| `jamfplatform_pro_automated_device_enrollment`, `jamfplatform_pro_location` | A duplicate collides on the server token or the Apple location behind it, not on the name. |
+| `jamfplatform_security_cloud_activation_profile` | A read returns only the profile code, with no name to compare. |
+| `jamfplatform_account_sso_connection` | Jamf Account appends a random suffix to every connection name, so the stored name never equals the planned one. |
+| `jamfplatform_pro_pki_adcs`, `jamfplatform_pro_pki_digicert`, `jamfplatform_pro_pki_venafi` | The provider has no way to list existing integrations, so there is nothing to compare against. |
+| `jamfplatform_pro_mobile_device_provisioning_profile` | Not probed. |
+| `jamfplatform_pro_icon`, `jamfplatform_pro_self_service_branding_image` | Uploads with no name key. |
+
 
 Smart groups, static groups and Platform device groups of one device type share one pool of names, so a new computer group is checked against all three. Computer groups and mobile device groups are separate pools, so the same name can exist once in each. `jamfplatform_device_group` is checked against the pool for its own `device_type`.
 

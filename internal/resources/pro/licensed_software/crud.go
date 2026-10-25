@@ -6,8 +6,10 @@
 //   proclassic.GetLicensedSoftwareByID      (GET    /licensedsoftware/id/{id})
 //   proclassic.UpdateLicensedSoftwareByID   (PUT    /licensedsoftware/id/{id})
 //   proclassic.DeleteLicensedSoftwareByID   (DELETE /licensedsoftware/id/{id})
-//   proclassic.ListLicensedSoftware         (data source / list resource)
+//   proclassic.ListLicensedSoftware         (data source / list resource / collision check in collision.go)
 //   proclassic.GetLicensedSoftwareByName    (data source name lookup)
+//
+// Uniqueness: name, enforced (409), case-, leading- and trailing-space-insensitive, accent-sensitive.
 //
 // Status: current. Last reviewed 2026-06-05.
 //

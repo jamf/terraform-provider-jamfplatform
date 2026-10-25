@@ -28,6 +28,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -58,11 +59,13 @@ var refIDPattern = regexp.MustCompile(`^(-1|[1-9]\d*)$`)
 // source_id v3 omits. Both keys are the same number — the classic title id equals
 // the configuration id, wire-verified.
 type PatchSoftwareTitleResource struct {
-	client    *proclassic.Client
-	proClient *pro.Client
+	collisions *collision.Checker
+	client     *proclassic.Client
+	proClient  *pro.Client
 }
 
 var _ resource.Resource = &PatchSoftwareTitleResource{}
+var _ resource.ResourceWithModifyPlan = &PatchSoftwareTitleResource{}
 var _ resource.ResourceWithImportState = &PatchSoftwareTitleResource{}
 var _ resource.ResourceWithIdentity = &PatchSoftwareTitleResource{}
 var _ resource.ResourceWithUpgradeState = &PatchSoftwareTitleResource{}
@@ -246,6 +249,7 @@ func (r *PatchSoftwareTitleResource) Configure(ctx context.Context, req resource
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 
 	proClient, proDiags := providerdata.ConfigurePro(ctx, req.ProviderData, minJamfProVersion, "jamfplatform_pro_patch_software_title")
 	resp.Diagnostics.Append(proDiags...)
@@ -258,4 +262,10 @@ func (r *PatchSoftwareTitleResource) Configure(ctx context.Context, req resource
 // ImportState handles import by the Jamf Pro patch software title ID.
 func (r *PatchSoftwareTitleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ModifyPlan reports a title that another configuration already defines for the
+// same patch source and site.
+func (r *PatchSoftwareTitleResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportTitleCollision(ctx, req, resp)
 }

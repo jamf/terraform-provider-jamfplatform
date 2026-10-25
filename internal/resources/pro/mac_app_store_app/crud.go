@@ -6,8 +6,10 @@
 //   proclassic.GetMacApplicationByID          (GET  /macapplications/id/{id})
 //   proclassic.UpdateMacApplicationByID       (PUT  /macapplications/id/{id})
 //   proclassic.DeleteMacApplicationByID       (DELETE)
-//   proclassic.ListMacApplications            (data source / list resource)
+//   proclassic.ListMacApplications            (data source / list resource / collision check in collision.go)
 //   proclassic.GetMacApplicationByName        (data source name lookup)
+//
+// Uniqueness: general.name, enforced (409), case-, surrounding-space- and accent-insensitive. The bundle ID and the URL are not keys.
 //
 // Status: current. Last reviewed 2026-05-31.
 //

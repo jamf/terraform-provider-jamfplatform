@@ -35,8 +35,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -58,10 +60,14 @@ var distributionMethods = proclassic.PatchPolicyGeneralDistributionMethodValues(
 // policies. No directory-service preflight is wired: patch-policy scope exposes
 // no readable name-keyed (LDAP/cloud-IdP) category.
 type PatchPolicyResource struct {
+	collisions *collision.Checker
 	// impact backs the plan-time impact alert on scope changes. nil when the
 	// provider's impact_alerts attribute is off, which is the default.
 	impact *impact.Cache
 	client *proclassic.Client
+	// proClient lists the tenant's patch policies for the plan-time name collision
+	// check; the CRUD path runs on client.
+	proClient *pro.Client
 }
 
 var _ resource.Resource = &PatchPolicyResource{}
@@ -395,6 +401,14 @@ func (r *PatchPolicyResource) Configure(ctx context.Context, req resource.Config
 	}
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
+
+	proClient, proDiags := providerdata.ConfigurePro(ctx, req.ProviderData, minJamfProVersion, "jamfplatform_pro_patch_policy")
+	resp.Diagnostics.Append(proDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	r.proClient = proClient
 }
 
 // ImportState handles import by the Jamf Pro patch policy ID.

@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -59,7 +60,8 @@ const (
 // FileShareDistributionPointResource implements the Terraform resource for
 // Jamf Pro file share distribution points.
 type FileShareDistributionPointResource struct {
-	client *pro.Client
+	collisions *collision.Checker
+	client     *pro.Client
 }
 
 var (
@@ -296,6 +298,7 @@ func (r *FileShareDistributionPointResource) Configure(ctx context.Context, req 
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro distribution point ID.
@@ -312,6 +315,7 @@ func (r *FileShareDistributionPointResource) ImportState(ctx context.Context, re
 // apply". (STYLE_GUIDE §discriminator-gated field clearing — the predict-cleared
 // half of the pattern; the input builder is the don't-send half.)
 func (r *FileShareDistributionPointResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	if req.Plan.Raw.IsNull() {
 		return // destroy
 	}
