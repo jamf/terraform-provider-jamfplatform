@@ -6,10 +6,12 @@
 //   pro.GetMobileDeviceExtensionAttributeV1
 //   pro.UpdateMobileDeviceExtensionAttributeV1            (PUT — full replace; GET after)
 //   pro.DeleteMobileDeviceExtensionAttributeV1
-//   pro.ListMobileDeviceExtensionAttributesV1             (list resource)
+//   pro.ListMobileDeviceExtensionAttributesV1             (list resource, collision check in collision.go)
 //   pro.ResolveMobileDeviceExtensionAttributeV1ByName     (data source name lookup)
 //
-// Status: current. Last reviewed 2026-06-02.
+// Uniqueness: name, enforced (400 DUPLICATE_FIELD), trimmed on save, case- and accent-insensitive.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package mobile_device_extension_attribute
 

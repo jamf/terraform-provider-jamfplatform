@@ -6,9 +6,11 @@
 //   pro.GetScriptV1
 //   pro.UpdateScriptV1
 //   pro.DeleteScriptV1
-//   pro.ListScriptsV1 (data source / list resource)
+//   pro.ListScriptsV1 (data source / list resource / collision check in collision.go)
 //
-// Status: current. Last reviewed 2026-05-19.
+// Uniqueness: name, enforced (400 DUPLICATE_FIELD), case-, trailing-space- and accent-insensitive; a leading space is significant.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package script
 

@@ -182,8 +182,9 @@ func (r *Resource) preflightScopeGroups(ctx context.Context, req resource.Modify
 }
 
 // ModifyPlan sequences the plan-time hooks so each one sees what it needs:
-// the scope directory-service user-group preflight first (it must cover
-// create plans too), then the payload-diff decision, then the impact alert.
+// the profile name collision check and the scope directory-service user-group
+// preflight first (both must cover create plans too), then the payload-diff
+// decision, then the impact alert.
 //
 // The impact alert's position is a correctness constraint, not taste:
 // healPayloadPlan can rewrite a byte-different but semantically-equal payload
@@ -195,6 +196,11 @@ func (r *Resource) preflightScopeGroups(ctx context.Context, req resource.Modify
 // otherwise `terraform plan` would print an impact alert directly above
 // "No changes".
 func (r *Resource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Scope directory-service user-group preflight runs first so it covers
 	// create-plans too (the payload compare below early-returns on create). It
 	// is skipped only on destroy (null plan).

@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -37,6 +38,9 @@ type ScriptResource struct {
 	// object reaches through the policies that use it. nil when the provider's
 	// impact_alerts attribute is off, which is the default.
 	impact *impact.Cache
+	// collisions is the shared plan-time name collision checker. nil when the
+	// provider's name_collision_check mode is off.
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &ScriptResource{}
@@ -196,6 +200,7 @@ func (r *ScriptResource) Configure(ctx context.Context, req resource.ConfigureRe
 		return
 	}
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 	r.client = client
 }
 
