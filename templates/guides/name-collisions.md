@@ -54,11 +54,42 @@ provider "jamfplatform" {
 
 `include_unenforced` extends the check to object types where Jamf accepts duplicate names, such as blueprints. The apply would succeed, so this is a strictness choice and not a prediction of failure.
 
+If your tenant keeps duplicate names on purpose, leave `include_unenforced` off. Terraform can then manage those objects as before. To see the duplicates without blocking a plan, set `mode = "warn"` as well.
+
 ## How names are compared
 
 Jamf Pro does not compare names the same way for every object type. Some fold case, trailing spaces and accents. Policies and computer groups fold case and trailing spaces but treat `Café` and `Cafe` as different names. User groups are case-sensitive. The provider applies the rule Jamf applies for each type and the diagnostic states it.
 
 Some object types share one pool of names. Computer groups, for example, share it with Platform device groups of type `COMPUTER`, so the check covers both.
+
+## Checked object types
+
+Each row is one uniqueness rule. "Refused by the service" says whether the service rejects a duplicate. A `Yes` row is checked by default, because the apply would fail anyway. A `No` row is checked only when `include_unenforced` is `true`, and the comparison there is the strict one the provider chose: the service stores every variant.
+
+| Construct | Key | Refused by the service | Compared without regard to |
+|---|---|---|---|
+| `jamfplatform_pro_category` | name | Yes | case, trailing spaces, accents |
+| `jamfplatform_pro_script` | name | Yes | case, trailing spaces, accents |
+| `jamfplatform_pro_package` | display name | Yes | case, trailing spaces, accents |
+| `jamfplatform_pro_package` | file name | Yes | case, trailing spaces, accents |
+| `jamfplatform_pro_computer_extension_attribute` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_mobile_device_extension_attribute` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_macos_configuration_profile` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_mobile_device_configuration_profile` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_policy` | name | Yes | case, leading and trailing spaces |
+| `jamfplatform_pro_user_group` | name | Yes | leading and trailing spaces |
+| `jamfplatform_pro_static_computer_group` | name | Yes | case |
+| `jamfplatform_pro_smart_computer_group` | name | Yes | case |
+| `jamfplatform_pro_static_mobile_device_group` | name | Yes | case, trailing spaces, accents |
+| `jamfplatform_pro_smart_mobile_device_group` | name | Yes | case, trailing spaces, accents |
+| `jamfplatform_device_group` | name | Yes | case, plus trailing spaces and accents for mobile groups |
+| `jamfplatform_security_cloud_device_group` | name | Yes | leading and trailing spaces |
+| `jamfplatform_security_cloud_dns_zone` | domain | Yes | case |
+| `jamfplatform_security_cloud_ztna_app` | hostname | Yes | case |
+| `jamfplatform_account_sso_domain` | domain | Yes | case |
+| `jamfplatform_cbengine_benchmark` | title | Yes | case |
+
+Smart groups, static groups and Platform device groups of one device type share one pool of names, so a new computer group is checked against all three.
 
 ## Values that are not known at plan time
 
