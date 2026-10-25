@@ -17,11 +17,12 @@ Error: Name already in use
   on main.tf line 3, in resource "jamfplatform_pro_category" "apps":
    3:   name = "Apps"
 
-A category with the name "Apps" already exists in Jamf Pro (ID 12), and Jamf Pro
+The category with the name "Apps" already exists in Jamf Pro (ID 12), and Jamf Pro
 does not allow two with the same name. Names are compared without regard to case,
 trailing spaces or accents.
 
-To manage the existing category with Terraform, import it. Use the full address of this resource as `to`, including any module path:
+To manage the existing category with Terraform, import it. Use the full address
+of this resource as `to`, including any module path:
 
   import {
     to = <this resource's address>
@@ -60,9 +61,9 @@ If your tenant keeps duplicate names on purpose, leave `include_unenforced` off.
 
 ## How names are compared
 
-Jamf Pro does not compare names the same way for every object type. Some fold case, trailing spaces and accents. Policies and computer groups fold case and trailing spaces but treat `Café` and `Cafe` as different names. User groups are case-sensitive. The provider applies each type's own rule, and the diagnostic states it.
+Jamf Pro does not compare names the same way for every object type, and one pool of names can compare differently depending on the API that writes to it. Most types fold case and trailing spaces. Many also fold accents, and Classic types fold a leading space too. Policies and Classic groups treat `Café` and `Cafe` as different names. Computer groups written through the JSON APIs fold case only. User groups are case-sensitive. The provider applies each type's own rule, and the diagnostic states it.
 
-Some object types share one pool of names. Computer groups, for example, share it with Platform device groups of type `COMPUTER`, so the check covers both.
+Smart groups, static groups and Platform device groups of one device type share one pool of names, so a new computer group is checked against all three. Computer groups and mobile device groups are separate pools, so the same name can exist once in each. `jamfplatform_device_group` is checked against the pool for its own `device_type`.
 
 ## Checked object types
 
