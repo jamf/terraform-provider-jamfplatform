@@ -160,8 +160,9 @@ type Rule[M any] struct {
 // ReportPlan is the shared ModifyPlan hook. It decodes prior state and the
 // plan, skips destroys and unknown keys, and runs each rule.
 //
-// An unknown key is skipped without a note: ModifyPlan runs again during apply
-// with the value resolved, which is the check that counts for it.
+// An unknown key is skipped without a note, and the known keys of a collection
+// are still checked: ModifyPlan runs again during apply with the value resolved,
+// which is the check that counts for the unknown one.
 func ReportPlan[M any](
 	ctx context.Context,
 	req resource.ModifyPlanRequest,
@@ -197,8 +198,8 @@ func ReportPlan[M any](
 	}
 
 	for _, rule := range rep.Rules {
-		keys, known := knownValues(rule.Keys(&plan))
-		if !known || len(keys) == 0 {
+		keys, _ := knownValues(rule.Keys(&plan))
+		if len(keys) == 0 {
 			continue
 		}
 		var priorKeys []string

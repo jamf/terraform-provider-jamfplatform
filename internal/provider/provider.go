@@ -356,7 +356,7 @@ func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRe
 			"name_collision_check": schema.SingleNestedAttribute{
 				Optional: true,
 				MarkdownDescription: "Detect during `terraform plan` a new or renamed object whose name already belongs to an object in the tenant. " +
-					"Jamf refuses the duplicate for most object types, so without the check `terraform apply` fails halfway through. " +
+					"Most object types refuse a duplicate name, so without the check `terraform apply` fails halfway through. " +
 					"The diagnostic names the existing object and its ID and gives the `import` block that adopts it. " +
 					"The check lists each object type once per plan. A listing that fails produces one warning and the plan continues. " +
 					"See the [Name collisions guide](../guides/name-collisions).",
@@ -371,7 +371,7 @@ func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRe
 					},
 					"include_unenforced": schema.BoolAttribute{
 						Optional: true,
-						MarkdownDescription: "Also check the object types for which Jamf accepts duplicate names, such as blueprints and AI Governance policies. A second object of the same name is then reported although Jamf would store it. Defaults to `false`. " +
+						MarkdownDescription: "Also check the object types that accept duplicate names, such as blueprints and AI Governance policies. A second object of the same name is then reported although the tenant would store it. Defaults to `false`. " +
 							"Can also be set via the JAMFPLATFORM_NAME_COLLISION_CHECK_INCLUDE_UNENFORCED environment variable, which accepts the values of Go's `strconv.ParseBool`. This attribute, when set, takes precedence over the variable.",
 					},
 				},

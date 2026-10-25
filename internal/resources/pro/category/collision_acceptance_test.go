@@ -101,3 +101,33 @@ func TestAccResource_ProCategory_NameCollisionOnRename(t *testing.T) {
 		},
 	})
 }
+
+func TestAccResource_ProCategory_NameCollisionWhenNameIsUnknownAtPlan(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-unknown-" + testhelpers.RunSuffix()
+	config := fmt.Sprintf(`
+		resource "terraform_data" "name" {
+			input = %q
+		}
+		resource "jamfplatform_pro_category" "test" {
+			name     = "${terraform_data.name.output}-aa"
+			priority = 7
+		}
+	`, name)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				PreConfig:          func() { createExistingCategory(t, name+"-aa") },
+				Config:             config,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use`),
+			},
+		},
+	})
+}

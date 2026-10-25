@@ -60,6 +60,14 @@ Jamf Pro does not compare names the same way for every object type. Some fold ca
 
 Some object types share one pool of names. Computer groups, for example, share it with Platform device groups of type `COMPUTER`, so the check covers both.
 
+## Values that are not known at plan time
+
+Input variables, locals and data sources read at plan time are known when the check runs, so a name built from them is checked in `terraform plan`.
+
+A name that depends on another resource's computed output, such as `"${random_id.suffix.hex}-apps"`, is unknown until that resource is applied. The plan skips it without a message. Terraform plans each resource again just before applying it, with the value resolved, and the check runs then. The failure arrives at apply, before the write, naming the existing object and the `import` block, but resources applied earlier in the same run are already created.
+
+Where a collection is partly unknown, such as a set of domains, the known entries are checked at plan time and the rest at apply.
+
 ## Cost and limits
 
 - Each object type is listed once per plan and shared by every resource of that type. A tenant with thousands of objects of one type pays one paged read.
