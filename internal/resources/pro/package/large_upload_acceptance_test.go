@@ -118,6 +118,16 @@ func checkRecordMatches(t *testing.T, wantSize int64) resource.TestCheckFunc {
 	}
 }
 
+// largeLabel names the large size in the scenario log, which follows the MiB
+// environment variable and not a fixed figure.
+func largeLabel() string {
+	mib := largeUploadBytes() / (1024 * 1024)
+	if mib%1024 == 0 {
+		return fmt.Sprintf("%d GiB", mib/1024)
+	}
+	return fmt.Sprintf("%d MiB", mib)
+}
+
 func TestAccResource_ProPackage_LargeUploadScenarios(t *testing.T) {
 	requireLargeUploads(t)
 
@@ -159,9 +169,9 @@ func TestAccResource_ProPackage_LargeUploadScenarios(t *testing.T) {
 				writeRandomFile(t, large, largeUploadBytes(), 3)
 				writeRandomFile(t, largeSameSize, largeUploadBytes(), 4)
 			}),
-			step("replace 300 MB with 2 GB", large, largeUploadBytes(), nil),
-			step("replace 2 GB with 2 GB of identical size", largeSameSize, largeUploadBytes(), nil),
-			step("replace 2 GB with 300 MB", smallOther, smallUploadBytes, nil),
+			step("replace 300 MB with "+largeLabel(), large, largeUploadBytes(), nil),
+			step("replace "+largeLabel()+" with "+largeLabel()+" of identical size", largeSameSize, largeUploadBytes(), nil),
+			step("replace "+largeLabel()+" with 300 MB", smallOther, smallUploadBytes, nil),
 		},
 	})
 }
@@ -186,7 +196,7 @@ func TestAccResource_ProPackage_LargeUploadCreate(t *testing.T) {
 				},
 				Config: hclLocalUpload(display, fileName, large, "large create"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					logStep(t, "create 2 GB", &started),
+					logStep(t, "create "+largeLabel(), &started),
 					checkRecordMatches(t, largeUploadBytes()),
 				),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
