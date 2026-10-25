@@ -80,7 +80,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps the resource privileges table
 // honest as crud.go changes.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods, calledSDKMethods(t, "crud.go"))
+	assertMatch(t, "crud.go", resourceSDKMethods, mergedCalls(t, "crud.go", "collision.go"))
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered.
@@ -134,4 +134,17 @@ func TestListResourcePrivileges_Rendered(t *testing.T) {
 	if !permissions.Renders(listResourcePrivileges, "accounts:read") {
 		t.Fatalf("listResourcePrivileges did not render the accounts privileges:\n%s", listResourcePrivileges)
 	}
+}
+
+// mergedCalls returns the SDK calls found across several source files, for a
+// resource whose privileges are split between crud.go and collision.go.
+func mergedCalls(t *testing.T, filenames ...string) map[string]bool {
+	t.Helper()
+	merged := map[string]bool{}
+	for _, f := range filenames {
+		for m := range calledSDKMethods(t, f) {
+			merged[m] = true
+		}
+	}
+	return merged
 }

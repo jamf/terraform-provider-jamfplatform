@@ -47,8 +47,10 @@ func calledSDKMethods(t *testing.T, filename string) []string {
 func assertMatch(t *testing.T, filename string, declaredList []string) {
 	t.Helper()
 	called := map[string]bool{}
-	for _, m := range calledSDKMethods(t, filename) {
-		called[m] = true
+	for _, f := range privilegeSourceFiles(filename) {
+		for _, m := range calledSDKMethods(t, f) {
+			called[m] = true
+		}
 	}
 	declared := map[string]bool{}
 	for _, m := range declaredList {
@@ -137,4 +139,14 @@ func TestPrivileges_Rendered(t *testing.T) {
 			t.Errorf("%s did not render %s:\n%s", tc.name, tc.scoped, tc.rendered)
 		}
 	}
+}
+
+// privilegeSourceFiles lists the source files whose SDK calls make up the
+// resource's privileges: its CRUD path and, for crud.go, the plan-time name
+// collision check in collision.go.
+func privilegeSourceFiles(filename string) []string {
+	if filename == "crud.go" {
+		return []string{"crud.go", "collision.go"}
+	}
+	return []string{filename}
 }

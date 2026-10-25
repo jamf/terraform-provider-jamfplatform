@@ -57,5 +57,6 @@ func (r *ClassResource) reportImpact(ctx context.Context, req resource.ModifyPla
 // ModifyPlan emits the impact alert for a class's device group targeting. The
 // class resource has no other plan-time work, so this is the whole of it.
 func (r *ClassResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	r.reportImpact(ctx, req, resp)
 }

@@ -90,6 +90,15 @@ Each row is one uniqueness rule. "Refused by the service" says whether the servi
 | `jamfplatform_security_cloud_ztna_app` | hostname | Yes | case |
 | `jamfplatform_account_sso_domain` | domain | Yes | case |
 | `jamfplatform_cbengine_benchmark` | title | Yes | case |
+| `jamfplatform_pro_class` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_user_extension_attribute` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_ibeacon` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_disk_encryption_configuration` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_directory_binding` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_ldap_server` | display name | Yes | case, leading and trailing spaces |
+| `jamfplatform_pro_account_group` | display name | Yes | case, leading and trailing spaces |
+| `jamfplatform_pro_account` | username | Yes | case, trailing spaces, accents |
+| `jamfplatform_pro_account` | email address | Yes | case, trailing spaces, accents |
 | `jamfplatform_pro_app_installer` | name | No | case, trailing spaces, accents |
 | `jamfplatform_pro_app_request_form_field` | title | No | case, trailing spaces, accents |
 | `jamfplatform_pro_mobile_device_app` | name | No | case, leading and trailing spaces, accents |

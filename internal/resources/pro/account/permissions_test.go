@@ -44,7 +44,12 @@ func calledSDKMethods(t *testing.T, filename string, reg permissions.Registry) m
 // SDK method not declared, or declares one it does not call.
 func assertDeclaredMatchesCalled(t *testing.T, filename string, reg permissions.Registry, declaredMethods []string) {
 	t.Helper()
-	called := calledSDKMethods(t, filename, reg)
+	called := map[string]bool{}
+	for _, f := range privilegeSourceFiles(filename) {
+		for m := range calledSDKMethods(t, f, reg) {
+			called[m] = true
+		}
+	}
 	declared := map[string]bool{}
 	for _, m := range declaredMethods {
 		declared[m] = true
@@ -136,4 +141,14 @@ func TestListResourcePrivileges_Rendered(t *testing.T) {
 	if !permissions.Renders(listResourcePrivileges, "accounts:read") {
 		t.Fatalf("listResourcePrivileges did not render the accounts privileges:\n%s", listResourcePrivileges)
 	}
+}
+
+// privilegeSourceFiles lists the source files whose SDK calls make up the
+// resource's privileges: its CRUD path and, for crud.go, the plan-time name
+// collision check in collision.go.
+func privilegeSourceFiles(filename string) []string {
+	if filename == "crud.go" {
+		return []string{"crud.go", "collision.go"}
+	}
+	return []string{filename}
 }

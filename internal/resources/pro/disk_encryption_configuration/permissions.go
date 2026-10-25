@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetDiskEncryptionConfigurationByID",
 	"UpdateDiskEncryptionConfigurationByID",
 	"DeleteDiskEncryptionConfigurationByID",
+	"ListDiskEncryptionConfigurations",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown
