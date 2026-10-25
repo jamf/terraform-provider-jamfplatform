@@ -6,8 +6,11 @@
 //   securitycloud.GetDeviceGroupV1
 //   securitycloud.UpdateDeviceGroupV2
 //   securitycloud.DeleteDeviceGroupV1
-//   securitycloud.ListDeviceGroupsV2 (data sources, list resource, and the
-//                                     singular data source's name lookup)
+//   securitycloud.ListDeviceGroupsV2 (data sources, list resource, the
+//                                     singular data source's name lookup, and
+//                                     the collision check in collision.go)
+//
+// Uniqueness: name, enforced (409 GROUP_ALREADY_EXISTS), case- and accent-sensitive, leading and trailing spaces trimmed.
 //
 // Deliberately not used:
 //   securitycloud.ResolveDeviceGroupV2ByName

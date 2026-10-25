@@ -85,6 +85,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -95,13 +96,15 @@ const maxDomainLength = 253
 
 // DomainResource implements the Terraform resource for Jamf Account SSO domains.
 type DomainResource struct {
-	client *account.Client
+	client     *account.Client
+	collisions *collision.Checker
 }
 
 var (
 	_ resource.Resource                = &DomainResource{}
 	_ resource.ResourceWithImportState = &DomainResource{}
 	_ resource.ResourceWithIdentity    = &DomainResource{}
+	_ resource.ResourceWithModifyPlan  = &DomainResource{}
 )
 
 const (
@@ -265,6 +268,7 @@ func (r *DomainResource) Configure(ctx context.Context, req resource.ConfigureRe
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by domain name.

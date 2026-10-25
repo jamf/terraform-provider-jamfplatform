@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/compliancebenchmarks"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -36,6 +37,9 @@ type BenchmarkResource struct {
 	// impact backs the plan-time impact alert on device group targeting. nil when
 	// the provider's impact_alerts attribute is off, which is the default.
 	impact *impact.Cache
+	// collisions backs the plan-time title collision check. nil when the
+	// provider's name_collision_check mode is off.
+	collisions *collision.Checker
 	// lock serializes creates and deletes across every benchmark in this
 	// provider instance; see providerdata.BenchmarkLock.
 	lock *providerdata.BenchmarkLock
@@ -430,6 +434,7 @@ func (r *BenchmarkResource) Configure(ctx context.Context, req resource.Configur
 	}
 
 	r.impact = pd.ImpactCache()
+	r.collisions = pd.CollisionChecker()
 	r.lock = pd.BenchmarkLock()
 	r.client = compliancebenchmarks.New(pd.Client)
 }

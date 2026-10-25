@@ -14,10 +14,12 @@ import (
 // The three axes vary independently across types, so a single normaliser would
 // either miss collisions Jamf refuses or report ones it accepts. IgnoreCase folds
 // upper and lower case together. IgnoreTrailingSpace drops trailing spaces before
-// comparing; a leading space is always significant. IgnoreAccents folds accented
-// letters onto their base letter.
+// comparing, and IgnoreLeadingSpace drops leading ones; most types keep a leading
+// space significant, and Jamf Security Cloud device groups are the probed
+// exception. IgnoreAccents folds accented letters onto their base letter.
 type Collation struct {
 	IgnoreCase          bool
+	IgnoreLeadingSpace  bool
 	IgnoreTrailingSpace bool
 	IgnoreAccents       bool
 }
@@ -38,6 +40,9 @@ var CollationExact = Collation{}
 
 // Fold returns the comparison form of a key under this collation.
 func (c Collation) Fold(key string) string {
+	if c.IgnoreLeadingSpace {
+		key = strings.TrimLeft(key, " ")
+	}
 	if c.IgnoreTrailingSpace {
 		key = strings.TrimRight(key, " ")
 	}
@@ -62,7 +67,12 @@ func (c Collation) Describe(keyLabel string) string {
 	if c.IgnoreCase {
 		ignored = append(ignored, "case")
 	}
-	if c.IgnoreTrailingSpace {
+	switch {
+	case c.IgnoreLeadingSpace && c.IgnoreTrailingSpace:
+		ignored = append(ignored, "leading or trailing spaces")
+	case c.IgnoreLeadingSpace:
+		ignored = append(ignored, "leading spaces")
+	case c.IgnoreTrailingSpace:
 		ignored = append(ignored, "trailing spaces")
 	}
 	if c.IgnoreAccents {

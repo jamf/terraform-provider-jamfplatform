@@ -46,6 +46,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -65,13 +66,15 @@ const (
 // DNSZoneResource implements the Terraform resource for Jamf Security Cloud
 // custom DNS zones.
 type DNSZoneResource struct {
-	client *securitycloud.Client
+	client     *securitycloud.Client
+	collisions *collision.Checker
 }
 
 var (
 	_ resource.Resource                = &DNSZoneResource{}
 	_ resource.ResourceWithImportState = &DNSZoneResource{}
 	_ resource.ResourceWithIdentity    = &DNSZoneResource{}
+	_ resource.ResourceWithModifyPlan  = &DNSZoneResource{}
 )
 
 const (
@@ -197,6 +200,7 @@ func (r *DNSZoneResource) Configure(ctx context.Context, req resource.ConfigureR
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Security Cloud DNS zone ID.

@@ -220,3 +220,23 @@ func knownValues(values []types.String) (out []string, allKnown bool) {
 	}
 	return out, allKnown
 }
+
+// SetKeys flattens a set of strings into key values for a Rule. A null set has no
+// keys, and an unknown set yields one unknown value so ReportPlan skips the rule
+// until apply resolves it.
+func SetKeys(set types.Set) []types.String {
+	switch {
+	case set.IsNull():
+		return nil
+	case set.IsUnknown():
+		return []types.String{types.StringUnknown()}
+	}
+	elements := set.Elements()
+	out := make([]types.String, 0, len(elements))
+	for _, el := range elements {
+		if s, ok := el.(types.String); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
