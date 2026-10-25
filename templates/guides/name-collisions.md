@@ -21,7 +21,7 @@ A category with the name "Apps" already exists in Jamf Pro (ID 12), and Jamf Pro
 does not allow two with the same name. Names are compared without regard to case,
 trailing spaces or accents.
 
-To manage the existing category with Terraform, import it:
+To manage the existing category with Terraform, import it. Use the full address of this resource as `to`, including any module path:
 
   import {
     to = <this resource's address>
@@ -31,6 +31,8 @@ To manage the existing category with Terraform, import it:
 Otherwise, choose a different name. If this configuration already manages the
 existing category under a different address, add a moved block instead.
 ```
+
+The provider does not know where the resource sits in your configuration, so `to` is a placeholder. Terraform names the resource address in the diagnostic header. For a resource inside a module, use the full address, for example `module.apps.jamfplatform_pro_category.apps`.
 
 The check runs again just before each resource is applied, so an object created in the web interface between plan and apply is still caught.
 

@@ -128,7 +128,7 @@ func render(req Request, key string, m Match) (summary, detail string) {
 	}
 
 	if adoptable {
-		fmt.Fprintf(&b, "\n\nTo manage the existing %s with Terraform, import it:\n\n  import {\n    to = <this resource's address>\n    id = %q\n  }\n\nOtherwise, choose a different %s. If this configuration already manages the existing %s under a different address, add a moved block instead.",
+		fmt.Fprintf(&b, "\n\nTo manage the existing %s with Terraform, import it. Use the full address of this resource as `to`, including any module path:\n\n  import {\n    to = <this resource's address>\n    id = %q\n  }\n\nOtherwise, choose a different %s. If this configuration already manages the existing %s under a different address, add a moved block instead.",
 			m.Noun, adoptID, label, m.Noun)
 	} else if m.ResourceType != "" {
 		fmt.Fprintf(&b, "\n\nThe existing %s is a different kind of object from this resource. To manage it with Terraform, import it into a %s resource. Otherwise, choose a different %s.",
