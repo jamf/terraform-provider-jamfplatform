@@ -13,7 +13,7 @@ import (
 // resource's CRUD and plan-time paths call. The CRUD path is split across
 // crud.go (provider discovery on import), crud_azure.go (Entra ID branch),
 // crud_google.go (Google Secure LDAP branch), and the keystore verify in
-// plan_modifiers.go. This list drives the "Required Jamf permissions" table
+// plan_modifiers.go, and the collision check in collision.go. This list drives the "Required Jamf permissions" table
 // appended to the resource MarkdownDescription. permissions_test.go asserts it
 // stays in sync with the actual client.<Method> calls across those files and
 // with the SDK privilege registry.
@@ -28,6 +28,7 @@ var resourceSDKMethods = []string{
 	"UpdateCloudLdapV2",
 	"DeleteCloudLdapV2",
 	"VerifyLdapKeystoreV1",
+	"ListCloudIdpV1",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

@@ -89,6 +89,7 @@ Each row is one uniqueness rule. "Refused by the service" says whether the servi
 | `jamfplatform_security_cloud_dns_zone` | domain | Yes | case |
 | `jamfplatform_security_cloud_ztna_app` | hostname | Yes | case |
 | `jamfplatform_account_sso_domain` | domain | Yes | case |
+| `jamfplatform_pro_cloud_identity_provider` | display name | Yes | case, leading and trailing spaces, accents |
 | `jamfplatform_cbengine_benchmark` | title | Yes | case |
 | `jamfplatform_pro_app_installer` | name | No | case, trailing spaces, accents |
 | `jamfplatform_pro_app_request_form_field` | title | No | case, trailing spaces, accents |
@@ -108,6 +109,7 @@ Each row is one uniqueness rule. "Refused by the service" says whether the servi
 | `jamfplatform_security_cloud_ztna_app` | name | No | case, trailing spaces, accents |
 | `jamfplatform_security_cloud_ztna_gateway` | name | No | case, trailing spaces, accents |
 | `jamfplatform_security_cloud_ztna_grouped_gateway` | name | No | case, trailing spaces, accents |
+| `jamfplatform_account_platform_environment` | name | No | case, leading and trailing spaces, accents |
 
 Jamf Security Cloud activation profiles and Jamf Account SSO connections are not checked. An activation profile read returns only its code, with no name to compare, and Jamf Account appends a random suffix to every connection name, so the stored name never equals the planned one.
 

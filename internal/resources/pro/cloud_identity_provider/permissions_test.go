@@ -90,7 +90,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // declare one they do not call. The CRUD path is split across crud.go,
 // crud_azure.go, crud_google.go, plus the keystore verify in plan_modifiers.go.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertCallsMatch(t, resourceSDKMethods, "crud.go", "crud_azure.go", "crud_google.go", "plan_modifiers.go")
+	assertCallsMatch(t, resourceSDKMethods, "crud.go", "crud_azure.go", "crud_google.go", "plan_modifiers.go", "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

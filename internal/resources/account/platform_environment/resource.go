@@ -67,19 +67,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/account"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
 // PlatformEnvironmentResource implements the Terraform resource for Jamf Account
 // platform environments.
 type PlatformEnvironmentResource struct {
-	client *account.Client
+	client     *account.Client
+	collisions *collision.Checker
 }
 
 var (
 	_ resource.Resource                = &PlatformEnvironmentResource{}
 	_ resource.ResourceWithImportState = &PlatformEnvironmentResource{}
 	_ resource.ResourceWithIdentity    = &PlatformEnvironmentResource{}
+	_ resource.ResourceWithModifyPlan  = &PlatformEnvironmentResource{}
 )
 
 const (
@@ -185,6 +188,7 @@ func (r *PlatformEnvironmentResource) Configure(ctx context.Context, req resourc
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the identifier Jamf Account assigned, which is

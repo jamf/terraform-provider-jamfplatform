@@ -15,8 +15,12 @@
 //     pro.DeleteCloudAzureV1
 //   Both (registry — provider discovery on import):
 //     pro.GetCloudIdpV1
+//     pro.ListCloudIdpV1       (collision check in collision.go)
 //
-// Status: current. Last reviewed 2026-05-30.
+// Uniqueness: display name, enforced (400 DUPLICATE_FIELD), case-, leading- and trailing-space-
+// and accent-insensitive (an accent variant is refused 500 with no body), across both providers.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package cloud_identity_provider
 
