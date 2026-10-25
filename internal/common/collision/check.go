@@ -105,10 +105,6 @@ func (c *Checker) report(diags *diag.Diagnostics, req Request, key string, m Mat
 func render(req Request, key string, m Match) (summary, detail string) {
 	ns := req.Namespace
 	label := ns.keyLabel()
-	article := "A"
-	if strings.ContainsRune("aeiouAEIOU", rune(m.Noun[0])) {
-		article = "An"
-	}
 
 	adoptID, adoptable := m.AdoptID(req.ResourceType)
 	shownID := m.ID
@@ -119,12 +115,12 @@ func render(req Request, key string, m Match) (summary, detail string) {
 	var b strings.Builder
 	if ns.Enforced {
 		summary = fmt.Sprintf("%s already in use", capitalise(label))
-		fmt.Fprintf(&b, "%s %s with the %s %q already exists in %s (ID %s), and %s does not allow two with the same %s. %s",
-			article, m.Noun, label, key, ns.Product, shownID, ns.Product, label, ns.Collation.Describe(label))
+		fmt.Fprintf(&b, "The %s with the %s %q already exists in %s (ID %s), and %s does not allow two with the same %s. %s",
+			m.Noun, label, key, ns.Product, shownID, ns.Product, label, ns.Collation.Describe(label))
 	} else {
 		summary = fmt.Sprintf("%s already in use (duplicate check)", capitalise(label))
-		fmt.Fprintf(&b, "%s %s with the %s %q already exists in %s (ID %s). %s accepts duplicates, so the apply would succeed and leave two. This check is on because include_unenforced is set. %s",
-			article, m.Noun, label, key, ns.Product, shownID, ns.Product, ns.Collation.Describe(label))
+		fmt.Fprintf(&b, "The %s with the %s %q already exists in %s (ID %s). %s accepts duplicates, so the apply would succeed and leave two. This check is on because include_unenforced is set. %s",
+			m.Noun, label, key, ns.Product, shownID, ns.Product, ns.Collation.Describe(label))
 	}
 
 	if adoptable {

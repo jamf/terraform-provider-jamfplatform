@@ -22,14 +22,14 @@ provider "jamfplatform" {
 }
 `
 
-func collisionPrestageConfig(name, instanceID string) string {
+func collisionPrestageResource(label, name string) string {
 	return fmt.Sprintf(`
-resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
+resource "jamfplatform_pro_computer_prestage_enrollment" %q {
   display_name                          = %q
   mandatory                             = true
   mdm_removable                         = true
   require_authentication                = false
-  device_enrollment_program_instance_id = %q
+  device_enrollment_program_instance_id = %s
   keep_existing_location_information    = false
   keep_existing_site_membership         = false
   auto_advance_setup                    = false
@@ -44,26 +44,31 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 
   scope_serial_numbers = []
 }
-`, name, instanceID)
+`, label, name, adeFixtureRef)
 }
 
 func TestAccResource_ProComputerPrestageEnrollment_NameCollisionStrict(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	instanceID := testhelpers.FirstDeviceEnrollmentInstanceID(t)
-	name := "tf-acc-prestage-collide-" + testhelpers.RunSuffix()
-	planned := collisionPrestageConfig(strings.ToUpper(name), instanceID)
+	token := requireADETokenBlob(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-prestage-collide-" + suffix
+	fixture := adeFixtureBlock(suffix, token)
+	existing := fixture + collisionPrestageResource("existing", name)
+	withDuplicate := existing + collisionPrestageResource("duplicate", strings.ToUpper(name))
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				PreConfig:   func() { testhelpers.CreateOutOfBandComputerPrestage(t, name, instanceID) },
-				Config:      strictCollisionProvider + planned,
+				Config: existing,
+			},
+			{
+				Config:      strictCollisionProvider + withDuplicate,
 				PlanOnly:    true,
 				ExpectError: regexp.MustCompile(`(?s)Display\s+name\s+already\s+in\s+use\s+\(duplicate\s+check\).*already\s+exists\s+in\s+Jamf\s+Pro.*accepts\s+duplicates`),
 			},
 			{
-				Config:             planned,
+				Config:             withDuplicate,
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: true,
 			},

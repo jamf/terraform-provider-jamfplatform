@@ -36,7 +36,7 @@ func TestAccResource_ProUserGroup_NameCollision(t *testing.T) {
 				PreConfig:   func() { testhelpers.CreateOutOfBandClassicUserGroup(t, name) },
 				Config:      collisionConfig(name + " "),
 				PlanOnly:    true,
-				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*user\s+group.*surrounding\s+spaces.*import\s+it`),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*user\s+group.*leading\s+and\s+trailing\s+spaces.*import\s+it`),
 			},
 		},
 	})
