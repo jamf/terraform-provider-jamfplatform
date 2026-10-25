@@ -176,7 +176,7 @@ func TestNameCollisionGuide_ListsEveryCheckedConstruct(t *testing.T) {
 func guideUncheckedConstructs(t *testing.T) map[string]bool {
 	t.Helper()
 	out := map[string]bool{}
-	for _, line := range strings.Split(guideSection(t, "Object types that are not checked"), "\n") {
+	for line := range strings.SplitSeq(guideSection(t, "Object types that are not checked"), "\n") {
 		if !strings.HasPrefix(line, "|") {
 			continue
 		}

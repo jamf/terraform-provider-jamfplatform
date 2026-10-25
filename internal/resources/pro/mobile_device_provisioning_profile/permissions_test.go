@@ -40,7 +40,20 @@ func sdkCallsIn(t *testing.T, filename string) map[string]bool {
 // method list — keeping the privileges table honest as the construct changes.
 func assertMatch(t *testing.T, filename string, declaredList []string) {
 	t.Helper()
-	called := sdkCallsIn(t, filename)
+	assertMatchFiles(t, declaredList, filename)
+}
+
+// assertMatchFiles is assertMatch across several source files, for a construct
+// whose SDK calls are split between crud.go and collision.go.
+func assertMatchFiles(t *testing.T, declaredList []string, filenames ...string) {
+	t.Helper()
+	filename := filenames[0]
+	called := map[string]bool{}
+	for _, f := range filenames {
+		for m := range sdkCallsIn(t, f) {
+			called[m] = true
+		}
+	}
 	declared := map[string]bool{}
 	for _, m := range declaredList {
 		declared[m] = true
@@ -81,7 +94,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
 // not declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods)
+	assertMatchFiles(t, resourceSDKMethods, "crud.go", "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

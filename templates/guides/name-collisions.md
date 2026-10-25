@@ -135,6 +135,7 @@ One row per construct. "Checked by default" lists the keys the service refuses a
 | `jamfplatform_pro_inventory_preload_record` | serial number | — | case, trailing spaces, accents |
 | `jamfplatform_pro_patch_software_title` | name ID, patch source and site | — | nothing, compared exactly |
 | `jamfplatform_pro_patch_policy` | name, within one software title | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_mobile_device_provisioning_profile` | name | — | case, leading and trailing spaces |
 
 ## Object types that are not checked
 
@@ -150,7 +151,6 @@ Every other construct in the provider is listed here with the reason. A test fai
 | `jamfplatform_security_cloud_activation_profile` | A read returns only the profile code, with no name to compare. |
 | `jamfplatform_account_sso_connection` | Jamf Account appends a random suffix to every connection name, so the stored name never equals the planned one. |
 | `jamfplatform_pro_pki_adcs`, `jamfplatform_pro_pki_digicert`, `jamfplatform_pro_pki_venafi` | The provider has no way to list existing integrations, so there is nothing to compare against. |
-| `jamfplatform_pro_mobile_device_provisioning_profile` | Not probed. Checking it needs a valid `.mobileprovision` file. |
 | `jamfplatform_pro_icon`, `jamfplatform_pro_self_service_branding_image` | Uploads with no name key. |
 
 ## Values that are not known at plan time
