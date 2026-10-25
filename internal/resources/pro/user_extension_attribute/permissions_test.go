@@ -42,7 +42,12 @@ func calledRegistryMethods(t *testing.T, filename string) map[string]bool {
 // declared, or declares one it does not call.
 func assertCallsMatch(t *testing.T, filename string, declared []string) {
 	t.Helper()
-	called := calledRegistryMethods(t, filename)
+	called := map[string]bool{}
+	for _, f := range privilegeSourceFiles(filename) {
+		for m := range calledRegistryMethods(t, f) {
+			called[m] = true
+		}
+	}
 	want := map[string]bool{}
 	for _, m := range declared {
 		want[m] = true
@@ -122,4 +127,14 @@ func TestListResourcePrivileges_Rendered(t *testing.T) {
 	if !permissions.Renders(listResourcePrivileges, "user-extension-attributes:read") {
 		t.Fatalf("listResourcePrivileges did not render the user-extension-attributes privileges:\n%s", listResourcePrivileges)
 	}
+}
+
+// privilegeSourceFiles lists the source files whose SDK calls make up the
+// resource's privileges: its CRUD path and, for crud.go, the plan-time name
+// collision check in collision.go.
+func privilegeSourceFiles(filename string) []string {
+	if filename == "crud.go" {
+		return []string{"crud.go", "collision.go"}
+	}
+	return []string{filename}
 }

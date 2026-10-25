@@ -81,7 +81,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
 // not declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, resourceSDKMethods, sdkCallsInFile(t, "crud.go"))
+	assertMatch(t, resourceSDKMethods, mergedCalls(t, "crud.go", "collision.go"))
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into
@@ -139,4 +139,17 @@ func TestListResourcePrivileges_Rendered(t *testing.T) {
 	if !permissions.Renders(listResourcePrivileges, "ldap-servers:read") {
 		t.Fatalf("listResourcePrivileges did not render the ldap-servers privileges:\n%s", listResourcePrivileges)
 	}
+}
+
+// mergedCalls returns the SDK calls found across several source files, for a
+// resource whose privileges are split between crud.go and collision.go.
+func mergedCalls(t *testing.T, filenames ...string) map[string]bool {
+	t.Helper()
+	merged := map[string]bool{}
+	for _, f := range filenames {
+		for m := range sdkCallsInFile(t, f) {
+			merged[m] = true
+		}
+	}
+	return merged
 }

@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetDirectoryBindingByID",
 	"UpdateDirectoryBindingByID",
 	"DeleteDirectoryBindingByID",
+	"ListDirectoryBindings",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

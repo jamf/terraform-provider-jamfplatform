@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -43,7 +44,8 @@ const uuidRegex = `^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-
 
 // IbeaconResource implements the Terraform resource for Jamf Pro iBeacons.
 type IbeaconResource struct {
-	client *proclassic.Client
+	client     *proclassic.Client
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &IbeaconResource{}
@@ -151,6 +153,7 @@ func (r *IbeaconResource) Configure(ctx context.Context, req resource.ConfigureR
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro iBeacon ID.

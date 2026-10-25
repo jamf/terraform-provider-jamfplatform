@@ -26,6 +26,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/accountprivileges"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -44,7 +45,8 @@ const (
 // AccountGroupResource implements the Terraform resource for Jamf Pro
 // administrator account groups.
 type AccountGroupResource struct {
-	client *proclassic.Client
+	client     *proclassic.Client
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &AccountGroupResource{}
@@ -149,6 +151,7 @@ func (r *AccountGroupResource) Configure(ctx context.Context, req resource.Confi
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro account group ID.
@@ -170,6 +173,7 @@ func (r *AccountGroupResource) ImportState(ctx context.Context, req resource.Imp
 // Pro was never going to read. jamfplatform_pro_account gates its own ModifyPlan
 // the same way.
 func (r *AccountGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	if req.Plan.Raw.IsNull() || r.client == nil {
 		return
 	}

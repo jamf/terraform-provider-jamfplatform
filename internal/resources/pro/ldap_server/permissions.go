@@ -19,6 +19,7 @@ var resourceSDKMethods = []string{
 	"GetLDAPServerByID",
 	"UpdateLDAPServerByID",
 	"DeleteLDAPServerByID",
+	"ListLDAPServers",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

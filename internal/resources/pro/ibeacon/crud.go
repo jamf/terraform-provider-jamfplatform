@@ -10,6 +10,8 @@
 //   proclassic.GetIBeaconByName        (data source name lookup)
 //   proclassic.ResolveIBeaconIDByName  (data source name → ID)
 //
+// Uniqueness: name, enforced (409), case-, leading-space-, trailing-space- and accent-insensitive. The plan-time collision check lists with proclassic.ListIBeacons (collision.go).
+//
 // Status: current. Last reviewed 2026-05-22.
 
 package ibeacon

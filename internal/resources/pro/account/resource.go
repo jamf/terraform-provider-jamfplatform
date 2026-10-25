@@ -37,6 +37,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/accountprivileges"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -54,6 +55,7 @@ const (
 type AccountResource struct {
 	proClient     *pro.Client
 	classicClient *proclassic.Client
+	collisions    *collision.Checker
 }
 
 var _ resource.Resource = &AccountResource{}
@@ -187,6 +189,7 @@ func (r *AccountResource) Configure(ctx context.Context, req resource.ConfigureR
 	}
 	r.proClient = proClient
 	r.classicClient = classicClient
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by account ID.
@@ -199,6 +202,7 @@ func (r *AccountResource) ImportState(ctx context.Context, req resource.ImportSt
 // when privileges are absent, or when the privilege set is not Custom (Jamf Pro
 // only honours the grid for Custom + Full Access accounts).
 func (r *AccountResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	if req.Plan.Raw.IsNull() || r.classicClient == nil {
 		return
 	}
