@@ -186,7 +186,7 @@ func (r *PackageResource) Schema(ctx context.Context, req resource.SchemaRequest
 
 			// Upload-source inputs (no wire field — pure provider plumbing).
 			"package_file_source": schema.StringAttribute{
-				MarkdownDescription: "Optional local path or `http(s)://` URL pointing to the package file. Set it to upload the file to the Jamf Cloud Distribution Point on create or update. A cloud distribution point must be configured on the tenant; without one the change is refused before any bytes are uploaded. Jamf Pro computes no hash for some very large packages. The apply then ends with a warning that the upload is unverified and leaves the hash attributes empty. With no recorded hash, a changed local file is detected by its size only. When omitted, the resource manages only the package record. Cannot be combined with the hash attributes; setting both is rejected before the change runs.",
+				MarkdownDescription: "Optional local path or `http(s)://` URL pointing to the package file. Set it to upload the file to the Jamf Cloud Distribution Point on create or update. A cloud distribution point must be configured on the tenant; without one the change is refused before any bytes are uploaded. A package with no recorded hash is checked for changes by file size only. When omitted, the resource manages only the package record. Cannot be combined with the hash attributes; setting both is rejected before the change runs.",
 				Optional:            true,
 			},
 			"package_file_source_checksum": schema.StringAttribute{
@@ -225,7 +225,7 @@ func (r *PackageResource) Schema(ctx context.Context, req resource.SchemaRequest
 			// cloud distribution point upload, or the user supplies them when
 			// managing a record without an uploaded file.
 			"sha3_512": schema.StringAttribute{
-				MarkdownDescription: "SHA-3-512 hex digest of the package file. Calculated by Jamf Pro after a Jamf Cloud distribution point upload, or set directly when managing the record without an uploaded file. An Amazon S3 distribution point does not calculate it, so the value stays empty there; the upload is verified against the strongest digest the distribution point reports. Jamf Pro also computes none for some very large packages. Cannot be combined with `package_file_source`.",
+				MarkdownDescription: "SHA-3-512 hex digest of the package file. Calculated by Jamf Pro after a Jamf Cloud distribution point upload, or set directly when managing the record without an uploaded file. An Amazon S3 distribution point does not calculate it, so the value stays empty there; the upload is verified against the strongest digest the distribution point reports. Cannot be combined with `package_file_source`.",
 				Optional:            true,
 				Computed:            true,
 				Validators: []validator.String{
