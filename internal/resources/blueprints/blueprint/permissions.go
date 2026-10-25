@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetBlueprint",
 	"UpdateBlueprint",
 	"DeleteBlueprint",
+	"ListBlueprints",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

@@ -10,7 +10,7 @@ import (
 )
 
 // resourceSDKMethods lists the SDK methods the advanced computer search
-// resource's CRUD path calls. It mirrors the "SDK endpoints used" block in
+// resource's CRUD and name collision paths call. It mirrors the "SDK endpoints used" block in
 // crud.go and drives the "Required Jamf permissions" table appended to the
 // resource MarkdownDescription. permissions_test.go asserts this list stays in
 // sync with the actual client.<Method> calls in crud.go and with the SDK
@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetAdvancedComputerSearchByID",
 	"UpdateAdvancedComputerSearchByID",
 	"DeleteAdvancedComputerSearchByID",
+	"ListAdvancedComputerSearches",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

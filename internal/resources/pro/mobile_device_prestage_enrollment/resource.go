@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -46,7 +47,8 @@ const (
 
 // MobileDevicePrestageEnrollmentResource implements the Terraform resource.
 type MobileDevicePrestageEnrollmentResource struct {
-	client *pro.Client
+	client     *pro.Client
+	collisions *collision.Checker
 }
 
 var (
@@ -311,6 +313,7 @@ func (r *MobileDevicePrestageEnrollmentResource) Configure(ctx context.Context, 
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro PreStage enrollment ID.

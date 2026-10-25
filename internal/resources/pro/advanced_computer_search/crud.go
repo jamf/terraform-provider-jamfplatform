@@ -6,10 +6,12 @@
 //   proclassic.GetAdvancedComputerSearchByID
 //   proclassic.UpdateAdvancedComputerSearchByID    (PUT — 201 with empty body; GET after)
 //   proclassic.DeleteAdvancedComputerSearchByID
-//   proclassic.ListAdvancedComputerSearches        (list resource)
+//   proclassic.ListAdvancedComputerSearches        (list resource / collision check in collision.go)
 //   proclassic.GetAdvancedComputerSearchByName     (data source name lookup)
 //
-// Status: current. Last reviewed 2026-06-02.
+// Uniqueness: name, not enforced; duplicates stored; checked only with include_unenforced.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package advanced_computer_search
 
@@ -34,6 +36,7 @@ const dsGroupObjectType = criteria.ObjectTypeComputer
 // `terraform plan` shows nothing to change. Skips create (no prior state) and
 // destroy (no plan); soft — any resolve failure leaves the diff intact.
 func (r *AdvancedComputerSearchResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() || r.ldap == nil {
 		return
 	}

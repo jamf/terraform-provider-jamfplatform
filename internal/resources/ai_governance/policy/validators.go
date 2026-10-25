@@ -43,6 +43,8 @@ func (r *PolicyResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 		return
 	}
 
+	r.reportNameCollision(ctx, req, resp)
+
 	var plan policyModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {

@@ -51,6 +51,8 @@ func (r *EnrollmentCustomizationResource) ModifyPlan(ctx context.Context, req re
 		return
 	}
 
+	r.reportNameCollision(ctx, req, resp)
+
 	var plan EnrollmentCustomizationResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {

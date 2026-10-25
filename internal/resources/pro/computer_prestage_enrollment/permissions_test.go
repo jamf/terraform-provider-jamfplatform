@@ -23,16 +23,18 @@ var clientCallRe = regexp.MustCompile(`\bclient\.([A-Za-z0-9]+)\(`)
 // name-lookup path) are not registry entries by design, so filtering against
 // the registry keeps the assertion focused on the privilege-bearing methods a
 // construct actually documents.
-func registryCalls(t *testing.T, filename string) map[string]bool {
+func registryCalls(t *testing.T, filename string, moreFiles ...string) map[string]bool {
 	t.Helper()
-	src, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatalf("reading %s: %v", filename, err)
-	}
 	called := map[string]bool{}
-	for _, m := range clientCallRe.FindAllStringSubmatch(string(src), -1) {
-		if _, ok := pro.Privileges[m[1]]; ok {
-			called[m[1]] = true
+	for _, f := range append([]string{filename}, moreFiles...) {
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("reading %s: %v", f, err)
+		}
+		for _, m := range clientCallRe.FindAllStringSubmatch(string(src), -1) {
+			if _, ok := pro.Privileges[m[1]]; ok {
+				called[m[1]] = true
+			}
 		}
 	}
 	return called
@@ -79,7 +81,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
 // not declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", registryCalls(t, "crud.go"), resourceSDKMethods)
+	assertMatch(t, "crud.go", registryCalls(t, "crud.go", "collision.go"), resourceSDKMethods)
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

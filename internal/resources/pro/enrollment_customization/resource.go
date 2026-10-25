@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -44,7 +45,8 @@ const (
 
 // EnrollmentCustomizationResource implements the Terraform resource.
 type EnrollmentCustomizationResource struct {
-	client *pro.Client
+	client     *pro.Client
+	collisions *collision.Checker
 }
 
 var (
@@ -397,6 +399,7 @@ func (r *EnrollmentCustomizationResource) Configure(ctx context.Context, req res
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro enrollment customization ID.
