@@ -83,7 +83,7 @@ One row per construct. "Checked by default" lists the keys the service refuses a
 | `jamfplatform_pro_smart_computer_group` | name | — | case |
 | `jamfplatform_pro_static_mobile_device_group` | name | — | case, trailing spaces, accents |
 | `jamfplatform_pro_smart_mobile_device_group` | name | — | case, trailing spaces, accents |
-| `jamfplatform_device_group` | name | — | case, plus trailing spaces and accents for mobile groups |
+| `jamfplatform_device_group` | name, per device type | — | case, plus trailing spaces and accents for mobile groups |
 | `jamfplatform_security_cloud_device_group` | name | — | leading and trailing spaces |
 | `jamfplatform_security_cloud_dns_zone` | domain | name | domain: case; name: case, trailing spaces, accents |
 | `jamfplatform_security_cloud_ztna_app` | hostname | name | hostname: case; name: case, trailing spaces, accents |
@@ -117,7 +117,7 @@ One row per construct. "Checked by default" lists the keys the service refuses a
 
 Jamf Security Cloud activation profiles and Jamf Account SSO connections are not checked. An activation profile read returns only its code, with no name to compare, and Jamf Account appends a random suffix to every connection name, so the stored name never equals the planned one.
 
-Smart groups, static groups and Platform device groups of one device type share one pool of names, so a new computer group is checked against all three.
+Smart groups, static groups and Platform device groups of one device type share one pool of names, so a new computer group is checked against all three. Computer groups and mobile device groups are separate pools, so the same name can exist once in each. `jamfplatform_device_group` is checked against the pool for its own `device_type`.
 
 ## Values that are not known at plan time
 
