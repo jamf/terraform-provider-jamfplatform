@@ -85,6 +85,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -94,6 +95,7 @@ import (
 type GatewayResource struct {
 	client        *securitycloud.Client
 	scopeTenantID string
+	collisions    *collision.Checker
 }
 
 var (
@@ -599,6 +601,7 @@ func (r *GatewayResource) Configure(ctx context.Context, req resource.ConfigureR
 	}
 	r.client = client
 	r.scopeTenantID = providerdata.SecurityCloudTenantScopeID(req.ProviderData)
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Security Cloud gateway ID.

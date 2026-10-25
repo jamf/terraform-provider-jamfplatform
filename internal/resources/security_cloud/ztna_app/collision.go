@@ -49,7 +49,41 @@ func ztnaAppNamespace(client *securitycloud.Client) collision.Namespace {
 	}
 }
 
-// ModifyPlan reports a hostname that another application already holds.
+// ztnaAppNameNamespace is the strict-only uniqueness rule for application names.
+// Jamf Security Cloud stores two applications with one name, whatever the case,
+// trailing space or accent (wire-probed 2026-10-25), so the rule is Enforced false
+// and applies only when include_unenforced is set. The comparison is
+// collision.CollationFolded, the strictest comparison. A predefined application
+// carries no name of its own and is skipped.
+func ztnaAppNameNamespace(client *securitycloud.Client) collision.Namespace {
+	return collision.Namespace{
+		ID:        "securitycloud.ztna-app-names",
+		Product:   "Jamf Security Cloud",
+		KeyLabel:  "name",
+		Enforced:  false,
+		Collation: collision.CollationFolded,
+		Sources: []collision.Source{{
+			Noun:         "access policy application",
+			ResourceType: resourceTypeName,
+			List: func(ctx context.Context) ([]collision.Entry, error) {
+				apps, err := client.ListZtnaAppsV1(ctx)
+				if err != nil {
+					return nil, err
+				}
+				entries := make([]collision.Entry, 0, len(apps))
+				for _, a := range apps {
+					if a.Name != nil {
+						entries = append(entries, collision.Entry{ID: a.ID, Key: *a.Name})
+					}
+				}
+				return entries, nil
+			},
+		}},
+	}
+}
+
+// ModifyPlan reports a hostname that another application already holds, and an
+// application name another one already holds when include_unenforced is set.
 func (r *ZtnaAppResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if r.client == nil {
 		return
@@ -61,6 +95,10 @@ func (r *ZtnaAppResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 			Namespace: ztnaAppNamespace(r.client),
 			Path:      path.Root("hostnames"),
 			Keys:      func(m *ZtnaAppResourceModel) []types.String { return collision.SetKeys(m.Hostnames) },
+		}, {
+			Namespace: ztnaAppNameNamespace(r.client),
+			Path:      path.Root("name"),
+			Keys:      func(m *ZtnaAppResourceModel) []types.String { return []types.String{m.Name} },
 		}},
 	})
 }

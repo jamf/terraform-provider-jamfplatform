@@ -19,6 +19,7 @@ import (
 // nothing rather than re-granting it. The lookup is skipped while the client is unconfigured,
 // which leaves the value unknown for Create to resolve.
 func (r *GroupedGatewayResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	if req.Plan.Raw.IsNull() || !req.State.Raw.IsNull() || r.client == nil {
 		return
 	}

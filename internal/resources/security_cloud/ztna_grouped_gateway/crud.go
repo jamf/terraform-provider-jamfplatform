@@ -6,11 +6,13 @@
 //   securitycloud.GetZtnaGroupedGatewayV1
 //   securitycloud.UpdateZtnaGroupedGatewayV1
 //   securitycloud.DeleteZtnaGroupedGatewayV1
-//   securitycloud.ListZtnaGroupedGatewaysV1 (data sources / list resource)
+//   securitycloud.ListZtnaGroupedGatewaysV1 (collision check in collision.go, data sources / list resource)
 //   securitycloud.ListUemConnectorsV1 (tenant_ids default, when unset)
 //   securitycloud.ResolveZtnaGroupedGatewayV1ByName (singular data source, name lookup)
 //
-// Status: current. Last reviewed 2026-08-27.
+// Uniqueness: name, not enforced: Jamf Security Cloud stores duplicates (wire-probed 2026-10-25), so the name is checked only under include_unenforced, case-, trailing-space- and accent-insensitive.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package ztna_grouped_gateway
 
