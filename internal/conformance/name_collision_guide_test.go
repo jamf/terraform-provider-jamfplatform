@@ -14,6 +14,8 @@ import (
 	"testing"
 )
 
+var constructRe = regexp.MustCompile("`(jamfplatform_[a-z0-9_]+)`")
+
 const nameCollisionGuide = "../../templates/guides/name-collisions.md"
 
 var (
@@ -31,14 +33,28 @@ func keysPresent(cell string) bool {
 	return cell != "" && cell != "—"
 }
 
-func nameCollisionGuideRows(t *testing.T) map[string][]guideRow {
+func guideSection(t *testing.T, heading string) string {
 	t.Helper()
 	body, err := os.ReadFile(nameCollisionGuide)
 	if err != nil {
 		t.Fatalf("reading %s: %v", nameCollisionGuide, err)
 	}
+	text := string(body)
+	start := strings.Index(text, "## "+heading)
+	if start < 0 {
+		t.Fatalf("%s has no %q section", nameCollisionGuide, heading)
+	}
+	rest := text[start+len("## "+heading):]
+	if end := strings.Index(rest, "\n## "); end >= 0 {
+		rest = rest[:end]
+	}
+	return rest
+}
+
+func nameCollisionGuideRows(t *testing.T) map[string][]guideRow {
+	t.Helper()
 	rows := map[string][]guideRow{}
-	for _, m := range guideRowRe.FindAllStringSubmatch(string(body), -1) {
+	for _, m := range guideRowRe.FindAllStringSubmatch(guideSection(t, "Checked object types"), -1) {
 		rows[m[1]] = append(rows[m[1]], guideRow{hasDefault: keysPresent(m[2]), hasStrict: keysPresent(m[3])})
 	}
 	return rows
@@ -149,5 +165,31 @@ func TestNameCollisionGuide_ListsEveryCheckedConstruct(t *testing.T) {
 		if slices.Contains(pkg.enforced, false) && !guide[0].hasStrict {
 			t.Errorf("%s sets Enforced: false but its guide row lists no key under \"Checked with include_unenforced\"", construct)
 		}
+	}
+}
+
+// TestNameCollisionGuide_UncheckedTypesHaveNoCheck keeps the "not checked" list
+// honest: a construct named there that later gains a collision.go must move to
+// the checked table.
+func TestNameCollisionGuide_UncheckedTypesHaveNoCheck(t *testing.T) {
+	pkgs := collisionPackages(t)
+	listed := 0
+	for line := range strings.SplitSeq(guideSection(t, "Object types that are not checked"), "\n") {
+		if !strings.HasPrefix(line, "|") {
+			continue
+		}
+		cells := strings.Split(line, "|")
+		if len(cells) < 3 {
+			continue
+		}
+		for _, m := range constructRe.FindAllStringSubmatch(cells[1], -1) {
+			listed++
+			if _, ok := pkgs[m[1]]; ok {
+				t.Errorf("%s is listed as not checked but has a collision.go", m[1])
+			}
+		}
+	}
+	if listed == 0 {
+		t.Fatal("parsed no constructs from the not-checked table; the parser is likely matching nothing")
 	}
 }
