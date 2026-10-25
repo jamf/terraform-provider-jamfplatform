@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/blueprints/blueprint/components"
@@ -36,6 +37,9 @@ type BlueprintResource struct {
 	// impact backs the plan-time impact alert on device group targeting. nil when
 	// the provider's impact_alerts attribute is off, which is the default.
 	impact *impact.Cache
+	// collisions backs the plan-time name collision check. nil when the provider's
+	// name_collision_check mode is off.
+	collisions *collision.Checker
 }
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -435,6 +439,7 @@ func (r *BlueprintResource) Configure(ctx context.Context, req resource.Configur
 
 	r.client = blueprints.New(pd.Client)
 	r.impact = pd.ImpactCache()
+	r.collisions = pd.CollisionChecker()
 }
 
 // ModifyPlan marks the server-managed `updated` and `deployment_state`
@@ -455,6 +460,7 @@ func (r *BlueprintResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	// leaving management changes what devices receive, so both are worth an
 	// impact alert even though neither needs the unknown-marking that follows.
 	r.reportDeviceGroupImpact(ctx, req, resp)
+	r.reportNameCollision(ctx, req, resp)
 
 	if !req.Plan.Raw.IsNull() {
 		resp.Diagnostics.Append(uncheckedPayloadWarnings(ctx, req.Config)...)

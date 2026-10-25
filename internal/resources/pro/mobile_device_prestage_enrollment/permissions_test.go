@@ -24,16 +24,18 @@ var clientCallRe = regexp.MustCompile(`\bclient\.([A-Za-z0-9]+)\(`)
 // registry. Resolver-wrapper calls (e.g. ResolveMobileDevicePrestageV3IDByName)
 // are not registry entries and are filtered out, since they carry no
 // independent privilege beyond the underlying read.
-func registryKnownCalls(t *testing.T, filename string) map[string]bool {
+func registryKnownCalls(t *testing.T, filename string, moreFiles ...string) map[string]bool {
 	t.Helper()
-	src, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatalf("reading %s: %v", filename, err)
-	}
 	called := map[string]bool{}
-	for _, m := range clientCallRe.FindAllStringSubmatch(string(src), -1) {
-		if _, ok := pro.Privileges[m[1]]; ok {
-			called[m[1]] = true
+	for _, f := range append([]string{filename}, moreFiles...) {
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("reading %s: %v", f, err)
+		}
+		for _, m := range clientCallRe.FindAllStringSubmatch(string(src), -1) {
+			if _, ok := pro.Privileges[m[1]]; ok {
+				called[m[1]] = true
+			}
 		}
 	}
 	return called
@@ -41,9 +43,9 @@ func registryKnownCalls(t *testing.T, filename string) map[string]bool {
 
 // assertMatch fails if the construct source calls a registry-known SDK method
 // not declared, or declares one it does not call.
-func assertMatch(t *testing.T, filename string, declaredList []string) {
+func assertMatch(t *testing.T, filename string, declaredList []string, moreFiles ...string) {
 	t.Helper()
-	called := registryKnownCalls(t, filename)
+	called := registryKnownCalls(t, filename, moreFiles...)
 	declared := map[string]bool{}
 	for _, m := range declaredList {
 		declared[m] = true
@@ -84,7 +86,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps the privileges table honest as the
 // CRUD path changes.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods)
+	assertMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

@@ -24,6 +24,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -42,6 +43,9 @@ type AdvancedComputerSearchResource struct {
 	// {uuid,serverId} wire value. Built from the shared Pro client because the
 	// classic API has no LDAP-group search of its own.
 	ldap ldapgroups.Searcher
+	// collisions backs the plan-time name collision check. nil when the provider's
+	// name_collision_check mode is off.
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &AdvancedComputerSearchResource{}
@@ -96,7 +100,7 @@ func (r *AdvancedComputerSearchResource) Schema(ctx context.Context, req resourc
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "Advanced computer search display name. Must be unique within the tenant.",
+				MarkdownDescription: "Advanced computer search display name.",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
@@ -143,6 +147,7 @@ func (r *AdvancedComputerSearchResource) Configure(ctx context.Context, req reso
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 	if pd, ok := req.ProviderData.(*providerdata.Data); ok {
 		r.ldap = pro.New(pd.Client)
 	}

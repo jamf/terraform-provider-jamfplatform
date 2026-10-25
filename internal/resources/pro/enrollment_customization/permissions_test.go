@@ -27,16 +27,18 @@ var sdkClientCallRe = regexp.MustCompile(`\b\w*[Cc]lient\.([A-Za-z0-9]+)\(`)
 // (e.g. ResolveEnrollmentCustomizationV2ByName) that the SDK privilege registry
 // does not carry, so the comparison reflects exactly the privilege-bearing
 // calls a construct makes.
-func calledSDKMethods(t *testing.T, filename string, reg permissions.Registry) map[string]bool {
+func calledSDKMethods(t *testing.T, filename string, reg permissions.Registry, moreFiles ...string) map[string]bool {
 	t.Helper()
-	src, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatalf("reading %s: %v", filename, err)
-	}
 	called := map[string]bool{}
-	for _, m := range sdkClientCallRe.FindAllStringSubmatch(string(src), -1) {
-		if _, ok := reg[m[1]]; ok {
-			called[m[1]] = true
+	for _, f := range append([]string{filename}, moreFiles...) {
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("reading %s: %v", f, err)
+		}
+		for _, m := range sdkClientCallRe.FindAllStringSubmatch(string(src), -1) {
+			if _, ok := reg[m[1]]; ok {
+				called[m[1]] = true
+			}
 		}
 	}
 	return called
@@ -44,9 +46,9 @@ func calledSDKMethods(t *testing.T, filename string, reg permissions.Registry) m
 
 // assertDeclaredMatchesCalled fails if the source file calls a registry-known
 // SDK method not declared, or declares one it does not call.
-func assertDeclaredMatchesCalled(t *testing.T, filename string, reg permissions.Registry, declaredMethods []string) {
+func assertDeclaredMatchesCalled(t *testing.T, filename string, reg permissions.Registry, declaredMethods []string, moreFiles ...string) {
 	t.Helper()
-	called := calledSDKMethods(t, filename, reg)
+	called := calledSDKMethods(t, filename, reg, moreFiles...)
 	declared := map[string]bool{}
 	for _, m := range declaredMethods {
 		declared[m] = true
@@ -85,7 +87,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps the resource privilege table
 // honest as crud.go changes.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertDeclaredMatchesCalled(t, "crud.go", pro.Privileges, resourceSDKMethods)
+	assertDeclaredMatchesCalled(t, "crud.go", pro.Privileges, resourceSDKMethods, "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

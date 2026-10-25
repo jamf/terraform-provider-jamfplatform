@@ -20,16 +20,18 @@ var clientCallRE = regexp.MustCompile(`\bclient\.([A-Za-z0-9]+)\(`)
 // sdkCallsIn returns the distinct SDK method names invoked via client.<Method>(
 // in the named source file, filtered to those known to the proclassic privilege
 // registry (so unrelated client.* helpers can't pollute the comparison).
-func sdkCallsIn(t *testing.T, filename string) map[string]bool {
+func sdkCallsIn(t *testing.T, filename string, moreFiles ...string) map[string]bool {
 	t.Helper()
-	src, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatalf("reading %s: %v", filename, err)
-	}
 	called := map[string]bool{}
-	for _, m := range clientCallRE.FindAllStringSubmatch(string(src), -1) {
-		if _, known := proclassic.Privileges[m[1]]; known {
-			called[m[1]] = true
+	for _, f := range append([]string{filename}, moreFiles...) {
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("reading %s: %v", f, err)
+		}
+		for _, m := range clientCallRE.FindAllStringSubmatch(string(src), -1) {
+			if _, known := proclassic.Privileges[m[1]]; known {
+				called[m[1]] = true
+			}
 		}
 	}
 	return called
@@ -37,9 +39,9 @@ func sdkCallsIn(t *testing.T, filename string) map[string]bool {
 
 // assertMatch fails if the source file calls an SDK method not declared in
 // methods, or declares one it does not call.
-func assertMatch(t *testing.T, filename string, methods []string) {
+func assertMatch(t *testing.T, filename string, methods []string, moreFiles ...string) {
 	t.Helper()
-	called := sdkCallsIn(t, filename)
+	called := sdkCallsIn(t, filename, moreFiles...)
 	declared := map[string]bool{}
 	for _, m := range methods {
 		declared[m] = true
@@ -78,7 +80,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method not
 // declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods)
+	assertMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

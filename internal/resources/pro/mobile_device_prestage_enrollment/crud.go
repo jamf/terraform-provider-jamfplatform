@@ -8,7 +8,7 @@
 //   pro.DeleteMobileDevicePrestageV3
 //   pro.ResolveMobileDevicePrestageV3ByName               (data source name lookup)
 //   pro.ResolveMobileDevicePrestageV3IDByName             (data source name lookup ID-only path)
-//   pro.ListMobileDevicePrestagesV3                       (list resource + data source name lookup paging)
+//   pro.ListMobileDevicePrestagesV3                       (list resource + data source name lookup paging + collision check in collision.go)
 //   pro.GetMobileDevicePrestageScopeV2                    (folded scope_serial_numbers read)
 //   pro.ReplaceMobileDevicePrestageScopeV2                (folded scope_serial_numbers write)
 //
@@ -28,7 +28,9 @@
 //     DEVICE_DOES_NOT_EXIST_ON_TOKEN (serial not on the ADE token).
 //   - DELETE → GET returns a clean 404 (no computer 400 INVALID_ID quirk).
 //
-// Status: current. Last reviewed 2026-08-07.
+// Uniqueness: displayName, not enforced; duplicates stored; checked only with include_unenforced.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package mobile_device_prestage_enrollment
 
@@ -64,8 +66,9 @@ import (
 // write). diffPlanAgainstGet additionally excludes those two fields (§9.1).
 func (r *MobileDevicePrestageEnrollmentResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
-		return // destroy
+		return
 	}
+	r.reportNameCollision(ctx, req, resp)
 	var plan MobileDevicePrestageEnrollmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {

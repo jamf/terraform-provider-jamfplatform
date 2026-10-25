@@ -10,7 +10,7 @@ import (
 )
 
 // resourceSDKMethods lists the SDK methods the policy resource's CRUD path calls, including the
-// plan-time validation path — an operator whose integration cannot read the tool catalogue gets no
+// plan-time validation and name collision paths — an operator whose integration cannot read the tool catalogue gets no
 // validation, so the read privilege belongs in the table even though nothing fails without it.
 // permissions_test.go asserts this list stays in sync with the actual client.<Method> calls in the
 // package and with the SDK privilege registry.
@@ -22,6 +22,7 @@ var resourceSDKMethods = []string{
 	"ArchivePolicy",
 	"ListTools",
 	"GetToolSchema",
+	"ListPolicies",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown section for the policy
