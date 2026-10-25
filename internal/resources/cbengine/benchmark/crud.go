@@ -15,6 +15,8 @@ import (
 )
 
 // Create creates a new Jamf Compliance Benchmark resource in Terraform.
+//
+// Uniqueness: title, enforced (409 DuplicateFieldException), case-insensitive; spaces and accents are significant.
 func (r *BenchmarkResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data BenchmarkResourceModel
 

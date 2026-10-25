@@ -45,6 +45,8 @@ func TestCollation_Describe(t *testing.T) {
 		{CollationAccentSensitive, "Names are compared without regard to case or trailing spaces."},
 		{CollationCaseSensitive, "Names are compared without regard to trailing spaces."},
 		{CollationExact, "Names are compared exactly."},
+		{Collation{IgnoreLeadingSpace: true, IgnoreTrailingSpace: true}, "Names are compared without regard to leading and trailing spaces."},
+		{Collation{IgnoreCase: true}, "Names are compared without regard to case."},
 	}
 	for _, tc := range cases {
 		if got := tc.c.Describe("name"); got != tc.want {

@@ -3,7 +3,7 @@
 
 // SDK endpoints used:
 //   account.CreateDomain
-//   account.ListDomains        (read, update refresh, data sources, list resource)
+//   account.ListDomains        (read, update refresh, data sources, list resource, collision check in collision.go)
 //   account.DeleteDomain
 //   account.GetDomainAllocation (singular data source)
 //
@@ -15,7 +15,9 @@
 // belongs to the jamfplatform_account_sso_domain_verify action rather than to
 // this resource's lifecycle.
 //
-// Status: current. Last reviewed 2026-09-02.
+// Uniqueness: domain, organization-wide, enforced (409 CONFLICT), case-insensitive. Shared domains count.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package sso_domain
 

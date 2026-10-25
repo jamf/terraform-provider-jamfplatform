@@ -80,6 +80,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -110,13 +111,15 @@ const (
 // ZtnaAppResource implements the Terraform resource for Jamf Security Cloud ZTNA
 // access policy applications.
 type ZtnaAppResource struct {
-	client *securitycloud.Client
+	client     *securitycloud.Client
+	collisions *collision.Checker
 }
 
 var (
 	_ resource.Resource                     = &ZtnaAppResource{}
 	_ resource.ResourceWithImportState      = &ZtnaAppResource{}
 	_ resource.ResourceWithIdentity         = &ZtnaAppResource{}
+	_ resource.ResourceWithModifyPlan       = &ZtnaAppResource{}
 	_ resource.ResourceWithConfigValidators = &ZtnaAppResource{}
 )
 
@@ -470,6 +473,7 @@ func (r *ZtnaAppResource) Configure(ctx context.Context, req resource.ConfigureR
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Security Cloud ZTNA app ID.

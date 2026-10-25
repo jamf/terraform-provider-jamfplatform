@@ -10,8 +10,27 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+func TestSetKeys(t *testing.T) {
+	set := types.SetValueMust(types.StringType, []attr.Value{types.StringValue("a"), types.StringValue("b")})
+	if got := SetKeys(set); len(got) != 2 {
+		t.Fatalf("want 2 keys, got %v", got)
+	}
+	if got := SetKeys(types.SetNull(types.StringType)); got != nil {
+		t.Fatalf("a null set has no keys, got %v", got)
+	}
+	got := SetKeys(types.SetUnknown(types.StringType))
+	if len(got) != 1 || !got[0].IsUnknown() {
+		t.Fatalf("an unknown set must yield one unknown key, got %v", got)
+	}
+	if _, known := knownValues(got); known {
+		t.Fatal("an unknown set must make ReportPlan skip the rule")
+	}
+}
 
 const testResourceType = "jamfplatform_pro_widget"
 

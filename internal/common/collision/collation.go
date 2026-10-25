@@ -15,8 +15,9 @@ import (
 // either miss collisions Jamf refuses or report ones it accepts. IgnoreCase folds
 // upper and lower case together. IgnoreTrailingSpace drops trailing spaces before
 // comparing. IgnoreLeadingSpace drops leading spaces, which Jamf does only for
-// the types that trim a name on save; elsewhere a leading space keeps two names
-// apart. IgnoreAccents folds accented letters onto their base letter.
+// the types that trim a name on save (extension attributes, configuration
+// profiles, Jamf Security Cloud device groups); elsewhere a leading space keeps
+// two names apart. IgnoreAccents folds accented letters onto their base letter.
 type Collation struct {
 	IgnoreCase          bool
 	IgnoreLeadingSpace  bool

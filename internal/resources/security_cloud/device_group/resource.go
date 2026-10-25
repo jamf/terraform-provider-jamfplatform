@@ -72,19 +72,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
 // DeviceGroupResource implements the Terraform resource for Jamf Security Cloud
 // device groups.
 type DeviceGroupResource struct {
-	client *securitycloud.Client
+	client     *securitycloud.Client
+	collisions *collision.Checker
 }
 
 var (
 	_ resource.Resource                = &DeviceGroupResource{}
 	_ resource.ResourceWithImportState = &DeviceGroupResource{}
 	_ resource.ResourceWithIdentity    = &DeviceGroupResource{}
+	_ resource.ResourceWithModifyPlan  = &DeviceGroupResource{}
 )
 
 const (
@@ -180,6 +183,7 @@ func (r *DeviceGroupResource) Configure(ctx context.Context, req resource.Config
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Security Cloud device group ID.
