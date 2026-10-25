@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -31,7 +32,8 @@ const minJamfProVersion = ""
 
 // SiteResource implements the Terraform resource for Jamf ProClassic sites.
 type SiteResource struct {
-	client *proclassic.Client
+	collisions *collision.Checker
+	client     *proclassic.Client
 }
 
 var _ resource.Resource = &SiteResource{}
@@ -105,6 +107,7 @@ func (r *SiteResource) Configure(ctx context.Context, req resource.ConfigureRequ
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro site ID.

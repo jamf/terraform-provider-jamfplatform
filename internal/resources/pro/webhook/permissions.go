@@ -4,6 +4,8 @@
 package webhook
 
 import (
+	"slices"
+
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
@@ -23,7 +25,13 @@ var resourceSDKMethods = []string{
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown
 // section for the webhook resource, appended to its MarkdownDescription.
-var resourcePrivileges = permissions.Section(proclassic.Privileges, resourceSDKMethods...)
+// collisionSDKMethods lists the SDK methods the plan-time name collision check calls. The
+// check lists every existing webhook once per plan, so the table documents the read it needs.
+var collisionSDKMethods = []string{
+	"ListWebhooks",
+}
+
+var resourcePrivileges = permissions.Section(proclassic.Privileges, slices.Concat(resourceSDKMethods, collisionSDKMethods)...)
 
 // dataSourceSDKMethods lists the SDK methods the webhook data source calls.
 // Lookup is by ID or by exact name, so it needs only the two read endpoints —

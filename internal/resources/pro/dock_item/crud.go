@@ -6,8 +6,10 @@
 //   proclassic.GetDockItemByID
 //   proclassic.UpdateDockItemByID
 //   proclassic.DeleteDockItemByID
-//   proclassic.ListDockItems       (data source / list resource)
+//   proclassic.ListDockItems       (data source / list resource / collision check in collision.go)
 //   proclassic.GetDockItemByName   (data source name lookup)
+//
+// Uniqueness: name, enforced (409), case-, leading-space-, trailing-space- and accent-insensitive.
 //
 // Status: current. Last reviewed 2026-05-22.
 

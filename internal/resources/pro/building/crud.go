@@ -6,7 +6,9 @@
 //   pro.GetBuildingV1
 //   pro.UpdateBuildingV1
 //   pro.DeleteBuildingV1
-//   pro.ListBuildingsV1 (data source / list resource)
+//   pro.ListBuildingsV1 (data source / list resource / collision check in collision.go)
+//
+// Uniqueness: name, enforced (400 DUPLICATE_FIELD), case-, trailing-space- and accent-insensitive; a leading space is significant.
 //
 // Status: current. Last reviewed 2026-05-21.
 

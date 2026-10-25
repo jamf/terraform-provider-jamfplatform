@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -42,7 +43,8 @@ const (
 
 // DockItemResource implements the Terraform resource for Jamf Pro dock items.
 type DockItemResource struct {
-	client *proclassic.Client
+	collisions *collision.Checker
+	client     *proclassic.Client
 	// impact backs the plan-time impact alert reporting how many computers this
 	// object reaches through the policies that use it. nil when the provider's
 	// impact_alerts attribute is off, which is the default.
@@ -139,6 +141,7 @@ func (r *DockItemResource) Configure(ctx context.Context, req resource.Configure
 	}
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro dock item ID.

@@ -79,6 +79,15 @@ Each row is one uniqueness rule. "Refused by the service" says whether the servi
 | `jamfplatform_pro_macos_configuration_profile` | name | Yes | case, leading and trailing spaces, accents |
 | `jamfplatform_pro_mobile_device_configuration_profile` | name | Yes | case, leading and trailing spaces, accents |
 | `jamfplatform_pro_policy` | name | Yes | case, leading and trailing spaces |
+| `jamfplatform_pro_building` | name | Yes | case, trailing spaces, accents |
+| `jamfplatform_pro_department` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_site` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_dock_item` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_printer` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_webhook` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_network_segment` | name | Yes | case, leading and trailing spaces |
+| `jamfplatform_pro_restricted_software` | name | Yes | case, leading and trailing spaces |
+| `jamfplatform_pro_ebook` | name | Yes | case, leading and trailing spaces |
 | `jamfplatform_pro_user_group` | name | Yes | leading and trailing spaces |
 | `jamfplatform_pro_static_computer_group` | name | Yes | case |
 | `jamfplatform_pro_smart_computer_group` | name | Yes | case |

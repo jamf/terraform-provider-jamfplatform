@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -35,7 +36,8 @@ const minJamfProVersion = ""
 
 // PrinterResource implements the Terraform resource for Jamf Pro printers.
 type PrinterResource struct {
-	client *proclassic.Client
+	collisions *collision.Checker
+	client     *proclassic.Client
 	// impact backs the plan-time impact alert reporting how many computers this
 	// object reaches through the policies that use it. nil when the provider's
 	// impact_alerts attribute is off, which is the default.
@@ -197,6 +199,7 @@ func (r *PrinterResource) Configure(ctx context.Context, req resource.ConfigureR
 	}
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro printer ID.

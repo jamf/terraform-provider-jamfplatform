@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -31,7 +32,8 @@ const minJamfProVersion = ""
 
 // BuildingResource implements the Terraform resource for Jamf Pro buildings.
 type BuildingResource struct {
-	client *pro.Client
+	collisions *collision.Checker
+	client     *pro.Client
 }
 
 var _ resource.Resource = &BuildingResource{}
@@ -162,6 +164,7 @@ func (r *BuildingResource) Configure(ctx context.Context, req resource.Configure
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro building ID.

@@ -4,6 +4,8 @@
 package department
 
 import (
+	"slices"
+
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
@@ -23,7 +25,13 @@ var resourceSDKMethods = []string{
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown
 // section for the department resource, appended to its MarkdownDescription.
-var resourcePrivileges = permissions.Section(pro.Privileges, resourceSDKMethods...)
+// collisionSDKMethods lists the SDK methods the plan-time name collision check calls. The
+// check lists every existing department once per plan, so the table documents the read it needs.
+var collisionSDKMethods = []string{
+	"ListDepartmentsV1",
+}
+
+var resourcePrivileges = permissions.Section(pro.Privileges, slices.Concat(resourceSDKMethods, collisionSDKMethods)...)
 
 // dataSourceSDKMethods lists the SDK methods the singular department data
 // source calls (data_source.go). It documents only the privileges that

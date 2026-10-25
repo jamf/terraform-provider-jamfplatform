@@ -6,13 +6,15 @@
 //   proclassic.GetPrinterByID
 //   proclassic.UpdatePrinterByID
 //   proclassic.DeletePrinterByID
-//   proclassic.ListPrinters       (data source / list resource)
+//   proclassic.ListPrinters       (data source / list resource / collision check in collision.go)
 //   proclassic.GetPrinterByName   (data source name lookup)
 //
 // Write semantics: the PUT merges field by field; an omitted element keeps
 // the stored value and an empty element clears it (wire-probed 2026-09-06 for
 // every plain string, incl. <ppd> beside a populated <ppd_path>, which does
 // not flip use_generic). See buildPrinterInput.
+//
+// Uniqueness: name, enforced (409), case-, leading-space-, trailing-space- and accent-insensitive.
 //
 // Status: current. Last reviewed 2026-09-06.
 
