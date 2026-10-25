@@ -6,7 +6,7 @@
 //   pro.GetAppRequestFormInputFieldV1
 //   pro.UpdateAppRequestFormInputFieldV1   (PUT — full-replace, returns the echo)
 //   pro.DeleteAppRequestFormInputFieldV1   (DELETE — 204)
-//   pro.ListAppRequestFormInputFieldsV1    (data source by title / list resource)
+//   pro.ListAppRequestFormInputFieldsV1    (data source by title / list resource / collision check in collision.go)
 //
 // A normal id-keyed Pro CRUD record. Create POSTs the field and the server returns a
 // complete echo (id + title + description + priority) — state is seeded directly from it,
@@ -16,6 +16,10 @@
 // cross-field independent (mutating one field does not re-sequence the others), so no
 // reorder call or provider mutex is required. GET on a deleted id returns 404 (code
 // INVALID_ID) — matched by helpers.IsNotFoundError.
+//
+// Uniqueness: title, not enforced; duplicates stored; checked only with
+// include_unenforced. The strict comparison ignores case, trailing spaces and
+// accents.
 //
 // Status: current. Last reviewed 2026-06-13.
 

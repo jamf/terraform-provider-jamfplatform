@@ -8,9 +8,13 @@
 //   proclassic.GetMobileDeviceEnrollmentProfileByInvitation (data source)
 //   proclassic.UpdateMobileDeviceEnrollmentProfileByID   (PUT, returns no body — GET after)
 //   proclassic.DeleteMobileDeviceEnrollmentProfileByID
-//   proclassic.ListMobileDeviceEnrollmentProfiles        (data source / list resource)
+//   proclassic.ListMobileDeviceEnrollmentProfiles        (data source / list resource / collision check in collision.go)
 //
 // Writes are a MERGE (omit=retain, empty=clear); see input_builders.go.
+//
+// Uniqueness: name, not enforced; duplicates stored; checked only with
+// include_unenforced. Classic trims the name on save, so the strict comparison also
+// ignores leading and trailing spaces, case and accents.
 //
 // Status: current. Last reviewed 2026-06-05.
 

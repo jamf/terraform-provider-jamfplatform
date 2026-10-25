@@ -70,9 +70,14 @@ func callsIn(t *testing.T, filename string) map[string]bool {
 
 // assertMatch fails when the registry-known SDK calls reachable from filename do
 // not exactly equal declared.
-func assertMatch(t *testing.T, filename string, declared []string) {
+func assertMatch(t *testing.T, filename string, declared []string, extraFiles ...string) {
 	t.Helper()
 	called := callsIn(t, filename)
+	for _, f := range extraFiles {
+		for m := range callsIn(t, f) {
+			called[m] = true
+		}
+	}
 	want := map[string]bool{}
 	for _, m := range declared {
 		want[m] = true
@@ -148,7 +153,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 }
 
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods)
+	assertMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 func TestResourcePrivileges_Rendered(t *testing.T) {

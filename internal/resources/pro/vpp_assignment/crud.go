@@ -6,7 +6,7 @@
 //   proclassic.GetVPPAssignmentByID
 //   proclassic.UpdateVPPAssignmentByID  (PUT → 201, NO body — GET after)
 //   proclassic.DeleteVPPAssignmentByID  (→ 200)
-//   proclassic.ListVPPAssignments       (data source / list resource)
+//   proclassic.ListVPPAssignments       (data source / list resource / collision check in collision.go)
 //
 // Writes are a MERGE (omit=retain). General scalars (name, vpp_admin_account_id)
 // are emitted as planned. Content collections are opt-out (null omits, empty
@@ -23,6 +23,10 @@
 // merge — no other section of the read is echoed back), emitting every merged
 // category explicitly. Omitted categories stay owned by the admin UI; declared
 // `[]` clears. See STYLE_GUIDE.md §Scope helper omission semantics.
+//
+// Uniqueness: name, not enforced; duplicates stored; checked only with
+// include_unenforced. Classic trims the name on save, so the strict comparison also
+// ignores leading and trailing spaces, case and accents.
 //
 // Status: current. Last reviewed 2026-07-08.
 

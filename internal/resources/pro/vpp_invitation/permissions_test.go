@@ -42,9 +42,14 @@ func scanClientCalls(t *testing.T, filename string) map[string]bool {
 
 // assertMatch fails when the set of registry-known SDK calls in the source file
 // does not exactly equal the declared method list.
-func assertMatch(t *testing.T, filename string, declaredMethods []string) {
+func assertMatch(t *testing.T, filename string, declaredMethods []string, extraFiles ...string) {
 	t.Helper()
 	called := scanClientCalls(t, filename)
+	for _, f := range extraFiles {
+		for m := range scanClientCalls(t, f) {
+			called[m] = true
+		}
+	}
 	declared := map[string]bool{}
 	for _, m := range declaredMethods {
 		declared[m] = true
@@ -85,7 +90,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
 // not declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods)
+	assertMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

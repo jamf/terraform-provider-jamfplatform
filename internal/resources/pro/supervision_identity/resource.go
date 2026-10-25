@@ -36,6 +36,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -49,11 +50,13 @@ const minJamfProVersion = ""
 // SupervisionIdentityResource implements the Terraform resource for Jamf Pro
 // supervision identities.
 type SupervisionIdentityResource struct {
-	client *pro.Client
+	client     *pro.Client
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &SupervisionIdentityResource{}
 var _ resource.ResourceWithImportState = &SupervisionIdentityResource{}
+var _ resource.ResourceWithModifyPlan = &SupervisionIdentityResource{}
 var _ resource.ResourceWithIdentity = &SupervisionIdentityResource{}
 
 const (
@@ -149,9 +152,16 @@ func (r *SupervisionIdentityResource) Configure(ctx context.Context, req resourc
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro supervision identity ID.
 func (r *SupervisionIdentityResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ModifyPlan reports a name that another object of this type already holds, when
+// the provider's name_collision_check enables the strict check.
+func (r *SupervisionIdentityResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 }

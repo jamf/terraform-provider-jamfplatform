@@ -6,8 +6,12 @@
 //   proclassic.GetMobileDeviceApplicationByID     (GET  /mobiledeviceapplications/id/{id})
 //   proclassic.UpdateMobileDeviceApplicationByID  (PUT  /mobiledeviceapplications/id/{id})
 //   proclassic.DeleteMobileDeviceApplicationByID  (DELETE)
-//   proclassic.ListMobileDeviceApplications       (data source / list resource)
+//   proclassic.ListMobileDeviceApplications       (data source / list resource / collision check in collision.go)
 //   proclassic.GetMobileDeviceApplicationByName   (data source name lookup)
+//
+// Uniqueness: name, not enforced; duplicates stored; checked only with
+// include_unenforced. Classic trims the name on save, so the strict comparison also
+// ignores leading and trailing spaces, case and accents.
 //
 // Status: current. Last reviewed 2026-05-31.
 //
