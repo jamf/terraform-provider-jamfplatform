@@ -56,7 +56,7 @@ func (c *Checker) Check(ctx context.Context, req Request) diag.Diagnostics {
 			warnUnavailable(&diags, s, req.Namespace, err)
 			return diags
 		}
-		for _, m := range s.find(req.Namespace, key, req.SelfID, req.ResourceType, extra) {
+		for _, m := range s.find(req.Namespace, key, req.SelfID, req.ResourceType, extra, func(id string) bool { return c.isReplacing(req.ResourceType, id) }) {
 			c.report(&diags, req, key, m)
 		}
 	}
@@ -71,6 +71,17 @@ func warnUnavailable(diags *diag.Diagnostics, s *sweep, ns Namespace, err error)
 				ns.nouns(), ns.keyLabel(), err),
 		)
 	})
+}
+
+// beingChanged reports whether an existing object has pending changes. The
+// framework hands ModifyPlan an empty RequiresReplace, so a replacement cannot be
+// seen directly, and Terraform plans the replacement a second time with no prior
+// state. A plan that differs from state is the signal that the object may be
+// replaced, which is enough to keep it from colliding with itself. An object
+// with no pending change is not recorded, so a new resource taking its name is
+// still flagged.
+func beingChanged(req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) bool {
+	return len(resp.RequiresReplace) > 0 || !req.Plan.Raw.Equal(req.State.Raw)
 }
 
 func newKeys(req Request) []string {
@@ -197,6 +208,9 @@ func ReportPlan[M any](
 		if diags := req.State.GetAttribute(ctx, idPath, &id); !diags.HasError() {
 			selfID = id.ValueString()
 		}
+		if beingChanged(req, resp) {
+			rep.Checker.noteReplacing(rep.ResourceType, selfID)
+		}
 	}
 
 	for _, rule := range rep.Rules {
@@ -258,6 +272,9 @@ func ReportAttributePlan(
 		var id types.String
 		if diags := req.State.GetAttribute(ctx, idPath, &id); !diags.HasError() {
 			selfID = id.ValueString()
+		}
+		if beingChanged(req, resp) {
+			rep.Checker.noteReplacing(rep.ResourceType, selfID)
 		}
 	}
 

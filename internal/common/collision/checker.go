@@ -154,6 +154,9 @@ type Checker struct {
 
 	mu     sync.Mutex
 	sweeps map[string]*sweep
+
+	replacingMu sync.Mutex
+	replacing   map[string]map[string]bool
 }
 
 // New returns a Checker for the configuration, or nil when the mode is off.
@@ -166,6 +169,31 @@ func New(cfg Config) *Checker {
 		sem:    make(chan struct{}, sweepConcurrency),
 		sweeps: make(map[string]*sweep),
 	}
+}
+
+// noteReplacing records that the object with this ID, managed by this resource
+// type, is being replaced in the current plan. Terraform plans the replacement
+// by calling the resource again with no prior state, so without the record the
+// object being replaced would collide with itself under its unchanged name.
+func (c *Checker) noteReplacing(resourceType, id string) {
+	if c == nil || id == "" {
+		return
+	}
+	c.replacingMu.Lock()
+	defer c.replacingMu.Unlock()
+	if c.replacing == nil {
+		c.replacing = make(map[string]map[string]bool)
+	}
+	if c.replacing[resourceType] == nil {
+		c.replacing[resourceType] = make(map[string]bool)
+	}
+	c.replacing[resourceType][id] = true
+}
+
+func (c *Checker) isReplacing(resourceType, id string) bool {
+	c.replacingMu.Lock()
+	defer c.replacingMu.Unlock()
+	return c.replacing[resourceType][id]
 }
 
 // Enabled reports whether the checker will report anything.
@@ -290,12 +318,12 @@ func (m Match) AdoptID(resourceType string) (string, bool) {
 // find returns the existing objects colliding with key. An entry is the object
 // being planned, and is skipped, when selfID is the identifier its source or
 // its AltIDs gives for the resource type being planned.
-func (s *sweep) find(ns Namespace, key, selfID, resourceType string, extra []taggedEntry) []Match {
+func (s *sweep) find(ns Namespace, key, selfID, resourceType string, extra []taggedEntry, replacing func(string) bool) []Match {
 	want := ns.Collation.Fold(key)
 	var out []Match
 	for _, e := range append(append([]taggedEntry(nil), s.entries...), extra...) {
 		m := Match{Entry: e.Entry, Noun: e.source.Noun, ResourceType: e.source.ResourceType}
-		if id, ok := m.AdoptID(resourceType); ok && selfID != "" && id == selfID {
+		if id, ok := m.AdoptID(resourceType); ok && ((selfID != "" && id == selfID) || replacing(id)) {
 			continue
 		}
 		if ns.Collation.Fold(e.Key) != want {
