@@ -67,8 +67,8 @@ func warnUnavailable(diags *diag.Diagnostics, s *sweep, ns Namespace, err error)
 	s.notice.Do(func() {
 		diags.AddWarning(
 			"Name collision check unavailable",
-			fmt.Sprintf("The provider could not read the existing %ss, so it could not check whether this plan reuses a %s that is already taken: %s. The plan continues without the check.",
-				ns.Sources[0].Noun, ns.keyLabel(), err),
+			fmt.Sprintf("The provider could not read the existing %s, so it could not check whether this plan reuses a %s that is already taken: %s. The plan continues without the check.",
+				ns.nouns(), ns.keyLabel(), err),
 		)
 	})
 }
