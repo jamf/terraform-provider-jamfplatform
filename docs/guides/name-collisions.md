@@ -167,5 +167,6 @@ Where a collection is partly unknown, such as a set of domains, the known entrie
 - Each object type is listed once per plan and shared by every resource of that type. A tenant with thousands of objects of one type pays one paged read.
 - A listing that fails produces one warning and the plan continues. The check never fails a plan it could not evaluate.
 - Two resources in one configuration with the same name are not caught at plan time, because neither exists yet. The service refuses the second write during apply, as it does today.
+- A new resource that takes the name of an existing object is not flagged when that object has changes pending in the same plan. Terraform plans a replacement with no prior state, so the provider cannot tell the two cases apart. The service refuses the write during apply, as it does today.
 - A `create_before_destroy` replacement that keeps the same name still fails at apply. The provider cannot see `lifecycle`.
 - A name reused straight after a delete can be flagged until the old object is gone. This applies to eBooks, where the delete completes in the background.
