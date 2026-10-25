@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetLicensedSoftwareByID",
 	"UpdateLicensedSoftwareByID",
 	"DeleteLicensedSoftwareByID",
+	"ListLicensedSoftware",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown section

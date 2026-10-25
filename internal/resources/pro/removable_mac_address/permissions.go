@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetRemovableMacAddressByID",
 	"UpdateRemovableMacAddressByID",
 	"DeleteRemovableMacAddressByID",
+	"ListRemovableMacAddresses",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

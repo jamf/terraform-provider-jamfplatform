@@ -6,8 +6,10 @@
 //   pro.GetAdvancedUserContentSearchV1
 //   pro.UpdateAdvancedUserContentSearchV1            (PUT — full replace; GET after, response body unreliable)
 //   pro.DeleteAdvancedUserContentSearchV1
-//   pro.ListAdvancedUserContentSearchesV1            (list resource)
+//   pro.ListAdvancedUserContentSearchesV1            (list resource / collision check in collision.go)
 //   pro.ResolveAdvancedUserContentSearchV1ByName     (data source name lookup)
+//
+// Uniqueness: name, enforced (400 DUPLICATE_FIELD), exact match only; case, leading space, trailing space and accents are distinct.
 //
 // Status: current. Last reviewed 2026-06-02.
 

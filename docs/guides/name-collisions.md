@@ -80,6 +80,17 @@ Each row is one uniqueness rule. "Refused by the service" says whether the servi
 | `jamfplatform_pro_mobile_device_configuration_profile` | name | Yes | case, leading and trailing spaces, accents |
 | `jamfplatform_pro_policy` | name | Yes | case, leading and trailing spaces |
 | `jamfplatform_pro_user_group` | name | Yes | leading and trailing spaces |
+| `jamfplatform_pro_advanced_user_search` | name | Yes | case, leading and trailing spaces |
+| `jamfplatform_pro_removable_mac_address` | value | Yes | case, leading and trailing spaces |
+| `jamfplatform_pro_licensed_software` | name | Yes | case, leading and trailing spaces |
+| `jamfplatform_pro_allowed_file_extension` | extension | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_mac_app_store_app` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_advanced_mobile_device_search` | name | Yes | case |
+| `jamfplatform_pro_advanced_volume_purchasing_content_search` | name | Yes | nothing, names are compared exactly |
+| `jamfplatform_pro_file_share_distribution_point` | name | Yes | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_inventory_preload_record` | serial number | Yes | case, trailing spaces, accents |
+| `jamfplatform_pro_patch_software_title` | name ID, patch source and site | Yes | nothing, compared exactly |
+| `jamfplatform_pro_patch_policy` | name within one software title | Yes | case, leading and trailing spaces, accents |
 | `jamfplatform_pro_static_computer_group` | name | Yes | case |
 | `jamfplatform_pro_smart_computer_group` | name | Yes | case |
 | `jamfplatform_pro_static_mobile_device_group` | name | Yes | case, trailing spaces, accents |

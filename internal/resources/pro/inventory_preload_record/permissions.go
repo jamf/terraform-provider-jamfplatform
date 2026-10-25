@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetInventoryPreloadRecordV2",
 	"UpdateInventoryPreloadRecordV2",
 	"DeleteInventoryPreloadRecordV2",
+	"ListInventoryPreloadRecordsV2",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

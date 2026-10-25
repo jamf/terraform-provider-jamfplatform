@@ -79,7 +79,11 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method not
 // declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatches(t, "crud.go", resourceSDKMethods, sdkCallsIn(t, "crud.go"))
+	called := sdkCallsIn(t, "crud.go")
+	for m := range sdkCallsIn(t, "collision.go") {
+		called[m] = true
+	}
+	assertMatches(t, "crud.go", resourceSDKMethods, called)
 }
 
 // TestDataSourceSDKMethods_KnownToSDK fails if a declared data source method has

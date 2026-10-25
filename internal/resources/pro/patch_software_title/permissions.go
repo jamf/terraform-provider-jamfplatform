@@ -34,6 +34,7 @@ var resourceSDKMethods = []string{
 	"ListPatchSoftwareTitleExtensionAttributesV3",
 	"ListPatchInternalSources",
 	"ListPatchExternalSources",
+	"ListPatchSoftwareTitleConfigurationsV3",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown section

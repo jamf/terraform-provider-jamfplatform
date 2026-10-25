@@ -38,9 +38,14 @@ func calledSDKMethods(t *testing.T, filename string) map[string]bool {
 
 // assertMethodSetsEqual fails if the declared method list and the set of SDK
 // calls discovered in the source file diverge.
-func assertMethodSetsEqual(t *testing.T, filename string, declared []string) {
+func assertMethodSetsEqual(t *testing.T, filename string, declared []string, extraFiles ...string) {
 	t.Helper()
 	called := calledSDKMethods(t, filename)
+	for _, f := range extraFiles {
+		for m := range calledSDKMethods(t, f) {
+			called[m] = true
+		}
+	}
 	declaredSet := map[string]bool{}
 	for _, m := range declared {
 		declaredSet[m] = true
@@ -81,7 +86,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps resourceSDKMethods in sync with
 // the actual client.<Method> calls in crud.go.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMethodSetsEqual(t, "crud.go", resourceSDKMethods)
+	assertMethodSetsEqual(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

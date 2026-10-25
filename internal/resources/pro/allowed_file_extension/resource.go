@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -42,10 +43,12 @@ var noSurroundingWhitespace = regexp.MustCompile(`^\S(.*\S)?$`)
 // AllowedFileExtensionResource implements the Terraform resource for Jamf ProClassic
 // allowed file extensions.
 type AllowedFileExtensionResource struct {
-	client *proclassic.Client
+	collisions *collision.Checker
+	client     *proclassic.Client
 }
 
 var _ resource.Resource = &AllowedFileExtensionResource{}
+var _ resource.ResourceWithModifyPlan = &AllowedFileExtensionResource{}
 var _ resource.ResourceWithImportState = &AllowedFileExtensionResource{}
 var _ resource.ResourceWithIdentity = &AllowedFileExtensionResource{}
 
@@ -126,9 +129,15 @@ func (r *AllowedFileExtensionResource) Configure(ctx context.Context, req resour
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro allowed file extension ID.
 func (r *AllowedFileExtensionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ModifyPlan reports a name that another object of this type already holds.
+func (r *AllowedFileExtensionResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 }

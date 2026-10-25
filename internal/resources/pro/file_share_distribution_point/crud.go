@@ -6,7 +6,7 @@
 //   pro.GetDistributionPointV1
 //   pro.PatchDistributionPointV1         (PATCH; merge — omitting a field preserves its stored value)
 //   pro.DeleteDistributionPointV1
-//   pro.ListDistributionPointsV1         (data source / list resource)
+//   pro.ListDistributionPointsV1         (data source / list resource / collision check in collision.go)
 //   pro.ResolveDistributionPointV1ByName (data source name lookup)
 //
 // Not adopted:
@@ -20,6 +20,8 @@
 //   ProClassic /JSSResource/distributionpoints — legacy; its passwords carry masked
 //                                            `*_password_sha256` echoes. The Pro v1
 //                                            endpoint's writeOnly passwords avoid that.
+//
+// Uniqueness: name, enforced (400 DUPLICATE_FIELD), case-, surrounding-space- and accent-insensitive.
 //
 // Status: current. Last reviewed 2026-06-11.
 

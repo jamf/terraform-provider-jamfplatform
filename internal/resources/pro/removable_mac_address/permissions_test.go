@@ -38,9 +38,14 @@ func sdkCallsIn(t *testing.T, filename string) map[string]bool {
 }
 
 // assertMatchesDeclared fails if the SDK calls in filename diverge from declared.
-func assertMatchesDeclared(t *testing.T, filename string, declared []string) {
+func assertMatchesDeclared(t *testing.T, filename string, declared []string, extraFiles ...string) {
 	t.Helper()
 	called := sdkCallsIn(t, filename)
+	for _, f := range extraFiles {
+		for m := range sdkCallsIn(t, f) {
+			called[m] = true
+		}
+	}
 	want := map[string]bool{}
 	for _, m := range declared {
 		want[m] = true
@@ -79,7 +84,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
 // not declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatchesDeclared(t, "crud.go", resourceSDKMethods)
+	assertMatchesDeclared(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestDataSourceSDKMethods_KnownToSDK fails if a declared method has been
