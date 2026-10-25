@@ -1,0 +1,103 @@
+// Copyright Jamf Software LLC 2026
+// SPDX-License-Identifier: MPL-2.0
+
+//go:build acceptance
+
+package category_test
+
+import (
+	"context"
+	"fmt"
+	"regexp"
+	"strings"
+	"testing"
+
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
+
+	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers"
+)
+
+// createExistingCategory creates a category outside Terraform and removes it when
+// the test ends, standing in for an object someone made in the web interface.
+func createExistingCategory(t *testing.T, name string) string {
+	t.Helper()
+	c := pro.New(testhelpers.NewAcceptanceClient(t))
+	ctx := context.Background()
+	created, err := c.CreateCategoryV1(ctx, &pro.Category{Name: name, Priority: 9})
+	if err != nil {
+		t.Fatalf("creating category %q outside Terraform: %v", name, err)
+	}
+	t.Cleanup(func() { _ = c.DeleteCategoryV1(ctx, created.ID) })
+	return created.ID
+}
+
+func TestAccResource_ProCategory_NameCollisionOnCreate(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-" + testhelpers.RunSuffix()
+	var existingID string
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				PreConfig: func() { existingID = createExistingCategory(t, name) },
+				Config: fmt.Sprintf(`
+					resource "jamfplatform_pro_category" "test" {
+						name     = %q
+						priority = 7
+					}
+				`, strings.ToUpper(name)),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+exists\s+in\s+Jamf\s+Pro`),
+			},
+			{
+				PreConfig: func() { t.Logf("existing category ID %s", existingID) },
+				Config: fmt.Sprintf(`
+					provider "jamfplatform" {
+						name_collision_check = { mode = "off" }
+					}
+					resource "jamfplatform_pro_category" "test" {
+						name     = %q
+						priority = 7
+					}
+				`, strings.ToUpper(name)),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
+func TestAccResource_ProCategory_NameCollisionOnRename(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	mine := "tf-acc-collide-mine-" + suffix
+	taken := "tf-acc-collide-taken-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckCategoryDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+					resource "jamfplatform_pro_category" "test" {
+						name     = %q
+						priority = 7
+					}
+				`, mine),
+			},
+			{
+				PreConfig: func() { createExistingCategory(t, taken) },
+				Config: fmt.Sprintf(`
+					resource "jamfplatform_pro_category" "test" {
+						name     = %q
+						priority = 7
+					}
+				`, taken),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use`),
+			},
+		},
+	})
+}

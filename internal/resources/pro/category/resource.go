@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -31,12 +32,14 @@ const minJamfProVersion = ""
 
 // CategoryResource implements the Terraform resource for Jamf Pro categories.
 type CategoryResource struct {
-	client *pro.Client
+	client     *pro.Client
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &CategoryResource{}
 var _ resource.ResourceWithImportState = &CategoryResource{}
 var _ resource.ResourceWithIdentity = &CategoryResource{}
+var _ resource.ResourceWithModifyPlan = &CategoryResource{}
 
 const (
 	defaultCreateTimeout = 60 * time.Second
@@ -112,6 +115,7 @@ func (r *CategoryResource) Configure(ctx context.Context, req resource.Configure
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro category ID.

@@ -8,6 +8,7 @@ description: |-
   Jamf lists this under Platform environment scope (preferred for new integrations) or Tenant scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
   |---|---|---|---|
+  | Global settings | Self Service configuration | Read | `self-service` |
   | Organizational context | Categories | Create, Read, Update, Delete | `categories` |
 ---
 
@@ -21,6 +22,7 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 
 | Category | Permission | Actions | API capability |
 |---|---|---|---|
+| Global settings | Self Service configuration | Read | `self-service` |
 | Organizational context | Categories | Create, Read, Update, Delete | `categories` |
 
 ## Example Usage

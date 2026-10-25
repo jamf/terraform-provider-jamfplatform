@@ -36,6 +36,7 @@ import (
 	mdmactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/pro/mdm"
 	patchactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/pro/patch"
 	uemconnectactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/security_cloud/uem_connect"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	mcxforcedpayload "github.com/jamf/terraform-provider-jamfplatform/internal/functions/mcx_forced_payload"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/functions/mobileconfig"
@@ -214,6 +215,7 @@ type JamfPlatformProviderModel struct {
 	TenantID             types.String `tfsdk:"tenant_id"`
 	MinRequestIntervalMs types.Int64  `tfsdk:"min_request_interval_ms"`
 	ImpactAlerts         types.Bool   `tfsdk:"impact_alerts"`
+	NameCollisionCheck   types.Object `tfsdk:"name_collision_check"`
 
 	CustomHeaders           types.Map    `tfsdk:"custom_headers"`
 	AuthorizationHeaderName types.String `tfsdk:"authorization_header_name"`
@@ -350,6 +352,29 @@ func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRe
 					"Can also be set via the JAMFPLATFORM_IMPACT_ALERTS environment variable, which accepts the values of Go's `strconv.ParseBool` (`true`, `false`, `1`, `0`, …). An unparseable value leaves alerts off and raises a configure-time warning. This attribute, when set, always takes precedence over the variable. " +
 					"This does not change any Jamf Pro setting; to configure the alerts Jamf Pro shows in its own web interface, use `jamfplatform_pro_impact_alert_notification_settings`. " +
 					"See the [Impact alerts guide](../guides/impact-alerts) for how to read the figures, how to consume them in CI, and what they cost.",
+			},
+			"name_collision_check": schema.SingleNestedAttribute{
+				Optional: true,
+				MarkdownDescription: "Detect during `terraform plan` a new or renamed object whose name already belongs to an object in the tenant. " +
+					"Jamf refuses the duplicate for most object types, so without the check `terraform apply` fails halfway through. " +
+					"The diagnostic names the existing object and its ID and gives the `import` block that adopts it. " +
+					"The check lists each object type once per plan. A listing that fails produces one warning and the plan continues. " +
+					"See the [Name collisions guide](../guides/name-collisions).",
+				Attributes: map[string]schema.Attribute{
+					"mode": schema.StringAttribute{
+						Optional: true,
+						MarkdownDescription: "What a collision does to the plan: `off`, `warn` or `error`. Defaults to `error`. " +
+							"Can also be set via the JAMFPLATFORM_NAME_COLLISION_CHECK_MODE environment variable. This attribute, when set, takes precedence over the variable.",
+						Validators: []validator.String{
+							stringvalidator.OneOf(collision.Modes()...),
+						},
+					},
+					"include_unenforced": schema.BoolAttribute{
+						Optional: true,
+						MarkdownDescription: "Also check the object types for which Jamf accepts duplicate names, such as blueprints and AI Governance policies. A second object of the same name is then reported although Jamf would store it. Defaults to `false`. " +
+							"Can also be set via the JAMFPLATFORM_NAME_COLLISION_CHECK_INCLUDE_UNENFORCED environment variable, which accepts the values of Go's `strconv.ParseBool`. This attribute, when set, takes precedence over the variable.",
+					},
+				},
 			},
 		},
 	}
@@ -499,6 +524,11 @@ func (p *JamfPlatformProvider) Configure(ctx context.Context, req provider.Confi
 	if impactEnabled {
 		pd.EnableImpactAlerts()
 	}
+	collisionCfg, collisionWarnings := resolveNameCollisionCheck(data.NameCollisionCheck)
+	for _, w := range collisionWarnings {
+		resp.Diagnostics.AddWarning("Invalid name collision check setting", w)
+	}
+	pd.EnableNameCollisionCheck(collisionCfg)
 	resp.DataSourceData = pd
 	resp.ResourceData = pd
 	resp.ListResourceData = pd
