@@ -11,27 +11,36 @@ import (
 )
 
 // Collation describes how one Jamf object type compares keys for uniqueness.
-// The three axes vary independently across types, so a single normaliser would
-// either miss collisions Jamf refuses or report ones it accepts. IgnoreCase folds
-// upper and lower case together. IgnoreTrailingSpace drops trailing spaces before
-// comparing; a leading space is always significant. IgnoreAccents folds accented
-// letters onto their base letter.
+// The axes vary independently across types, and across the API that performs the
+// write, so a single normaliser would either miss collisions Jamf refuses or
+// report ones it accepts. IgnoreCase folds upper and lower case together.
+// IgnoreTrailingSpace and IgnoreLeadingSpace drop spaces at that end before
+// comparing. IgnoreAccents folds accented letters onto their base letter.
 type Collation struct {
 	IgnoreCase          bool
 	IgnoreTrailingSpace bool
+	IgnoreLeadingSpace  bool
 	IgnoreAccents       bool
 }
 
 // CollationFolded ignores case, trailing spaces and accents. Pro v1 categories,
-// buildings, departments and scripts use it, as do several Classic types.
+// buildings, departments and scripts use it, as do the Pro v2 and Platform
+// mobile device groups.
 var CollationFolded = Collation{IgnoreCase: true, IgnoreTrailingSpace: true, IgnoreAccents: true}
 
-// CollationAccentSensitive ignores case and trailing spaces but not accents.
-// Classic policies, computer groups and mobile device groups use it.
-var CollationAccentSensitive = Collation{IgnoreCase: true, IgnoreTrailingSpace: true}
+// CollationCaseOnly ignores case and nothing else. The Pro v3 and Platform
+// computer groups use it: a trailing space, a leading space and an accent each
+// make a distinct name.
+var CollationCaseOnly = Collation{IgnoreCase: true}
 
-// CollationCaseSensitive ignores trailing spaces only. Classic user groups use it.
-var CollationCaseSensitive = Collation{IgnoreTrailingSpace: true}
+// CollationAccentSensitive ignores case and surrounding spaces but not accents.
+// It is the rule of the Classic API, which trims the XML text of every field
+// before comparing, so a leading space collides there too. Classic policies use it.
+var CollationAccentSensitive = Collation{IgnoreCase: true, IgnoreTrailingSpace: true, IgnoreLeadingSpace: true}
+
+// CollationCaseSensitive ignores surrounding spaces only, the Classic API's rule
+// for user groups.
+var CollationCaseSensitive = Collation{IgnoreTrailingSpace: true, IgnoreLeadingSpace: true}
 
 // CollationExact compares byte for byte.
 var CollationExact = Collation{}
@@ -40,6 +49,9 @@ var CollationExact = Collation{}
 func (c Collation) Fold(key string) string {
 	if c.IgnoreTrailingSpace {
 		key = strings.TrimRight(key, " ")
+	}
+	if c.IgnoreLeadingSpace {
+		key = strings.TrimLeft(key, " ")
 	}
 	if c.IgnoreAccents {
 		key = stripAccents(key)
@@ -62,8 +74,13 @@ func (c Collation) Describe(keyLabel string) string {
 	if c.IgnoreCase {
 		ignored = append(ignored, "case")
 	}
-	if c.IgnoreTrailingSpace {
+	switch {
+	case c.IgnoreTrailingSpace && c.IgnoreLeadingSpace:
+		ignored = append(ignored, "surrounding spaces")
+	case c.IgnoreTrailingSpace:
 		ignored = append(ignored, "trailing spaces")
+	case c.IgnoreLeadingSpace:
+		ignored = append(ignored, "leading spaces")
 	}
 	if c.IgnoreAccents {
 		ignored = append(ignored, "accents")

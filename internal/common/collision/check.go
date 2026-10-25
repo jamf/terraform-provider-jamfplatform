@@ -49,8 +49,8 @@ func (c *Checker) Check(ctx context.Context, req Request) diag.Diagnostics {
 		s.notice.Do(func() {
 			diags.AddWarning(
 				"Name collision check unavailable",
-				fmt.Sprintf("The provider could not list the existing %ss, so it could not check whether this plan reuses a %s that is already taken: %s. The plan continues without the check.",
-					req.Namespace.Sources[0].Noun, req.Namespace.keyLabel(), s.err),
+				fmt.Sprintf("The provider could not list the existing %s, so it could not check whether this plan reuses a %s that is already taken: %s. The plan continues without the check.",
+					req.Namespace.nouns(), req.Namespace.keyLabel(), s.err),
 			)
 		})
 		return diags
@@ -101,23 +101,29 @@ func render(req Request, key string, m Match) (summary, detail string) {
 		article = "An"
 	}
 
+	adoptID, adoptable := m.AdoptID(req.ResourceType)
+	shownID := m.ID
+	if adoptable {
+		shownID = adoptID
+	}
+
 	var b strings.Builder
 	if ns.Enforced {
 		summary = fmt.Sprintf("%s already in use", capitalise(label))
 		fmt.Fprintf(&b, "%s %s with the %s %q already exists in %s (ID %s), and %s does not allow two with the same %s. %s",
-			article, m.Noun, label, key, ns.Product, m.ID, ns.Product, label, ns.Collation.Describe(label))
+			article, m.Noun, label, key, ns.Product, shownID, ns.Product, label, ns.Collation.Describe(label))
 	} else {
 		summary = fmt.Sprintf("%s already in use (duplicate check)", capitalise(label))
 		fmt.Fprintf(&b, "%s %s with the %s %q already exists in %s (ID %s). %s accepts duplicates, so the apply would succeed and leave two. This check is on because include_unenforced is set. %s",
-			article, m.Noun, label, key, ns.Product, m.ID, ns.Product, ns.Collation.Describe(label))
+			article, m.Noun, label, key, ns.Product, shownID, ns.Product, ns.Collation.Describe(label))
 	}
 
-	if m.ResourceType != "" && m.ResourceType == req.ResourceType {
+	if adoptable {
 		fmt.Fprintf(&b, "\n\nTo manage the existing %s with Terraform, import it:\n\n  import {\n    to = <this resource's address>\n    id = %q\n  }\n\nOtherwise, choose a different %s. If this configuration already manages the existing %s under a different address, add a moved block instead.",
-			m.Noun, m.ID, label, m.Noun)
+			m.Noun, adoptID, label, m.Noun)
 	} else if m.ResourceType != "" {
-		fmt.Fprintf(&b, "\n\nThe existing %s is managed by %s, not by this resource. Choose a different %s, or import it into a %s resource.",
-			m.Noun, m.ResourceType, label, m.ResourceType)
+		fmt.Fprintf(&b, "\n\nThe existing %s is a different kind of object from this resource. To manage it with Terraform, import it into a %s resource. Otherwise, choose a different %s.",
+			m.Noun, m.ResourceType, label)
 	} else {
 		fmt.Fprintf(&b, "\n\nChoose a different %s.", label)
 	}
@@ -178,7 +184,7 @@ func ReportPlan[M any](
 			return
 		}
 		idPath := rep.IDPath
-		if idPath.Equal(path.Empty()) {
+		if len(idPath.Steps()) == 0 {
 			idPath = path.Root("id")
 		}
 		var id types.String
@@ -195,6 +201,75 @@ func ReportPlan[M any](
 		var priorKeys []string
 		if hasOld {
 			priorKeys, _ = knownValues(rule.Keys(&prior))
+		}
+		resp.Diagnostics.Append(rep.Checker.Check(ctx, Request{
+			Namespace:    rule.Namespace,
+			ResourceType: rep.ResourceType,
+			Path:         rule.Path,
+			Keys:         keys,
+			PriorKeys:    priorKeys,
+			SelfID:       selfID,
+		})...)
+	}
+}
+
+// AttributeReport configures ReportAttributePlan for one resource. Each rule
+// reads one top-level string attribute, so the resource model is never decoded.
+type AttributeReport struct {
+	Checker      *Checker
+	ResourceType string
+	IDPath       path.Path
+	Rules        []AttributeRule
+}
+
+// AttributeRule pairs a namespace with the string attribute that carries its key.
+type AttributeRule struct {
+	Namespace Namespace
+	Path      path.Path
+}
+
+// ReportAttributePlan is ReportPlan for a key held in a single string attribute.
+// It reads the attribute directly from the plan and state instead of decoding the
+// whole resource model, so a plan whose other attributes are not yet known, such
+// as a smart group's criteria, is still checked.
+func ReportAttributePlan(
+	ctx context.Context,
+	req resource.ModifyPlanRequest,
+	resp *resource.ModifyPlanResponse,
+	rep AttributeReport,
+) {
+	if !rep.Checker.Enabled() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	hasOld := !req.State.Raw.IsNull()
+	var selfID string
+	if hasOld {
+		idPath := rep.IDPath
+		if len(idPath.Steps()) == 0 {
+			idPath = path.Root("id")
+		}
+		var id types.String
+		if diags := req.State.GetAttribute(ctx, idPath, &id); !diags.HasError() {
+			selfID = id.ValueString()
+		}
+	}
+
+	for _, rule := range rep.Rules {
+		var planned types.String
+		if diags := req.Plan.GetAttribute(ctx, rule.Path, &planned); diags.HasError() {
+			continue
+		}
+		keys, known := knownValues([]types.String{planned})
+		if !known || len(keys) == 0 {
+			continue
+		}
+		var priorKeys []string
+		if hasOld {
+			var prior types.String
+			if diags := req.State.GetAttribute(ctx, rule.Path, &prior); !diags.HasError() {
+				priorKeys, _ = knownValues([]types.String{prior})
+			}
 		}
 		resp.Diagnostics.Append(rep.Checker.Check(ctx, Request{
 			Namespace:    rule.Namespace,

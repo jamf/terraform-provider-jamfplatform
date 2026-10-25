@@ -40,9 +40,14 @@ func calledSDKMethods(t *testing.T, filename string) map[string]bool {
 // assertMethodsMatch fails if the file's client.<Method> calls differ from the
 // declared SDK method list — keeping the privileges table honest as the code
 // path changes.
-func assertMethodsMatch(t *testing.T, filename string, declaredMethods []string) {
+func assertMethodsMatch(t *testing.T, filename string, declaredMethods []string, alsoIn ...string) {
 	t.Helper()
 	called := calledSDKMethods(t, filename)
+	for _, f := range alsoIn {
+		for m := range calledSDKMethods(t, f) {
+			called[m] = true
+		}
+	}
 	declared := map[string]bool{}
 	for _, m := range declaredMethods {
 		declared[m] = true
@@ -99,7 +104,7 @@ func TestListResourceSDKMethods_KnownToSDK(t *testing.T) {
 // --- Call-site guards: declared methods must match the construct's calls. ---
 
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMethodsMatch(t, "crud.go", resourceSDKMethods)
+	assertMethodsMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 func TestDataSourceSDKMethods_MatchCalls(t *testing.T) {

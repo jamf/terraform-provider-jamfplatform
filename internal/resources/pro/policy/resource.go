@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
@@ -50,6 +51,9 @@ type PolicyResource struct {
 	// impact backs the plan-time impact alert on scope changes. nil when the
 	// provider's impact_alerts attribute is off, which is the default.
 	impact *impact.Cache
+	// collisions backs the plan-time name collision check. nil when the
+	// provider's name_collision_check mode is off.
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &PolicyResource{}
@@ -607,6 +611,7 @@ func (r *PolicyResource) Configure(ctx context.Context, req resource.ConfigureRe
 	// Impact alerts are advisory and produce no diagnostics of their own here;
 	// a nil cache means they are switched off.
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro policy ID.
@@ -630,6 +635,7 @@ func (r *PolicyResource) ConfigValidators(context.Context) []resource.ConfigVali
 // group"). Best-effort: search errors / unconfigured LDAP downgrade to a
 // warning. No-op on destroy and when no scope groups are declared.
 func (r *PolicyResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	r.reportScopeImpact(ctx, req, resp)
 	validateEFIPasswordOnCreate(ctx, req, resp)
 	validateRetryAttemptsOnCreate(ctx, req, resp)

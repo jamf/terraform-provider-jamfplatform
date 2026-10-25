@@ -10,7 +10,7 @@ import (
 )
 
 // resourceSDKMethods lists the SDK methods the user group resource's CRUD path
-// calls. It mirrors the "SDK endpoints used" block in crud.go and drives the
+// and name collision check call. It mirrors the "SDK endpoints used" block in crud.go and drives the
 // "Required Jamf permissions" table appended to the resource MarkdownDescription.
 // permissions_test.go asserts this list stays in sync with the actual
 // client.<Method> calls in crud.go and with the SDK privilege registry.
@@ -19,6 +19,7 @@ var resourceSDKMethods = []string{
 	"GetUserGroupByID",
 	"UpdateUserGroupByID",
 	"DeleteUserGroupByID",
+	"ListUserGroups",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

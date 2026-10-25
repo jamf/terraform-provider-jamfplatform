@@ -9,7 +9,9 @@
 //   pro.ListStaticMobileDeviceGroupMembershipV2  GET    /pro/v2/mobile-device-groups/static-group-membership/{id}
 //   pro.ListStaticMobileDeviceGroupsV2           GET    /pro/v2/mobile-device-groups/static-groups        (plural data source, list resource)
 //   pro.ResolveStaticMobileDeviceGroupV2IDByName GET    /pro/v2/mobile-device-groups/static-groups        (data source name lookup)
-//   pro.ListGroupsV2                             GET    /pro/v2/groups                                    (platform identifier bridge, via internal/common/progroups)
+//   pro.ListGroupsV2                             GET    /pro/v2/groups                                    (platform identifier bridge, via internal/common/progroups; name collision check, via internal/common/groupcollision)
+//
+// Uniqueness: groupName, enforced (422 DUPLICATE_FIELD), case-, trailing-space- and accent-insensitive, one pool shared by smart, static and Platform MOBILE groups.
 //
 // Status: current. Last reviewed 2026-09-17.
 //
@@ -70,10 +72,12 @@ var membersPath = path.Root("assigned_mobile_device_ids")
 // sitePath anchors a site diagnostic to the attribute that caused it.
 var sitePath = path.Root("site_id")
 
-// ModifyPlan reports the plan-time impact alert for a membership change. A group
-// entering or leaving Terraform management changes what everything scoped to it
-// applies to, so it runs on creates and destroys as well as updates.
+// ModifyPlan reports a name another mobile device group already holds, then the
+// plan-time impact alert for a membership change. A group entering or leaving
+// Terraform management changes what everything scoped to it applies to, so the
+// alert runs on creates and destroys as well as updates.
 func (r *StaticMobileDeviceGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	r.reportMembershipImpact(ctx, req, resp)
 }
 

@@ -103,6 +103,32 @@ func TestCheck_SelfExcluded(t *testing.T) {
 	}
 }
 
+func TestCheck_AltIDExcludesSelfUnderAnotherResourceType(t *testing.T) {
+	ns := widgetNamespace([]Entry{{ID: "7", Key: "a", AltIDs: map[string]string{"jamfplatform_other": "uuid-7"}}}, nil)
+	req := request(ns, []string{"a"}, []string{"b"}, "uuid-7")
+	req.ResourceType = "jamfplatform_other"
+	if d := newChecker(ModeError, false).Check(context.Background(), req); len(d) != 0 {
+		t.Fatalf("an object must not collide with itself under its alternate identifier, got %v", d)
+	}
+}
+
+func TestCheck_AltIDDrivesTheImportSnippet(t *testing.T) {
+	ns := widgetNamespace([]Entry{{ID: "7", Key: "a", AltIDs: map[string]string{"jamfplatform_other": "uuid-7"}}}, nil)
+	req := request(ns, []string{"a"}, nil, "")
+	req.ResourceType = "jamfplatform_other"
+	d := newChecker(ModeError, false).Check(context.Background(), req)
+	if !d.HasError() {
+		t.Fatal("want a collision")
+	}
+	detail := d[0].Detail()
+	if !strings.Contains(detail, `id = "uuid-7"`) || !strings.Contains(detail, "(ID uuid-7)") {
+		t.Errorf("the import snippet must use the identifier of the resource being planned:\n%s", detail)
+	}
+	if strings.Contains(detail, `"7"`) {
+		t.Errorf("the primary identifier must not leak into another resource type's snippet:\n%s", detail)
+	}
+}
+
 func TestCheck_SelfIDOfAnotherTypeIsNotExcluded(t *testing.T) {
 	ns := widgetNamespace([]Entry{{ID: "7", Key: "a"}}, nil)
 	ns.Sources[0].ResourceType = "jamfplatform_pro_other"

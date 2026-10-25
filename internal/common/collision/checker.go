@@ -50,10 +50,15 @@ type Config struct {
 
 // Entry is one existing key in a namespace. A single object contributes several
 // entries when its uniqueness key is a collection, such as DNS zone domains.
-// ID is the identifier the Terraform resource imports by.
+// ID is the identifier the source's Terraform resource imports by. AltIDs holds
+// the identifiers other Terraform resource types import the same object by,
+// keyed by resource type, for an object that two resource types can manage
+// under different identifiers, such as a Jamf Pro group that is also a Platform
+// device group.
 type Entry struct {
-	ID  string
-	Key string
+	ID     string
+	Key    string
+	AltIDs map[string]string
 }
 
 // Source lists the existing objects of one type. Noun is the object name as the
@@ -80,6 +85,14 @@ type Namespace struct {
 	Enforced  bool
 	Collation Collation
 	Sources   []Source
+}
+
+func (n Namespace) nouns() string {
+	plural := make([]string, 0, len(n.Sources))
+	for _, s := range n.Sources {
+		plural = append(plural, s.Noun+"s")
+	}
+	return joinAnd(plural)
 }
 
 func (n Namespace) keyLabel() string {
@@ -191,20 +204,34 @@ type Match struct {
 	ResourceType string
 }
 
+// AdoptID returns the identifier the given resource type imports this object by,
+// and whether that resource type can manage it at all.
+func (m Match) AdoptID(resourceType string) (string, bool) {
+	if resourceType == "" {
+		return "", false
+	}
+	if m.ResourceType == resourceType {
+		return m.ID, true
+	}
+	id, ok := m.AltIDs[resourceType]
+	return id, ok
+}
+
 // find returns the existing objects colliding with key. An entry is the object
-// being planned, and is skipped, when it carries selfID and was listed by the
-// source of the same resource type.
+// being planned, and is skipped, when selfID is the identifier its source or
+// its AltIDs gives for the resource type being planned.
 func (s *sweep) find(ns Namespace, key, selfID, resourceType string) []Match {
 	want := ns.Collation.Fold(key)
 	var out []Match
 	for _, e := range s.entries {
-		if selfID != "" && e.ID == selfID && e.source.ResourceType == resourceType {
+		m := Match{Entry: e.Entry, Noun: e.source.Noun, ResourceType: e.source.ResourceType}
+		if id, ok := m.AdoptID(resourceType); ok && selfID != "" && id == selfID {
 			continue
 		}
 		if ns.Collation.Fold(e.Key) != want {
 			continue
 		}
-		out = append(out, Match{Entry: e.Entry, Noun: e.source.Noun, ResourceType: e.source.ResourceType})
+		out = append(out, m)
 	}
 	return out
 }
