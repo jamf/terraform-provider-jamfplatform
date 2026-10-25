@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -32,7 +33,8 @@ const minJamfProVersion = ""
 
 // NetworkSegmentResource implements the Terraform resource for Jamf ProClassic network segments.
 type NetworkSegmentResource struct {
-	client *proclassic.Client
+	collisions *collision.Checker
+	client     *proclassic.Client
 }
 
 var _ resource.Resource = &NetworkSegmentResource{}
@@ -170,6 +172,7 @@ func (r *NetworkSegmentResource) Configure(ctx context.Context, req resource.Con
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro network segment ID.

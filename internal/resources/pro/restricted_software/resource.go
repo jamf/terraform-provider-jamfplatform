@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -42,6 +43,7 @@ const minJamfProVersion = ""
 // only name-keyed scope category (exclusion users) is free-text local
 // usernames, not Jamf LDAP/cloud-IdP objects.
 type RestrictedSoftwareResource struct {
+	collisions *collision.Checker
 	// impact backs the plan-time impact alert on scope changes. nil when the
 	// provider's impact_alerts attribute is off, which is the default.
 	impact *impact.Cache
@@ -238,6 +240,7 @@ func (r *RestrictedSoftwareResource) Configure(ctx context.Context, req resource
 	}
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro restricted software ID.

@@ -6,8 +6,10 @@
 //   proclassic.GetEbookByID      (GET    /ebooks/id/{id})
 //   proclassic.UpdateEbookByID   (PUT    /ebooks/id/{id})
 //   proclassic.DeleteEbookByID   (DELETE /ebooks/id/{id})
-//   proclassic.ListEbooks        (data source / list resource)
+//   proclassic.ListEbooks        (data source / list resource / collision check in collision.go)
 //   proclassic.GetEbookByName    (data source name lookup)
+//
+// Uniqueness: general.name, enforced (409), case-, leading-space- and trailing-space-insensitive; accents are significant. A delete completes asynchronously.
 //
 // Status: current. Last reviewed 2026-06-03.
 //

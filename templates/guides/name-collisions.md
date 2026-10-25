@@ -105,6 +105,15 @@ One row per construct. "Checked by default" lists the keys the service refuses a
 | `jamfplatform_pro_advanced_computer_search` | — | name | case, leading and trailing spaces, accents |
 | `jamfplatform_security_cloud_ztna_gateway` | — | name | case, trailing spaces, accents |
 | `jamfplatform_security_cloud_ztna_grouped_gateway` | — | name | case, trailing spaces, accents |
+| `jamfplatform_pro_building` | name | — | case, trailing spaces, accents |
+| `jamfplatform_pro_department` | name | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_site` | name | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_dock_item` | name | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_printer` | name | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_webhook` | name | — | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_network_segment` | name | — | case, leading and trailing spaces |
+| `jamfplatform_pro_restricted_software` | name | — | case, leading and trailing spaces |
+| `jamfplatform_pro_ebook` | name | — | case, leading and trailing spaces |
 
 Jamf Security Cloud activation profiles and Jamf Account SSO connections are not checked. An activation profile read returns only its code, with no name to compare, and Jamf Account appends a random suffix to every connection name, so the stored name never equals the planned one.
 
