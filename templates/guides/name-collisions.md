@@ -88,6 +88,14 @@ Each row is one uniqueness rule. "Refused by the service" says whether the servi
 | `jamfplatform_security_cloud_ztna_app` | hostname | Yes | case |
 | `jamfplatform_account_sso_domain` | domain | Yes | case |
 | `jamfplatform_cbengine_benchmark` | title | Yes | case |
+| `jamfplatform_pro_app_installer` | name | No | case, trailing spaces, accents |
+| `jamfplatform_pro_app_request_form_field` | title | No | case, trailing spaces, accents |
+| `jamfplatform_pro_mobile_device_app` | name | No | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_mobile_device_enrollment_profile` | name | No | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_patch_external_source` | name | No | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_supervision_identity` | display name | No | case, trailing spaces, accents |
+| `jamfplatform_pro_vpp_assignment` | name | No | case, leading and trailing spaces, accents |
+| `jamfplatform_pro_vpp_invitation` | name | No | case, leading and trailing spaces, accents |
 
 Smart groups, static groups and Platform device groups of one device type share one pool of names, so a new computer group is checked against all three.
 
