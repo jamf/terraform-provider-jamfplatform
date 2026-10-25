@@ -21,15 +21,17 @@ var clientCallRE = regexp.MustCompile(`\bclient\.([A-Za-z0-9]+)\(`)
 // assertCallsMatch reads a construct source file and asserts the set of SDK
 // client method calls it makes equals the declared method list, keeping the
 // privileges table honest as the construct's calls change.
-func assertCallsMatch(t *testing.T, filename string, declaredMethods []string) {
+func assertCallsMatch(t *testing.T, filename string, declaredMethods []string, moreFiles ...string) {
 	t.Helper()
-	src, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatalf("reading %s: %v", filename, err)
-	}
 	called := map[string]bool{}
-	for _, m := range clientCallRE.FindAllStringSubmatch(string(src), -1) {
-		called[m[1]] = true
+	for _, f := range append([]string{filename}, moreFiles...) {
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("reading %s: %v", f, err)
+		}
+		for _, m := range clientCallRE.FindAllStringSubmatch(string(src), -1) {
+			called[m[1]] = true
+		}
 	}
 	declared := map[string]bool{}
 	for _, m := range declaredMethods {
@@ -69,7 +71,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
 // not declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertCallsMatch(t, "crud.go", resourceSDKMethods)
+	assertCallsMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestDataSourceSDKMethods_KnownToSDK fails on SDK registry drift for the

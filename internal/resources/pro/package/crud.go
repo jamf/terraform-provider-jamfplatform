@@ -11,10 +11,12 @@
 //   pro.DeletePackageManifestV1
 //   pro.RefreshCloudDistributionPointInventoryV1
 //   pro.GetCloudDistributionPointV1   (upload preflight — no cloud distribution point, no upload)
-//   pro.ListPackagesV1 (data source / list resource)
+//   pro.ListPackagesV1 (data source / list resource / collision check in collision.go)
 //   pro.ResolvePackageV1ByName (data source)
 //
-// Status: current. Last reviewed 2026-09-04.
+// Uniqueness: display name (packageName) and file name (fileName), each enforced separately (400 DUPLICATE_FIELD), case- and accent-insensitive; a leading space is significant.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package pkg
 

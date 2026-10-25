@@ -6,10 +6,12 @@
 //   pro.GetComputerExtensionAttributeV1
 //   pro.UpdateComputerExtensionAttributeV1            (PUT — full replace; GET after, server normalises script)
 //   pro.DeleteComputerExtensionAttributeV1
-//   pro.ListComputerExtensionAttributesV1             (list resource)
+//   pro.ListComputerExtensionAttributesV1             (list resource, collision check in collision.go)
 //   pro.ResolveComputerExtensionAttributeV1ByName     (data source name lookup)
 //
-// Status: current. Last reviewed 2026-06-02.
+// Uniqueness: name, enforced (400 DUPLICATE_FIELD), trimmed on save, case- and accent-insensitive.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package computer_extension_attribute
 

@@ -41,9 +41,14 @@ func calledSDKMethods(t *testing.T, filename string, reg permissions.Registry) m
 
 // assertDeclaredMatchesCalled fails if the source file calls a registry-known
 // SDK method not declared, or declares one it does not call.
-func assertDeclaredMatchesCalled(t *testing.T, filename string, reg permissions.Registry, declaredMethods []string) {
+func assertDeclaredMatchesCalled(t *testing.T, filename string, reg permissions.Registry, declaredMethods []string, moreFiles ...string) {
 	t.Helper()
 	called := calledSDKMethods(t, filename, reg)
+	for _, f := range moreFiles {
+		for m := range calledSDKMethods(t, f, reg) {
+			called[m] = true
+		}
+	}
 	declared := map[string]bool{}
 	for _, m := range declaredMethods {
 		declared[m] = true
@@ -82,7 +87,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps the resource privilege table
 // honest as crud.go changes.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertDeclaredMatchesCalled(t, "crud.go", pro.Privileges, resourceSDKMethods)
+	assertDeclaredMatchesCalled(t, "crud.go", pro.Privileges, resourceSDKMethods, "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

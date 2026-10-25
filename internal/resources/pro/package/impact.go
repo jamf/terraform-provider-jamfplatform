@@ -22,10 +22,15 @@ func (r *PackageResource) identifyDependency(_ context.Context, m *PackageResour
 
 var _ resource.ResourceWithModifyPlan = &PackageResource{}
 
-// ModifyPlan marks the hash attributes Unknown when the uploaded file's bytes
-// changed (see planUploadedContentChange), then reports how many computers this
-// package reaches through the policies using it.
+// ModifyPlan reports a display name or file name another package already holds,
+// marks the hash attributes Unknown when the uploaded file's bytes changed (see
+// planUploadedContentChange), then reports how many computers this package
+// reaches through the policies using it.
 func (r *PackageResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	planUploadedContentChange(ctx, req, resp)
 	if resp.Diagnostics.HasError() {
 		return

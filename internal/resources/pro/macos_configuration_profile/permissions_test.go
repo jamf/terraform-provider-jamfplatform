@@ -23,17 +23,19 @@ var sdkCallRE = regexp.MustCompile(`\bclient\.([A-Za-z0-9]+)\(`)
 // not present in the SDK registry are ignored so a non-SDK helper named
 // client.Foo cannot break the comparison; the declared list is the source of
 // truth for what the construct documents.
-func assertMatchesCalls(t *testing.T, filename string, declaredMethods []string) {
+func assertMatchesCalls(t *testing.T, filename string, declaredMethods []string, moreFiles ...string) {
 	t.Helper()
-	src, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatalf("reading %s: %v", filename, err)
-	}
 	called := map[string]bool{}
-	for _, m := range sdkCallRE.FindAllStringSubmatch(string(src), -1) {
-		name := m[1]
-		if _, ok := proclassic.Privileges[name]; ok {
-			called[name] = true
+	for _, f := range append([]string{filename}, moreFiles...) {
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("reading %s: %v", f, err)
+		}
+		for _, m := range sdkCallRE.FindAllStringSubmatch(string(src), -1) {
+			name := m[1]
+			if _, ok := proclassic.Privileges[name]; ok {
+				called[name] = true
+			}
 		}
 	}
 	declared := map[string]bool{}
@@ -74,7 +76,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
 // not declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatchesCalls(t, "crud.go", resourceSDKMethods)
+	assertMatchesCalls(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into
