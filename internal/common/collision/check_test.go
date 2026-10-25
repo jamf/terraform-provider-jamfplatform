@@ -203,3 +203,86 @@ func TestCheck_EveryMatchReported(t *testing.T) {
 		t.Fatalf("want a diagnostic per colliding object, got %d", len(d))
 	}
 }
+
+func findNamespace(find func(context.Context, string) ([]Entry, error)) Namespace {
+	return Namespace{
+		ID:        "pro.finders",
+		Product:   "Jamf Pro",
+		Enforced:  true,
+		Collation: CollationAccentSensitive,
+		Sources:   []Source{{Noun: "widget", ResourceType: testResourceType, Find: find}},
+	}
+}
+
+func TestCheck_FindSourceQueriesPerKey(t *testing.T) {
+	var calls atomic.Int32
+	ns := findNamespace(func(_ context.Context, key string) ([]Entry, error) {
+		calls.Add(1)
+		if key == "taken" {
+			return []Entry{{ID: "9", Key: "Taken"}}, nil
+		}
+		return nil, nil
+	})
+	c := newChecker(ModeError, false)
+
+	if d := c.Check(context.Background(), request(ns, []string{"free"}, nil, "")); len(d) != 0 {
+		t.Fatalf("a key with no candidates must not collide, got %v", d)
+	}
+	d := c.Check(context.Background(), request(ns, []string{"taken"}, nil, ""))
+	if !d.HasError() || !strings.Contains(d[0].Detail(), "(ID 9)") {
+		t.Fatalf("want a collision with ID 9, got %v", d)
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("want one lookup per key, got %d", calls.Load())
+	}
+}
+
+func TestCheck_FindCandidatesAreComparedUnderTheCollation(t *testing.T) {
+	ns := findNamespace(func(context.Context, string) ([]Entry, error) {
+		return []Entry{{ID: "9", Key: "Café"}}, nil
+	})
+	if d := newChecker(ModeError, false).Check(context.Background(), request(ns, []string{"Cafe"}, nil, "")); len(d) != 0 {
+		t.Fatalf("an accent-sensitive namespace must not report Café for Cafe, got %v", d)
+	}
+}
+
+func TestCheck_FindResultIsMemoisedPerKey(t *testing.T) {
+	var calls atomic.Int32
+	ns := findNamespace(func(context.Context, string) ([]Entry, error) {
+		calls.Add(1)
+		return nil, nil
+	})
+	c := newChecker(ModeError, false)
+	c.Check(context.Background(), request(ns, []string{"a"}, nil, ""))
+	c.Check(context.Background(), request(ns, []string{"A "}, nil, ""))
+	if calls.Load() != 1 {
+		t.Fatalf("keys equal under the collation must share one lookup, got %d", calls.Load())
+	}
+}
+
+func TestCheck_FindFailureWarnsOnce(t *testing.T) {
+	ns := findNamespace(func(context.Context, string) ([]Entry, error) { return nil, errors.New("boom") })
+	c := newChecker(ModeError, false)
+	first := c.Check(context.Background(), request(ns, []string{"a"}, nil, ""))
+	if first.HasError() || first.WarningsCount() != 1 {
+		t.Fatalf("a failed lookup must warn, not error: %v", first)
+	}
+	if second := c.Check(context.Background(), request(ns, []string{"b"}, nil, "")); len(second) != 0 {
+		t.Fatalf("the notice must fire once per namespace, got %v", second)
+	}
+}
+
+func TestCheck_ListAndFindSourcesMix(t *testing.T) {
+	ns := widgetNamespace([]Entry{{ID: "1", Key: "listed"}}, nil)
+	ns.Sources = append(ns.Sources, Source{
+		Noun: "found widget",
+		Find: func(context.Context, string) ([]Entry, error) { return []Entry{{ID: "2", Key: "found"}}, nil },
+	})
+	c := newChecker(ModeError, false)
+	if d := c.Check(context.Background(), request(ns, []string{"listed"}, nil, "")); !d.HasError() {
+		t.Fatal("the listed source must still be swept")
+	}
+	if d := c.Check(context.Background(), request(ns, []string{"found"}, nil, "")); !d.HasError() {
+		t.Fatal("the find source must also be consulted")
+	}
+}

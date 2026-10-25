@@ -46,22 +46,31 @@ func (c *Checker) Check(ctx context.Context, req Request) diag.Diagnostics {
 
 	s := c.load(ctx, req.Namespace)
 	if s.err != nil {
-		s.notice.Do(func() {
-			diags.AddWarning(
-				"Name collision check unavailable",
-				fmt.Sprintf("The provider could not list the existing %ss, so it could not check whether this plan reuses a %s that is already taken: %s. The plan continues without the check.",
-					req.Namespace.Sources[0].Noun, req.Namespace.keyLabel(), s.err),
-			)
-		})
+		warnUnavailable(&diags, s, req.Namespace, s.err)
 		return diags
 	}
 
 	for _, key := range fresh {
-		for _, m := range s.find(req.Namespace, key, req.SelfID, req.ResourceType) {
+		extra, err := c.lookup(ctx, req.Namespace, s, key)
+		if err != nil {
+			warnUnavailable(&diags, s, req.Namespace, err)
+			return diags
+		}
+		for _, m := range s.find(req.Namespace, key, req.SelfID, req.ResourceType, extra) {
 			c.report(&diags, req, key, m)
 		}
 	}
 	return diags
+}
+
+func warnUnavailable(diags *diag.Diagnostics, s *sweep, ns Namespace, err error) {
+	s.notice.Do(func() {
+		diags.AddWarning(
+			"Name collision check unavailable",
+			fmt.Sprintf("The provider could not read the existing %ss, so it could not check whether this plan reuses a %s that is already taken: %s. The plan continues without the check.",
+				ns.Sources[0].Noun, ns.keyLabel(), err),
+		)
+	})
 }
 
 func newKeys(req Request) []string {

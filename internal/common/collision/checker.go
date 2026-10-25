@@ -56,14 +56,22 @@ type Entry struct {
 	Key string
 }
 
-// Source lists the existing objects of one type. Noun is the object name as the
+// Source reads the existing objects of one type. Noun is the object name as the
 // admin UI writes it ("static computer group"). ResourceType is the Terraform
 // resource that adopts it ("jamfplatform_pro_static_computer_group"), empty when
 // no resource in this provider manages the type.
+//
+// List returns every object in one sweep, shared by the whole plan. Find returns
+// the objects whose key could collide with one planned key and is used instead of
+// List for a type whose list endpoint is unreliable: Jamf Pro 11.32.0 left rows
+// out of a Classic list while reads by name still worked. It costs one read per
+// planned key. Set exactly one of the two; the candidates Find returns are
+// compared under the namespace's collation like any other entry.
 type Source struct {
 	Noun         string
 	ResourceType string
 	List         func(ctx context.Context) ([]Entry, error)
+	Find         func(ctx context.Context, key string) ([]Entry, error)
 }
 
 // Namespace is a set of object types that share one uniqueness rule. Computer
@@ -103,6 +111,20 @@ type sweep struct {
 	entries []taggedEntry
 	err     error
 	notice  sync.Once
+
+	findMu sync.Mutex
+	finds  map[findKey]*findResult
+}
+
+type findKey struct {
+	source int
+	key    string
+}
+
+type findResult struct {
+	once    sync.Once
+	entries []taggedEntry
+	err     error
 }
 
 type taggedEntry struct {
@@ -170,6 +192,9 @@ func (c *Checker) load(ctx context.Context, ns Namespace) *sweep {
 		defer cancel()
 
 		for _, src := range ns.Sources {
+			if src.List == nil {
+				continue
+			}
 			entries, err := src.List(listCtx)
 			if err != nil {
 				s.err = fmt.Errorf("listing %ss: %w", src.Noun, err)
@@ -191,13 +216,58 @@ type Match struct {
 	ResourceType string
 }
 
+// lookup reads the candidates of every Find source for one key, once per folded
+// key. A failure is returned for the caller to report and is memoised, so a
+// broken endpoint costs one read per key and one notice per namespace.
+func (c *Checker) lookup(ctx context.Context, ns Namespace, s *sweep, key string) ([]taggedEntry, error) {
+	var out []taggedEntry
+	for i, src := range ns.Sources {
+		if src.Find == nil {
+			continue
+		}
+		fk := findKey{source: i, key: ns.Collation.Fold(key)}
+		s.findMu.Lock()
+		if s.finds == nil {
+			s.finds = make(map[findKey]*findResult)
+		}
+		r, ok := s.finds[fk]
+		if !ok {
+			r = &findResult{}
+			s.finds[fk] = r
+		}
+		s.findMu.Unlock()
+
+		r.once.Do(func() {
+			c.sem <- struct{}{}
+			defer func() { <-c.sem }()
+
+			findCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sweepTimeout)
+			defer cancel()
+
+			entries, err := src.Find(findCtx, key)
+			if err != nil {
+				r.err = fmt.Errorf("looking up %s %q: %w", src.Noun, key, err)
+				return
+			}
+			for _, e := range entries {
+				r.entries = append(r.entries, taggedEntry{Entry: e, source: src})
+			}
+		})
+		if r.err != nil {
+			return nil, r.err
+		}
+		out = append(out, r.entries...)
+	}
+	return out, nil
+}
+
 // find returns the existing objects colliding with key. An entry is the object
 // being planned, and is skipped, when it carries selfID and was listed by the
 // source of the same resource type.
-func (s *sweep) find(ns Namespace, key, selfID, resourceType string) []Match {
+func (s *sweep) find(ns Namespace, key, selfID, resourceType string, extra []taggedEntry) []Match {
 	want := ns.Collation.Fold(key)
 	var out []Match
-	for _, e := range s.entries {
+	for _, e := range append(append([]taggedEntry(nil), s.entries...), extra...) {
 		if selfID != "" && e.ID == selfID && e.source.ResourceType == resourceType {
 			continue
 		}
