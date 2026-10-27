@@ -42,7 +42,7 @@ func (c *Checker) CreateConflictHint(err error, resourceType string) string {
 		return ""
 	}
 	which := joinAnd(labels)
-	return fmt.Sprintf("\n\nIf this is a duplicate, %s does not allow two objects with the same %s, and the plan-time check found no existing one. Another resource in this configuration probably declares the same %s and was created first in this apply: give each a distinct value. Otherwise something created it after the plan was made.",
+	return fmt.Sprintf("\n\nIf this is a duplicate: %s does not allow two objects with the same %s, and the plan found none. Another resource in this configuration probably declares the same %s and was created first in this apply. Give each a distinct value. If no resource does, something else created it after the plan.",
 		product, which, which)
 }
 

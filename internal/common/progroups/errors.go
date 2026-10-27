@@ -125,7 +125,7 @@ func WriteDiagnostics(err error, label string, sitePath, membersPath path.Path) 
 	case IsDuplicateName(err):
 		diags.AddError(
 			fmt.Sprintf("A %s with this name already exists", label),
-			"Jamf Pro requires a group name to be unique. Choose a different name. If the existing group is not managed by this configuration and you want Terraform to manage it instead of creating another, import it."+
+			"Jamf Pro requires a unique group name. Choose a different name. To manage the existing group with Terraform instead of creating another, import it, unless this configuration already manages it."+
 				"\n\nJamf Pro's response: "+helpers.APIErrorDetail(err),
 		)
 	case IsSiteRefused(err):

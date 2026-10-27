@@ -137,11 +137,11 @@ func render(req Request, key string, m Match) (summary, detail string) {
 
 	switch {
 	case m.Managed:
-		fmt.Fprintf(&b, "\n\nThe existing %s is already managed by another resource in this configuration. Choose a different %s. If you renamed the resource that manages it, add a moved block instead.",
+		fmt.Fprintf(&b, "\n\nThe existing %s is already managed by another resource in this configuration's state. Choose a different %s. If you renamed the resource that manages it, add a moved block instead.",
 			m.Noun, label)
 	case adoptable:
-		fmt.Fprintf(&b, "\n\nIf this configuration does not manage the existing %s yet, import it to manage it with Terraform. Use the full address of this resource as `to`, including any module path:\n\n  import {\n    to = <this resource's address>\n    id = %q\n  }\n\nIf this configuration or its state already manages it under another address, choose a different %s instead.",
-			m.Noun, adoptID, label)
+		fmt.Fprintf(&b, "\n\nCheck whether this configuration or its state already manages the existing %s under another address. The provider cannot always tell, for example under -refresh=false, -target or a saved plan. If something does, choose a different %s. Importing it again puts one object under two addresses.\n\nIf nothing manages it, import it to manage it with Terraform. Use the full address of this resource as `to`, including any module path:\n\n  import {\n    to = <this resource's address>\n    id = %q\n  }",
+			m.Noun, label, adoptID)
 	case m.ResourceType != "":
 		fmt.Fprintf(&b, "\n\nThe existing %s is a different kind of object from this resource. To manage it with Terraform, import it into a %s resource. Otherwise, choose a different %s.",
 			m.Noun, m.ResourceType, label)

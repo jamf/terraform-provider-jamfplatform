@@ -208,11 +208,15 @@ func (c *Checker) isReplacing(resourceType, id string) bool {
 
 // NoteManaged records that the object with this ID is managed by a resource of
 // this type in the configuration being planned. Resources call it from Read and
-// Create, and Read runs for every resource in state before any ModifyPlan, so a
-// collision with an object this configuration already manages can be told apart
-// from one with an object nothing manages. Importing the second kind is the
-// remedy; importing the first would put one object under two addresses. It is a
-// no-op on a nil Checker.
+// Create, so a collision with an object this configuration already manages can
+// often be told apart from one with an object nothing manages. Importing the
+// second kind is the remedy; importing the first would put one object under two
+// addresses. The record is best effort: Terraform refreshes and plans each
+// resource instance on its own, so a sibling's Read can land after this
+// resource's ModifyPlan, and a refresh-less plan, a targeted plan or an apply of
+// a saved plan never reads at all. An object not recorded is therefore unknown,
+// not unmanaged, and the message that offers an import says so. It is a no-op on
+// a nil Checker.
 func (c *Checker) NoteManaged(resourceType, id string) {
 	if c == nil || resourceType == "" || id == "" {
 		return

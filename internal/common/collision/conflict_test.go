@@ -107,11 +107,11 @@ func TestNoteManagedState(t *testing.T) {
 
 	c := newChecker(ModeError, false)
 	c.NoteManagedState(context.Background(), testResourceType, state(nil))
-	if c.isManaged(Match{Entry: Entry{ID: "7"}, ResourceType: testResourceType}) {
+	if c.isManaged(Match{ID: "7", ResourceType: testResourceType}) {
 		t.Fatal("a removed resource must not be recorded")
 	}
 	c.NoteManagedState(context.Background(), testResourceType, state(&id))
-	if !c.isManaged(Match{Entry: Entry{ID: "7"}, ResourceType: testResourceType}) {
+	if !c.isManaged(Match{ID: "7", ResourceType: testResourceType}) {
 		t.Fatal("the state's id must be recorded")
 	}
 

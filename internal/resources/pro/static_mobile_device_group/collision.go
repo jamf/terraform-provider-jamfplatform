@@ -44,7 +44,7 @@ func (r *StaticMobileDeviceGroupResource) withConflictHint(diags diag.Diagnostic
 	}
 	var out diag.Diagnostics
 	for _, d := range diags {
-		if d.Severity() != diag.SeverityError {
+		if _, anchored := d.(diag.DiagnosticWithPath); anchored || d.Severity() != diag.SeverityError {
 			out.Append(d)
 			continue
 		}

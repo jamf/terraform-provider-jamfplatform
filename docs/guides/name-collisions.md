@@ -21,17 +21,18 @@ The category with the name "Apps" already exists in Jamf Pro (ID 12), and Jamf P
 does not allow two with the same name. Names are compared without regard to case,
 trailing spaces or accents.
 
-If this configuration does not manage the existing category yet, import it to
-manage it with Terraform. Use the full address of this resource as `to`,
-including any module path:
+Check whether this configuration or its state already manages the existing
+category under another address. The provider cannot always tell, for example
+under -refresh=false, -target or a saved plan. If something does, choose a
+different name. Importing it again puts one object under two addresses.
+
+If nothing manages it, import it to manage it with Terraform. Use the full
+address of this resource as `to`, including any module path:
 
   import {
     to = <this resource's address>
     id = "12"
   }
-
-If this configuration or its state already manages it under another address,
-choose a different name instead.
 ```
 
 The provider does not know where the resource sits in your configuration, so `to` is a placeholder. Terraform names the resource address in the diagnostic header. For a resource inside a module, use the full address, for example `module.apps.jamfplatform_pro_category.apps`.
@@ -46,13 +47,13 @@ does not allow two with the same name. Names are compared without regard to case
 trailing spaces or accents.
 
 The existing category is already managed by another resource in this
-configuration. Choose a different name. If you renamed the resource that manages
-it, add a moved block instead.
+configuration's state. Choose a different name. If you renamed the resource
+that manages it, add a moved block instead.
 ```
 
 The `moved` hint covers a renamed resource block with no `moved` block. Terraform then plans to destroy the old address and create the new one, and the create collides with the object that is still managed under the old address.
 
-`terraform plan -refresh=false` skips the refresh, so the provider cannot see what the configuration manages. The error then offers the import block even for an object you manage.
+The provider recognises a managed object only after that resource's refresh has run. Terraform refreshes and plans resources independently, so one configuration can show either message on different runs. `terraform plan -refresh=false`, a targeted plan and applying a saved plan never refresh. The error then offers the import block even for an object you manage, so it asks you to check for an existing manager first.
 
 The check runs again just before each resource is applied, so an object created in the web interface between plan and apply is still caught.
 

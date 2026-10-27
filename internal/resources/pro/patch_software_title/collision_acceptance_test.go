@@ -77,3 +77,55 @@ func TestAccResource_ProPatchSoftwareTitle_DifferentTitleDoesNotCollide(t *testi
 		},
 	})
 }
+
+// twoTitlesConfig declares two titles, the second depending on the first so the creates
+// are sequential: Jamf Pro's duplicate check is not atomic, and two concurrent creates of
+// one key can both succeed.
+func twoTitlesConfig(suffix, nameIDOne, nameIDTwo string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_patch_software_title" "one" {
+			name      = "tf-acc-collide-pst-one-%[1]s"
+			name_id   = %[2]q
+			source_id = %[4]d
+		}
+
+		resource "jamfplatform_pro_patch_software_title" "two" {
+			depends_on = [jamfplatform_pro_patch_software_title.one]
+
+			name      = "tf-acc-collide-pst-two-%[1]s"
+			name_id   = %[3]q
+			source_id = %[4]d
+		}
+	`, suffix, nameIDOne, nameIDTwo, accTitleSourceID)
+}
+
+func TestAccResource_ProPatchSoftwareTitle_RenameIntoManagedTitleOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: twoTitlesConfig(suffix, accTitleNameID, "286")},
+			{
+				Config:      twoTitlesConfig(suffix, accTitleNameID, accTitleNameID),
+				ExpectError: regexp.MustCompile(`(?s)Software\s+title\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProPatchSoftwareTitle_TwoNewWithOneTitleExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoTitlesConfig(suffix, accTitleNameID, accTitleNameID),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}
