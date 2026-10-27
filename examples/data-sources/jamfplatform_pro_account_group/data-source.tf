@@ -3,7 +3,7 @@ data "jamfplatform_pro_account_group" "by_id" {
 }
 
 data "jamfplatform_pro_account_group" "by_name" {
-  display_name = "Auditors"
+  display_name = "Help Desk"
 }
 
 output "account_group_by_id" {
