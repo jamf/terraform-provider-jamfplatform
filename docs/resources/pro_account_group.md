@@ -26,14 +26,9 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 ## Example Usage
 
 ```terraform
-# A preset (non-Custom) administrator account group.
-resource "jamfplatform_pro_account_group" "auditors" {
-  display_name  = "Auditors"
-  access_level  = "Full Access"
-  privilege_set = "Auditor"
-}
-
-# A Custom account group with an explicit privilege grid. Privileges are grouped
+# An account group with an explicit privilege grid. Jamf Pro accepts only the
+# Custom privilege set from an API client, which is how this provider
+# authenticates, so every group uses it. Privileges are grouped
 # by the same categories as the Jamf Pro admin UI Privileges tab. Jamf Pro
 # silently adds dependency privileges and silently ignores unrecognised ones;
 # the provider validates declared privileges at plan time against the tenant's
@@ -61,8 +56,12 @@ resource "jamfplatform_pro_account_group" "helpdesk" {
 resource "jamfplatform_pro_account_group" "directory_admins" {
   display_name   = "Directory Admins"
   access_level   = "Full Access"
-  privilege_set  = "Administrator"
+  privilege_set  = "Custom"
   ldap_server_id = 31
+
+  privileges = {
+    jamf_pro_server_objects = ["Read Computers"]
+  }
 }
 
 # A group with explicitly-managed Jamf-Pro-local members. Reference administrator
@@ -71,8 +70,12 @@ resource "jamfplatform_pro_account_group" "directory_admins" {
 resource "jamfplatform_pro_account_group" "managed_members" {
   display_name  = "Managed Members"
   access_level  = "Full Access"
-  privilege_set = "Auditor"
+  privilege_set = "Custom"
   members       = [12, 56]
+
+  privileges = {
+    jamf_pro_server_objects = ["Read Computers"]
+  }
 }
 ```
 
@@ -83,7 +86,7 @@ resource "jamfplatform_pro_account_group" "managed_members" {
 
 - `access_level` (String) Access level granted to members. One of `Full Access` or `Site Access`.
 - `display_name` (String) Group display name (UI "Display Name"). Must not be empty.
-- `privilege_set` (String) Privilege set. One of `Administrator`, `Auditor`, `Enrollment Only`, or `Custom`. The `privileges` block is only applied when this is `Custom`.
+- `privilege_set` (String) Privilege set. One of `Administrator`, `Auditor`, `Enrollment Only`, or `Custom`. The `privileges` block is only applied when this is `Custom`. Jamf Pro accepts only `Custom` from an API client, which is how this provider authenticates, and refuses the other three with an error.
 
 ### Optional
 

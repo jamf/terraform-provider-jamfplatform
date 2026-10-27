@@ -197,7 +197,7 @@ func (r *PackageResource) Schema(ctx context.Context, req resource.SchemaRequest
 				},
 			},
 			"stream_url_directly": schema.BoolAttribute{
-				MarkdownDescription: "When `true` and `package_file_source` is an `http(s)://` URL, the file is sent straight to the Jamf Cloud Distribution Point as it downloads, instead of being saved to a temporary file first. This avoids using local disk, but disables retry on rate-limiting, pre-upload checksum validation (so it cannot be combined with `package_file_source_checksum`), and recovery if the download is interrupted partway. Use it on disk-constrained machines with very large files. Ignored for local-path sources.",
+				MarkdownDescription: "When `true` and `package_file_source` is an `http(s)://` URL, the file is sent straight to the Jamf Cloud Distribution Point as it downloads, instead of being saved to a temporary file first. This avoids using local disk, but disables retry on rate-limiting, pre-upload checksum validation (so it cannot be combined with `package_file_source_checksum`), and recovery if the download is interrupted partway. The upload needs the file size up front, so the download must declare a `Content-Length`; if it does not, the file is saved to a temporary file first, as if this were `false`. Use it on disk-constrained machines with very large files. Ignored for local-path sources.",
 				Optional:            true,
 			},
 			"manifest_file_source": schema.StringAttribute{

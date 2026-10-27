@@ -18,6 +18,9 @@
 //
 // Uniqueness: display_name, enforced (409), case-, leading-space- and trailing-space-insensitive, accent-sensitive. The plan-time collision check lists with proclassic.ListAccounts (collision.go).
 //
+// Privilege sets: Jamf Pro accepts only Custom from an API client on POST and PUT (409/403
+// "Only an administrator can assign the ... privilege level"); isPrivilegeSetRefusal names it.
+//
 // Status: current. Last reviewed 2026-09-06.
 
 package account_group
@@ -26,6 +29,7 @@ import (
 	"context"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
@@ -60,6 +64,10 @@ func (r *AccountGroupResource) Create(ctx context.Context, req resource.CreateRe
 
 	created, err := r.client.CreateAccountGroupByID(createCtx, "0", input)
 	if err != nil {
+		if isPrivilegeSetRefusal(err) {
+			resp.Diagnostics.AddAttributeError(path.Root("privilege_set"), "Privilege set refused for API clients", privilegeSetRefusalDetail(err))
+			return
+		}
 		resp.Diagnostics.AddError("Error creating Jamf Pro account group", helpers.APIErrorDetail(err))
 		return
 	}
@@ -264,6 +272,10 @@ func (r *AccountGroupResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	if err := r.client.UpdateAccountGroupByID(updateCtx, plan.ID.ValueString(), input); err != nil {
+		if isPrivilegeSetRefusal(err) {
+			resp.Diagnostics.AddAttributeError(path.Root("privilege_set"), "Privilege set refused for API clients", privilegeSetRefusalDetail(err))
+			return
+		}
 		resp.Diagnostics.AddError("Error updating Jamf Pro account group", helpers.APIErrorDetail(err))
 		return
 	}

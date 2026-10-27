@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -118,19 +119,19 @@ func TestAccResource_ProAccountGroup(t *testing.T) {
 	})
 }
 
-// TestAccResource_ProAccountGroup_NonCustom verifies a preset privilege set
-// (Auditor) with no privileges block, and the Pro v1 data source read.
-func TestAccResource_ProAccountGroup_NonCustom(t *testing.T) {
+// TestAccResource_ProAccountGroup_PresetPrivilegeSetRefused pins Jamf Pro
+// refusing the Administrator, Auditor and Enrollment Only privilege sets to an
+// API client, and the named diagnostic the resource returns for it. The other
+// acceptance tests in this file create with Custom, which is the control. When
+// Jamf Pro lifts the refusal the apply succeeds and this test fails, which is
+// the signal to restore preset-set coverage.
+func TestAccResource_ProAccountGroup_PresetPrivilegeSetRefused(t *testing.T) {
 	name := fmt.Sprintf("tf-acc-account-group-auditor-%d", os.Getpid())
 	config := fmt.Sprintf(`
 resource "jamfplatform_pro_account_group" "auditor" {
   display_name  = %q
   access_level  = "Full Access"
   privilege_set = "Auditor"
-}
-
-data "jamfplatform_pro_account_group" "by_name" {
-  display_name = jamfplatform_pro_account_group.auditor.display_name
 }
 `, name)
 
@@ -140,26 +141,9 @@ data "jamfplatform_pro_account_group" "by_name" {
 		CheckDestroy:             testAccCheckAccountGroupDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: config,
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("jamfplatform_pro_account_group.auditor", "privilege_set", "Auditor"),
-					// DS is classic-sourced (same spellings as the resource).
-					resource.TestCheckResourceAttr("data.jamfplatform_pro_account_group.by_name", "privilege_set", "Auditor"),
-					resource.TestCheckResourceAttr("data.jamfplatform_pro_account_group.by_name", "access_level", "Full Access"),
-					resource.TestCheckResourceAttrPair("data.jamfplatform_pro_account_group.by_name", "id", "jamfplatform_pro_account_group.auditor", "id"),
-				),
+				Config:      config,
+				ExpectError: regexp.MustCompile(`(?s)Privilege\s+set\s+refused\s+for\s+API\s+clients`),
 			},
-			// A preset privilege_set is where the read used to commit privileges
-			// the tenant will not grant. Jamf Pro expands "Auditor" into a full
-			// privilege list, and on an 11.x tenant that list names "Read Knobs",
-			// which the same tenant refuses — so the generated configuration was
-			// rejected by this resource's own ModifyPlan validator and the plan
-			// could not run. The expansion is no longer adopted at all for a
-			// preset set, because no write can change it, so the generated
-			// configuration carries no privileges block; GenerateConfigStep
-			// requires it to plan as a no-op import, which is what both halves of
-			// that (adopting nothing, validating nothing) have to agree on.
-			testhelpers.GenerateConfigStep("jamfplatform_pro_account_group.auditor"),
 		},
 	})
 }
@@ -194,8 +178,12 @@ resource "jamfplatform_pro_account" "member" {
 resource "jamfplatform_pro_account_group" "members" {
   display_name  = %[1]q
   access_level  = "Full Access"
-  privilege_set = "Auditor"
+  privilege_set = "Custom"
   members       = %[3]s
+
+  privileges = {
+    jamf_pro_server_objects = ["Read Computers"]
+  }
 }
 `, name, suffix, members)
 }
@@ -255,8 +243,12 @@ resource "jamfplatform_pro_account_group" "ldap" {
   depends_on    = [jamfplatform_pro_ldap_server.fixture]
   display_name  = %[1]q
   access_level  = "Full Access"
-  privilege_set = "Auditor"
+  privilege_set = "Custom"
   %[3]s
+
+  privileges = {
+    jamf_pro_server_objects = ["Read Computers"]
+  }
 }
 `, name, suffix, ldap)
 }

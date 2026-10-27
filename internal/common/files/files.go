@@ -170,7 +170,13 @@ func DownloadCapped(ctx context.Context, src string, dst io.Writer, maxBytes int
 // the body has not been read. Callers that want enforcement must wrap
 // the returned reader in their own counted-copy and compare against
 // maxBytes after the stream completes.
-func OpenURLStream(ctx context.Context, src string, maxBytes int64) (io.ReadCloser, string, error) {
+//
+// The returned int64 is the response's declared Content-Length, or -1 when
+// the origin sent none (chunked, or transparently decompressed). The SDK
+// refuses to upload a body of unknown size, so a caller that needs to
+// stream must fall back to OpenUploadSource on -1. A declared length above
+// maxBytes is rejected here, before any byte is read.
+func OpenURLStream(ctx context.Context, src string, maxBytes int64) (io.ReadCloser, string, int64, error) {
 	if maxBytes <= 0 {
 		maxBytes = DefaultMaxBytes
 	}
@@ -189,16 +195,20 @@ func OpenURLStream(ctx context.Context, src string, maxBytes int64) (io.ReadClos
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
 	if err != nil {
-		return nil, "", fmt.Errorf("files: building request: %w", err)
+		return nil, "", -1, fmt.Errorf("files: building request: %w", err)
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, "", fmt.Errorf("files: fetching %q: %w", src, err)
+		return nil, "", -1, fmt.Errorf("files: fetching %q: %w", src, err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		_ = resp.Body.Close()
-		return nil, "", fmt.Errorf("files: GET %q returned HTTP %d", src, resp.StatusCode)
+		return nil, "", -1, fmt.Errorf("files: GET %q returned HTTP %d", src, resp.StatusCode)
+	}
+	if resp.ContentLength > maxBytes {
+		_ = resp.Body.Close()
+		return nil, "", -1, fmt.Errorf("files: %q declares %d bytes, over the %d byte cap", src, resp.ContentLength, maxBytes)
 	}
 
 	filename := path.Base(resp.Request.URL.Path)
@@ -207,7 +217,11 @@ func OpenURLStream(ctx context.Context, src string, maxBytes int64) (io.ReadClos
 	}
 
 	limited := io.LimitReader(resp.Body, maxBytes)
-	return &limitedBodyCloser{Reader: limited, body: resp.Body}, filename, nil
+	size := resp.ContentLength
+	if resp.Uncompressed {
+		size = -1
+	}
+	return &limitedBodyCloser{Reader: limited, body: resp.Body}, filename, size, nil
 }
 
 // limitedBodyCloser pairs a LimitReader view with the underlying body so

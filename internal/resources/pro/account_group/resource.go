@@ -103,7 +103,7 @@ func (r *AccountGroupResource) Schema(ctx context.Context, req resource.SchemaRe
 				},
 			},
 			"privilege_set": schema.StringAttribute{
-				MarkdownDescription: "Privilege set. One of `Administrator`, `Auditor`, `Enrollment Only`, or `Custom`. The `privileges` block is only applied when this is `Custom`.",
+				MarkdownDescription: "Privilege set. One of `Administrator`, `Auditor`, `Enrollment Only`, or `Custom`. The `privileges` block is only applied when this is `Custom`. Jamf Pro accepts only `Custom` from an API client, which is how this provider authenticates, and refuses the other three with an error.",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(privilegeSetValues...),
