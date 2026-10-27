@@ -4,6 +4,8 @@
 package account_group
 
 import (
+	"strings"
+
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
@@ -47,4 +49,25 @@ func ldapServerIDForWrite(value types.Int64) *int {
 // ModifyPlan does not validate a grid it cannot send.
 func customPrivilegeSet(privilegeSet types.String) bool {
 	return privilegeSet.ValueString() == proclassic.GroupPrivilegeSetCustom
+}
+
+// privilegeSetRefusalPhrase is the Jamf Pro wording for refusing a preset
+// privilege set to an API client: 409 on POST, 403 on PUT.
+const privilegeSetRefusalPhrase = "only an administrator can assign"
+
+// isPrivilegeSetRefusal reports whether err is Jamf Pro refusing the Administrator,
+// Auditor or Enrollment Only privilege set because the caller is an API client.
+// Only Custom is accepted from one. The phrase is matched within any 4xx so the
+// check survives a change of status code.
+func isPrivilegeSetRefusal(err error) bool {
+	if err == nil || !helpers.IsClientError(err) {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), privilegeSetRefusalPhrase)
+}
+
+// privilegeSetRefusalDetail is the diagnostic for isPrivilegeSetRefusal.
+func privilegeSetRefusalDetail(err error) string {
+	return "Jamf Pro refuses the Administrator, Auditor and Enrollment Only privilege sets when the caller is an API client. " +
+		"Set privilege_set to \"Custom\" and list the permissions in the privileges block.\n\n" + err.Error()
 }

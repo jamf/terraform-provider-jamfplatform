@@ -83,7 +83,7 @@ resource "jamfplatform_pro_account_group" "managed_members" {
 
 - `access_level` (String) Access level granted to members. One of `Full Access` or `Site Access`.
 - `display_name` (String) Group display name (UI "Display Name"). Must not be empty.
-- `privilege_set` (String) Privilege set. One of `Administrator`, `Auditor`, `Enrollment Only`, or `Custom`. The `privileges` block is only applied when this is `Custom`.
+- `privilege_set` (String) Privilege set. One of `Administrator`, `Auditor`, `Enrollment Only`, or `Custom`. The `privileges` block is only applied when this is `Custom`. Jamf Pro accepts only `Custom` from an API client, which is how this provider authenticates, and refuses the other three with an error.
 
 ### Optional
 
