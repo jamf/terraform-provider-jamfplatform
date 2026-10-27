@@ -218,7 +218,8 @@ func (r *PackageResource) Read(ctx context.Context, req resource.ReadRequest, re
 // open handle, validate any user-supplied checksum, decide whether the local
 // bytes differ from state's recorded sha3, and (if re-upload is needed)
 // rewind the SAME handle and upload it by the preflight's route. URL sources are
-// downloaded exactly once per Update.
+// downloaded exactly once per Update. An upload by the direct route under a
+// changed file_name renames the record first (renameRecordBeforeUpload).
 func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state PackageResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -253,7 +254,7 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 		// Upload + verify FIRST so JCDS has recomputed hashes when the
 		// metadata PUT lands (see disk-staging path for full rationale).
 		previous := recordedDigestsFromState(&state)
-		streamDiags := streamURLUploadAndVerify(updateCtx, r.client, route, &plan, previous, state.Size.ValueString())
+		streamDiags := reuploadFromURL(updateCtx, r.client, route, &plan, &state, previous)
 		resp.Diagnostics.Append(streamDiags...)
 		if streamDiags.HasError() {
 			return
@@ -381,7 +382,7 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 		if fileName == "" {
 			fileName = uploadName
 		}
-		uploadDiags := uploadAndPoll(updateCtx, r.client, route, plan.ID.ValueString(), fileName, uploadFile, local, localSize, previous, state.Size.ValueString())
+		uploadDiags := reuploadFromFile(updateCtx, r.client, route, &plan, &state, fileName, uploadFile, local, localSize, previous)
 		resp.Diagnostics.Append(uploadDiags...)
 		if uploadDiags.HasError() {
 			return
@@ -522,7 +523,7 @@ func isConfiguredString(v types.String) bool {
 // validates the optional user-supplied checksum, rewinds, streams to
 // the preflight's route, and polls until convergence. previous is empty
 // on Create.
-func openHashUploadVerify(ctx context.Context, client *pro.Client, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
+func openHashUploadVerify(ctx context.Context, client uploadClient, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
 	file, filename, cleanup, err := files.OpenUploadSource(ctx, plan.PackageFileSource.ValueString(), files.DefaultMaxBytes)
 	if err != nil {
 		return errorDiag("Error opening package binary", err.Error())
@@ -636,7 +637,7 @@ const maxUploadAttempts = 5
 // from the open/hash phase lets Update reuse the open handle from the hash
 // decision; file must be seekable so a retry can rewind and resend the same
 // bytes.
-func uploadAndPoll(ctx context.Context, client *pro.Client, route uploadRoute, id, fileName string, file io.ReadSeeker, local fileDigests, localSize int64, previous fileDigests, previousSize string) diag.Diagnostics {
+func uploadAndPoll(ctx context.Context, client uploadClient, route uploadRoute, id, fileName string, file io.ReadSeeker, local fileDigests, localSize int64, previous fileDigests, previousSize string) diag.Diagnostics {
 	for attempt := 1; ; attempt++ {
 		if attempt > 1 {
 			if _, seekErr := file.Seek(0, io.SeekStart); seekErr != nil {
@@ -659,7 +660,7 @@ func uploadAndPoll(ctx context.Context, client *pro.Client, route uploadRoute, i
 		}
 		tflog.Info(ctx, "package upload returned", map[string]any{"id": id, "attempt": attempt, "route": route.String()})
 
-		convergedPkg, pollErr := PollPackageVerification(ctx, client, id, fileName, local, localSize, previous, previousSize)
+		convergedPkg, pollErr := pollPackageVerification(ctx, client, pollInterval, verifyGrace, id, fileName, local, localSize, previous, previousSize)
 		if pollErr == nil {
 			converged := recordedDigests(convergedPkg)
 			tflog.Info(ctx, "package poll converged", map[string]any{
@@ -795,7 +796,7 @@ func streamingURLEnabled(plan PackageResourceModel) bool {
 // Trade is intentional: see schema description for the user-facing
 // rationale. Caller has already enforced `package_file_source` is a URL
 // (streamingURLEnabled guards entry).
-func streamURLUploadAndVerify(ctx context.Context, client *pro.Client, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
+func streamURLUploadAndVerify(ctx context.Context, client uploadClient, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
 	for attempt := 1; ; attempt++ {
 		diags, pollErr := streamURLUploadOnce(ctx, client, route, plan, previous, previousSize, attempt)
 		if diags.HasError() {
@@ -843,7 +844,7 @@ var errStreamSizeUnknown = errors.New("package URL declared no Content-Length")
 // diagnostics for anything that fails before the poll (opening the URL,
 // streaming the upload itself); otherwise returns the poll's error (nil on
 // convergence) for the caller's retry decision.
-func streamURLUploadOnce(ctx context.Context, client *pro.Client, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string, attempt int) (diag.Diagnostics, error) {
+func streamURLUploadOnce(ctx context.Context, client uploadClient, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string, attempt int) (diag.Diagnostics, error) {
 	body, urlFilename, declaredSize, err := files.OpenURLStream(ctx, plan.PackageFileSource.ValueString(), files.DefaultMaxBytes)
 	if err != nil {
 		return errorDiag("Error opening package URL stream", err.Error()), nil
@@ -889,7 +890,7 @@ func streamURLUploadOnce(ctx context.Context, client *pro.Client, route uploadRo
 	local := digests.sum()
 	localSize := bytesStreamed
 
-	_, pollErr := PollPackageVerification(ctx, client, plan.ID.ValueString(), fileName, local, localSize, previous, previousSize)
+	_, pollErr := pollPackageVerification(ctx, client, pollInterval, verifyGrace, plan.ID.ValueString(), fileName, local, localSize, previous, previousSize)
 	return nil, pollErr
 }
 

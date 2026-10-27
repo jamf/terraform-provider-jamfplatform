@@ -8,20 +8,84 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
+	"github.com/jamf/jamfplatform-go-sdk/jcdsupload"
 )
 
 type routeRecorder struct {
+	mu         sync.Mutex
 	apiUploads int
 	initiates  int
 	apiErr     error
+	events     []string
+	puts       []*pro.Package
+	getFn      func(call int) pro.Package
+	gets       int
 }
 
-func (r *routeRecorder) UploadPackageV1(_ context.Context, _, _ string, _ io.Reader) (*pro.HrefResponse, error) {
+func (r *routeRecorder) log(event string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, event)
+}
+
+func (r *routeRecorder) snapshot() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.events...)
+}
+
+func (r *routeRecorder) count(prefix string) int {
+	n := 0
+	for _, e := range r.snapshot() {
+		if strings.HasPrefix(e, prefix) {
+			n++
+		}
+	}
+	return n
+}
+
+func (r *routeRecorder) UploadPackageV1(_ context.Context, id, fileName string, file io.Reader) (*pro.HrefResponse, error) {
+	_, _ = io.Copy(io.Discard, file)
+	r.mu.Lock()
 	r.apiUploads++
+	r.mu.Unlock()
+	r.log("upload-api:" + id + ":" + fileName)
 	return &pro.HrefResponse{}, r.apiErr
+}
+
+func (r *routeRecorder) directUpload(_ context.Context, _ jcdsupload.API, fileName string, body io.Reader) error {
+	_, _ = io.Copy(io.Discard, body)
+	r.log("upload-jcds:" + fileName)
+	return nil
+}
+
+func (r *routeRecorder) GetPackageV1(context.Context, string) (*pro.Package, error) {
+	r.mu.Lock()
+	r.gets++
+	call := r.gets
+	r.mu.Unlock()
+	r.log("get")
+	if r.getFn == nil {
+		return &pro.Package{}, nil
+	}
+	rec := r.getFn(call)
+	return &rec, nil
+}
+
+func (r *routeRecorder) RefreshCloudDistributionPointInventoryV1(context.Context, string) error {
+	return nil
+}
+
+func (r *routeRecorder) UpdatePackageV1(_ context.Context, _ string, request *pro.Package) (*pro.Package, error) {
+	r.mu.Lock()
+	r.puts = append(r.puts, request)
+	r.mu.Unlock()
+	r.log("put:" + request.FileName)
+	return request, nil
 }
 
 func (r *routeRecorder) InitiateJCDSUploadV1(context.Context) (*pro.Credentials, error) {
@@ -61,6 +125,9 @@ func TestUploadBinaryDispatchesByRoute(t *testing.T) {
 		}
 		if rec.apiUploads != 1 || rec.initiates != 0 {
 			t.Fatalf("apiUploads=%d initiates=%d, want 1 and 0", rec.apiUploads, rec.initiates)
+		}
+		if got := rec.snapshot(); len(got) != 1 || got[0] != "upload-api:7:a.pkg" {
+			t.Fatalf("events = %v, want the API upload of id 7 and a.pkg", got)
 		}
 	})
 
