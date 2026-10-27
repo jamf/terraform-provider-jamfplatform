@@ -6,7 +6,7 @@
 //   proclassic.GetNetworkSegmentByID
 //   proclassic.UpdateNetworkSegmentByID
 //   proclassic.DeleteNetworkSegmentByID
-//   proclassic.ListNetworkSegments            (data source / list resource)
+//   proclassic.ListNetworkSegments            (data source / list resource / collision check in collision.go)
 //   proclassic.GetNetworkSegmentByName        (data source name lookup)
 //   proclassic.ResolveNetworkSegmentIDByName  (data source name → ID)
 //
@@ -14,6 +14,8 @@
 // the stored value, an empty <building>/<department> clears it and an explicit
 // false clears an override flag (wire-probed 2026-09-06). See
 // buildNetworkSegmentInput.
+//
+// Uniqueness: name, enforced (409), case-, leading-space- and trailing-space-insensitive; accents are significant.
 //
 // Status: current. Last reviewed 2026-09-06.
 

@@ -8,7 +8,7 @@
 //   pro.DeleteComputerPrestageV3
 //   pro.ResolveComputerPrestageV3ByName                   (data source name lookup)
 //   pro.ResolveComputerPrestageV3IDByName                 (data source name lookup ID-only path)
-//   pro.ListComputerPrestagesV3                           (list resource + data source name lookup paging)
+//   pro.ListComputerPrestagesV3                           (list resource + data source name lookup paging + collision check in collision.go)
 //   pro.GetComputerPrestageScopeV2                        (folded scope_serial_numbers read)
 //   pro.ReplaceComputerPrestageScopeV2                    (folded scope_serial_numbers write)
 //
@@ -23,7 +23,9 @@
 // for the documented error paths, 409 OPTIMISTIC_LOCK_FAILED on stale
 // versionLock.
 //
-// Status: current. Last reviewed 2026-05-28.
+// Uniqueness: displayName, not enforced; duplicates stored; checked only with include_unenforced.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package computer_prestage_enrollment
 

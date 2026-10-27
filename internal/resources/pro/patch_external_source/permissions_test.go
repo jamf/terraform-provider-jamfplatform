@@ -39,9 +39,14 @@ func calledMethods(t *testing.T, filename string) map[string]bool {
 
 // assertMatch fails if the source file calls an SDK method not declared, or
 // declares one it does not call.
-func assertMatch(t *testing.T, filename string, declaredList []string) {
+func assertMatch(t *testing.T, filename string, declaredList []string, extraFiles ...string) {
 	t.Helper()
 	called := calledMethods(t, filename)
+	for _, f := range extraFiles {
+		for m := range calledMethods(t, f) {
+			called[m] = true
+		}
+	}
 	declared := map[string]bool{}
 	for _, m := range declaredList {
 		declared[m] = true
@@ -82,7 +87,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps the resource privileges table
 // honest as the CRUD path changes.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods)
+	assertMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered.

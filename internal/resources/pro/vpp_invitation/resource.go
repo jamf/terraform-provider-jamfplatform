@@ -44,6 +44,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -60,7 +61,8 @@ const (
 
 // VPPInvitationResource implements the Terraform resource.
 type VPPInvitationResource struct {
-	client *proclassic.Client
+	client     *proclassic.Client
+	collisions *collision.Checker
 	// ldapSearcher backs the plan-time scope directory-service user-group
 	// preflight (Pro v1 LDAP search). Nil when the Pro client is unavailable.
 	ldapSearcher ldapgroups.Searcher
@@ -188,6 +190,7 @@ func (r *VPPInvitationResource) Configure(ctx context.Context, req resource.Conf
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 
 	// Pro (v1) client for the scope directory-service group preflight.
 	proClient, proDiags := providerdata.ConfigurePro(ctx, req.ProviderData, minJamfProVersion, "jamfplatform_pro_vpp_invitation")
@@ -206,6 +209,8 @@ func (r *VPPInvitationResource) Configure(ctx context.Context, req resource.Conf
 // unconfigured LDAP downgrade to a warning. No-op on destroy and when no scope
 // groups are declared.
 func (r *VPPInvitationResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
+
 	if r.ldapSearcher == nil || req.Plan.Raw.IsNull() {
 		return
 	}

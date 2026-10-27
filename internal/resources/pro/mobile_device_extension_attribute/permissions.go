@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetMobileDeviceExtensionAttributeV1",
 	"UpdateMobileDeviceExtensionAttributeV1",
 	"DeleteMobileDeviceExtensionAttributeV1",
+	"ListMobileDeviceExtensionAttributesV1",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

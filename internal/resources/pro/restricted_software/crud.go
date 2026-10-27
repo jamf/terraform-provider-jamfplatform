@@ -6,8 +6,10 @@
 //   proclassic.GetRestrictedSoftwareByID      (GET    /restrictedsoftware/id/{id})
 //   proclassic.UpdateRestrictedSoftwareByID   (PUT    /restrictedsoftware/id/{id})
 //   proclassic.DeleteRestrictedSoftwareByID   (DELETE /restrictedsoftware/id/{id})
-//   proclassic.ListRestrictedSoftware         (data source / list resource)
+//   proclassic.ListRestrictedSoftware         (data source / list resource / collision check in collision.go)
 //   proclassic.GetRestrictedSoftwareByName    (data source name lookup)
+//
+// Uniqueness: general.name, enforced (409), case-, leading-space- and trailing-space-insensitive; accents are significant.
 //
 // Status: current. Last reviewed 2026-05-31.
 //

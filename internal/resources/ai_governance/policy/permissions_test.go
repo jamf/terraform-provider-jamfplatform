@@ -113,7 +113,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCalls keeps the resource privileges table honest as the CRUD and
 // plan-time validation paths change.
 func TestResourceSDKMethods_MatchCalls(t *testing.T) {
-	assertMatch(t, resourceSDKMethods, "crud.go", "validators.go")
+	assertMatch(t, resourceSDKMethods, "crud.go", "validators.go", "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into the description.

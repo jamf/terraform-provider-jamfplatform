@@ -51,6 +51,7 @@ func (r *DeviceGroupResource) ModifyPlan(ctx context.Context, req resource.Modif
 	// management changes what everything scoped to it applies to, so both deserve
 	// an impact alert even though neither needs the criteria suppression that
 	// follows.
+	r.reportNameCollision(ctx, req, resp)
 	r.reportMembershipImpact(ctx, req, resp)
 
 	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() || r.proClient == nil {

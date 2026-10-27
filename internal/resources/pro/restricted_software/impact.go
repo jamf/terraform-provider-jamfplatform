@@ -53,8 +53,8 @@ func (r *RestrictedSoftwareResource) reportScopeImpact(ctx context.Context, req 
 	}, restrictedSoftwareImpactScope)
 }
 
-// ModifyPlan emits the impact alert for a scope change. This resource has no
-// other plan-time work, so this is the whole of it.
+// ModifyPlan emits the impact alert for a scope change and the name collision check.
 func (r *RestrictedSoftwareResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	r.reportScopeImpact(ctx, req, resp)
+	r.reportNameCollision(ctx, req, resp)
 }

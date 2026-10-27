@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetVPPInvitationByID",
 	"UpdateVPPInvitationByID",
 	"DeleteVPPInvitationByID",
+	"ListVPPInvitations",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

@@ -34,7 +34,9 @@ func (r *BenchmarkResource) reportScopeImpact(ctx context.Context, req resource.
 	}, benchmarkImpactScope)
 }
 
-// ModifyPlan emits the impact alert for a change to device group targeting.
+// ModifyPlan reports a title another benchmark already holds, and emits the impact
+// alert for a change to device group targeting.
 func (r *BenchmarkResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportTitleCollision(ctx, req, resp)
 	r.reportScopeImpact(ctx, req, resp)
 }

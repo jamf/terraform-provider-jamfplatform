@@ -24,6 +24,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -37,7 +38,8 @@ const minJamfProVersion = ""
 // AdvancedUserSearchResource implements the Terraform resource for Jamf Pro
 // advanced user searches.
 type AdvancedUserSearchResource struct {
-	client *proclassic.Client
+	collisions *collision.Checker
+	client     *proclassic.Client
 	// ldap resolves directory-service group criterion names to/from the base64
 	// {uuid,serverId} wire value. Built from the shared Pro client because the
 	// classic API has no LDAP-group search of its own.
@@ -138,6 +140,7 @@ func (r *AdvancedUserSearchResource) Configure(ctx context.Context, req resource
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 	if pd, ok := req.ProviderData.(*providerdata.Data); ok {
 		r.ldap = pro.New(pd.Client)
 	}

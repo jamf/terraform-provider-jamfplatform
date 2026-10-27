@@ -72,6 +72,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/aigovernance"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/aischemas"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -99,6 +100,7 @@ type PolicyResource struct {
 	client          *aigovernance.Client
 	schemas         *aischemas.Cache
 	privateOverride privateState
+	collisions      *collision.Checker
 }
 
 var (
@@ -299,6 +301,7 @@ func (r *PolicyResource) Configure(_ context.Context, req resource.ConfigureRequ
 
 	r.client = aigovernance.New(pd.Client)
 	r.schemas = pd.AISchemaCache()
+	r.collisions = pd.CollisionChecker()
 }
 
 // ImportState handles import by the AI Governance policy ID.

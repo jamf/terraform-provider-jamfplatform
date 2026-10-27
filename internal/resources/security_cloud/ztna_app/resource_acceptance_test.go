@@ -703,7 +703,14 @@ func TestAccResource_SecurityCloudZtnaApp_ServerConflicts(t *testing.T) {
 			},
 			{
 				// A second application claiming the same host name is refused tenant-wide.
+				// The plan-time name collision check would name it first, so it is switched
+				// off to exercise the translated server diagnostic, which still has to cover
+				// a collision created between plan and apply.
 				Config: fmt.Sprintf(`
+					provider "jamfplatform" {
+						name_collision_check = { mode = "off" }
+					}
+
 					resource "jamfplatform_security_cloud_ztna_app" "test" {
 						name              = "tf-acc-jsc-ztna-conflict-a-%[1]s"
 						category          = "Uncategorized"

@@ -61,5 +61,6 @@ func (r *PatchPolicyResource) reportScopeImpact(ctx context.Context, req resourc
 // ModifyPlan emits the impact alert for a scope change. This resource has no
 // other plan-time work, so this is the whole of it.
 func (r *PatchPolicyResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	r.reportScopeImpact(ctx, req, resp)
 }

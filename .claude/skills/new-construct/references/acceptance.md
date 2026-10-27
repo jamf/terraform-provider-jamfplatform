@@ -12,7 +12,11 @@ multi-step **Update round-trip** (every non-`RequiresReplace` attribute, a neste
 **and** remove, a computed sibling re-resolving); an **`ExpectError` per declared cross-field
 validator**; an **`ImportStateVerify` round-trip** with every `ImportStateVerifyIgnore` entry
 justified in a comment; **one happy path per mutually-exclusive shape**; and **drift-recovery**
-assertions for self-healing computed attributes. `//go:build acceptance` on line 1 or the file
+assertions for self-healing computed attributes; and, for a type with a collision check, a
+`collision_acceptance_test.go` that creates the colliding object outside Terraform in
+`PreConfig` and asserts the plan-time `ExpectError`, with a step showing the default settings
+do not error for a strict-only type. Assert that the error fires: a key path the plan cannot
+read makes the check skip silently, which a test that only expects success never notices. `//go:build acceptance` on line 1 or the file
 leaks into the unit run.
 
 ## Harness traps

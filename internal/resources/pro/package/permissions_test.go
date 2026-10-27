@@ -52,11 +52,13 @@ func sdkCallsKnownToRegistry(t *testing.T, filename string) []string {
 
 // assertMethodSetMatches fails when the registry-known SDK calls in filename do
 // not exactly equal the declared method list.
-func assertMethodSetMatches(t *testing.T, filename string, declared []string) {
+func assertMethodSetMatches(t *testing.T, filename string, declared []string, moreFiles ...string) {
 	t.Helper()
 	called := map[string]bool{}
-	for _, m := range sdkCallsKnownToRegistry(t, filename) {
-		called[m] = true
+	for _, f := range append([]string{filename}, moreFiles...) {
+		for _, m := range sdkCallsKnownToRegistry(t, f) {
+			called[m] = true
+		}
 	}
 	want := map[string]bool{}
 	for _, m := range declared {
@@ -98,7 +100,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps resourceSDKMethods in sync with
 // the SDK calls in crud.go.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMethodSetMatches(t, "crud.go", resourceSDKMethods)
+	assertMethodSetMatches(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

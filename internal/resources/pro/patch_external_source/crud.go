@@ -6,13 +6,17 @@
 //   proclassic.GetPatchExternalSourceByID
 //   proclassic.UpdatePatchExternalSourceByID
 //   proclassic.DeletePatchExternalSourceByID
-//   proclassic.ListPatchExternalSources              (data source / list resource)
+//   proclassic.ListPatchExternalSources              (data source / list resource / collision check in collision.go)
 //   proclassic.GetPatchExternalSourceByName          (data source name lookup)
 //   proclassic.ResolvePatchExternalSourceIDByName    (data source name → ID)
 //
 // Write semantics: the PUT merges field by field; an omitted <port> keeps the
 // stored value and <port>0</port> clears it (wire-probed 2026-09-06; -1 is
 // refused). See portForWrite.
+//
+// Uniqueness: name, not enforced; duplicates stored; checked only with
+// include_unenforced. Classic trims the name on save, so the strict comparison also
+// ignores leading and trailing spaces, case and accents.
 //
 // Status: current. Last reviewed 2026-09-06.
 

@@ -6,7 +6,9 @@
 //   pro.GetDepartmentV1
 //   pro.UpdateDepartmentV1
 //   pro.DeleteDepartmentV1
-//   pro.ListDepartmentsV1 (data source / list resource)
+//   pro.ListDepartmentsV1 (data source / list resource / collision check in collision.go)
+//
+// Uniqueness: name, enforced (400 DUPLICATE_FIELD), case-, leading-space-, trailing-space- and accent-insensitive.
 //
 // Status: current. Last reviewed 2026-05-21.
 

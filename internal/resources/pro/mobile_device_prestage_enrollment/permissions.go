@@ -10,7 +10,7 @@ import (
 )
 
 // resourceSDKMethods lists the SDK methods the mobile device prestage
-// enrollment resource's CRUD path calls (crud.go). It mirrors the "SDK
+// enrollment resource's CRUD and name collision paths call (crud.go, collision.go). It mirrors the "SDK
 // endpoints used" block in crud.go and drives the "Required Jamf permissions"
 // table appended to the resource MarkdownDescription. permissions_test.go
 // asserts this list stays in sync with the actual client.<Method> calls in
@@ -22,6 +22,7 @@ var resourceSDKMethods = []string{
 	"DeleteMobileDevicePrestageV3",
 	"GetMobileDevicePrestageScopeV2",
 	"ReplaceMobileDevicePrestageScopeV2",
+	"ListMobileDevicePrestagesV3",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

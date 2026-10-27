@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
@@ -41,6 +42,7 @@ const minJamfProVersion = ""
 
 // MacAppResource implements the Terraform resource for Jamf Pro App Store Mac apps.
 type MacAppResource struct {
+	collisions *collision.Checker
 	// impact backs the plan-time impact alert on scope changes. nil when the
 	// provider's impact_alerts attribute is off, which is the default.
 	impact *impact.Cache
@@ -235,6 +237,7 @@ func (r *MacAppResource) Configure(ctx context.Context, req resource.ConfigureRe
 	}
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 
 	// Also obtain a Pro (v1) client for the scope directory-service group
 	// preflight. Same provider data and version contract; ConfigurePro returns
@@ -266,6 +269,7 @@ func (r *MacAppResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 	// Runs ahead of any guard below: an object entering or leaving management
 	// changes what its scope receives, so creates and destroys are reported too.
 	r.reportScopeImpact(ctx, req, resp)
+	r.reportNameCollision(ctx, req, resp)
 
 	if r.ldapSearcher == nil || req.Plan.Raw.IsNull() {
 		return

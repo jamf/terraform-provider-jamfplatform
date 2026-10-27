@@ -15,7 +15,9 @@
 // a connection Jamf's collection lists but cannot read on its own identifier
 // from one that has genuinely gone.
 //
-// Status: current. Last reviewed 2026-09-02.
+// Uniqueness: name, not enforced: Jamf Account appends a random suffix to every name a create sends, so two creates with one name, and one differing only in case, all succeed under distinct stored names (issue #533, wire-probed 2026-10-25). Not checked by the name collision check, because the stored name never equals the planned one, so a comparison would flag a connection Jamf Account keeps distinct; the configured name is recovered from the stored one by configuredNameFromStored, which is what the resource reports as name.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package sso_connection
 

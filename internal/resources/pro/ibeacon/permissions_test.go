@@ -41,7 +41,12 @@ func callsInFile(t *testing.T, filename string) map[string]bool {
 // changes.
 func assertCallsMatch(t *testing.T, filename string, declaredMethods []string) {
 	t.Helper()
-	called := callsInFile(t, filename)
+	called := map[string]bool{}
+	for _, f := range privilegeSourceFiles(filename) {
+		for m := range callsInFile(t, f) {
+			called[m] = true
+		}
+	}
 	declared := map[string]bool{}
 	for _, m := range declaredMethods {
 		declared[m] = true
@@ -139,4 +144,14 @@ func TestListResourcePrivileges_Rendered(t *testing.T) {
 	if !permissions.Renders(listResourcePrivileges, "ibeacon:read") {
 		t.Fatalf("listResourcePrivileges did not render the iBeacon privileges:\n%s", listResourcePrivileges)
 	}
+}
+
+// privilegeSourceFiles lists the source files whose SDK calls make up the
+// resource's privileges: its CRUD path and, for crud.go, the plan-time name
+// collision check in collision.go.
+func privilegeSourceFiles(filename string) []string {
+	if filename == "crud.go" {
+		return []string{"crud.go", "collision.go"}
+	}
+	return []string{filename}
 }

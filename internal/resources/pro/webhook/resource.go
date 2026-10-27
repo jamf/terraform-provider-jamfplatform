@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -38,7 +39,8 @@ const minJamfProVersion = ""
 
 // WebhookResource implements the Terraform resource for Jamf Pro webhooks.
 type WebhookResource struct {
-	client *proclassic.Client
+	collisions *collision.Checker
+	client     *proclassic.Client
 }
 
 var (
@@ -210,6 +212,7 @@ func (r *WebhookResource) Configure(ctx context.Context, req resource.ConfigureR
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro webhook ID.

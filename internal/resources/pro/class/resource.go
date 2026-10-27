@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -40,7 +41,8 @@ type ClassResource struct {
 	client *proclassic.Client
 	// impact backs the plan-time impact alert on device group targeting. nil when
 	// the provider's impact_alerts attribute is off, which is the default.
-	impact *impact.Cache
+	impact     *impact.Cache
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &ClassResource{}
@@ -176,6 +178,7 @@ func (r *ClassResource) Configure(ctx context.Context, req resource.ConfigureReq
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
 }
 

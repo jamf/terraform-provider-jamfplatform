@@ -40,9 +40,14 @@ func registryFilteredCalls(t *testing.T, filename string) map[string]bool {
 
 // assertCallsMatch fails if the registry-backed client calls in filename differ
 // from declared.
-func assertCallsMatch(t *testing.T, filename string, declared []string) {
+func assertCallsMatch(t *testing.T, filename string, declared []string, extraFiles ...string) {
 	t.Helper()
 	called := registryFilteredCalls(t, filename)
+	for _, f := range extraFiles {
+		for m := range registryFilteredCalls(t, f) {
+			called[m] = true
+		}
+	}
 	want := map[string]bool{}
 	for _, m := range declared {
 		want[m] = true
@@ -81,7 +86,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps resourceSDKMethods in sync with the
 // client.<Method> calls in crud.go.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertCallsMatch(t, "crud.go", resourceSDKMethods)
+	assertCallsMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestDataSourceSDKMethods_KnownToSDK fails if a declared data source method has

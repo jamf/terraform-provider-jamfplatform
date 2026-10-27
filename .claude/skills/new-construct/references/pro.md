@@ -36,6 +36,11 @@ function's `// Available since` comment, or hand-research, and record it in the 
 constructs are exempt. Endpoint paths and SDK function names live **here and in Go comments**,
 never in user-facing schema text.
 
+Add a `Uniqueness:` line below the endpoints, for example
+`Uniqueness: name, enforced (409), case- and trailing-space-insensitive, tenant-wide across sites`,
+or `not enforced; duplicates stored; checked only with include_unenforced`. The probe result stays
+with the code that depends on it.
+
 ## Classic write semantics to probe, never assume
 
 Each of these bit a shipped build. They are per-endpoint, not per-namespace:

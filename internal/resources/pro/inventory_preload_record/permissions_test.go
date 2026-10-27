@@ -41,9 +41,14 @@ func calledSDKMethods(t *testing.T, filename string) map[string]bool {
 
 // assertMethodSet compares the registry-known SDK calls in filename against the
 // declared method list, failing on either direction of drift.
-func assertMethodSet(t *testing.T, filename string, declaredList []string) {
+func assertMethodSet(t *testing.T, filename string, declaredList []string, extraFiles ...string) {
 	t.Helper()
 	called := calledSDKMethods(t, filename)
+	for _, f := range extraFiles {
+		for m := range calledSDKMethods(t, f) {
+			called[m] = true
+		}
+	}
 	declared := map[string]bool{}
 	for _, m := range declaredList {
 		declared[m] = true
@@ -82,7 +87,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps resourceSDKMethods in sync with
 // the actual client.<Method> calls in crud.go.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMethodSet(t, "crud.go", resourceSDKMethods)
+	assertMethodSet(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestDataSourceSDKMethods_KnownToSDK fails if a declared data source method

@@ -19,6 +19,7 @@ var resourceSDKMethods = []string{
 	"GetIBeaconByID",
 	"UpdateIBeaconByID",
 	"DeleteIBeaconByID",
+	"ListIBeacons",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

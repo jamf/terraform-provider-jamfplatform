@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -38,6 +39,9 @@ type PackageResource struct {
 	// object reaches through the policies that use it. nil when the provider's
 	// impact_alerts attribute is off, which is the default.
 	impact *impact.Cache
+	// collisions is the shared plan-time name collision checker. nil when the
+	// provider's name_collision_check mode is off.
+	collisions *collision.Checker
 }
 
 var (
@@ -182,7 +186,7 @@ func (r *PackageResource) Schema(ctx context.Context, req resource.SchemaRequest
 
 			// Upload-source inputs (no wire field — pure provider plumbing).
 			"package_file_source": schema.StringAttribute{
-				MarkdownDescription: "Optional local path or `http(s)://` URL pointing to the package file. Set it to upload the file to the Jamf Cloud Distribution Point on create or update. A cloud distribution point must be configured on the tenant; without one the change is refused before any bytes are uploaded. When omitted, the resource manages only the package record. Cannot be combined with the hash attributes; setting both is rejected before the change runs.",
+				MarkdownDescription: "Optional local path or `http(s)://` URL pointing to the package file. Set it to upload the file to the Jamf Cloud Distribution Point on create or update. A cloud distribution point must be configured on the tenant; without one the change is refused before any bytes are uploaded. A package with no recorded hash is checked for changes by file size only. When omitted, the resource manages only the package record. Cannot be combined with the hash attributes; setting both is rejected before the change runs.",
 				Optional:            true,
 			},
 			"package_file_source_checksum": schema.StringAttribute{
@@ -359,6 +363,7 @@ func (r *PackageResource) Configure(ctx context.Context, req resource.ConfigureR
 		return
 	}
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 	r.client = client
 }
 

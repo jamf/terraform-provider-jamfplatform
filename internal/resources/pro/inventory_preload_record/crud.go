@@ -6,7 +6,7 @@
 //   pro.GetInventoryPreloadRecordV2
 //   pro.UpdateInventoryPreloadRecordV2
 //   pro.DeleteInventoryPreloadRecordV2
-//   pro.ListInventoryPreloadRecordsV2 (list resource)
+//   pro.ListInventoryPreloadRecordsV2 (list resource / collision check in collision.go)
 //   pro.ResolveInventoryPreloadRecordV2BySerialNumber (data source serial_number lookup)
 //
 // Not adopted:
@@ -25,6 +25,8 @@
 // The records PUT is full-replace (omit = clear) and returns a 200 with the full
 // record body, so Update sources state from the PUT echo directly — no GET-after-write
 // needed (wire-probed 2026-06-10; the echo is not lossy).
+//
+// Uniqueness: serial_number, enforced (400 DUPLICATE_FIELD) across both device types, case-, trailing-space- and accent-insensitive; a leading space is distinct.
 //
 // Status: current. Last reviewed 2026-06-10.
 

@@ -8,6 +8,8 @@
 //   - POST   /diskencryptionconfigurations/id/0
 //   - PUT    /diskencryptionconfigurations/id/{id}
 //   - DELETE /diskencryptionconfigurations/id/{id}
+// Uniqueness: name, enforced (409), case-, leading-space-, trailing-space- and accent-insensitive. The plan-time collision check lists with proclassic.ListDiskEncryptionConfigurations (collision.go).
+//
 // Status: current. Last reviewed 2026-08-26.
 
 package disk_encryption_configuration

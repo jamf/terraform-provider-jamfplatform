@@ -39,6 +39,7 @@ Resource packages live under `internal/resources/<domain>/<resource>/` and use r
 | `state_upgrader.go` | Schema version upgraders (when bumping schema version) |
 | `plan_modifiers.go` | Schema plan modifiers (if needed) |
 | `validators.go` | Schema validators (if needed) |
+| `collision.go` | Plan-time name collision check: the uniqueness `collision.Namespace` and the `ModifyPlan` hook (see §Plan-time name collision check) |
 | `list_resource.go` | List resource implementation |
 | `data_source.go` | Singular (by-id / by-name) data source implementation |
 | `datasource_plural.go` | Plural (list) data source implementation, when the resource also exposes one |
@@ -1683,6 +1684,20 @@ Trigger summary:
 | Schema (shape, field set) | 3+ verified-identical SDK shapes | `internal/common/schemas/` (or domain-specific package like `internal/common/scope/`) |
 | Code helper (non-trivial, no per-resource branching) | 2 consumers | `internal/common/<topic>/` |
 | Trivial code helper (1-line wrapper) | Stays in-resource; extract only on demonstrated need | `internal/common/helpers/` |
+
+### Plan-time name collision check
+
+A resource whose create or rename Jamf refuses (or silently accepts) for a duplicate key wires the shared check from `internal/common/collision` into `ModifyPlan`. Issue #533 holds the wire-probed uniqueness table; probe any type that is not in it before wiring.
+
+- **One `collision.go` per package**, holding the `collision.Namespace` builder and the `ModifyPlan` method that calls `collision.ReportPlan`. Fetch the checker in `Configure` with `providerdata.ConfigureCollision(req.ProviderData)`; a nil checker is the disabled state, so there is no flag check.
+- **The namespace states the rule Jamf applies, not the rule that is convenient.** `Enforced` is whether Jamf refuses the duplicate. `Collation` is one of the named collations (`CollationFolded`, `CollationAccentSensitive`, `CollationCaseSensitive`, `CollationExact`) taken from the probe table; the three axes differ by type, so never reuse one by guess. A key that is not a name (`domains`, `hostnames`, `serialNumber`, `fileName`) gets its own namespace and `KeyLabel`.
+- **Types sharing one pool of names share one namespace.** Jamf Pro groups are the case: smart groups, static groups and Platform device groups of one device type draw on one pool, built once in `internal/common/groupcollision` so the five constructs do not import each other. A `Source` names the Terraform resource that adopts it in `ResourceType`; the import snippet is offered only when that matches the resource being planned. An object two resource types manage under different identifiers (a Jamf Pro group is also a Platform device group) lists the other identifiers in `Entry.AltIDs`, which both the snippet and self-exclusion read.
+- **The collation is the write API's, not the object type's.** The same group pool compares differently depending on which API writes: the Pro v3 and Platform computer-group writes are case-insensitive only, the Pro v2 and Platform mobile-group writes also fold trailing spaces and accents, and the Classic API trims the XML text of every field first and compares accents exactly. Model the API the resource writes through, and re-probe when it changes.
+- **A key in one top-level string attribute uses `collision.ReportAttributePlan`**, which reads the attribute from the plan and state directly. `collision.ReportPlan` decodes the whole model, which fails on an unknown nested value such as a smart group's criteria, and a failed decode skips the check.
+- **List with the SDK list method the resource's `Read` path already needs**, one call per namespace. Where a type's list endpoint has dropped rows (Classic mobile device provisioning profiles on 11.32.0, fixed in 11.33.0), give the `Source` a `Find` function instead of `List`: it queries each planned key directly (v1 and Platform RSQL `name==`, or Classic `/name/{name}`, which refuses a name containing `/`) at the cost of one read per key. Add the method to the package's `resourceSDKMethods` so the permissions table lists it, and have the `permissions_test.go` assertion read `collision.go` as well as `crud.go`.
+- **Record the rule in `crud.go`'s endpoints annotation** on a `Uniqueness:` line, for example `Uniqueness: name, enforced (409), case- and trailing-space-insensitive, tenant-wide across sites`.
+- **Acceptance test per family**: `collision_acceptance_test.go` creates the colliding object outside Terraform in `PreConfig` and asserts the plan-time error with `ExpectError`. Terraform wraps the message, so the regex uses `\s+` between words.
+- **A listing that fails is a warning, never an error.** The check must not fail a plan that would otherwise succeed.
 
 ### Scope helper
 

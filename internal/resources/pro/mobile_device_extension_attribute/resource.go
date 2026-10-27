@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -34,7 +35,8 @@ const minJamfProVersion = ""
 // MobileDeviceExtensionAttributeResource implements the Terraform resource for
 // Jamf Pro mobile device extension attributes.
 type MobileDeviceExtensionAttributeResource struct {
-	client *pro.Client
+	client     *pro.Client
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &MobileDeviceExtensionAttributeResource{}
@@ -165,6 +167,7 @@ func (r *MobileDeviceExtensionAttributeResource) Configure(ctx context.Context, 
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState imports a mobile device extension attribute by ID.

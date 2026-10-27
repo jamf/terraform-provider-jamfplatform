@@ -16,6 +16,8 @@
 // ldapServerIDForWrite. A sent <privileges> is the exception: it replaces the
 // whole grid, so Update merges it client-side against the live one.
 //
+// Uniqueness: display_name, enforced (409), case-, leading-space- and trailing-space-insensitive, accent-sensitive. The plan-time collision check lists with proclassic.ListAccounts (collision.go).
+//
 // Status: current. Last reviewed 2026-09-06.
 
 package account_group

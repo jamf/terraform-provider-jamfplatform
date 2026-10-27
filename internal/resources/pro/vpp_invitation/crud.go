@@ -6,7 +6,7 @@
 //   proclassic.GetVPPInvitationByID
 //   proclassic.UpdateVPPInvitationByID  (PUT → 201, NO body — GET after)
 //   proclassic.DeleteVPPInvitationByID  (→ 200)
-//   proclassic.ListVPPInvitations       (data source / list resource)
+//   proclassic.ListVPPInvitations       (data source / list resource / collision check in collision.go)
 //
 // Writes are a MERGE (omit=retain). General scalars are emitted as planned;
 // the four email-mode strings are always emitted, empty when null, so a value
@@ -28,6 +28,10 @@
 // is echoed back), emitting every merged category explicitly. Omitted
 // categories stay owned by the admin UI; declared `[]` clears. See
 // STYLE_GUIDE.md §Scope helper omission semantics.
+//
+// Uniqueness: name, not enforced; duplicates stored; checked only with
+// include_unenforced. Classic trims the name on save, so the strict comparison also
+// ignores leading and trailing spaces, case and accents.
 //
 // Status: current. Last reviewed 2026-09-06.
 

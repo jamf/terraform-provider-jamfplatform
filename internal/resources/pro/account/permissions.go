@@ -31,6 +31,7 @@ var resourceSDKMethods = []string{
 	"DeleteAccountV1",
 	"GetAccountByUserID",
 	"UpdateAccountByUserID",
+	"ListAccountsV1",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

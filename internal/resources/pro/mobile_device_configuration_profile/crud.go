@@ -7,9 +7,11 @@
 //   proclassic.CreateMobileDeviceConfigurationProfileByID
 //   proclassic.UpdateMobileDeviceConfigurationProfileByID
 //   proclassic.DeleteMobileDeviceConfigurationProfileByID
-//   proclassic.ListMobileDeviceConfigurationProfiles         (list resource)
+//   proclassic.ListMobileDeviceConfigurationProfiles         (list resource, collision check in collision.go)
 //
-// Status: current. Last reviewed 2026-05-25.
+// Uniqueness: name, enforced (409 Duplicate name), trimmed on save, case- and accent-insensitive; separate pool from macOS configuration profiles.
+//
+// Status: current. Last reviewed 2026-10-25.
 //
 // Scope semantics: within a sent <scope> the server replaces the whole
 // subtree (wire-probed 2026-07-08 — any category element present, even empty,

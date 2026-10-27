@@ -25,6 +25,7 @@ var _ resource.ResourceWithModifyPlan = &DiskEncryptionConfigurationResource{}
 // ModifyPlan reports how many computers this disk encryption configuration reaches through the
 // policies using it.
 func (r *DiskEncryptionConfigurationResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 	impact.ReportDependencyPlan(ctx, req, resp, impact.DependencyPlanReport{
 		Cache: r.impact,
 		// Unanchored: any change reaches every policy using it, so no one attribute

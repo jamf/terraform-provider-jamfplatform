@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -35,7 +36,8 @@ const minJamfProVersion = ""
 // ComputerExtensionAttributeResource implements the Terraform resource for Jamf
 // Pro computer extension attributes.
 type ComputerExtensionAttributeResource struct {
-	client *pro.Client
+	client     *pro.Client
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &ComputerExtensionAttributeResource{}
@@ -185,6 +187,7 @@ func (r *ComputerExtensionAttributeResource) Configure(ctx context.Context, req 
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState imports a computer extension attribute by ID.

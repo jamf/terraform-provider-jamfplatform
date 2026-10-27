@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -41,7 +42,8 @@ type DiskEncryptionConfigurationResource struct {
 	// impact backs the plan-time impact alert reporting how many computers this
 	// object reaches through the policies that use it. nil when the provider's
 	// impact_alerts attribute is off, which is the default.
-	impact *impact.Cache
+	impact     *impact.Cache
+	collisions *collision.Checker
 }
 
 var (
@@ -183,6 +185,7 @@ func (r *DiskEncryptionConfigurationResource) Configure(ctx context.Context, req
 	}
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro disk encryption configuration ID.

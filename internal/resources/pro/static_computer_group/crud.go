@@ -9,7 +9,9 @@
 //   proclassic.GetComputerGroupByID           GET    /JSSResource/computergroups/id/{id}    (membership read)
 //   pro.ListStaticComputerGroupsV3            GET    /pro/v3/computer-groups/static-groups  (plural data source, list resource)
 //   pro.ResolveStaticComputerGroupV3IDByName                                                (data source name lookup)
-//   pro.ListGroupsV2                          GET    /pro/v2/groups                         (platform identifier bridge, through internal/common/progroups)
+//   pro.ListGroupsV2                          GET    /pro/v2/groups                         (platform identifier bridge, through internal/common/progroups; name collision check, through internal/common/groupcollision)
+//
+// Uniqueness: name, enforced (422 DUPLICATE_FIELD), case-insensitive only, one pool shared by smart, static and Platform COMPUTER groups.
 //
 // Why one classic call sits in an otherwise pro/ construct: Jamf Pro publishes
 // no static-computer-group membership read. /pro/v1, /pro/v2 and /pro/v3

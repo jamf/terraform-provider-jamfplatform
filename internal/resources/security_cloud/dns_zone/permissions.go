@@ -25,6 +25,7 @@ var resourceSDKMethods = []string{
 	"GetDnsZoneV1",
 	"UpdateDnsZoneV1",
 	"DeleteDnsZoneV1",
+	"ListDnsZonesV1",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown section

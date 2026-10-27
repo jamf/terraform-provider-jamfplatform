@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -33,11 +34,13 @@ const minJamfProVersion = ""
 // AppRequestFormFieldResource implements the Terraform resource for Jamf Pro App Request
 // form fields.
 type AppRequestFormFieldResource struct {
-	client *pro.Client
+	client     *pro.Client
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &AppRequestFormFieldResource{}
 var _ resource.ResourceWithImportState = &AppRequestFormFieldResource{}
+var _ resource.ResourceWithModifyPlan = &AppRequestFormFieldResource{}
 var _ resource.ResourceWithIdentity = &AppRequestFormFieldResource{}
 
 const (
@@ -118,9 +121,16 @@ func (r *AppRequestFormFieldResource) Configure(ctx context.Context, req resourc
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro App Request form field ID.
 func (r *AppRequestFormFieldResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ModifyPlan reports a name that another object of this type already holds, when
+// the provider's name_collision_check enables the strict check.
+func (r *AppRequestFormFieldResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 }

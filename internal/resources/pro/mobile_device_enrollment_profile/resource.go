@@ -30,6 +30,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -37,11 +38,13 @@ const minJamfProVersion = ""
 
 // EnrollmentProfileResource implements the Terraform resource.
 type EnrollmentProfileResource struct {
-	client *proclassic.Client
+	client     *proclassic.Client
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &EnrollmentProfileResource{}
 var _ resource.ResourceWithImportState = &EnrollmentProfileResource{}
+var _ resource.ResourceWithModifyPlan = &EnrollmentProfileResource{}
 var _ resource.ResourceWithIdentity = &EnrollmentProfileResource{}
 
 const (
@@ -191,8 +194,15 @@ func (r *EnrollmentProfileResource) Configure(ctx context.Context, req resource.
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 func (r *EnrollmentProfileResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ModifyPlan reports a name that another object of this type already holds, when
+// the provider's name_collision_check enables the strict check.
+func (r *EnrollmentProfileResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 }

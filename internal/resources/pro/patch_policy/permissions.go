@@ -29,6 +29,7 @@ var resourceSDKMethods = []string{
 	"GetPatchPolicyByID",
 	"UpdatePatchPolicyByID",
 	"DeletePatchPolicyByID",
+	"ListPatchPoliciesV2",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

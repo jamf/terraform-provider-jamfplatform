@@ -52,6 +52,7 @@ At minimum, per endpoint:
 | an out-of-vocabulary enum value | is it enum-constrained or freeform? |
 | a value outside the UI's presets | `OneOf` validator or range validator? |
 | unit-bearing fields | the wire multiplier behind a UI number+unit control |
+| create the same object twice: same name, upper case, trailing space, `é`, leading space | whether the service refuses a duplicate, which key it compares, and how (case, spaces, accents). Never assume the key is the name: packages compare `fileName`, DNS zones `domains`, inventory preload `serialNumber`. Probe the write API the resource uses, since one pool can compare differently per API |
 
 ## Honesty rules
 

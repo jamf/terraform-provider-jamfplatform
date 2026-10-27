@@ -6,8 +6,10 @@
 //   proclassic.GetWebhookByID      (GET    /webhooks/id/{id})
 //   proclassic.UpdateWebhookByID   (PUT    /webhooks/id/{id})
 //   proclassic.DeleteWebhookByID   (DELETE /webhooks/id/{id})
-//   proclassic.ListWebhooks        (data source / list resource)
+//   proclassic.ListWebhooks        (data source / list resource / collision check in collision.go)
 //   proclassic.GetWebhookByName    (data source name lookup)
+//
+// Uniqueness: name, enforced (409), case-, leading-space-, trailing-space- and accent-insensitive.
 //
 // Status: current. Last reviewed 2026-09-06.
 //

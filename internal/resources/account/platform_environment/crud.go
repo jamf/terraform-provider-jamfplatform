@@ -3,7 +3,7 @@
 
 // SDK endpoints used:
 //   account.CreateEnvironment
-//   account.ListEnvironments (read, update refresh, failure re-check, data sources, list resource)
+//   account.ListEnvironments (read, update refresh, failure re-check, data sources, list resource, collision check in collision.go)
 //   account.UpdateEnvironment
 //   account.DeleteEnvironment
 //   account.ListTenants      (delete: refuse an environment that still holds tenants)
@@ -19,7 +19,10 @@
 // IsNotFoundError therefore never matches, and Update and Delete decide whether
 // the environment is gone by listing the collection after a failure.
 //
-// Status: current. Last reviewed 2026-10-22.
+// Uniqueness: name, not enforced; duplicates stored (case, accent and surrounding-space variants all
+// accepted, surrounding spaces trimmed on save); checked only with include_unenforced.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package platform_environment
 

@@ -7,7 +7,7 @@
 //   pro.GetSupervisionIdentityV1
 //   pro.UpdateSupervisionIdentityV1   (rename only — display_name)
 //   pro.DeleteSupervisionIdentityV1
-//   pro.ListSupervisionIdentitiesV1   (data source / list resource)
+//   pro.ListSupervisionIdentitiesV1   (data source / list resource / collision check in collision.go)
 //
 // pro.DownloadSupervisionIdentityV1 is intentionally NOT used: it returns the
 // .p12 with its private key, which must never be exported into Terraform state.
@@ -15,6 +15,10 @@
 // The endpoint carries the `supervision-identities-preview` OpenAPI tag. SDK
 // status codes (create 200, upload 201, delete 204) were wire-probed against
 // Jamf Pro 11.28.1 on 2026-06-12.
+//
+// Uniqueness: displayName, not enforced; duplicates stored; checked only with
+// include_unenforced. The strict comparison ignores case, trailing spaces and
+// accents.
 //
 // Status: current. Last reviewed 2026-06-12.
 

@@ -6,7 +6,7 @@
 //   proclassic.GetPatchPolicyByID                       (GET    /patchpolicies/id/{id})
 //   proclassic.UpdatePatchPolicyByID                    (PUT    /patchpolicies/id/{id}, 201 empty body → GET after)
 //   proclassic.DeletePatchPolicyByID                    (DELETE /patchpolicies/id/{id})
-//   pro.ListPatchPoliciesV2                             (GET    /v2/patch-policies — list resource enumeration)
+//   pro.ListPatchPoliciesV2                             (GET    /v2/patch-policies — list resource enumeration, collision check in collision.go)
 //
 // ENUMERATION: the list resource enumerates on the Pro v2 collection the
 // deprecation notice named, not on ProClassic /patchpolicies. Only enumeration
@@ -29,6 +29,8 @@
 // struct on every successful call since it first shipped, because the endpoint
 // answers <patch_policies> against a spec declaring the singular — which is one
 // more reason not to move back onto it without a wire probe of its own.
+//
+// Uniqueness: name per software title configuration (the same name on two titles is accepted), enforced (409), case-, surrounding-space- and accent-insensitive.
 //
 // Status: current. Last reviewed 2026-09-04.
 //

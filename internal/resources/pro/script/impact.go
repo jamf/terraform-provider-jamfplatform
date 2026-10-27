@@ -22,9 +22,13 @@ func (r *ScriptResource) identifyDependency(_ context.Context, m *ScriptResource
 
 var _ resource.ResourceWithModifyPlan = &ScriptResource{}
 
-// ModifyPlan reports how many computers this script reaches through the
-// policies using it.
+// ModifyPlan reports a script name another script already holds, then how many
+// computers this script reaches through the policies using it.
 func (r *ScriptResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	impact.ReportDependencyPlan(ctx, req, resp, impact.DependencyPlanReport{
 		Cache: r.impact,
 		// Unanchored: any change reaches every policy using it, so no one attribute

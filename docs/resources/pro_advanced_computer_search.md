@@ -74,7 +74,7 @@ resource "jamfplatform_pro_advanced_computer_search" "all_in_site" {
 
 ### Required
 
-- `name` (String) Advanced computer search display name. Must be unique within the tenant.
+- `name` (String) Advanced computer search display name.
 
 ### Optional
 

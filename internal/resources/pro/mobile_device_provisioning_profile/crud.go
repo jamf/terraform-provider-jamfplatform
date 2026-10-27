@@ -7,13 +7,16 @@
 //   proclassic.GetMobileDeviceProvisioningProfileByName     (data source name lookup)
 //   proclassic.GetMobileDeviceProvisioningProfileByUUID     (data source uuid lookup)
 //   proclassic.DeleteMobileDeviceProvisioningProfileByID
-//   proclassic.ListMobileDeviceProvisioningProfiles         (data source / list resource)
+//   proclassic.ListMobileDeviceProvisioningProfiles         (data source / list resource / collision check in collision.go)
+//
+// Uniqueness: name, enforced (409), case-, leading- and trailing-space-insensitive, accent-sensitive.
+// The embedded profile UUID is not a key: two profiles with one blob are accepted under different names.
 //
 // UpdateMobileDeviceProvisioningProfileByID is intentionally NOT used: once a
 // profile carries a blob, every PUT returns HTTP 500 (wire-probed). All
 // user-writable attributes are RequiresReplace, so Update never needs to write.
 //
-// Status: current. Last reviewed 2026-06-05.
+// Status: current. Last reviewed 2026-10-25.
 
 package mobile_device_provisioning_profile
 

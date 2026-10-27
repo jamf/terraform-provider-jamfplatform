@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -41,11 +42,13 @@ const minJamfProVersion = ""
 // ProvisioningProfileResource implements the Terraform resource for Jamf
 // ProClassic mobile device provisioning profiles.
 type ProvisioningProfileResource struct {
-	client *proclassic.Client
+	client     *proclassic.Client
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &ProvisioningProfileResource{}
 var _ resource.ResourceWithImportState = &ProvisioningProfileResource{}
+var _ resource.ResourceWithModifyPlan = &ProvisioningProfileResource{}
 var _ resource.ResourceWithIdentity = &ProvisioningProfileResource{}
 
 const (
@@ -156,6 +159,7 @@ func (r *ProvisioningProfileResource) Configure(ctx context.Context, req resourc
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro provisioning profile ID.

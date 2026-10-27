@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
@@ -39,6 +40,9 @@ type Resource struct {
 	// provider's impact_alerts attribute is off, which is the default.
 	impact *impact.Cache
 	client *proclassic.Client
+	// collisions is the shared plan-time name collision checker. nil when the
+	// provider's name_collision_check mode is off.
+	collisions *collision.Checker
 	// ldapSearcher backs the plan-time scope directory-service user-group
 	// preflight (ModifyPlan). The LDAP group search is a Pro (v1) endpoint, so
 	// it is a separate client from the ProClassic CRUD client. nil until Configure.
@@ -236,6 +240,7 @@ func (r *Resource) Configure(ctx context.Context, req resource.ConfigureRequest,
 		return
 	}
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 	r.client = client
 
 	// Pro (v1) client for the scope directory-service group preflight.

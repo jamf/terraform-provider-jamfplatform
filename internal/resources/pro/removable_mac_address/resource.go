@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -33,10 +34,12 @@ const minJamfProVersion = ""
 // RemovableMacAddressResource implements the Terraform resource for Jamf ProClassic
 // removable Mac addresses.
 type RemovableMacAddressResource struct {
-	client *proclassic.Client
+	collisions *collision.Checker
+	client     *proclassic.Client
 }
 
 var _ resource.Resource = &RemovableMacAddressResource{}
+var _ resource.ResourceWithModifyPlan = &RemovableMacAddressResource{}
 var _ resource.ResourceWithImportState = &RemovableMacAddressResource{}
 var _ resource.ResourceWithIdentity = &RemovableMacAddressResource{}
 
@@ -110,9 +113,15 @@ func (r *RemovableMacAddressResource) Configure(ctx context.Context, req resourc
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro removable MAC address ID.
 func (r *RemovableMacAddressResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ModifyPlan reports a name that another object of this type already holds.
+func (r *RemovableMacAddressResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 }

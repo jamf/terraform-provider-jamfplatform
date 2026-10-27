@@ -30,6 +30,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/securitycloud"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -43,6 +44,7 @@ const minMemberGateways = 2
 type GroupedGatewayResource struct {
 	client        *securitycloud.Client
 	scopeTenantID string
+	collisions    *collision.Checker
 }
 
 var (
@@ -190,6 +192,7 @@ func (r *GroupedGatewayResource) Configure(ctx context.Context, req resource.Con
 	}
 	r.client = client
 	r.scopeTenantID = providerdata.SecurityCloudTenantScopeID(req.ProviderData)
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Security Cloud grouped gateway ID.

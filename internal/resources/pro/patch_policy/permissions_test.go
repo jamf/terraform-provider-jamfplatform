@@ -34,9 +34,14 @@ func callsInFile(t *testing.T, filename string) map[string]bool {
 
 // assertMethodsMatch fails if the file calls an SDK method not declared in
 // methods, or declares one it does not call.
-func assertMethodsMatch(t *testing.T, filename string, methods []string) {
+func assertMethodsMatch(t *testing.T, filename string, methods []string, extraFiles ...string) {
 	t.Helper()
 	called := callsInFile(t, filename)
+	for _, f := range extraFiles {
+		for m := range callsInFile(t, f) {
+			called[m] = true
+		}
+	}
 	declared := map[string]bool{}
 	for _, m := range methods {
 		declared[m] = true
@@ -77,7 +82,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
 // not declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMethodsMatch(t, "crud.go", resourceSDKMethods)
+	assertMethodsMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

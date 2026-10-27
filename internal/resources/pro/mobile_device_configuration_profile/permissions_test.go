@@ -92,7 +92,8 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps the resource privileges table
 // honest as the CRUD path changes.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertSetEquals(t, "crud.go", resourceSDKMethods, calledSDKMethods(t, "crud.go"))
+	called := append(calledSDKMethods(t, "crud.go"), calledSDKMethods(t, "collision.go")...)
+	assertSetEquals(t, "crud.go and collision.go", resourceSDKMethods, called)
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

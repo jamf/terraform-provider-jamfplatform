@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -31,7 +32,8 @@ const minJamfProVersion = ""
 
 // DepartmentResource implements the Terraform resource for Jamf Pro departments.
 type DepartmentResource struct {
-	client *pro.Client
+	collisions *collision.Checker
+	client     *pro.Client
 }
 
 var _ resource.Resource = &DepartmentResource{}
@@ -105,6 +107,7 @@ func (r *DepartmentResource) Configure(ctx context.Context, req resource.Configu
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro department ID.

@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -32,7 +33,8 @@ const minJamfProVersion = ""
 // UserExtensionAttributeResource implements the Terraform resource for Jamf Pro
 // user extension attributes.
 type UserExtensionAttributeResource struct {
-	client *proclassic.Client
+	client     *proclassic.Client
+	collisions *collision.Checker
 }
 
 var _ resource.Resource = &UserExtensionAttributeResource{}
@@ -136,6 +138,7 @@ func (r *UserExtensionAttributeResource) Configure(ctx context.Context, req reso
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState imports a user extension attribute by ID.

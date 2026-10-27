@@ -6,9 +6,11 @@
 //   pro.GetCategoryV1
 //   pro.UpdateCategoryV1
 //   pro.DeleteCategoryV1
-//   pro.ListCategoriesV1 (data source / list resource)
+//   pro.ListCategoriesV1 (data source / list resource / collision check in collision.go)
 //
-// Status: current. Last reviewed 2026-05-19.
+// Uniqueness: name, enforced (400 DUPLICATE_FIELD), case-, trailing-space- and accent-insensitive.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package category
 

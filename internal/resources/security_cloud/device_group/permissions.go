@@ -19,6 +19,7 @@ var resourceSDKMethods = []string{
 	"GetDeviceGroupV1",
 	"UpdateDeviceGroupV2",
 	"DeleteDeviceGroupV1",
+	"ListDeviceGroupsV2",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown section

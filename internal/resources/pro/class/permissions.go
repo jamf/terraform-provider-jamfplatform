@@ -19,6 +19,7 @@ var resourceSDKMethods = []string{
 	"GetClassByID",
 	"UpdateClassByID",
 	"DeleteClassByID",
+	"ListClasses",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

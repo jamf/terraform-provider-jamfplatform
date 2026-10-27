@@ -88,8 +88,8 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // extension_attributes.go (invoked from Create/Read/Update), and the patch
 // source catalogue reads behind source_id resolution in patch_sources.go.
 func TestResourceSDKMethods_MatchCalls(t *testing.T) {
-	called := sdkCallsIn(t, mergedRegistry, "crud.go", "extension_attributes.go", "patch_sources.go")
-	assertMatch(t, resourceSDKMethods, called, "crud.go+extension_attributes.go+patch_sources.go")
+	called := sdkCallsIn(t, mergedRegistry, "crud.go", "extension_attributes.go", "patch_sources.go", "collision.go")
+	assertMatch(t, resourceSDKMethods, called, "crud.go+extension_attributes.go+patch_sources.go+collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

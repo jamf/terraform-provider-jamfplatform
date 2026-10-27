@@ -19,6 +19,7 @@ var resourceSDKMethods = []string{
 	"GetMobileDeviceConfigurationProfileByID",
 	"UpdateMobileDeviceConfigurationProfileByID",
 	"DeleteMobileDeviceConfigurationProfileByID",
+	"ListMobileDeviceConfigurationProfiles",
 }
 
 // dataSourceSDKMethods lists the SDK methods the data source calls.

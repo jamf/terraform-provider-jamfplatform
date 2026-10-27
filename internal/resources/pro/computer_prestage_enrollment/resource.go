@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -54,7 +55,8 @@ const (
 
 // ComputerPrestageEnrollmentResource implements the Terraform resource.
 type ComputerPrestageEnrollmentResource struct {
-	client *pro.Client
+	client     *pro.Client
+	collisions *collision.Checker
 }
 
 var (
@@ -417,6 +419,7 @@ func (r *ComputerPrestageEnrollmentResource) Configure(ctx context.Context, req 
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ModifyPlan keeps the two Platform SSO mode inputs from being written together.
@@ -430,10 +433,11 @@ func (r *ComputerPrestageEnrollmentResource) Configure(ctx context.Context, req 
 // the config selects exactly one mode, force the other field's plan to its wire
 // "none" form so only the configured mode is sent.
 func (r *ComputerPrestageEnrollmentResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	// No coupling to apply on destroy.
 	if req.Plan.Raw.IsNull() {
 		return
 	}
+
+	r.reportNameCollision(ctx, req, resp)
 
 	var cfgBundle, cfgProfile, cfgCustomization types.String
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("platform_sso_app_bundle_id"), &cfgBundle)...)

@@ -40,9 +40,14 @@ func registryKnownCalls(t *testing.T, filename string) map[string]bool {
 
 // assertCallsMatch fails if filename calls a registry-known SDK method not in
 // declared, or declares one it does not call.
-func assertCallsMatch(t *testing.T, filename string, declared []string) {
+func assertCallsMatch(t *testing.T, filename string, declared []string, extraFiles ...string) {
 	t.Helper()
 	called := registryKnownCalls(t, filename)
+	for _, f := range extraFiles {
+		for m := range registryKnownCalls(t, f) {
+			called[m] = true
+		}
+	}
 	declaredSet := map[string]bool{}
 	for _, m := range declared {
 		declaredSet[m] = true
@@ -81,7 +86,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps the resource privileges table
 // honest as the CRUD path changes.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertCallsMatch(t, "crud.go", resourceSDKMethods)
+	assertCallsMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestDataSourceSDKMethods_KnownToSDK fails if a declared data source method

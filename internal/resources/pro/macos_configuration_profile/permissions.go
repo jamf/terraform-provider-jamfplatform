@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetOSXConfigurationProfileByID",
 	"UpdateOSXConfigurationProfileByID",
 	"DeleteOSXConfigurationProfileByID",
+	"ListOSXConfigurationProfiles",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

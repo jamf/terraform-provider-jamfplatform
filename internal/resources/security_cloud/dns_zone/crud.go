@@ -6,10 +6,12 @@
 //   securitycloud.GetDnsZoneV1
 //   securitycloud.UpdateDnsZoneV1
 //   securitycloud.DeleteDnsZoneV1
-//   securitycloud.ListDnsZonesV1 (data sources / list resource)
+//   securitycloud.ListDnsZonesV1 (data sources / list resource / collision check in collision.go)
 //   securitycloud.ResolveDnsZoneV1ByName (singular data source, name lookup)
 //
-// Status: current. Last reviewed 2026-08-27.
+// Uniqueness: each domains entry, tenant-wide, enforced (409 DOMAIN_CONFLICT), case-insensitive. The name is not a key for the server: duplicate names are stored (wire-probed 2026-10-25, every case, trailing-space and accent variant), so the name is checked only under include_unenforced.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package dns_zone
 

@@ -37,6 +37,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -49,10 +50,12 @@ const minJamfProVersion = ""
 // LicensedSoftwareResource implements the Terraform resource for Jamf Pro
 // licensed software records.
 type LicensedSoftwareResource struct {
-	client *proclassic.Client
+	collisions *collision.Checker
+	client     *proclassic.Client
 }
 
 var _ resource.Resource = &LicensedSoftwareResource{}
+var _ resource.ResourceWithModifyPlan = &LicensedSoftwareResource{}
 var _ resource.ResourceWithImportState = &LicensedSoftwareResource{}
 var _ resource.ResourceWithIdentity = &LicensedSoftwareResource{}
 
@@ -322,9 +325,15 @@ func (r *LicensedSoftwareResource) Configure(ctx context.Context, req resource.C
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState handles import by the Jamf Pro licensed software ID.
 func (r *LicensedSoftwareResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ModifyPlan reports a name that another object of this type already holds.
+func (r *LicensedSoftwareResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 }

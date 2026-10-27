@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
 	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -39,10 +40,12 @@ const minJamfProVersion = ""
 // AdvancedVolumePurchasingContentSearchResource implements the Terraform resource for Jamf
 // Pro advanced volume purchasing content searches.
 type AdvancedVolumePurchasingContentSearchResource struct {
-	client *pro.Client
+	collisions *collision.Checker
+	client     *pro.Client
 }
 
 var _ resource.Resource = &AdvancedVolumePurchasingContentSearchResource{}
+var _ resource.ResourceWithModifyPlan = &AdvancedVolumePurchasingContentSearchResource{}
 var _ resource.ResourceWithImportState = &AdvancedVolumePurchasingContentSearchResource{}
 var _ resource.ResourceWithIdentity = &AdvancedVolumePurchasingContentSearchResource{}
 
@@ -143,9 +146,15 @@ func (r *AdvancedVolumePurchasingContentSearchResource) Configure(ctx context.Co
 		return
 	}
 	r.client = client
+	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
 }
 
 // ImportState imports an advanced volume purchasing content search by ID.
 func (r *AdvancedVolumePurchasingContentSearchResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// ModifyPlan reports a name that another object of this type already holds.
+func (r *AdvancedVolumePurchasingContentSearchResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.reportNameCollision(ctx, req, resp)
 }

@@ -18,6 +18,7 @@ var resourceSDKMethods = []string{
 	"CreateBenchmark",
 	"GetBenchmark",
 	"DeleteBenchmark",
+	"ListBenchmarks",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

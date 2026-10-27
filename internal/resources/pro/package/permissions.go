@@ -22,6 +22,7 @@ var resourceSDKMethods = []string{
 	"UploadPackageV1",
 	"UploadPackageManifestV1",
 	"DeletePackageManifestV1",
+	"ListPackagesV1",
 	// Read before an upload, to refuse one the tenant has nowhere to put
 	// (preflightUploadDestination). It adds no privilege the resource did not
 	// already need: finalReadRestoringSize calls

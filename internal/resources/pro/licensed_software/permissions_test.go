@@ -38,9 +38,14 @@ func calledSDKMethods(t *testing.T, filename string) map[string]bool {
 
 // assertMethodSets fails if the construct's source file calls an SDK method not
 // declared in the var, or declares one it does not call.
-func assertMethodSets(t *testing.T, filename string, declaredMethods []string) {
+func assertMethodSets(t *testing.T, filename string, declaredMethods []string, extraFiles ...string) {
 	t.Helper()
 	called := calledSDKMethods(t, filename)
+	for _, f := range extraFiles {
+		for m := range calledSDKMethods(t, f) {
+			called[m] = true
+		}
+	}
 	declared := map[string]bool{}
 	for _, m := range declaredMethods {
 		declared[m] = true
@@ -79,7 +84,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps the resource privileges table
 // honest as the CRUD path changes.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMethodSets(t, "crud.go", resourceSDKMethods)
+	assertMethodSets(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestDataSourceSDKMethods_KnownToSDK fails if a declared method has been

@@ -19,9 +19,11 @@
 //   pro.UpdateEnrollmentCustomizationSsoPanelV1
 //   pro.DeleteEnrollmentCustomizationPanelV1
 //   pro.ResolveEnrollmentCustomizationV2ByName              (data source name lookup)
-//   pro.ListEnrollmentCustomizationsV2                      (list resource)
+//   pro.ListEnrollmentCustomizationsV2                      (list resource / collision check in collision.go)
 //
-// Status: current. Last reviewed 2026-05-28.
+// Uniqueness: displayName, not enforced; duplicates stored; checked only with include_unenforced.
+//
+// Status: current. Last reviewed 2026-10-25.
 
 package enrollment_customization
 

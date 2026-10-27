@@ -20,6 +20,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/aischemas"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 )
@@ -101,6 +102,8 @@ type Data struct {
 	// impact_alerts attribute is unset, which is the default — a nil cache
 	// reports nothing, so resources need no flag check of their own.
 	impactCache *impact.Cache
+
+	collisionChecker *collision.Checker
 
 	aiSchemaMu    sync.Mutex
 	aiSchemaCache *aischemas.Cache
@@ -352,6 +355,33 @@ func (d *Data) ImpactCache() *impact.Cache {
 		return nil
 	}
 	return d.impactCache
+}
+
+// EnableNameCollisionCheck builds the shared plan-time name collision checker from
+// the provider's name_collision_check setting. A mode of off leaves it nil.
+func (d *Data) EnableNameCollisionCheck(cfg collision.Config) {
+	d.collisionChecker = collision.New(cfg)
+}
+
+// CollisionChecker returns the shared name collision checker, or nil when the
+// check is off. Nil-receiver-safe, like ImpactCache: the check is advisory about
+// the plan, so a resource whose Configure never ran must degrade to disabled.
+func (d *Data) CollisionChecker() *collision.Checker {
+	if d == nil {
+		return nil
+	}
+	return d.collisionChecker
+}
+
+// ConfigureCollision returns the shared name collision checker from providerData,
+// or nil when the check is off or providerData is not yet available. It never
+// produces diagnostics.
+func ConfigureCollision(providerData any) *collision.Checker {
+	pd, ok := providerData.(*Data)
+	if !ok {
+		return nil
+	}
+	return pd.CollisionChecker()
 }
 
 // ConfigureImpact returns the shared impact cache from providerData, or nil when

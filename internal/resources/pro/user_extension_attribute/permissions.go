@@ -20,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetUserExtensionAttributeByID",
 	"UpdateUserExtensionAttributeByID",
 	"DeleteUserExtensionAttributeByID",
+	"ListUserExtensionAttributes",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

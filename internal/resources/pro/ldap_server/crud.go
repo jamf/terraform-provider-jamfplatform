@@ -9,6 +9,8 @@
 //   proclassic.ListLDAPServers         (data source / list resource)
 //   proclassic.GetLDAPServerByName     (data source name lookup)
 //
+// Uniqueness: connection_settings.display_name, enforced (409), case-, leading-space- and trailing-space-insensitive, accent-sensitive. The plan-time collision check lists with proclassic.ListLDAPServers (collision.go).
+//
 // Status: current. Last reviewed 2026-05-31.
 
 package ldap_server

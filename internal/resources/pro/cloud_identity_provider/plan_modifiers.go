@@ -30,6 +30,8 @@ func (r *CloudIdentityProviderResource) ModifyPlan(ctx context.Context, req reso
 		return
 	}
 
+	r.reportNameCollision(ctx, req, resp)
+
 	var cfg CloudIdentityProviderResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
 	if resp.Diagnostics.HasError() {

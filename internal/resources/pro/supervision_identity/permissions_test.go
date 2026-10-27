@@ -40,9 +40,14 @@ func sdkCallsIn(t *testing.T, filename string) map[string]bool {
 
 // assertMatch fails if the construct's registry-known client calls differ from
 // the declared method set in either direction.
-func assertMatch(t *testing.T, filename string, declared []string) {
+func assertMatch(t *testing.T, filename string, declared []string, extraFiles ...string) {
 	t.Helper()
 	called := sdkCallsIn(t, filename)
+	for _, f := range extraFiles {
+		for m := range sdkCallsIn(t, f) {
+			called[m] = true
+		}
+	}
 	declaredSet := map[string]bool{}
 	for _, m := range declared {
 		declaredSet[m] = true
@@ -79,7 +84,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 }
 
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods)
+	assertMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 func TestResourcePrivileges_Rendered(t *testing.T) {

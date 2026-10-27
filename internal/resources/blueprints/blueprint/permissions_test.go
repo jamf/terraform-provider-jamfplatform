@@ -21,17 +21,19 @@ var sdkCallRe = regexp.MustCompile(`\bclient\.([A-Za-z0-9]+)\(`)
 // client method calls it makes that resolve to a privilege entry in the
 // registry. Filtering to registry-known names drops same-named helper calls on
 // non-SDK clients (e.g. resolver wrappers absent from the privilege registry).
-func sdkCallsIn(t *testing.T, filename string) map[string]bool {
+func sdkCallsIn(t *testing.T, filename string, moreFiles ...string) map[string]bool {
 	t.Helper()
-	src, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatalf("reading %s: %v", filename, err)
-	}
 	called := map[string]bool{}
-	for _, m := range sdkCallRe.FindAllStringSubmatch(string(src), -1) {
-		name := m[1]
-		if _, ok := bp.Privileges[name]; ok {
-			called[name] = true
+	for _, f := range append([]string{filename}, moreFiles...) {
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("reading %s: %v", f, err)
+		}
+		for _, m := range sdkCallRe.FindAllStringSubmatch(string(src), -1) {
+			name := m[1]
+			if _, ok := bp.Privileges[name]; ok {
+				called[name] = true
+			}
 		}
 	}
 	return called
@@ -39,9 +41,9 @@ func sdkCallsIn(t *testing.T, filename string) map[string]bool {
 
 // assertMatch fails if the construct's source calls an SDK method not declared
 // in methods, or declares one the source does not call.
-func assertMatch(t *testing.T, filename string, methods []string) {
+func assertMatch(t *testing.T, filename string, methods []string, moreFiles ...string) {
 	t.Helper()
-	called := sdkCallsIn(t, filename)
+	called := sdkCallsIn(t, filename, moreFiles...)
 	declared := map[string]bool{}
 	for _, m := range methods {
 		declared[m] = true
@@ -80,7 +82,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
 // not declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods)
+	assertMatch(t, "crud.go", resourceSDKMethods, "collision.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into
