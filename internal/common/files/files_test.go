@@ -348,3 +348,53 @@ func TestHashLocalSourceMissingFile(t *testing.T) {
 		t.Fatal("HashLocalSource returned no error for a path that does not exist")
 	}
 }
+
+func TestOpenURLStream_DeclaredSize(t *testing.T) {
+	body := []byte("hello-pkg-bytes")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	rc, name, size, err := OpenURLStream(context.Background(), srv.URL+"/a.pkg", 0)
+	if err != nil {
+		t.Fatalf("OpenURLStream: %v", err)
+	}
+	defer func() { _ = rc.Close() }()
+	if size != int64(len(body)) {
+		t.Errorf("size %d, want %d", size, len(body))
+	}
+	if name != "a.pkg" {
+		t.Errorf("filename %q, want a.pkg", name)
+	}
+}
+
+func TestOpenURLStream_UnknownSizeIsMinusOne(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f := w.(http.Flusher)
+		_, _ = w.Write([]byte("part-one"))
+		f.Flush()
+		_, _ = w.Write([]byte("part-two"))
+	}))
+	defer srv.Close()
+
+	rc, _, size, err := OpenURLStream(context.Background(), srv.URL+"/a.pkg", 0)
+	if err != nil {
+		t.Fatalf("OpenURLStream: %v", err)
+	}
+	defer func() { _ = rc.Close() }()
+	if size != -1 {
+		t.Errorf("size %d, want -1 for a chunked response", size)
+	}
+}
+
+func TestOpenURLStream_DeclaredSizeOverCap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(bytes.Repeat([]byte("x"), 64))
+	}))
+	defer srv.Close()
+
+	if _, _, _, err := OpenURLStream(context.Background(), srv.URL+"/a.pkg", 16); err == nil {
+		t.Fatal("expected a cap error for a declared length over maxBytes")
+	}
+}

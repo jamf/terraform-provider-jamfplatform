@@ -32,6 +32,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/files"
@@ -766,6 +767,11 @@ func streamingURLEnabled(plan PackageResourceModel) bool {
 // attempt cannot be replayed — up to maxUploadAttempts times when the poll
 // reports errUploadFailed (server size=0).
 //
+// The SDK declares an exact Content-Length on every upload and refuses a
+// reader of unknown size, so the streamed body is wrapped in
+// jamfplatform.SizedReader with the origin's Content-Length. When the origin
+// sends none, the upload falls back to the disk-staging path.
+//
 // Tradeoffs (versus the disk-staging path):
 //   - No 429 retry mid-upload — the upload reader is not seekable.
 //   - No pre-upload checksum validation — bytes leave before the hash is known.
@@ -779,6 +785,12 @@ func streamURLUploadAndVerify(ctx context.Context, client *pro.Client, plan *Pac
 		diags, pollErr := streamURLUploadOnce(ctx, client, plan, previous, previousSize, attempt)
 		if diags.HasError() {
 			return diags
+		}
+		if errors.Is(pollErr, errStreamSizeUnknown) {
+			tflog.Warn(ctx, "package URL declared no Content-Length; staging to disk instead of streaming", map[string]any{
+				"id": plan.ID.ValueString(),
+			})
+			return openHashUploadVerify(ctx, client, plan, previous, previousSize)
 		}
 		if pollErr == nil {
 			return nil
@@ -807,17 +819,24 @@ func streamURLUploadAndVerify(ctx context.Context, client *pro.Client, plan *Pac
 	}
 }
 
+// errStreamSizeUnknown is returned by streamURLUploadOnce, before any byte is
+// uploaded, when the origin declared no Content-Length.
+var errStreamSizeUnknown = errors.New("package URL declared no Content-Length")
+
 // streamURLUploadOnce performs a single upload+verify attempt of the
 // streaming-URL path documented on streamURLUploadAndVerify. Returns terminal
 // diagnostics for anything that fails before the poll (opening the URL,
 // streaming the upload itself); otherwise returns the poll's error (nil on
 // convergence) for the caller's retry decision.
 func streamURLUploadOnce(ctx context.Context, client *pro.Client, plan *PackageResourceModel, previous fileDigests, previousSize string, attempt int) (diag.Diagnostics, error) {
-	body, urlFilename, err := files.OpenURLStream(ctx, plan.PackageFileSource.ValueString(), files.DefaultMaxBytes)
+	body, urlFilename, declaredSize, err := files.OpenURLStream(ctx, plan.PackageFileSource.ValueString(), files.DefaultMaxBytes)
 	if err != nil {
 		return errorDiag("Error opening package URL stream", err.Error()), nil
 	}
 	defer func() { _ = body.Close() }()
+	if declaredSize < 0 {
+		return nil, errStreamSizeUnknown
+	}
 
 	pr, pw := io.Pipe()
 	digests := newDigester()
@@ -845,7 +864,7 @@ func streamURLUploadOnce(ctx context.Context, client *pro.Client, plan *PackageR
 		"file_name": fileName,
 		"attempt":   attempt,
 	})
-	if _, err := client.UploadPackageV1(ctx, plan.ID.ValueString(), fileName, pr); err != nil {
+	if _, err := client.UploadPackageV1(ctx, plan.ID.ValueString(), fileName, jamfplatform.SizedReader(pr, declaredSize)); err != nil {
 		// Drain any remaining body so the goroutine exits cleanly.
 		_ = pr.CloseWithError(err)
 		return errorDiag("Error streaming Jamf Pro package upload", err.Error()), nil

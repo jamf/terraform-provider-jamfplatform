@@ -106,6 +106,8 @@ github.com/hashicorp/yamux v0.1.2 h1:XtB8kyFOyHXYVFnwT5C3+Bdo8gArse7j2AQ0DA0Uey8
 github.com/hashicorp/yamux v0.1.2/go.mod h1:C+zze2n6e/7wshOZep2A70/aQU6QBRWJO/G6FT1wIns=
 github.com/jamf/jamfplatform-go-sdk v1.9.0 h1:roR63aGkovWWMwUyFSxk8ebWJgnxHmQcs1dWCpWJKQ0=
 github.com/jamf/jamfplatform-go-sdk v1.9.0/go.mod h1:654PhqtRAIXUCaeW9GdUZdP2GlXPTLFYpfaVfT4m860=
+github.com/jamf/jamfplatform-go-sdk v1.10.0 h1:A/rVukeKtlOB/Qpn3eWYiX0gDQDiEOeKKyC4pBMA7qM=
+github.com/jamf/jamfplatform-go-sdk v1.10.0/go.mod h1:654PhqtRAIXUCaeW9GdUZdP2GlXPTLFYpfaVfT4m860=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 h1:BQSFePA1RWJOlocH6Fxy8MmwDt+yVQYULKfN0RoTN8A=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99/go.mod h1:1lJo3i6rXxKeerYnT8Nvf0QmHCRC1n8sfWVwXF2Frvo=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=

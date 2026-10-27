@@ -24,6 +24,7 @@ package pkg_test
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -368,6 +369,64 @@ func TestAccResource_ProPackage_URLStreamingUploadCreateAndUpdate(t *testing.T) 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(packageResourceAddr, "info", "stream-replace"),
 					testCheckPackageHashConverged(t, packageResourceAddr, staticDigest(sha160)),
+				),
+			},
+		},
+	})
+}
+
+// urlFixtureNoContentLength is a text file at an immutable tag. The CDN
+// gzips it for clients that ask, and Go's transport, which asks by default,
+// then hides the compressed length and reports the size as unknown (-1) — the
+// same thing the provider sees. The SDK's upload needs the size up front, so
+// stream_url_directly must fall back to disk staging. Tag archives on
+// github.com and codeload.github.com were rejected: both are cached after a
+// first request and then declare a length.
+const urlFixtureNoContentLength = "https://raw.githubusercontent.com/jamf/jamfplatform-go-sdk/v1.10.0/go.sum"
+
+// requireNoContentLength skips unless url, after redirects, answers a GET
+// without a declared length. If GitHub starts sending one, the fallback is
+// no longer exercised and a pass would say nothing about it.
+func requireNoContentLength(t *testing.T, url string) {
+	t.Helper()
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Skipf("cannot reach %s: %v", url, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Skipf("%s answered HTTP %d", url, resp.StatusCode)
+	}
+	if resp.ContentLength >= 0 {
+		t.Skipf("%s now declares Content-Length %d; the no-length fallback is not reachable through it", url, resp.ContentLength)
+	}
+}
+
+// TestAccResource_ProPackage_URLStreamingNoContentLengthFallback sets
+// stream_url_directly against a source that declares no Content-Length. The
+// upload cannot be streamed, so the provider stages it to disk and the hash
+// must still converge on the downloaded bytes.
+func TestAccResource_ProPackage_URLStreamingNoContentLengthFallback(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	testhelpers.RequireDirectUploads(t)
+	requireNoContentLength(t, urlFixtureNoContentLength)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-package-nolen-" + suffix
+	fileName := name + ".pkg"
+
+	_, sha := downloadAndHashURL(t, urlFixtureNoContentLength)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckPackageDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: hclURLUpload(name, fileName, urlFixtureNoContentLength, "nolen-create", true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet(packageResourceAddr, "id"),
+					resource.TestCheckResourceAttr(packageResourceAddr, "stream_url_directly", "true"),
+					resource.TestCheckResourceAttr(packageResourceAddr, "cloud_transfer_status", "READY"),
+					testCheckPackageHashConverged(t, packageResourceAddr, staticDigest(sha)),
 				),
 			},
 		},
