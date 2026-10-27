@@ -55,6 +55,7 @@ import (
 //  4. Refresh state via GET + per-pane GET so server-canonical values are
 //     what land in TF state (the create responses are not authoritative).
 func (r *EnrollmentCustomizationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan EnrollmentCustomizationResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -84,7 +85,7 @@ func (r *EnrollmentCustomizationResource) Create(ctx context.Context, req resour
 
 	parentResp, err := r.client.CreateEnrollmentCustomizationV2(createCtx, buildParentInput(plan, uploadedURL))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro enrollment customization", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro enrollment customization", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if parentResp == nil || parentResp.ID == "" {
@@ -128,6 +129,7 @@ func (r *EnrollmentCustomizationResource) Create(ctx context.Context, req resour
 // Read refreshes Terraform state with the latest customization
 // representation.
 func (r *EnrollmentCustomizationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state EnrollmentCustomizationResourceModel
 	isImport := req.State.Raw.IsNull()
 	if isImport {

@@ -26,7 +26,7 @@ func (r *CloudIdentityProviderResource) createAzure(ctx context.Context, plan, _
 
 	created, err := r.client.CreateCloudAzureV1(ctx, body)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro Cloud Identity Provider (Azure)", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro Cloud Identity Provider (Azure)", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == "" {

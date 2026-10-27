@@ -61,6 +61,7 @@ import (
 // not run Terraform's plan-consistency check. Nothing needs nulling first: the ID is
 // this schema's only Computed value.
 func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan DeviceGroupResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -77,8 +78,8 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 
 	created, err := r.client.CreateDeviceGroupV1(createCtx, buildGroupCreateInput(plan))
 	if err != nil {
-		if !appendWriteDiagnostics(&resp.Diagnostics, err) {
-			resp.Diagnostics.AddError("Error creating Jamf Security Cloud device group", helpers.APIErrorDetail(err))
+		if !appendWriteDiagnosticsHint(&resp.Diagnostics, err, r.collisions.CreateConflictHint(err, resourceTypeName)) {
+			resp.Diagnostics.AddError("Error creating Jamf Security Cloud device group", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		}
 		return
 	}
@@ -121,6 +122,7 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 
 // Read refreshes the Terraform state with the latest device group representation.
 func (r *DeviceGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state DeviceGroupResourceModel
 	isImport := req.State.Raw.IsNull()
 

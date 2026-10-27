@@ -29,6 +29,7 @@ import (
 // not relied upon for field values, so the full representation is read back via
 // GET.
 func (r *UserExtensionAttributeResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan UserExtensionAttributeResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -51,7 +52,7 @@ func (r *UserExtensionAttributeResource) Create(ctx context.Context, req resourc
 
 	created, err := r.client.CreateUserExtensionAttributeByID(createCtx, "0", input)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro user extension attribute", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro user extension attribute", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -84,6 +85,7 @@ func (r *UserExtensionAttributeResource) Create(ctx context.Context, req resourc
 
 // Read refreshes the Terraform state with the latest EA representation.
 func (r *UserExtensionAttributeResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state UserExtensionAttributeResourceModel
 	isImport := req.State.Raw.IsNull()
 

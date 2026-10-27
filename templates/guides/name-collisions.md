@@ -21,19 +21,38 @@ The category with the name "Apps" already exists in Jamf Pro (ID 12), and Jamf P
 does not allow two with the same name. Names are compared without regard to case,
 trailing spaces or accents.
 
-To manage the existing category with Terraform, import it. Use the full address
-of this resource as `to`, including any module path:
+If this configuration does not manage the existing category yet, import it to
+manage it with Terraform. Use the full address of this resource as `to`,
+including any module path:
 
   import {
     to = <this resource's address>
     id = "12"
   }
 
-Otherwise, choose a different name. If this configuration already manages the
-existing category under a different address, add a moved block instead.
+If this configuration or its state already manages it under another address,
+choose a different name instead.
 ```
 
 The provider does not know where the resource sits in your configuration, so `to` is a placeholder. Terraform names the resource address in the diagnostic header. For a resource inside a module, use the full address, for example `module.apps.jamfplatform_pro_category.apps`.
+
+### When the existing object is already managed here
+
+If another resource in your configuration or state already manages the object, importing it a second time is the wrong fix. The provider learns which objects the configuration manages while Terraform refreshes state, so a rename into the name of a resource you already manage gets a different message, with no import block:
+
+```
+The category with the name "Apps" already exists in Jamf Pro (ID 12), and Jamf Pro
+does not allow two with the same name. Names are compared without regard to case,
+trailing spaces or accents.
+
+The existing category is already managed by another resource in this
+configuration. Choose a different name. If you renamed the resource that manages
+it, add a moved block instead.
+```
+
+The `moved` hint covers a renamed resource block with no `moved` block. Terraform then plans to destroy the old address and create the new one, and the create collides with the object that is still managed under the old address.
+
+`terraform plan -refresh=false` skips the refresh, so the provider cannot see what the configuration manages. The error then offers the import block even for an object you manage.
 
 The check runs again just before each resource is applied, so an object created in the web interface between plan and apply is still caught.
 
@@ -166,7 +185,7 @@ Where a collection is partly unknown, such as a set of domains, the known entrie
 
 - Each object type is listed once per plan and shared by every resource of that type. A tenant with thousands of objects of one type pays one paged read.
 - A listing that fails produces one warning and the plan continues. The check never fails a plan it could not evaluate.
-- Two resources in one configuration with the same name are not caught at plan time, because neither exists yet. The service refuses the second write during apply, as it does today.
+- Two new resources in one configuration with the same name are not caught at plan time, because neither exists yet and a resource cannot see another's plan. The service refuses the second write during apply, as it does today, and the provider now appends a note to that error saying a sibling resource probably declares the same value. The note is added to the object types the service refuses a duplicate for. The service's own duplicate check is not atomic, so two writes that run at the same time can both succeed and leave two objects of one name. Add a `depends_on` between the two resources to make the second write fail.
 - A new resource that takes the name of an existing object is not flagged when that object has changes pending in the same plan. Terraform plans a replacement with no prior state, so the provider cannot tell the two cases apart. The service refuses the write during apply, as it does today.
 - A `create_before_destroy` replacement that keeps the same name still fails at apply. The provider cannot see `lifecycle`.
 - A name reused straight after a delete can be flagged until the old object is gone. This applies to eBooks, where the delete completes in the background.

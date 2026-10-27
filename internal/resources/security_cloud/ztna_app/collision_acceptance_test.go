@@ -112,3 +112,70 @@ func TestAccResource_SecurityCloudZtnaApp_NameCollisionIsStrictOnly(t *testing.T
 		},
 	})
 }
+
+// twoZtnaAppsConfig declares two applications, the second depending on the first
+// so the creates are sequential: Jamf's duplicate check is not atomic, and two
+// concurrent creates of one hostname can both succeed.
+func twoZtnaAppsConfig(suffix, category, hostOne, hostTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_security_cloud_ztna_app" "one" {
+  name              = %q
+  category          = %q
+  hostnames         = [%q]
+  all_device_groups = true
+
+  routing = {
+    traffic_routing = "Direct device routing"
+  }
+}
+
+resource "jamfplatform_security_cloud_ztna_app" "two" {
+  depends_on = [jamfplatform_security_cloud_ztna_app.one]
+
+  name              = %q
+  category          = %q
+  hostnames         = [%q]
+  all_device_groups = true
+
+  routing = {
+    traffic_routing = "Direct device routing"
+  }
+}
+`, "tf-acc-collide-one-"+suffix, category, hostOne, "tf-acc-collide-two-"+suffix, category, hostTwo)
+}
+
+func TestAccResource_SecurityCloudZtnaApp_RenameIntoManagedHostnameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheckSecurityCloud(t)
+	categories := testhelpers.RequireSecurityCloudContentCategories(t)
+	suffix := testhelpers.RunSuffix()
+	one := "collide-one-" + suffix + testHostnameSuffix
+	two := "collide-two-" + suffix + testHostnameSuffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: twoZtnaAppsConfig(suffix, categories[0].DisplayName, one, two)},
+			{
+				Config:      twoZtnaAppsConfig(suffix, categories[0].DisplayName, one, one),
+				ExpectError: regexp.MustCompile(`(?s)Hostname\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_SecurityCloudZtnaApp_TwoNewWithOneHostnameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheckSecurityCloud(t)
+	categories := testhelpers.RequireSecurityCloudContentCategories(t)
+	suffix := testhelpers.RunSuffix()
+	host := "collide-pair-" + suffix + testHostnameSuffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoZtnaAppsConfig(suffix, categories[0].DisplayName, host, host),
+				ExpectError: regexp.MustCompile(`(?s)Host\s+name\s+already\s+claimed.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

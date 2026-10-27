@@ -106,3 +106,75 @@ func TestAccResource_SecurityCloudDNSZone_NameCollisionIsStrictOnly(t *testing.T
 		},
 	})
 }
+
+// twoDNSZonesConfig declares two DNS zones, the second depending on the first so
+// the creates are sequential: Jamf's duplicate check is not atomic, and two
+// concurrent creates of one domain can both succeed.
+func twoDNSZonesConfig(suffix, domainOne, domainTwo, gatewayID string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_security_cloud_dns_zone" "one" {
+  name    = %q
+  domains = [%q]
+
+  authoritative_name_servers = [
+    {
+      ip_address = %q
+      gateway_id = %q
+    },
+  ]
+}
+
+resource "jamfplatform_security_cloud_dns_zone" "two" {
+  depends_on = [jamfplatform_security_cloud_dns_zone.one]
+
+  name    = %q
+  domains = [%q]
+
+  authoritative_name_servers = [
+    {
+      ip_address = %q
+      gateway_id = %q
+    },
+  ]
+}
+`, "tf-acc-collide-one-"+suffix, domainOne, testNameServerIPOne, gatewayID,
+		"tf-acc-collide-two-"+suffix, domainTwo, testNameServerIPTwo, gatewayID)
+}
+
+func TestAccResource_SecurityCloudDNSZone_RenameIntoManagedDomainOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheckSecurityCloud(t)
+	gateways := testhelpers.RequireSecurityCloudSharedGatewayIDs(t, 1)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-one-" + suffix + ".example.com"
+	two := "tf-acc-collide-two-" + suffix + ".example.com"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckDNSZoneDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: twoDNSZonesConfig(suffix, one, two, gateways[0])},
+			{
+				Config:      twoDNSZonesConfig(suffix, one, one, gateways[0]),
+				ExpectError: regexp.MustCompile(`(?s)Domain\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_SecurityCloudDNSZone_TwoNewWithOneDomainExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheckSecurityCloud(t)
+	gateways := testhelpers.RequireSecurityCloudSharedGatewayIDs(t, 1)
+	suffix := testhelpers.RunSuffix()
+	domain := "tf-acc-collide-pair-" + suffix + ".example.com"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckDNSZoneDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:      twoDNSZonesConfig(suffix, domain, domain, gateways[0]),
+				ExpectError: regexp.MustCompile(`(?s)Domain\s+already\s+claimed.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

@@ -33,6 +33,7 @@ import (
 // Create creates a new Jamf Pro network segment. Classic POSTs to id="0"; the server
 // allocates the real integer ID and returns it in the response body.
 func (r *NetworkSegmentResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan NetworkSegmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -49,7 +50,7 @@ func (r *NetworkSegmentResource) Create(ctx context.Context, req resource.Create
 
 	created, err := r.client.CreateNetworkSegmentByID(createCtx, "0", buildNetworkSegmentInput(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro network segment", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro network segment", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	// Defensive: the classic SDK trusts the server and would deref a nil ID via
@@ -81,6 +82,7 @@ func (r *NetworkSegmentResource) Create(ctx context.Context, req resource.Create
 
 // Read refreshes the Terraform state with the latest network segment representation.
 func (r *NetworkSegmentResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state NetworkSegmentResourceModel
 	isImport := req.State.Raw.IsNull()
 

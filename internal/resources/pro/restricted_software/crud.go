@@ -56,6 +56,7 @@ import (
 // Create creates a new Jamf Pro restricted software record. Classic POSTs to
 // id="0"; the server allocates the real integer ID and returns it.
 func (r *RestrictedSoftwareResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan RestrictedSoftwareResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -78,7 +79,7 @@ func (r *RestrictedSoftwareResource) Create(ctx context.Context, req resource.Cr
 
 	created, err := r.client.CreateRestrictedSoftwareByID(createCtx, "0", payload)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro restricted software", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro restricted software", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	id := extractRestrictedSoftwareID(created)
@@ -111,6 +112,7 @@ func (r *RestrictedSoftwareResource) Create(ctx context.Context, req resource.Cr
 
 // Read refreshes Terraform state with the latest record representation.
 func (r *RestrictedSoftwareResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state RestrictedSoftwareResourceModel
 	isImport := req.State.Raw.IsNull()
 

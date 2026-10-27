@@ -28,6 +28,7 @@ import (
 // in the response body. We then GET to capture server-populated fields
 // (`key`, `certificate_type`).
 func (r *DiskEncryptionConfigurationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan DiskEncryptionConfigurationResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -49,7 +50,7 @@ func (r *DiskEncryptionConfigurationResource) Create(ctx context.Context, req re
 
 	created, err := r.client.CreateDiskEncryptionConfigurationByID(createCtx, "0", buildDiskEncryptionConfigurationInput(plan, irkPasswordFromConfig(&cfg)))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro disk encryption configuration", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro disk encryption configuration", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -84,6 +85,7 @@ func (r *DiskEncryptionConfigurationResource) Create(ctx context.Context, req re
 // configuration. Import-time refresh sources the ID from the identity
 // object so users can `terraform import` by the integer ID.
 func (r *DiskEncryptionConfigurationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state DiskEncryptionConfigurationResourceModel
 	isImport := req.State.Raw.IsNull()
 

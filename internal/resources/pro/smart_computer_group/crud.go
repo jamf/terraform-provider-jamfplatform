@@ -178,6 +178,7 @@ func (r *SmartComputerGroupResource) suppressEquivalentCriteria(ctx context.Cont
 // could not write — and reporting that before the state is set would fail the
 // apply with the group already made and nothing in Terraform naming it.
 func (r *SmartComputerGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan SmartComputerGroupResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -228,7 +229,7 @@ func (r *SmartComputerGroupResource) Create(ctx context.Context, req resource.Cr
 			return
 		}
 	default:
-		resp.Diagnostics.Append(progroups.WriteDiagnostics(err, groupLabel, path.Root("site_id"), path.Empty())...)
+		resp.Diagnostics.Append(r.withCreateConflictHint(err, progroups.WriteDiagnostics(err, groupLabel, path.Root("site_id"), path.Empty()))...)
 		return
 	}
 
@@ -263,6 +264,24 @@ func (r *SmartComputerGroupResource) Create(ctx context.Context, req resource.Cr
 	})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(deferred...)
+}
+
+// withCreateConflictHint appends the shared collision hint to the duplicate-name
+// diagnostic of a refused create, so the operator learns that a sibling resource in
+// the same configuration may hold the name. Every other diagnostic passes through.
+func (r *SmartComputerGroupResource) withCreateConflictHint(err error, diags diag.Diagnostics) diag.Diagnostics {
+	hint := r.pd.CollisionChecker().CreateConflictHint(err, resourceTypeName)
+	if hint == "" || !progroups.IsDuplicateName(err) {
+		return diags
+	}
+	out := make(diag.Diagnostics, 0, len(diags))
+	for _, d := range diags {
+		if d.Severity() == diag.SeverityError {
+			d = diag.NewErrorDiagnostic(d.Summary(), d.Detail()+hint)
+		}
+		out = append(out, d)
+	}
+	return out
 }
 
 // recordCreatedGroup writes a group the create has already made to state, for
@@ -377,6 +396,7 @@ func (r *SmartComputerGroupResource) setDescription(ctx context.Context, plan Sm
 // the import case: on an ordinary refresh it is already there and a group's
 // platform identifier does not change.
 func (r *SmartComputerGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state SmartComputerGroupResourceModel
 
 	if req.State.Raw.IsNull() {

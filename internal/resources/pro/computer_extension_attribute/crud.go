@@ -29,6 +29,7 @@ import (
 // an href + id, so the ID is parsed from the response and the full
 // representation read back via GET.
 func (r *ComputerExtensionAttributeResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan, cfg ComputerExtensionAttributeResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
@@ -52,7 +53,7 @@ func (r *ComputerExtensionAttributeResource) Create(ctx context.Context, req res
 
 	created, err := r.client.CreateComputerExtensionAttributeV1(createCtx, input)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro computer extension attribute", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro computer extension attribute", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == "" {
@@ -85,6 +86,7 @@ func (r *ComputerExtensionAttributeResource) Create(ctx context.Context, req res
 
 // Read refreshes the Terraform state with the latest EA representation.
 func (r *ComputerExtensionAttributeResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state ComputerExtensionAttributeResourceModel
 	isImport := req.State.Raw.IsNull()
 

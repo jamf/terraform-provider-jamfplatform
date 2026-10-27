@@ -44,6 +44,7 @@ import (
 // Create creates a new App Installer deployment, then refreshes state from a
 // follow-up GET (the POST returns only {href,id}).
 func (r *AppInstallerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan AppInstallerResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -66,7 +67,7 @@ func (r *AppInstallerResource) Create(ctx context.Context, req resource.CreateRe
 
 	created, err := r.client.CreateAppInstallerDeploymentV1(createCtx, buildAppInstallerInput(plan, appTitleID))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating App Installer deployment", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating App Installer deployment", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == "" {
@@ -95,6 +96,7 @@ func (r *AppInstallerResource) Create(ctx context.Context, req resource.CreateRe
 
 // Read refreshes Terraform state with the latest deployment representation.
 func (r *AppInstallerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state AppInstallerResourceModel
 	isImport := req.State.Raw.IsNull()
 

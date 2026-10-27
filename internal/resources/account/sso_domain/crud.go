@@ -24,6 +24,7 @@ package sso_domain
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -38,6 +39,7 @@ import (
 // call, and a claim can only be re-read by scanning the collection, so a
 // read-back would cost a full listing to learn nothing new.
 func (r *DomainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State, path.Root("domain"))
 	var plan DomainResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -56,7 +58,7 @@ func (r *DomainResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	created, err := r.client.CreateDomain(createCtx, buildDomainRequest(plan))
 	if err != nil {
-		if !appendClaimDiagnostics(&resp.Diagnostics, domain, err) {
+		if !appendClaimDiagnosticsWithHint(&resp.Diagnostics, domain, err, r.collisions.CreateConflictHint(err, resourceTypeName)) {
 			resp.Diagnostics.AddError("Error claiming Jamf Account SSO domain", helpers.APIErrorDetail(err))
 		}
 		return
@@ -91,6 +93,7 @@ func (r *DomainResource) Create(ctx context.Context, req resource.CreateRequest,
 // shared domain cannot be a managed resource. Refusing here covers both the
 // import and the case of a domain shared in after Terraform adopted it.
 func (r *DomainResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State, path.Root("domain"))
 	var state DomainResourceModel
 
 	if req.State.Raw.IsNull() {

@@ -34,6 +34,7 @@ import (
 // GET to capture server-populated fields (category sentinel, `ppd_path`
 // auto-fill when `use_generic=true`, etc.).
 func (r *PrinterResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan PrinterResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -50,7 +51,7 @@ func (r *PrinterResource) Create(ctx context.Context, req resource.CreateRequest
 
 	created, err := r.client.CreatePrinterByID(createCtx, "0", buildPrinterInput(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro printer", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro printer", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -83,6 +84,7 @@ func (r *PrinterResource) Create(ctx context.Context, req resource.CreateRequest
 
 // Read refreshes the Terraform state with the latest printer representation.
 func (r *PrinterResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state PrinterResourceModel
 	isImport := req.State.Raw.IsNull()
 

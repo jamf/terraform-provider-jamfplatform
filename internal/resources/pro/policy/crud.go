@@ -39,6 +39,7 @@ import (
 // Create creates a new Jamf Pro classic policy. Classic POSTs to id="0"; the
 // server allocates the real integer ID and returns it in the response body.
 func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan PolicyResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -77,7 +78,7 @@ func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest,
 		})
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro policy", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro policy", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	policyID := extractPolicyID(created)
@@ -111,6 +112,7 @@ func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest,
 
 // Read refreshes the Terraform state with the latest policy representation.
 func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state PolicyResourceModel
 	isImport := req.State.Raw.IsNull()
 

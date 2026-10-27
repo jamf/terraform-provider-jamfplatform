@@ -34,6 +34,7 @@ import (
 // body. We then GET to capture server-populated fields (priority default,
 // etc.).
 func (r *DirectoryBindingResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan DirectoryBindingResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -55,7 +56,7 @@ func (r *DirectoryBindingResource) Create(ctx context.Context, req resource.Crea
 
 	created, err := r.client.CreateDirectoryBindingByID(createCtx, "0", buildDirectoryBindingInput(plan, helpers.OptionalStringPointer(cfg.Password)))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro directory binding", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro directory binding", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -91,6 +92,7 @@ func (r *DirectoryBindingResource) Create(ctx context.Context, req resource.Crea
 // ID from the identity object so users can `terraform import` by the
 // binding's integer ID.
 func (r *DirectoryBindingResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state DirectoryBindingResourceModel
 	isImport := req.State.Raw.IsNull()
 

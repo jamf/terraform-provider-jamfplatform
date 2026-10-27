@@ -18,6 +18,7 @@ import (
 //
 // Uniqueness: title, enforced (409 DuplicateFieldException), case-insensitive; spaces and accents are significant.
 func (r *BenchmarkResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var data BenchmarkResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -38,7 +39,7 @@ func (r *BenchmarkResource) Create(ctx context.Context, req resource.CreateReque
 
 	release, err := r.lock.Acquire(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating benchmark", "Terraform canceled the create while it waited for another benchmark to finish creating or deleting: "+helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating benchmark", "Terraform canceled the create while it waited for another benchmark to finish creating or deleting: "+helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	defer release()
@@ -54,7 +55,7 @@ func (r *BenchmarkResource) Create(ctx context.Context, req resource.CreateReque
 
 	bench, err := r.client.CreateBenchmark(createCtx, reqBody)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating benchmark", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating benchmark", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 
@@ -98,6 +99,7 @@ func (r *BenchmarkResource) Create(ctx context.Context, req resource.CreateReque
 
 // Read reads the current state of a Jamf Compliance Benchmark resource from the API and updates the Terraform state.
 func (r *BenchmarkResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var data BenchmarkResourceModel
 
 	if req.State.Raw.IsNull() {

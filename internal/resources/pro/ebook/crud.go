@@ -81,6 +81,7 @@ import (
 // Create creates a new Jamf Pro ebook. Classic POSTs to id="0"; the server
 // allocates the real integer ID and returns it in the response body.
 func (r *EbookResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan EbookResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -112,7 +113,7 @@ func (r *EbookResource) Create(ctx context.Context, req resource.CreateRequest, 
 		})
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro ebook", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro ebook", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	id := extractEbookID(created)
@@ -145,6 +146,7 @@ func (r *EbookResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 // Read refreshes Terraform state with the latest ebook representation.
 func (r *EbookResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state EbookResourceModel
 	isImport := req.State.Raw.IsNull()
 

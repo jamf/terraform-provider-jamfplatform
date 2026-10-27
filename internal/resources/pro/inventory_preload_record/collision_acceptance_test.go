@@ -71,3 +71,52 @@ func TestAccResource_ProInventoryPreloadRecord_SerialNumberWithLeadingSpaceDoesN
 		},
 	})
 }
+
+func twoConfig(serialOne, serialTwo string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_inventory_preload_record" "one" {
+			serial_number = %q
+			device_type   = "Computer"
+		}
+
+		resource "jamfplatform_pro_inventory_preload_record" "two" {
+			depends_on = [jamfplatform_pro_inventory_preload_record.one]
+
+			serial_number = %q
+			device_type   = "Computer"
+		}
+	`, serialOne, serialTwo)
+}
+
+func TestAccResource_ProInventoryPreloadRecord_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "ZZCOLLIDEONE" + suffix
+	two := "ZZCOLLIDETWO" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: twoConfig(one, two)},
+			{
+				Config:      twoConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Serial\s+number\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProInventoryPreloadRecord_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "ZZCOLLIDEPAIR" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

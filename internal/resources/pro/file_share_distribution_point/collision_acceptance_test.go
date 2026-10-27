@@ -77,3 +77,80 @@ func TestAccResource_ProFileShareDistributionPoint_NameCollision(t *testing.T) {
 		},
 	})
 }
+
+// twoDistributionPointsConfig declares two distribution points. The second
+// depends on the first so the creates are sequential: Jamf's duplicate check is
+// not atomic, and two concurrent creates of one name can both succeed, which
+// would leave a test asserting on a race instead of on the refusal.
+func twoDistributionPointsConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_file_share_distribution_point" "one" {
+			name                         = %q
+			server_name                  = "smb.acc.example.com"
+			file_sharing_connection_type = "SMB"
+			share_name                   = "CasperShare"
+			port                         = 445
+			workgroup                    = "WORKGROUP"
+
+			read_write_username            = "rwuser"
+			read_write_password            = "rw-secret-1"
+			read_write_password_wo_version = 1
+			read_only_username             = "rouser"
+			read_only_password             = "ro-secret-1"
+			read_only_password_wo_version  = 1
+		}
+
+		resource "jamfplatform_pro_file_share_distribution_point" "two" {
+			depends_on = [jamfplatform_pro_file_share_distribution_point.one]
+
+			name                         = %q
+			server_name                  = "smb.acc.example.com"
+			file_sharing_connection_type = "SMB"
+			share_name                   = "CasperShare"
+			port                         = 445
+			workgroup                    = "WORKGROUP"
+
+			read_write_username            = "rwuser"
+			read_write_password            = "rw-secret-1"
+			read_write_password_wo_version = 1
+			read_only_username             = "rouser"
+			read_only_password             = "ro-secret-1"
+			read_only_password_wo_version  = 1
+		}
+	`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProFileShareDistributionPoint_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoDistributionPointsConfig(one, two),
+			},
+			{
+				Config:      twoDistributionPointsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProFileShareDistributionPoint_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoDistributionPointsConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating\s+Jamf\s+Pro\s+file\s+share\s+distribution\s+point.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

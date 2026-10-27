@@ -33,6 +33,7 @@ import (
 // allocates the real integer ID and returns it in the response body, then we GET
 // to hydrate the server-parsed uuid/date fields.
 func (r *ProvisioningProfileResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan ProvisioningProfileResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -49,7 +50,7 @@ func (r *ProvisioningProfileResource) Create(ctx context.Context, req resource.C
 
 	created, err := r.client.CreateMobileDeviceProvisioningProfileByID(createCtx, "0", buildProvisioningProfileInput(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro mobile device provisioning profile", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro mobile device provisioning profile", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -79,6 +80,7 @@ func (r *ProvisioningProfileResource) Create(ctx context.Context, req resource.C
 
 // Read refreshes the Terraform state with the latest profile representation.
 func (r *ProvisioningProfileResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state ProvisioningProfileResourceModel
 	isImport := req.State.Raw.IsNull()
 

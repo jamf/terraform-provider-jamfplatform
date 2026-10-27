@@ -66,6 +66,7 @@ import (
 // Create creates a new Jamf Pro mobile device app. Classic POSTs to id="0"; the
 // server allocates the real integer ID and returns it in the response body.
 func (r *MobileAppResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan MobileAppResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -98,7 +99,7 @@ func (r *MobileAppResource) Create(ctx context.Context, req resource.CreateReque
 		})
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro mobile device app", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro mobile device app", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	id := extractMobileAppID(created)
@@ -148,6 +149,7 @@ func (r *MobileAppResource) Create(ctx context.Context, req resource.CreateReque
 
 // Read refreshes Terraform state with the latest app representation.
 func (r *MobileAppResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state MobileAppResourceModel
 	isImport := req.State.Raw.IsNull()
 

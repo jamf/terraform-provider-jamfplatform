@@ -83,3 +83,54 @@ func TestAccResource_ProScript_NameCollisionOnRename(t *testing.T) {
 		},
 	})
 }
+
+func twoScriptsConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_script" "one" {
+  name            = %q
+  script_contents = "#!/bin/sh\necho hello"
+}
+
+resource "jamfplatform_pro_script" "two" {
+  depends_on = [jamfplatform_pro_script.one]
+
+  name            = %q
+  script_contents = "#!/bin/sh\necho hello"
+}
+`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProScript_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoScriptsConfig(one, two),
+			},
+			{
+				Config:      twoScriptsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProScript_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoScriptsConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

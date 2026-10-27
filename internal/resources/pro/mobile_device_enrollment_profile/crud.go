@@ -30,6 +30,7 @@ import (
 )
 
 func (r *EnrollmentProfileResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan EnrollmentProfileResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -46,7 +47,7 @@ func (r *EnrollmentProfileResource) Create(ctx context.Context, req resource.Cre
 
 	created, err := r.client.CreateMobileDeviceEnrollmentProfileByID(createCtx, "0", buildEnrollmentProfileInput(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro mobile device enrollment profile", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro mobile device enrollment profile", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -71,6 +72,7 @@ func (r *EnrollmentProfileResource) Create(ctx context.Context, req resource.Cre
 }
 
 func (r *EnrollmentProfileResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state EnrollmentProfileResourceModel
 	isImport := req.State.Raw.IsNull()
 

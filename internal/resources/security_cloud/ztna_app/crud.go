@@ -42,6 +42,7 @@ import (
 // re-ordered or de-duplicated is not a fault at that point. Values only the read-back
 // could have filled are nulled first — see nullUnknownReadBackValues.
 func (r *ZtnaAppResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan ZtnaAppResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -64,8 +65,8 @@ func (r *ZtnaAppResource) Create(ctx context.Context, req resource.CreateRequest
 
 	created, err := r.client.CreateZtnaAppV1(createCtx, input)
 	if err != nil {
-		if !appendWriteDiagnostics(&resp.Diagnostics, err, !plan.PredefinedAppID.IsNull()) {
-			resp.Diagnostics.AddError("Error creating Jamf Security Cloud access policy application", helpers.APIErrorDetail(err))
+		if !appendWriteDiagnosticsHint(&resp.Diagnostics, err, !plan.PredefinedAppID.IsNull(), r.collisions.CreateConflictHint(err, resourceTypeName)) {
+			resp.Diagnostics.AddError("Error creating Jamf Security Cloud access policy application", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		}
 		return
 	}
@@ -124,6 +125,7 @@ func nullUnknownReadBackValues(plan *ZtnaAppResourceModel) {
 // the cards they want to manage. The server always holds all three, and adopting
 // them all would put values in state the configuration never wrote.
 func (r *ZtnaAppResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state ZtnaAppResourceModel
 	isImport := req.State.Raw.IsNull()
 

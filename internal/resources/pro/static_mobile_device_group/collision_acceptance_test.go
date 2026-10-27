@@ -76,3 +76,56 @@ func TestAccResource_ProStaticMobileDeviceGroup_ComputerGroupNameDoesNotCollide(
 		},
 	})
 }
+
+// twoGroupsConfig declares two groups. The second depends on the first so the
+// creates are sequential: Jamf's duplicate check is not atomic, and two
+// concurrent creates of one name can both succeed, which would leave a test
+// asserting on a race instead of on the refusal.
+func twoGroupsConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_static_mobile_device_group" "one" {
+  name = %q
+}
+
+resource "jamfplatform_pro_static_mobile_device_group" "two" {
+  depends_on = [jamfplatform_pro_static_mobile_device_group.one]
+
+  name = %q
+}
+`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProStaticMobileDeviceGroup_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoGroupsConfig(one, two),
+			},
+			{
+				Config:      twoGroupsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProStaticMobileDeviceGroup_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoGroupsConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)with\s+this\s+name\s+already\s+exists.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

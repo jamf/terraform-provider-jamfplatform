@@ -75,6 +75,7 @@ func dsGroupCriteriaChanged(suppressed, planned []criteria.CriterionModel) bool 
 // server allocates the real integer ID and returns it in the response body
 // (which carries only <id> — every other field must be read back via GET).
 func (r *AdvancedComputerSearchResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan AdvancedComputerSearchResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -104,7 +105,7 @@ func (r *AdvancedComputerSearchResource) Create(ctx context.Context, req resourc
 
 	created, err := r.client.CreateAdvancedComputerSearchByID(createCtx, "0", input)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro advanced computer search", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro advanced computer search", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -138,6 +139,7 @@ func (r *AdvancedComputerSearchResource) Create(ctx context.Context, req resourc
 
 // Read refreshes the Terraform state with the latest search representation.
 func (r *AdvancedComputerSearchResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state AdvancedComputerSearchResourceModel
 	isImport := req.State.Raw.IsNull()
 

@@ -46,6 +46,7 @@ import (
 // payloadhelpers.PayloadFidelityErrorDetail) instead of Terraform core's
 // inconsistent-result error.
 func (r *Resource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	if r.client == nil {
 		resp.Diagnostics.AddError("Provider not configured", providerNotConfigured)
 		return
@@ -90,7 +91,7 @@ func (r *Resource) Create(ctx context.Context, req resource.CreateRequest, resp 
 		})
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro macOS configuration profile", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro macOS configuration profile", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 
@@ -144,6 +145,7 @@ func (r *Resource) Create(ctx context.Context, req resource.CreateRequest, resp 
 }
 
 func (r *Resource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	if r.client == nil {
 		resp.Diagnostics.AddError("Provider not configured", providerNotConfigured)
 		return

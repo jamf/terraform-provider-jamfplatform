@@ -70,3 +70,43 @@ func TestAccResource_ProLdapServer_NameDifferingByAccentDoesNotCollide(t *testin
 		},
 	})
 }
+
+func twoServersConfig(nameOne, nameTwo string) string {
+	dependent := strings.Replace(collisionBlock("two", nameTwo), "{\n  connection_settings", "{\n  depends_on = [jamfplatform_pro_ldap_server.one]\n\n  connection_settings", 1)
+	return collisionBlock("one", nameOne) + dependent
+}
+
+func TestAccResource_ProLdapServer_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoServersConfig(one, two),
+			},
+			{
+				Config:      twoServersConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Display\s+name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProLdapServer_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoServersConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

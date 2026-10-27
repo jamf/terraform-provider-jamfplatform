@@ -27,6 +27,13 @@ import (
 // BAD_PERMISSIONS is deliberately absent — see mappings.go for why translating it
 // would be a guess.
 func appendWriteDiagnostics(diags *diag.Diagnostics, err error) bool {
+	return appendWriteDiagnosticsHint(diags, err, "")
+}
+
+// appendWriteDiagnosticsHint is appendWriteDiagnostics with a conflict hint appended to the
+// duplicate-value diagnostic, so a create refused for a value another resource in the same
+// configuration holds says so.
+func appendWriteDiagnosticsHint(diags *diag.Diagnostics, err error, hint string) bool {
 	apiErr := jamfplatform.AsAPIError(err)
 	if apiErr == nil {
 		return false
@@ -40,7 +47,7 @@ func appendWriteDiagnostics(diags *diag.Diagnostics, err error) bool {
 				"Device group name already in use",
 				"Jamf Security Cloud requires device group names to be unique on the tenant. The comparison is "+
 					"exact, so a group differing only in capitalisation still counts as a different name and is not "+
-					"the one clashing here. Reported by Jamf Security Cloud: "+detail.Description,
+					"the one clashing here. Reported by Jamf Security Cloud: "+detail.Description+hint,
 			)
 		case codeReservedGroupName:
 			diags.AddAttributeError(

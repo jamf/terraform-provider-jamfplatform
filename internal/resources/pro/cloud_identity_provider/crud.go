@@ -45,6 +45,7 @@ func missingProviderBlockError(providerName, blockName string) (string, string) 
 
 // Create dispatches to the Google or Entra ID branch based on provider_name.
 func (r *CloudIdentityProviderResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	if r.client == nil {
 		resp.Diagnostics.AddError(helpers.ProviderNotConfiguredError())
 		return
@@ -82,6 +83,7 @@ func (r *CloudIdentityProviderResource) Create(ctx context.Context, req resource
 // Read refreshes state. On import only the id is known, so the provider is
 // discovered via the Cloud Identity Provider registry before dispatch.
 func (r *CloudIdentityProviderResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	if r.client == nil {
 		resp.Diagnostics.AddError(helpers.ProviderNotConfiguredError())
 		return

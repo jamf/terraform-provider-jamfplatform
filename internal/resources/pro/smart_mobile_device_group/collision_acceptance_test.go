@@ -48,3 +48,64 @@ func TestAccResource_ProSmartMobileDeviceGroup_NameCollisionWithPlatformGroup(t 
 		},
 	})
 }
+
+func twoGroupsConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_smart_mobile_device_group" "one" {
+  name = %[1]q
+  criteria = [
+    {
+      name        = "Model"
+      search_type = "like"
+      value       = "iPad"
+    },
+  ]
+}
+
+resource "jamfplatform_pro_smart_mobile_device_group" "two" {
+  depends_on = [jamfplatform_pro_smart_mobile_device_group.one]
+
+  name = %[2]q
+  criteria = [
+    {
+      name        = "Model"
+      search_type = "like"
+      value       = "iPad"
+    },
+  ]
+}
+`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProSmartMobileDeviceGroup_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-smart-mdg-one-" + suffix
+	two := "tf-acc-collide-smart-mdg-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: twoGroupsConfig(one, two)},
+			{
+				Config:      twoGroupsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProSmartMobileDeviceGroup_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-smart-mdg-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoGroupsConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)already\s+exists.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

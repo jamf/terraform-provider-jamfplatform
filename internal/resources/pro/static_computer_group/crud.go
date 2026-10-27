@@ -48,6 +48,7 @@ import (
 // that UUID in place of {id}, so the read-after-create runs against it unchanged
 // and reports the Jamf Pro id in its body. No bridging request is needed.
 func (r *StaticComputerGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan, config StaticComputerGroupResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
@@ -76,7 +77,13 @@ func (r *StaticComputerGroupResource) Create(ctx context.Context, req resource.C
 
 	created, err := r.client.CreateStaticComputerGroupV3(createCtx, buildStaticComputerGroupInput(plan, assignments), true)
 	if err != nil {
-		resp.Diagnostics.Append(progroups.WriteDiagnostics(err, groupLabel, path.Root("site_id"), path.Root("assigned_computer_ids"))...)
+		for _, d := range progroups.WriteDiagnostics(err, groupLabel, path.Root("site_id"), path.Root("assigned_computer_ids")) {
+			if progroups.IsDuplicateName(err) {
+				resp.Diagnostics.AddError(d.Summary(), d.Detail()+r.pd.CollisionChecker().CreateConflictHint(err, resourceTypeName))
+				continue
+			}
+			resp.Diagnostics.Append(d)
+		}
 		return
 	}
 	if created == nil || created.ID == "" {
@@ -147,6 +154,7 @@ func (r *StaticComputerGroupResource) Create(ctx context.Context, req resource.C
 // membership maintained in Jamf Pro out of Terraform's state and out of its
 // plans.
 func (r *StaticComputerGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state StaticComputerGroupResourceModel
 
 	if req.State.Raw.IsNull() {

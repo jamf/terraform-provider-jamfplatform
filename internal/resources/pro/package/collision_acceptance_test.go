@@ -80,3 +80,53 @@ func TestAccResource_ProPackage_NameCollisionOnRename(t *testing.T) {
 		},
 	})
 }
+
+func twoPackagesConfig(displayOne, fileOne, displayTwo, fileTwo string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_package" "one" {
+			display_name = %q
+			file_name    = %q
+		}
+
+		resource "jamfplatform_pro_package" "two" {
+			depends_on = [jamfplatform_pro_package.one]
+
+			display_name = %q
+			file_name    = %q
+		}
+	`, displayOne, fileOne, displayTwo, fileTwo)
+}
+
+func TestAccResource_ProPackage_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-pkg-one-" + suffix
+	two := "tf-acc-collide-pkg-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: twoPackagesConfig(one, one+".pkg", two, two+".pkg")},
+			{
+				Config:      twoPackagesConfig(one, one+".pkg", one, two+".pkg"),
+				ExpectError: regexp.MustCompile(`(?s)Display\s+name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProPackage_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-collide-pkg-pair-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoPackagesConfig(name, name+"-a.pkg", name, name+"-b.pkg"),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

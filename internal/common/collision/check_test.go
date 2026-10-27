@@ -92,7 +92,7 @@ func TestCheck_CreateCollides(t *testing.T) {
 		t.Fatalf("want one error, got %v", d)
 	}
 	detail := d[0].Detail()
-	for _, want := range []string{`"install chrome "`, "(ID 7)", `id = "7"`, "to = <this resource's address>", "moved block"} {
+	for _, want := range []string{`"install chrome "`, "(ID 7)", `id = "7"`, "to = <this resource's address>"} {
 		if !strings.Contains(detail, want) {
 			t.Errorf("detail missing %q:\n%s", want, detail)
 		}
@@ -330,4 +330,48 @@ func TestCheck_ListAndFindSourcesMix(t *testing.T) {
 	if d := c.Check(context.Background(), request(ns, []string{"found"}, nil, "")); !d.HasError() {
 		t.Fatal("the find source must also be consulted")
 	}
+}
+
+func TestCheck_ManagedElsewhereDoesNotSuggestImport(t *testing.T) {
+	ns := widgetNamespace([]Entry{{ID: "7", Key: "a"}}, nil)
+	c := newChecker(ModeError, false)
+	c.NoteManaged(testResourceType, "7")
+	d := c.Check(context.Background(), request(ns, []string{"a"}, nil, ""))
+	if !d.HasError() {
+		t.Fatal("want a collision")
+	}
+	detail := d[0].Detail()
+	if strings.Contains(detail, "import {") {
+		t.Errorf("an object this configuration already manages must not be offered for import:\n%s", detail)
+	}
+	for _, want := range []string{"already managed by another resource", "moved block"} {
+		if !strings.Contains(detail, want) {
+			t.Errorf("detail missing %q:\n%s", want, detail)
+		}
+	}
+}
+
+func TestCheck_ManagedUnderAnotherTypeViaAltID(t *testing.T) {
+	ns := widgetNamespace([]Entry{{ID: "7", Key: "a", AltIDs: map[string]string{"jamfplatform_other": "uuid-7"}}}, nil)
+	c := newChecker(ModeError, false)
+	c.NoteManaged("jamfplatform_other", "uuid-7")
+	d := c.Check(context.Background(), request(ns, []string{"a"}, nil, ""))
+	if !d.HasError() || strings.Contains(d[0].Detail(), "import {") {
+		t.Fatalf("an object managed under its other resource type must not be offered for import: %v", d)
+	}
+}
+
+func TestCheck_UnmanagedStillOffersImport(t *testing.T) {
+	ns := widgetNamespace([]Entry{{ID: "7", Key: "a"}}, nil)
+	c := newChecker(ModeError, false)
+	c.NoteManaged(testResourceType, "8")
+	d := c.Check(context.Background(), request(ns, []string{"a"}, nil, ""))
+	if !d.HasError() || !strings.Contains(d[0].Detail(), `id = "7"`) {
+		t.Fatalf("an object nothing manages must still be offered for import: %v", d)
+	}
+}
+
+func TestNoteManaged_NilCheckerIsSafe(t *testing.T) {
+	var c *Checker
+	c.NoteManaged(testResourceType, "1")
 }

@@ -65,3 +65,43 @@ func TestAccResource_ProDirectoryBinding_NameCollision(t *testing.T) {
 		},
 	})
 }
+
+func twoBindingsConfig(nameOne, nameTwo string) string {
+	dependent := strings.Replace(collisionBlock("two", nameTwo), "  priority ", "  depends_on          = [jamfplatform_pro_directory_binding.one]\n  priority ", 1)
+	return collisionBlock("one", nameOne) + dependent
+}
+
+func TestAccResource_ProDirectoryBinding_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoBindingsConfig(one, two),
+			},
+			{
+				Config:      twoBindingsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProDirectoryBinding_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoBindingsConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

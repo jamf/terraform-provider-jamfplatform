@@ -26,6 +26,7 @@ import (
 
 // Create creates a new Jamf Pro department.
 func (r *DepartmentResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan DepartmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -42,7 +43,7 @@ func (r *DepartmentResource) Create(ctx context.Context, req resource.CreateRequ
 
 	createResp, err := r.client.CreateDepartmentV1(createCtx, buildDepartmentInput(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro department", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro department", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 
@@ -66,6 +67,7 @@ func (r *DepartmentResource) Create(ctx context.Context, req resource.CreateRequ
 
 // Read refreshes the Terraform state with the latest department representation.
 func (r *DepartmentResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state DepartmentResourceModel
 	isImport := req.State.Raw.IsNull()
 

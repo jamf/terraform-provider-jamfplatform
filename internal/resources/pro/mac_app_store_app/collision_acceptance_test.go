@@ -64,3 +64,68 @@ func TestAccResource_ProMacAppStoreApp_NameCollision(t *testing.T) {
 		},
 	})
 }
+
+// twoMacAppStoreAppsConfig declares two resources. The second depends on the first so
+// the creates are sequential: Jamf's duplicate check is not atomic, and two
+// concurrent creates of one name can both succeed, which would leave a test
+// asserting on a race instead of on the refusal.
+func twoMacAppStoreAppsConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_mac_app_store_app" "one" {
+  general = {
+    name            = %[1]q
+    version         = "1.0"
+    bundle_id       = "com.example.tfacc.macapp.collide1"
+    url             = "https://apps.apple.com/app/id000000001"
+    deployment_type = "Make Available in Self Service"
+  }
+}
+
+resource "jamfplatform_pro_mac_app_store_app" "two" {
+  depends_on = [jamfplatform_pro_mac_app_store_app.one]
+
+  general = {
+    name            = %[2]q
+    version         = "1.0"
+    bundle_id       = "com.example.tfacc.macapp.collide2"
+    url             = "https://apps.apple.com/app/id000000002"
+    deployment_type = "Make Available in Self Service"
+  }
+}
+`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProMacAppStoreApp_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoMacAppStoreAppsConfig(one, two),
+			},
+			{
+				Config:      twoMacAppStoreAppsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProMacAppStoreApp_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoMacAppStoreAppsConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

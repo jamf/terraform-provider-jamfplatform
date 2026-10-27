@@ -42,6 +42,7 @@ import (
 // allocates the integer ID. Privileges and members are trusted from the plan
 // (not re-read from the server) so silent server expansion does not abort apply.
 func (r *AccountGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan AccountGroupResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -68,7 +69,7 @@ func (r *AccountGroupResource) Create(ctx context.Context, req resource.CreateRe
 			resp.Diagnostics.AddAttributeError(path.Root("privilege_set"), "Privilege set refused for API clients", privilegeSetRefusalDetail(err))
 			return
 		}
-		resp.Diagnostics.AddError("Error creating Jamf Pro account group", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro account group", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -98,6 +99,7 @@ func (r *AccountGroupResource) Create(ctx context.Context, req resource.CreateRe
 // Read refreshes Terraform state. Privileges and members are reconciled against
 // what the configuration manages (intersect-on-read / null-aware).
 func (r *AccountGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state AccountGroupResourceModel
 	isImport := req.State.Raw.IsNull()
 

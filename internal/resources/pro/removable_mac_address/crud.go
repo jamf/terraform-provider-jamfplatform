@@ -33,6 +33,7 @@ import (
 // Create creates a new Jamf Pro removable MAC address. Classic POSTs to id="0"; the
 // server allocates the real integer ID and returns it in the response body.
 func (r *RemovableMacAddressResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan RemovableMacAddressResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -49,7 +50,7 @@ func (r *RemovableMacAddressResource) Create(ctx context.Context, req resource.C
 
 	created, err := r.client.CreateRemovableMacAddressByID(createCtx, "0", buildRemovableMacAddressInput(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro removable MAC address", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro removable MAC address", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	// Defensive: the classic SDK trusts the server and would deref a nil ID via
@@ -82,6 +83,7 @@ func (r *RemovableMacAddressResource) Create(ctx context.Context, req resource.C
 
 // Read refreshes the Terraform state with the latest removable MAC address representation.
 func (r *RemovableMacAddressResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state RemovableMacAddressResourceModel
 	isImport := req.State.Raw.IsNull()
 

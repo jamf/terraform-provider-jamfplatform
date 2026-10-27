@@ -46,6 +46,7 @@ import (
 
 // Create provisions a new computer prestage enrollment on Jamf Pro.
 func (r *ComputerPrestageEnrollmentResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan, cfg ComputerPrestageEnrollmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -72,7 +73,7 @@ func (r *ComputerPrestageEnrollmentResource) Create(ctx context.Context, req res
 
 	postResp, err := r.client.CreateComputerPrestageV3(createCtx, post)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro computer prestage enrollment", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro computer prestage enrollment", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if postResp == nil || postResp.ID == "" {
@@ -129,6 +130,7 @@ func (r *ComputerPrestageEnrollmentResource) Create(ctx context.Context, req res
 
 // Read refreshes Terraform state from the live Jamf Pro record.
 func (r *ComputerPrestageEnrollmentResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state ComputerPrestageEnrollmentResourceModel
 	isImport := req.State.Raw.IsNull()
 	if isImport {

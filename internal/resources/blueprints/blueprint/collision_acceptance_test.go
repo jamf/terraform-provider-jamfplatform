@@ -64,3 +64,56 @@ func TestAccResource_Blueprint_NameCollisionStrict(t *testing.T) {
 		},
 	})
 }
+
+// twoBlueprintsConfig declares two blueprints, the second depending on the first
+// so the creates are sequential.
+func twoBlueprintsConfig(nameOne, nameTwo string) string {
+	blueprint := `
+	resource "jamfplatform_blueprints_blueprint" %q {
+		%s
+		name          = %q
+		deployed      = false
+		device_groups = [jamfplatform_device_group.scope.id]
+
+		component_blocks = [
+			{
+				name = "Passcode Policy"
+				passcode_policy = {
+					require_passcode = true
+					minimum_length   = 6
+				}
+			},
+		]
+	}
+`
+	return testBlueprintConfig(smartGroupHCL("collide"),
+		fmt.Sprintf(blueprint, "one", "", nameOne)+
+			fmt.Sprintf(blueprint, "two", "depends_on = [jamfplatform_blueprints_blueprint.one]", nameTwo))
+}
+
+func TestAccResource_Blueprint_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	config := func(nameOne, nameTwo string) string {
+		return strictCollisionProvider + twoBlueprintsConfig(nameOne, nameTwo)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBlueprintResourcesDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: config(one, two)},
+			{
+				Config:      config(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_Blueprint_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	t.Skip("Jamf Blueprints stores duplicate blueprint names (Enforced: false), so no create is refused and the hint never fires")
+}

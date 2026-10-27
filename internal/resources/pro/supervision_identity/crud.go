@@ -39,6 +39,7 @@ import (
 // the .p12; omitted -> Jamf Pro generates a new identity. Both responses carry
 // the full read shape, so state is populated directly from the response.
 func (r *SupervisionIdentityResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan, cfg SupervisionIdentityResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
@@ -67,7 +68,7 @@ func (r *SupervisionIdentityResource) Create(ctx context.Context, req resource.C
 		created, err = r.client.CreateSupervisionIdentityV1(createCtx, buildGenerateInput(plan, cfg))
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro supervision identity", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro supervision identity", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == 0 {
@@ -92,6 +93,7 @@ func (r *SupervisionIdentityResource) Create(ctx context.Context, req resource.C
 // Read refreshes the Terraform state with the latest identity representation.
 // The password and certificate are never reconciled (WriteOnly, never echoed).
 func (r *SupervisionIdentityResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state SupervisionIdentityResourceModel
 	isImport := req.State.Raw.IsNull()
 

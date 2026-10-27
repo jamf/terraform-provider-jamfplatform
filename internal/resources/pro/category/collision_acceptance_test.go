@@ -131,3 +131,55 @@ func TestAccResource_ProCategory_NameCollisionWhenNameIsUnknownAtPlan(t *testing
 		},
 	})
 }
+
+// twoCategoriesConfig declares two categories, the second depending on the first
+// so the creates are sequential: Jamf's duplicate check is not atomic, and two
+// concurrent creates of one name can both succeed.
+func twoCategoriesConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_category" "one" {
+  name     = %q
+  priority = 9
+}
+
+resource "jamfplatform_pro_category" "two" {
+  depends_on = [jamfplatform_pro_category.one]
+
+  name     = %q
+  priority = 9
+}
+`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProCategory_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: twoCategoriesConfig(one, two)},
+			{
+				Config:      twoCategoriesConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProCategory_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoCategoriesConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

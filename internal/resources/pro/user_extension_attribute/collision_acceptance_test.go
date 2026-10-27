@@ -45,3 +45,54 @@ func TestAccResource_ProUserExtensionAttribute_NameCollision(t *testing.T) {
 		},
 	})
 }
+
+func twoConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_user_extension_attribute" "one" {
+  name       = %[1]q
+  data_type  = "String"
+  input_type = "Text Field"
+}
+
+resource "jamfplatform_pro_user_extension_attribute" "two" {
+  depends_on = [jamfplatform_pro_user_extension_attribute.one]
+
+  name       = %[2]q
+  data_type  = "String"
+  input_type = "Text Field"
+}
+`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProUserExtensionAttribute_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-uea-one-" + suffix
+	two := "tf-acc-collide-uea-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: twoConfig(one, two)},
+			{
+				Config:      twoConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProUserExtensionAttribute_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-uea-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

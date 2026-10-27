@@ -156,6 +156,7 @@ func (r *UserGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 // Create creates a new Jamf Pro user group. Classic POSTs to id="0"; the
 // server allocates the real integer ID and returns it in the response body.
 func (r *UserGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan UserGroupResourceModel
 	var config UserGroupResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -204,7 +205,7 @@ func (r *UserGroupResource) Create(ctx context.Context, req resource.CreateReque
 
 	created, err := r.client.CreateUserGroupByID(createCtx, "0", input)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro user group", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro user group", helpers.APIErrorDetail(err)+r.pd.CollisionChecker().CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -240,6 +241,7 @@ func (r *UserGroupResource) Create(ctx context.Context, req resource.CreateReque
 
 // Read refreshes the Terraform state with the latest user group representation.
 func (r *UserGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state UserGroupResourceModel
 	isImport := req.State.Raw.IsNull()
 

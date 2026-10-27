@@ -51,6 +51,7 @@ import (
 // Create creates a new Jamf Pro licensed software record. Classic POSTs to
 // id="0"; the server allocates the real integer ID and returns it.
 func (r *LicensedSoftwareResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan LicensedSoftwareResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -73,7 +74,7 @@ func (r *LicensedSoftwareResource) Create(ctx context.Context, req resource.Crea
 
 	created, err := r.client.CreateLicensedSoftwareByID(createCtx, "0", payload)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro licensed software", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro licensed software", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	id := extractLicensedSoftwareID(created)
@@ -106,6 +107,7 @@ func (r *LicensedSoftwareResource) Create(ctx context.Context, req resource.Crea
 
 // Read refreshes Terraform state with the latest record representation.
 func (r *LicensedSoftwareResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state LicensedSoftwareResourceModel
 	isImport := req.State.Raw.IsNull()
 

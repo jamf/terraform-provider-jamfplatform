@@ -51,6 +51,7 @@ import (
 //
 // FSDP modes skip step 2 (and step 3 when no manifest source is supplied).
 func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan PackageResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -74,7 +75,7 @@ func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest
 
 	created, err := r.client.CreatePackageV1(createCtx, buildPackageInput(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro package", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro package", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == "" {
@@ -129,6 +130,7 @@ func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest
 
 // Read refreshes Terraform state with the latest package representation.
 func (r *PackageResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state PackageResourceModel
 	isImport := req.State.Raw.IsNull()
 

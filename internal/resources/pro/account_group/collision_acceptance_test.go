@@ -68,3 +68,66 @@ func TestAccResource_ProAccountGroup_NameDifferingByAccentDoesNotCollide(t *test
 		},
 	})
 }
+
+// twoAccountGroupsConfig declares two account groups. The second depends on the first so
+// the creates are sequential: Jamf's duplicate check is not atomic, and two
+// concurrent creates of one name can both succeed, which would leave a test
+// asserting on a race instead of on the refusal.
+func twoAccountGroupsConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_account_group" "one" {
+  display_name  = %[1]q
+  access_level  = "Full Access"
+  privilege_set = "Custom"
+  privileges = {
+    jamf_pro_server_objects = ["Read Categories"]
+  }
+}
+
+resource "jamfplatform_pro_account_group" "two" {
+  depends_on = [jamfplatform_pro_account_group.one]
+
+  display_name  = %[2]q
+  access_level  = "Full Access"
+  privilege_set = "Custom"
+  privileges = {
+    jamf_pro_server_objects = ["Read Categories"]
+  }
+}
+`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProAccountGroup_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoAccountGroupsConfig(one, two),
+			},
+			{
+				Config:      twoAccountGroupsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Display\s+name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProAccountGroup_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoAccountGroupsConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

@@ -67,3 +67,47 @@ func TestAccResource_ProAppRequestFormField_StrictNameCollision(t *testing.T) {
 		},
 	})
 }
+
+// twoFieldsConfig declares two form fields. The second depends on the first so
+// the creates are sequential.
+func twoFieldsConfig(titleOne, titleTwo string) string {
+	return collisionProviderBlock + fmt.Sprintf(`
+resource "jamfplatform_pro_app_request_form_field" "one" {
+	title    = %q
+	priority = 10
+}
+
+resource "jamfplatform_pro_app_request_form_field" "two" {
+	depends_on = [jamfplatform_pro_app_request_form_field.one]
+
+	title    = %q
+	priority = 11
+}
+`, titleOne, titleTwo)
+}
+
+// TestAccResource_ProAppRequestFormField_RenameIntoManagedTitleOffersNoImport
+// covers the managed-elsewhere wording for a type that stores duplicates, which
+// only the strict check reaches. There is no two-new-with-one-title test: Jamf
+// Pro accepts duplicate titles, so the create is never refused and the conflict
+// hint never fires.
+func TestAccResource_ProAppRequestFormField_RenameIntoManagedTitleOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAppRequestFormFieldDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: twoFieldsConfig(one, two),
+			},
+			{
+				Config:      twoFieldsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Title\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
