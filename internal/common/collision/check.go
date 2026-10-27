@@ -35,6 +35,7 @@ type Request struct {
 // configuration.
 func (c *Checker) Check(ctx context.Context, req Request) diag.Diagnostics {
 	var diags diag.Diagnostics
+	c.noteRules(req.ResourceType, req.Namespace)
 	if !c.applies(req.Namespace) {
 		return diags
 	}

@@ -119,3 +119,12 @@ func TestNoteManagedState(t *testing.T) {
 	nilChecker.NoteManagedState(context.Background(), testResourceType, state(&id))
 	c.NoteManagedState(context.Background(), testResourceType, nil)
 }
+
+func TestCheckRecordsRulesForTheCreateHint(t *testing.T) {
+	c := newChecker(ModeError, false)
+	c.Check(context.Background(), request(widgetNamespace(nil, nil), []string{"a"}, nil, ""))
+	got := c.CreateConflictHint(&jamfplatform.APIResponseError{StatusCode: 409}, testResourceType)
+	if got == "" {
+		t.Error("a resource that calls Check directly must still get the create hint")
+	}
+}
