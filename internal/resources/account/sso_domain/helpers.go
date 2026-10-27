@@ -29,6 +29,12 @@ import (
 // code is documented for a domain another organization has verified, which is
 // the same wire shape and a completely different fix.
 func appendClaimDiagnostics(diags *diag.Diagnostics, domain string, err error) bool {
+	return appendClaimDiagnosticsWithHint(diags, domain, err, "")
+}
+
+// appendClaimDiagnosticsWithHint is appendClaimDiagnostics with a collision hint
+// appended to the duplicate-claim diagnostic.
+func appendClaimDiagnosticsWithHint(diags *diag.Diagnostics, domain string, err error, hint string) bool {
 	apiErr := jamfplatform.AsAPIError(err)
 	if apiErr == nil {
 		return false
@@ -43,7 +49,7 @@ func appendClaimDiagnostics(diags *diag.Diagnostics, domain string, err error) b
 				"The domain \""+domain+"\" is already claimed. A domain can belong to only one Jamf Account "+
 					"organization: either your organization already holds it — in which case import it rather "+
 					"than claiming it again — or another organization has verified it, in which case Jamf "+
-					"Support has to release it first. Reported by Jamf Account: "+detail.Description,
+					"Support has to release it first. Reported by Jamf Account: "+detail.Description+hint,
 			)
 		case codeBadRequest:
 			diags.AddAttributeError(

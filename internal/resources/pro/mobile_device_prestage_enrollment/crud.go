@@ -196,6 +196,7 @@ func resolveIntentBool(planV, cfgV, stateV types.Bool) types.Bool {
 
 // Create provisions a new mobile device prestage enrollment on Jamf Pro.
 func (r *MobileDevicePrestageEnrollmentResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan, cfg MobileDevicePrestageEnrollmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -226,7 +227,7 @@ func (r *MobileDevicePrestageEnrollmentResource) Create(ctx context.Context, req
 	postResp, err := r.client.CreateMobileDevicePrestageV3(createCtx, post)
 	if err != nil {
 		if !diagnoseAlreadyDefault(&resp.Diagnostics, cfg, err) {
-			resp.Diagnostics.AddError("Error creating Jamf Pro mobile device prestage enrollment", helpers.APIErrorDetail(err))
+			resp.Diagnostics.AddError("Error creating Jamf Pro mobile device prestage enrollment", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		}
 		return
 	}
@@ -277,6 +278,7 @@ func (r *MobileDevicePrestageEnrollmentResource) Create(ctx context.Context, req
 
 // Read refreshes Terraform state from the live Jamf Pro record.
 func (r *MobileDevicePrestageEnrollmentResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state MobileDevicePrestageEnrollmentResourceModel
 	isImport := req.State.Raw.IsNull()
 	if isImport {

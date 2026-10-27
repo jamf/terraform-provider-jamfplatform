@@ -37,6 +37,13 @@ const (
 // NOT_ENTITLED is the other one worth naming: the credentials are valid and the
 // tenant simply does not have the surface, which is invisible in a bare 403.
 func appendWriteDiagnostics(diags *diag.Diagnostics, err error) bool {
+	return appendWriteDiagnosticsHint(diags, err, "")
+}
+
+// appendWriteDiagnosticsHint is appendWriteDiagnostics with a conflict hint appended to the
+// duplicate-value diagnostic, so a create refused for a value another resource in the same
+// configuration holds says so.
+func appendWriteDiagnosticsHint(diags *diag.Diagnostics, err error, hint string) bool {
 	apiErr := jamfplatform.AsAPIError(err)
 	if apiErr == nil {
 		return false
@@ -50,7 +57,7 @@ func appendWriteDiagnostics(diags *diag.Diagnostics, err error) bool {
 				"Domain already claimed by another DNS zone",
 				"Jamf Security Cloud allows a domain to belong to only one custom DNS zone. Remove the domain from "+
 					"the zone that already holds it, or drop it from this one. Reported by Jamf Security Cloud: "+
-					detail.Description,
+					detail.Description+hint,
 			)
 		case codeGatewayNotFound:
 			diags.AddAttributeError(

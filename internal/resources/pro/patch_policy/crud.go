@@ -98,6 +98,7 @@ import (
 // title configuration. The server allocates the integer policy ID and returns
 // it; we then GET by that ID to capture the server-derived general fields.
 func (r *PatchPolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan PatchPolicyResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -121,7 +122,7 @@ func (r *PatchPolicyResource) Create(ctx context.Context, req resource.CreateReq
 	configID := plan.SoftwareTitleConfigurationID.ValueString()
 	created, err := r.client.CreatePatchPolicyBySoftwareTitleConfigID(createCtx, configID, payload)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro patch policy", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro patch policy", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	id := extractPatchPolicyID(created)
@@ -154,6 +155,7 @@ func (r *PatchPolicyResource) Create(ctx context.Context, req resource.CreateReq
 
 // Read refreshes Terraform state with the latest patch policy representation.
 func (r *PatchPolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state PatchPolicyResourceModel
 	isImport := req.State.Raw.IsNull()
 

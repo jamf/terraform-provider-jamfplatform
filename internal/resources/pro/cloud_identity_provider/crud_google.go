@@ -28,7 +28,7 @@ func (r *CloudIdentityProviderResource) createGoogle(ctx context.Context, plan, 
 
 	created, err := r.client.CreateCloudLdapV2(ctx, body)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro Cloud Identity Provider (Google)", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro Cloud Identity Provider (Google)", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == "" {

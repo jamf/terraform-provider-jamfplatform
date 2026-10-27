@@ -57,6 +57,7 @@ func (c *Checker) Check(ctx context.Context, req Request) diag.Diagnostics {
 			return diags
 		}
 		for _, m := range s.find(req.Namespace, key, req.SelfID, req.ResourceType, extra, func(id string) bool { return c.isReplacing(req.ResourceType, id) }) {
+			m.Managed = c.isManaged(m)
 			c.report(&diags, req, key, m)
 		}
 	}
@@ -134,13 +135,17 @@ func render(req Request, key string, m Match) (summary, detail string) {
 			m.Noun, label, key, ns.Product, shownID, ns.Product, ns.Collation.Describe(label))
 	}
 
-	if adoptable {
-		fmt.Fprintf(&b, "\n\nTo manage the existing %s with Terraform, import it. Use the full address of this resource as `to`, including any module path:\n\n  import {\n    to = <this resource's address>\n    id = %q\n  }\n\nOtherwise, choose a different %s. If this configuration already manages the existing %s under a different address, add a moved block instead.",
-			m.Noun, adoptID, label, m.Noun)
-	} else if m.ResourceType != "" {
+	switch {
+	case m.Managed:
+		fmt.Fprintf(&b, "\n\nThe existing %s is already managed by another resource in this configuration's state. Choose a different %s. If you renamed the resource that manages it, add a moved block instead.",
+			m.Noun, label)
+	case adoptable:
+		fmt.Fprintf(&b, "\n\nCheck whether this configuration or its state already manages the existing %s under another address. The provider cannot always tell, for example under -refresh=false, -target or a saved plan. If something does, choose a different %s. Importing it again puts one object under two addresses.\n\nIf nothing manages it, import it to manage it with Terraform. Use the full address of this resource as `to`, including any module path:\n\n  import {\n    to = <this resource's address>\n    id = %q\n  }",
+			m.Noun, label, adoptID)
+	case m.ResourceType != "":
 		fmt.Fprintf(&b, "\n\nThe existing %s is a different kind of object from this resource. To manage it with Terraform, import it into a %s resource. Otherwise, choose a different %s.",
 			m.Noun, m.ResourceType, label)
-	} else {
+	default:
 		fmt.Fprintf(&b, "\n\nChoose a different %s.", label)
 	}
 	return summary, b.String()
@@ -184,6 +189,10 @@ func ReportPlan[M any](
 ) {
 	if !rep.Checker.Enabled() || req.Plan.Raw.IsNull() {
 		return
+	}
+
+	for _, rule := range rep.Rules {
+		rep.Checker.noteRules(rep.ResourceType, rule.Namespace)
 	}
 
 	var plan M
@@ -260,6 +269,10 @@ func ReportAttributePlan(
 ) {
 	if !rep.Checker.Enabled() || req.Plan.Raw.IsNull() {
 		return
+	}
+
+	for _, rule := range rep.Rules {
+		rep.Checker.noteRules(rep.ResourceType, rule.Namespace)
 	}
 
 	hasOld := !req.State.Raw.IsNull()

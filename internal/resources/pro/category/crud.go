@@ -26,6 +26,7 @@ import (
 
 // Create creates a new Jamf Pro category.
 func (r *CategoryResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan CategoryResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -42,7 +43,7 @@ func (r *CategoryResource) Create(ctx context.Context, req resource.CreateReques
 
 	createResp, err := r.client.CreateCategoryV1(createCtx, buildCategoryInput(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro category", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro category", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 
@@ -66,6 +67,7 @@ func (r *CategoryResource) Create(ctx context.Context, req resource.CreateReques
 
 // Read refreshes the Terraform state with the latest category representation.
 func (r *CategoryResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state CategoryResourceModel
 	isImport := req.State.Raw.IsNull()
 

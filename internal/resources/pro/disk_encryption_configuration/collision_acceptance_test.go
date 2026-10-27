@@ -45,3 +45,52 @@ func TestAccResource_ProDiskEncryptionConfiguration_NameCollision(t *testing.T) 
 		},
 	})
 }
+
+// twoConfigurationsConfig declares two disk encryption configurations. The
+// second depends on the first so the creates are sequential: Jamf's duplicate
+// check is not atomic, and two concurrent creates of one name can both succeed,
+// which would leave a test asserting on a race instead of on the refusal.
+func twoConfigurationsConfig(nameOne, nameTwo string) string {
+	second := strings.Replace(
+		collisionBlock("two", nameTwo),
+		`resource "jamfplatform_pro_disk_encryption_configuration" "two" {`,
+		"resource \"jamfplatform_pro_disk_encryption_configuration\" \"two\" {\n  depends_on = [jamfplatform_pro_disk_encryption_configuration.one]\n",
+		1,
+	)
+	return collisionBlock("one", nameOne) + second
+}
+
+func TestAccResource_ProDiskEncryptionConfiguration_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoConfigurationsConfig(one, two),
+			},
+			{
+				Config:      twoConfigurationsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProDiskEncryptionConfiguration_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoConfigurationsConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating\s+Jamf\s+Pro\s+disk\s+encryption\s+configuration.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

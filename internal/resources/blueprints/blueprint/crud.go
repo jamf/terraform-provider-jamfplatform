@@ -15,6 +15,7 @@ import (
 
 // Create creates a new Blueprint resource in Terraform.
 func (r *BlueprintResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var data BlueprintResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -56,7 +57,7 @@ func (r *BlueprintResource) Create(ctx context.Context, req resource.CreateReque
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating blueprint",
-			"Could not create blueprint: "+helpers.APIErrorDetail(err),
+			"Could not create blueprint: "+helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName),
 		)
 		return
 	}
@@ -94,6 +95,7 @@ func (r *BlueprintResource) Create(ctx context.Context, req resource.CreateReque
 
 // Read reads the Blueprint resource state from the API.
 func (r *BlueprintResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var data BlueprintResourceModel
 
 	if req.State.Raw.IsNull() {

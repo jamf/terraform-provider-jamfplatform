@@ -50,3 +50,56 @@ func TestAccResource_ProRestrictedSoftware_NameCollision(t *testing.T) {
 		},
 	})
 }
+
+func twoConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_restricted_software" "one" {
+  general = {
+    name         = %[1]q
+    process_name = "tf-acc-collide.app"
+  }
+}
+
+resource "jamfplatform_pro_restricted_software" "two" {
+  depends_on = [jamfplatform_pro_restricted_software.one]
+
+  general = {
+    name         = %[2]q
+    process_name = "tf-acc-collide.app"
+  }
+}
+`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProRestrictedSoftware_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-restricted-one-" + suffix
+	two := "tf-acc-collide-restricted-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: twoConfig(one, two)},
+			{
+				Config:      twoConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProRestrictedSoftware_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-restricted-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

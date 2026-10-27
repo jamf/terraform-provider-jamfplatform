@@ -40,6 +40,7 @@ import (
 // check, so a re-sorted collection is not a fault at that point. Nothing needs nulling
 // first: the ID is this schema's only Computed value.
 func (r *DNSZoneResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan DNSZoneResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -62,8 +63,8 @@ func (r *DNSZoneResource) Create(ctx context.Context, req resource.CreateRequest
 
 	created, err := r.client.CreateDnsZoneV1(createCtx, input)
 	if err != nil {
-		if !appendWriteDiagnostics(&resp.Diagnostics, err) {
-			resp.Diagnostics.AddError("Error creating Jamf Security Cloud DNS zone", helpers.APIErrorDetail(err))
+		if !appendWriteDiagnosticsHint(&resp.Diagnostics, err, r.collisions.CreateConflictHint(err, resourceTypeName)) {
+			resp.Diagnostics.AddError("Error creating Jamf Security Cloud DNS zone", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		}
 		return
 	}
@@ -99,6 +100,7 @@ func (r *DNSZoneResource) Create(ctx context.Context, req resource.CreateRequest
 
 // Read refreshes the Terraform state with the latest DNS zone representation.
 func (r *DNSZoneResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state DNSZoneResourceModel
 	isImport := req.State.Raw.IsNull()
 

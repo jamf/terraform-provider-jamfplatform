@@ -67,3 +67,43 @@ func TestAccResource_ProVPPAssignment_StrictNameCollision(t *testing.T) {
 		},
 	})
 }
+
+// twoAssignmentsConfig declares two assignments on one location. The second
+// depends on the first so the creates are sequential.
+func twoAssignmentsConfig(token, suffix, nameOne, nameTwo string) string {
+	return collisionProviderBlock + vppLocationFixture(token, suffix) +
+		collisionAssignment("one", nameOne) +
+		strings.Replace(
+			collisionAssignment("two", nameTwo),
+			`resource "jamfplatform_pro_vpp_assignment" "two" {`,
+			"resource \"jamfplatform_pro_vpp_assignment\" \"two\" {\n  depends_on = [jamfplatform_pro_vpp_assignment.one]\n",
+			1,
+		)
+}
+
+// TestAccResource_ProVPPAssignment_RenameIntoManagedNameOffersNoImport covers the
+// managed-elsewhere wording for a type that stores duplicates, which only the
+// strict check reaches. There is no two-new-with-one-name test: Jamf Pro accepts
+// duplicate names, so the create is never refused and the conflict hint never
+// fires.
+func TestAccResource_ProVPPAssignment_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	token := vppToken(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckVPPAssignmentDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: twoAssignmentsConfig(token, suffix, one, two),
+			},
+			{
+				Config:      twoAssignmentsConfig(token, suffix, one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}

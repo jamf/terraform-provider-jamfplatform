@@ -37,6 +37,7 @@ import (
 // Create creates a new Jamf Pro App Request form field. The POST echo is complete, so it
 // seeds state directly.
 func (r *AppRequestFormFieldResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan AppRequestFormFieldResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -53,7 +54,7 @@ func (r *AppRequestFormFieldResource) Create(ctx context.Context, req resource.C
 
 	created, err := r.client.CreateAppRequestFormInputFieldV1(createCtx, buildAppRequestFormFieldInput(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro App Request form field", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro App Request form field", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -76,6 +77,7 @@ func (r *AppRequestFormFieldResource) Create(ctx context.Context, req resource.C
 
 // Read refreshes the Terraform state with the latest App Request form field representation.
 func (r *AppRequestFormFieldResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state AppRequestFormFieldResourceModel
 	isImport := req.State.Raw.IsNull()
 

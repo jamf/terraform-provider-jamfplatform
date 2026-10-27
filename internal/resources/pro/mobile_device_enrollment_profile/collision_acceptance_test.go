@@ -66,3 +66,27 @@ func TestAccResource_ProMobileDeviceEnrollmentProfile_StrictNameCollision(t *tes
 		},
 	})
 }
+
+func TestAccResource_ProMobileDeviceEnrollmentProfile_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+	pair := func(nameOne, nameTwo string) string {
+		return collisionResource("one", nameOne) + collisionResource("two", nameTwo)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckEnrollmentProfileDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: collisionProviderBlock + pair(one, two),
+			},
+			{
+				Config:      collisionProviderBlock + pair(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}

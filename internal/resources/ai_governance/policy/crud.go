@@ -33,6 +33,7 @@ type policyIdentityModel struct {
 // the write would make the error check that guards it fire and record nothing for a policy that now
 // exists — and because policy names are not unique, the next apply would create a second one.
 func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan policyModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -50,7 +51,7 @@ func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest,
 	created, err := r.client.CreatePolicy(ctx, buildCreateRequest(&plan))
 	if err != nil {
 		if !appendWriteDiagnostics(&resp.Diagnostics, err) {
-			resp.Diagnostics.AddError("Unable to create AI policy", helpers.APIErrorDetail(err))
+			resp.Diagnostics.AddError("Unable to create AI policy", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		}
 		return
 	}
@@ -84,6 +85,7 @@ func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest,
 // for it; wire probing on 2026-08-30 saw only the 404, but a service release that starts honouring
 // the spec would otherwise leave a plan reporting no changes for a policy delivered to no device.
 func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state policyModel
 	if req.State.Raw.IsNull() {
 		if !readIdentity(ctx, req.Identity, &state, &resp.Diagnostics) {

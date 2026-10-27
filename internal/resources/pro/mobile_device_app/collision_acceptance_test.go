@@ -72,3 +72,31 @@ func TestAccResource_ProMobileApp_StrictNameCollision(t *testing.T) {
 		},
 	})
 }
+
+// TestAccResource_ProMobileApp_RenameIntoManagedNameOffersNoImportStrict proves that
+// renaming one resource onto the name of a sibling this configuration already manages is
+// refused without offering an import block.
+func TestAccResource_ProMobileApp_RenameIntoManagedNameOffersNoImportStrict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-mdapp-one-" + suffix
+	two := "tf-acc-collide-mdapp-two-" + suffix
+
+	pair := func(nameOne, nameTwo string) string {
+		return collisionProviderBlock +
+			collisionResource("one", nameOne) +
+			strings.Replace(collisionResource("two", nameTwo), "\tgeneral", "\tdepends_on = [jamfplatform_pro_mobile_device_app.one]\n\tgeneral", 1)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckMobileAppDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: pair(one, two)},
+			{
+				Config:      pair(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}

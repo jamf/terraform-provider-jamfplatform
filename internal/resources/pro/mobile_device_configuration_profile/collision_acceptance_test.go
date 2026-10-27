@@ -81,3 +81,58 @@ func TestAccResource_MobileDeviceConfigurationProfile_NameCollisionOnRename(t *t
 		},
 	})
 }
+
+// twoProfilesConfig declares two profiles, each with its own payload since Jamf
+// Pro keys a profile's identity on the payload UUID. The second depends on the
+// first so the creates are sequential: Jamf's duplicate check is not atomic, and
+// two concurrent creates of one name can both succeed, which would leave a test
+// asserting on a race instead of on the refusal.
+func twoProfilesConfig(nameOne, payloadOne, nameTwo, payloadTwo string) string {
+	const address = `resource "jamfplatform_pro_mobile_device_configuration_profile" "test" {`
+	first := strings.Replace(configMinimal(nameOne, payloadOne), address,
+		`resource "jamfplatform_pro_mobile_device_configuration_profile" "one" {`, 1)
+	second := strings.Replace(configMinimal(nameTwo, payloadTwo), address,
+		"resource \"jamfplatform_pro_mobile_device_configuration_profile\" \"two\" {\n  depends_on = [jamfplatform_pro_mobile_device_configuration_profile.one]\n", 1)
+	return first + second
+}
+
+func TestAccResource_MobileDeviceConfigurationProfile_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+	payloadOne := freshPayload(t, "profile_48.mobileconfig")
+	payloadTwo := freshPayload(t, "profile_48.mobileconfig")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: twoProfilesConfig(one, payloadOne, two, payloadTwo),
+			},
+			{
+				Config:      twoProfilesConfig(one, payloadOne, one, payloadTwo),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_MobileDeviceConfigurationProfile_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+	payloadOne := freshPayload(t, "profile_48.mobileconfig")
+	payloadTwo := freshPayload(t, "profile_48.mobileconfig")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:      twoProfilesConfig(name, payloadOne, name, payloadTwo),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating\s+Jamf\s+Pro\s+mobile\s+device\s+configuration\s+profile.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

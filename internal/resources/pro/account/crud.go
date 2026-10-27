@@ -36,6 +36,7 @@ import (
 // deleted so no half-built account is left behind. Privileges are trusted from
 // the plan (not re-read).
 func (r *AccountResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan, cfg AccountResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
@@ -53,7 +54,7 @@ func (r *AccountResource) Create(ctx context.Context, req resource.CreateRequest
 
 	created, err := r.proClient.CreateAccountV1(createCtx, buildProUserAccount(plan, helpers.OptionalStringPointer(cfg.Password)))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro account", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro account", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -93,6 +94,7 @@ func (r *AccountResource) Create(ctx context.Context, req resource.CreateRequest
 // Read refreshes state: base fields from Pro, the Custom privilege grid from
 // classic (intersect-on-read) when the account is Custom + Full Access.
 func (r *AccountResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state AccountResourceModel
 	stateAbsent := req.State.Raw.IsNull()
 

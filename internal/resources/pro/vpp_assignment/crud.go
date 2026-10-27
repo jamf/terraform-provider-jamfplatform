@@ -44,6 +44,7 @@ import (
 )
 
 func (r *VPPAssignmentResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan VPPAssignmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -75,7 +76,7 @@ func (r *VPPAssignmentResource) Create(ctx context.Context, req resource.CreateR
 		})
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro VPP assignment", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro VPP assignment", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -100,6 +101,7 @@ func (r *VPPAssignmentResource) Create(ctx context.Context, req resource.CreateR
 }
 
 func (r *VPPAssignmentResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state VPPAssignmentResourceModel
 	isImport := req.State.Raw.IsNull()
 

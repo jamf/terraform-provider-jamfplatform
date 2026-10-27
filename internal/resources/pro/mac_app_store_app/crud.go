@@ -46,6 +46,7 @@ import (
 // Create creates a new Jamf Pro Mac App Store app. Classic POSTs to id="0"; the
 // server allocates the real integer ID and returns it in the response body.
 func (r *MacAppResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan MacAppResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -77,7 +78,7 @@ func (r *MacAppResource) Create(ctx context.Context, req resource.CreateRequest,
 		})
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro Mac App Store app", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro Mac App Store app", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	id := extractMacAppID(created)
@@ -110,6 +111,7 @@ func (r *MacAppResource) Create(ctx context.Context, req resource.CreateRequest,
 
 // Read refreshes Terraform state with the latest app representation.
 func (r *MacAppResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state MacAppResourceModel
 	isImport := req.State.Raw.IsNull()
 

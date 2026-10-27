@@ -93,3 +93,62 @@ func TestAccResource_MacOSConfigurationProfile_NameCollisionOnRename(t *testing.
 		},
 	})
 }
+
+func twoConfig(payload, nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_macos_configuration_profile" "one" {
+  general = {
+    name     = %[1]q
+    payloads = <<EOF
+%[3]sEOF
+  }
+}
+
+resource "jamfplatform_pro_macos_configuration_profile" "two" {
+  depends_on = [jamfplatform_pro_macos_configuration_profile.one]
+
+  general = {
+    name     = %[2]q
+    payloads = <<EOF
+%[3]sEOF
+  }
+}
+`, nameOne, nameTwo, payload)
+}
+
+func TestAccResource_MacOSConfigurationProfile_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-mcp-one-" + suffix
+	two := "tf-acc-collide-mcp-two-" + suffix
+	payload := readFixture(t, "1Password__managed_login_items_profile.mobileconfig")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: twoConfig(payload, one, two)},
+			{
+				Config:      twoConfig(payload, one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_MacOSConfigurationProfile_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-mcp-pair-" + testhelpers.RunSuffix()
+	payload := readFixture(t, "1Password__managed_login_items_profile.mobileconfig")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:      twoConfig(payload, name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

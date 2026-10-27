@@ -29,6 +29,7 @@ import (
 // an href + id (not the created object), so the ID is parsed from the response
 // and the full representation read back via GET.
 func (r *AdvancedVolumePurchasingContentSearchResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan AdvancedVolumePurchasingContentSearchResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -51,7 +52,7 @@ func (r *AdvancedVolumePurchasingContentSearchResource) Create(ctx context.Conte
 
 	created, err := r.client.CreateAdvancedUserContentSearchV1(createCtx, input)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro advanced volume purchasing content search", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro advanced volume purchasing content search", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == "" {
@@ -84,6 +85,7 @@ func (r *AdvancedVolumePurchasingContentSearchResource) Create(ctx context.Conte
 
 // Read refreshes the Terraform state with the latest search representation.
 func (r *AdvancedVolumePurchasingContentSearchResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state AdvancedVolumePurchasingContentSearchResourceModel
 	isImport := req.State.Raw.IsNull()
 

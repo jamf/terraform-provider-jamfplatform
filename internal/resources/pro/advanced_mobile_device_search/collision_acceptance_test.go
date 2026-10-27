@@ -82,3 +82,61 @@ func TestAccResource_ProAdvancedMobileDeviceSearch_NameDifferingByAccentDoesNotC
 		},
 	})
 }
+
+func twoSearchesConfig(nameOne, nameTwo string) string {
+	return collisionConfigNamed("one", "", nameOne) + collisionConfigNamed("two", "depends_on = [jamfplatform_pro_advanced_mobile_device_search.one]", nameTwo)
+}
+
+func collisionConfigNamed(label, dependsOn, name string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_advanced_mobile_device_search" %q {
+			%s
+			name = %q
+
+			criteria = [
+				{
+					name        = "Managed"
+					search_type = "is"
+					value       = "Unmanaged"
+				},
+			]
+
+			display_fields = ["Display Name"]
+		}
+	`, label, dependsOn, name)
+}
+
+func TestAccResource_ProAdvancedMobileDeviceSearch_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoSearchesConfig(one, two),
+			},
+			{
+				Config:      twoSearchesConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProAdvancedMobileDeviceSearch_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoSearchesConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

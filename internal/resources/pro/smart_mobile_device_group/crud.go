@@ -199,6 +199,7 @@ const newGroupID = "0"
 // object tainted, and Terraform plans a tainted object for replacement rather
 // than for repair. See descriptionNotSetAfterCreate.
 func (r *SmartMobileDeviceGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan SmartMobileDeviceGroupResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -241,7 +242,7 @@ func (r *SmartMobileDeviceGroupResource) Create(ctx context.Context, req resourc
 	case fallbackApplies(createErr):
 		classicCreated, classicErr := r.classicClient.CreateMobileDeviceGroupByID(createCtx, newGroupID, buildClassicSmartMobileDeviceGroupInput(plan))
 		if classicErr != nil {
-			resp.Diagnostics.Append(progroups.FallbackWriteDiagnostics(writeLabel(), path.Root("site_id"), path.Empty(), createErr, classicErr)...)
+			resp.Diagnostics.Append(r.withCreateConflictHint(progroups.FallbackWriteDiagnostics(writeLabel(), path.Root("site_id"), path.Empty(), createErr, classicErr), classicErr)...)
 			return
 		}
 		resp.Diagnostics.Append(progroups.FallbackWarning(writeLabel(), createErr))
@@ -270,7 +271,7 @@ func (r *SmartMobileDeviceGroupResource) Create(ctx context.Context, req resourc
 		}
 
 	default:
-		resp.Diagnostics.Append(progroups.WriteDiagnostics(createErr, writeLabel(), path.Root("site_id"), path.Empty())...)
+		resp.Diagnostics.Append(r.withCreateConflictHint(progroups.WriteDiagnostics(createErr, writeLabel(), path.Root("site_id"), path.Empty()), createErr)...)
 		return
 	}
 
@@ -317,6 +318,7 @@ func (r *SmartMobileDeviceGroupResource) Create(ctx context.Context, req resourc
 
 // Read refreshes state from Jamf Pro.
 func (r *SmartMobileDeviceGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state SmartMobileDeviceGroupResourceModel
 	isImport := req.State.Raw.IsNull()
 

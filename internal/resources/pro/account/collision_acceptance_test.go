@@ -100,3 +100,55 @@ func TestAccResource_ProAccount_LeadingSpaceUsernameDoesNotCollide(t *testing.T)
 		},
 	})
 }
+
+// twoAccountsConfig declares two accounts. The second depends on the first so
+// the creates are sequential: Jamf's duplicate check is not atomic, and two
+// concurrent creates of one username can both succeed, which would leave a test
+// asserting on a race instead of on the refusal.
+func twoAccountsConfig(usernameOne, emailOne, usernameTwo, emailTwo string) string {
+	second := strings.Replace(
+		collisionBlock("two", usernameTwo, emailTwo),
+		`resource "jamfplatform_pro_account" "two" {`,
+		"resource \"jamfplatform_pro_account\" \"two\" {\n  depends_on = [jamfplatform_pro_account.one]\n",
+		1,
+	)
+	return collisionBlock("one", usernameOne, emailOne) + second
+}
+
+func TestAccResource_ProAccount_RenameIntoManagedUsernameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+	emailOne := one + "@example.invalid"
+	emailTwo := two + "@example.invalid"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoAccountsConfig(one, emailOne, two, emailTwo),
+			},
+			{
+				Config:      twoAccountsConfig(one, emailOne, one, emailTwo),
+				ExpectError: regexp.MustCompile(`(?s)Username\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProAccount_TwoNewWithOneUsernameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-collide-pair-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoAccountsConfig(name, name+"-1@example.invalid", name, name+"-2@example.invalid"),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating\s+Jamf\s+Pro\s+account.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

@@ -99,6 +99,7 @@ import (
 // which the next Read fills in; the same line the accept side-call sits behind,
 // one screen lower.
 func (r *PatchSoftwareTitleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan PatchSoftwareTitleResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -115,7 +116,7 @@ func (r *PatchSoftwareTitleResource) Create(ctx context.Context, req resource.Cr
 
 	created, err := r.client.CreatePatchSoftwareTitleByID(createCtx, "0", buildPatchSoftwareTitleCreateInput(plan)) //nolint:staticcheck // SA1019: classic /patchsoftwaretitles is the only id-minting create, and the configurations surface has no successor to migrate to — see #311 and the file header note
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro patch software title", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro patch software title", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -207,6 +208,7 @@ func (r *PatchSoftwareTitleResource) Create(ctx context.Context, req resource.Cr
 // failure, so a warning never rewrites the attribute to an empty list and
 // claims the title publishes no versions.
 func (r *PatchSoftwareTitleResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state PatchSoftwareTitleResourceModel
 	isImport := req.State.Raw.IsNull()
 

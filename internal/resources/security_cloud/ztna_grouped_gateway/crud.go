@@ -40,6 +40,7 @@ import (
 // not run Terraform's plan-consistency check. The one value only the read-back could
 // have filled is nulled first — see nullUnknownReadBackValues.
 func (r *GroupedGatewayResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan GroupedGatewayResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -72,7 +73,7 @@ func (r *GroupedGatewayResource) Create(ctx context.Context, req resource.Create
 	created, err := r.client.CreateZtnaGroupedGatewayV1(createCtx, input)
 	if err != nil {
 		if !appendWriteDiagnostics(&resp.Diagnostics, err) {
-			resp.Diagnostics.AddError("Error creating Jamf Security Cloud ZTNA grouped gateway", helpers.APIErrorDetail(err))
+			resp.Diagnostics.AddError("Error creating Jamf Security Cloud ZTNA grouped gateway", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		}
 		return
 	}
@@ -124,6 +125,7 @@ func nullUnknownReadBackValues(plan *GroupedGatewayResourceModel) {
 // Read refreshes the Terraform state with the latest grouped gateway
 // representation.
 func (r *GroupedGatewayResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state GroupedGatewayResourceModel
 	isImport := req.State.Raw.IsNull()
 

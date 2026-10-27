@@ -55,3 +55,50 @@ func TestAccResource_ProAllowedFileExtension_ExtensionCollision(t *testing.T) {
 		},
 	})
 }
+
+func twoExtensionsConfig(one, two string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_allowed_file_extension" "one" {
+			extension = %q
+		}
+
+		resource "jamfplatform_pro_allowed_file_extension" "two" {
+			depends_on = [jamfplatform_pro_allowed_file_extension.one]
+
+			extension = %q
+		}
+	`, one, two)
+}
+
+func TestAccResource_ProAllowedFileExtension_RenameIntoManagedExtensionOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "zzcollideone" + suffix
+	two := "zzcollidetwo" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: twoExtensionsConfig(one, two)},
+			{
+				Config:      twoExtensionsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Extension\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProAllowedFileExtension_TwoNewWithOneExtensionExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "zzcollidepair" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoExtensionsConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

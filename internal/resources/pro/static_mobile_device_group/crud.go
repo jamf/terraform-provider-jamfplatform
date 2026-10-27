@@ -83,6 +83,7 @@ func (r *StaticMobileDeviceGroupResource) ModifyPlan(ctx context.Context, req re
 
 // Create creates the group, then reads it back to learn its Jamf Pro identifier.
 func (r *StaticMobileDeviceGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan, config StaticMobileDeviceGroupResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
@@ -111,7 +112,7 @@ func (r *StaticMobileDeviceGroupResource) Create(ctx context.Context, req resour
 
 	created, err := r.client.CreateStaticMobileDeviceGroupV2(createCtx, buildGroupInput(plan, assignments), true)
 	if err != nil {
-		resp.Diagnostics.Append(progroups.WriteDiagnostics(err, progroups.Label(deviceType, groupKind), sitePath, membersPath)...)
+		resp.Diagnostics.Append(r.withConflictHint(progroups.WriteDiagnostics(err, progroups.Label(deviceType, groupKind), sitePath, membersPath), err)...)
 		return
 	}
 	if created == nil || created.ID == "" {
@@ -165,6 +166,7 @@ func (r *StaticMobileDeviceGroupResource) Create(ctx context.Context, req resour
 // Read refreshes state. Membership costs a second request, so it is fetched only
 // when the configuration manages it or when this is a first-time import.
 func (r *StaticMobileDeviceGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state StaticMobileDeviceGroupResourceModel
 	identityOnly := req.State.Raw.IsNull()
 

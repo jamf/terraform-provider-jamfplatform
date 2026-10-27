@@ -58,3 +58,52 @@ func TestAccResource_ProStaticComputerGroup_NameDifferingByTrailingSpaceDoesNotC
 		},
 	})
 }
+
+func twoGroupsConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_static_computer_group" "one" {
+  name = %q
+}
+
+resource "jamfplatform_pro_static_computer_group" "two" {
+  depends_on = [jamfplatform_pro_static_computer_group.one]
+
+  name = %q
+}
+`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProStaticComputerGroup_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoGroupsConfig(one, two),
+			},
+			{
+				Config:      twoGroupsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProStaticComputerGroup_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoGroupsConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)already\s+exists.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

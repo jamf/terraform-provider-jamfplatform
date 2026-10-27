@@ -51,3 +51,56 @@ func TestAccResource_ProRemovableMacAddress_ValueCollision(t *testing.T) {
 		},
 	})
 }
+
+// twoRemovableMacAddressesConfig declares two addresses. The second depends on the first so
+// the creates are sequential: Jamf's duplicate check is not atomic, and two
+// concurrent creates of one value can both succeed, which would leave a test
+// asserting on a race instead of on the refusal.
+func twoRemovableMacAddressesConfig(valueOne, valueTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_removable_mac_address" "one" {
+  mac_address = %[1]q
+}
+
+resource "jamfplatform_pro_removable_mac_address" "two" {
+  depends_on = [jamfplatform_pro_removable_mac_address.one]
+
+  mac_address = %[2]q
+}
+`, valueOne, valueTwo)
+}
+
+func TestAccResource_ProRemovableMacAddress_RenameIntoManagedValueOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := macFor(suffix, 0xC2)
+	two := macFor(suffix, 0xC3)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoRemovableMacAddressesConfig(one, two),
+			},
+			{
+				Config:      twoRemovableMacAddressesConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Value\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProRemovableMacAddress_TwoNewWithOneValueExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	value := macFor(testhelpers.RunSuffix(), 0xC4)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoRemovableMacAddressesConfig(value, value),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

@@ -36,6 +36,7 @@ import (
 // Create creates a new Jamf Pro allowed file extension. Classic POSTs to id="0"; the
 // server allocates the real integer ID and returns it in the response body.
 func (r *AllowedFileExtensionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan AllowedFileExtensionResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -52,7 +53,7 @@ func (r *AllowedFileExtensionResource) Create(ctx context.Context, req resource.
 
 	created, err := r.client.CreateAllowedFileExtensionByID(createCtx, "0", buildAllowedFileExtensionInput(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro allowed file extension", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro allowed file extension", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	// Defensive: the classic SDK trusts the server and would deref a nil ID; we explicitly
@@ -85,6 +86,7 @@ func (r *AllowedFileExtensionResource) Create(ctx context.Context, req resource.
 
 // Read refreshes the Terraform state with the latest allowed file extension representation.
 func (r *AllowedFileExtensionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state AllowedFileExtensionResourceModel
 	isImport := req.State.Raw.IsNull()
 

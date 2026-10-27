@@ -82,3 +82,76 @@ func TestAccResource_ProAdvancedVolumePurchasingContentSearch_NameDifferingByCas
 		},
 	})
 }
+
+// twoAdvancedVolumePurchasingContentSearchesConfig declares two resources. The second depends on the first so
+// the creates are sequential: Jamf's duplicate check is not atomic, and two
+// concurrent creates of one name can both succeed, which would leave a test
+// asserting on a race instead of on the refusal.
+func twoAdvancedVolumePurchasingContentSearchesConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_advanced_volume_purchasing_content_search" "one" {
+  name = %[1]q
+
+  criteria = [
+    {
+      name        = "Name"
+      search_type = "like"
+      value       = "Office"
+    },
+  ]
+
+  display_fields = ["Name"]
+}
+
+resource "jamfplatform_pro_advanced_volume_purchasing_content_search" "two" {
+  depends_on = [jamfplatform_pro_advanced_volume_purchasing_content_search.one]
+
+  name = %[2]q
+
+  criteria = [
+    {
+      name        = "Name"
+      search_type = "like"
+      value       = "Office"
+    },
+  ]
+
+  display_fields = ["Name"]
+}
+`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProAdvancedVolumePurchasingContentSearch_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoAdvancedVolumePurchasingContentSearchesConfig(one, two),
+			},
+			{
+				Config:      twoAdvancedVolumePurchasingContentSearchesConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProAdvancedVolumePurchasingContentSearch_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoAdvancedVolumePurchasingContentSearchesConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

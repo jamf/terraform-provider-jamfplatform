@@ -6,6 +6,7 @@
 package advanced_computer_search_test
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -39,6 +40,58 @@ func TestAccResource_ProAdvancedComputerSearch_NameCollisionStrict(t *testing.T)
 				Config:             planned,
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
+func twoSearchesConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_advanced_computer_search" "one" {
+			name = %q
+
+			criteria = [
+				{
+					name        = "Computer Name"
+					search_type = "like"
+					value       = "lab"
+				},
+			]
+
+			display_fields = ["Computer Name", "Username"]
+		}
+
+		resource "jamfplatform_pro_advanced_computer_search" "two" {
+			depends_on = [jamfplatform_pro_advanced_computer_search.one]
+
+			name = %q
+
+			criteria = [
+				{
+					name        = "Computer Name"
+					search_type = "like"
+					value       = "lab"
+				},
+			]
+
+			display_fields = ["Computer Name", "Username"]
+		}
+	`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProAdvancedComputerSearch_RenameIntoManagedNameOffersNoImportStrict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-acs-one-" + suffix
+	two := "tf-acc-collide-acs-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: strictCollisionProvider + twoSearchesConfig(one, two)},
+			{
+				Config:      strictCollisionProvider + twoSearchesConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
 			},
 		},
 	})

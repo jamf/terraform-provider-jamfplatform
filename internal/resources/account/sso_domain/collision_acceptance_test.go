@@ -45,3 +45,52 @@ func TestAccResource_AccountSSODomain_Collision(t *testing.T) {
 		},
 	})
 }
+
+func twoDomainsConfig(domainOne, domainTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_account_sso_domain" "one" {
+  domain = %q
+}
+
+resource "jamfplatform_account_sso_domain" "two" {
+  depends_on = [jamfplatform_account_sso_domain.one]
+
+  domain = %q
+}
+`, domainOne, domainTwo)
+}
+
+func TestAccResource_AccountSSODomain_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheckAccount(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix + ".example"
+	two := "tf-acc-collide-managed-two-" + suffix + ".example"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckSSODomainDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: twoDomainsConfig(one, two)},
+			{
+				Config:      twoDomainsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Domain\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_AccountSSODomain_TwoNewWithOneDomainExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheckAccount(t)
+	domain := "tf-acc-collide-pair-" + testhelpers.RunSuffix() + ".example"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckSSODomainDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:      twoDomainsConfig(domain, domain),
+				ExpectError: regexp.MustCompile(`(?s)Domain\s+already\s+claimed.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

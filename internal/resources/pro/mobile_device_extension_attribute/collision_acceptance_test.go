@@ -85,3 +85,56 @@ func TestAccResource_ProMobileDeviceExtensionAttribute_NameCollisionOnRename(t *
 		},
 	})
 }
+
+func twoConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_mobile_device_extension_attribute" "one" {
+			name              = %q
+			data_type         = "STRING"
+			input_type        = "TEXT"
+			inventory_display = "GENERAL"
+		}
+
+		resource "jamfplatform_pro_mobile_device_extension_attribute" "two" {
+			depends_on = [jamfplatform_pro_mobile_device_extension_attribute.one]
+
+			name              = %q
+			data_type         = "STRING"
+			input_type        = "TEXT"
+			inventory_display = "GENERAL"
+		}
+	`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProMobileDeviceExtensionAttribute_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-mdea-one-" + suffix
+	two := "tf-acc-collide-mdea-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: twoConfig(one, two)},
+			{
+				Config:      twoConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProMobileDeviceExtensionAttribute_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-mdea-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

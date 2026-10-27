@@ -82,3 +82,76 @@ func TestAccResource_ProAdvancedUserSearch_NameDifferingByAccentDoesNotCollide(t
 		},
 	})
 }
+
+// twoSearchesConfig declares two advanced user searches. The second depends on
+// the first so the creates are sequential: Jamf's duplicate check is not atomic,
+// and two concurrent creates of one name can both succeed, which would leave a
+// test asserting on a race instead of on the refusal.
+func twoSearchesConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+		resource "jamfplatform_pro_advanced_user_search" "one" {
+			name = %q
+
+			criteria = [
+				{
+					name        = "Full Name"
+					search_type = "like"
+					value       = "a"
+				},
+			]
+
+			display_fields = ["Full Name"]
+		}
+
+		resource "jamfplatform_pro_advanced_user_search" "two" {
+			depends_on = [jamfplatform_pro_advanced_user_search.one]
+
+			name = %q
+
+			criteria = [
+				{
+					name        = "Full Name"
+					search_type = "like"
+					value       = "a"
+				},
+			]
+
+			display_fields = ["Full Name"]
+		}
+	`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProAdvancedUserSearch_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: twoSearchesConfig(one, two),
+			},
+			{
+				Config:      twoSearchesConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProAdvancedUserSearch_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoSearchesConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating\s+Jamf\s+Pro\s+advanced\s+user\s+search.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

@@ -44,6 +44,7 @@ import (
 
 // Create creates a new Jamf Pro Inventory Preload record.
 func (r *InventoryPreloadRecordResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan InventoryPreloadRecordResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -66,7 +67,7 @@ func (r *InventoryPreloadRecordResource) Create(ctx context.Context, req resourc
 
 	createResp, err := r.client.CreateInventoryPreloadRecordV2(createCtx, input)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro inventory preload record", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro inventory preload record", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 
@@ -93,6 +94,7 @@ func (r *InventoryPreloadRecordResource) Create(ctx context.Context, req resourc
 
 // Read refreshes the Terraform state with the latest record representation.
 func (r *InventoryPreloadRecordResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state InventoryPreloadRecordResourceModel
 	isImport := req.State.Raw.IsNull()
 

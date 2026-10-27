@@ -42,6 +42,7 @@ import (
 // fields. All three plaintext passwords are sourced from req.Config (they are
 // WriteOnly) and sent on create.
 func (r *FileShareDistributionPointResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan FileShareDistributionPointResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -70,7 +71,7 @@ func (r *FileShareDistributionPointResource) Create(ctx context.Context, req res
 
 	created, err := r.client.CreateDistributionPointV1(createCtx, input)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro file share distribution point", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro file share distribution point", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == "" {
@@ -101,6 +102,7 @@ func (r *FileShareDistributionPointResource) Create(ctx context.Context, req res
 // Read refreshes the Terraform state. Import-time refresh (req.State.Raw is
 // null) sources the ID from the identity object so users can import by ID.
 func (r *FileShareDistributionPointResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state FileShareDistributionPointResourceModel
 	isImport := req.State.Raw.IsNull()
 

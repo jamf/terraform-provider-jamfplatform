@@ -41,6 +41,7 @@ import (
 // The create response carries the whole stored representation, so there is no
 // read-back.
 func (r *PlatformEnvironmentResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan PlatformEnvironmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -57,7 +58,7 @@ func (r *PlatformEnvironmentResource) Create(ctx context.Context, req resource.C
 
 	created, err := r.client.CreateEnvironment(createCtx, buildCreateRequest(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Account platform environment", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Account platform environment", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 
@@ -83,6 +84,7 @@ func (r *PlatformEnvironmentResource) Create(ctx context.Context, req resource.C
 // has already been written into state, so nothing here is gated on which path
 // it arrived by.
 func (r *PlatformEnvironmentResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state PlatformEnvironmentResourceModel
 
 	if req.State.Raw.IsNull() {

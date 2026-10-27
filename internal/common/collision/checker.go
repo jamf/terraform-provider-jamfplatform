@@ -21,6 +21,10 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Mode selects what a detected collision does to the plan.
@@ -157,6 +161,12 @@ type Checker struct {
 
 	replacingMu sync.Mutex
 	replacing   map[string]map[string]bool
+
+	managedMu sync.Mutex
+	managed   map[string]map[string]bool
+
+	rulesMu sync.Mutex
+	rules   map[string][]Namespace
 }
 
 // New returns a Checker for the configuration, or nil when the mode is off.
@@ -194,6 +204,100 @@ func (c *Checker) isReplacing(resourceType, id string) bool {
 	c.replacingMu.Lock()
 	defer c.replacingMu.Unlock()
 	return c.replacing[resourceType][id]
+}
+
+// NoteManaged records that the object with this ID is managed by a resource of
+// this type in the configuration being planned. Resources call it from Read and
+// Create, so a collision with an object this configuration already manages can
+// often be told apart from one with an object nothing manages. Importing the
+// second kind is the remedy; importing the first would put one object under two
+// addresses. The record is best effort: Terraform refreshes and plans each
+// resource instance on its own, so a sibling's Read can land after this
+// resource's ModifyPlan, and a refresh-less plan, a targeted plan or an apply of
+// a saved plan never reads at all. An object not recorded is therefore unknown,
+// not unmanaged, and the message that offers an import says so. It is a no-op on
+// a nil Checker.
+func (c *Checker) NoteManaged(resourceType, id string) {
+	if c == nil || resourceType == "" || id == "" {
+		return
+	}
+	c.managedMu.Lock()
+	defer c.managedMu.Unlock()
+	if c.managed == nil {
+		c.managed = make(map[string]map[string]bool)
+	}
+	if c.managed[resourceType] == nil {
+		c.managed[resourceType] = make(map[string]bool)
+	}
+	c.managed[resourceType][id] = true
+}
+
+// NoteManagedState is NoteManaged for the ID held in a resource's state. A
+// resource defers it at the top of Read and Create, so whatever state the
+// function ends up writing is recorded and a removed or failed one is not. The
+// ID is the top-level "id" attribute unless idPath says otherwise. It is a
+// no-op on a nil Checker.
+func (c *Checker) NoteManagedState(ctx context.Context, resourceType string, state *tfsdk.State, idPath ...path.Path) {
+	if c == nil || state == nil || state.Raw.IsNull() {
+		return
+	}
+	at := path.Root("id")
+	if len(idPath) > 0 {
+		at = idPath[0]
+	}
+	var id types.String
+	if diags := state.GetAttribute(ctx, at, &id); diags.HasError() {
+		return
+	}
+	c.NoteManaged(resourceType, id.ValueString())
+}
+
+// noteRules records the enforced namespaces a resource type is checked
+// against, so a failed create can say which keys to look at without each
+// resource restating them.
+func (c *Checker) noteRules(resourceType string, namespaces ...Namespace) {
+	if c == nil || resourceType == "" {
+		return
+	}
+	c.rulesMu.Lock()
+	defer c.rulesMu.Unlock()
+	if c.rules == nil {
+		c.rules = make(map[string][]Namespace)
+	}
+	for _, ns := range namespaces {
+		known := false
+		for _, have := range c.rules[resourceType] {
+			if have.ID == ns.ID {
+				known = true
+				break
+			}
+		}
+		if !known {
+			c.rules[resourceType] = append(c.rules[resourceType], ns)
+		}
+	}
+}
+
+func (c *Checker) rulesFor(resourceType string) []Namespace {
+	c.rulesMu.Lock()
+	defer c.rulesMu.Unlock()
+	return c.rules[resourceType]
+}
+
+// isManaged reports whether any Terraform resource type has recorded the matched
+// object as managed, under the identifier that type imports it by.
+func (c *Checker) isManaged(m Match) bool {
+	c.managedMu.Lock()
+	defer c.managedMu.Unlock()
+	if m.ResourceType != "" && c.managed[m.ResourceType][m.ID] {
+		return true
+	}
+	for resourceType, id := range m.AltIDs {
+		if c.managed[resourceType][id] {
+			return true
+		}
+	}
+	return false
 }
 
 // Enabled reports whether the checker will report anything.
@@ -255,6 +359,9 @@ type Match struct {
 	Entry
 	Noun         string
 	ResourceType string
+	// Managed is set when this configuration already manages the object under
+	// another address, so importing it again is the wrong remedy.
+	Managed bool
 }
 
 // lookup reads the candidates of every Find source for one key, once per folded

@@ -56,6 +56,7 @@ import (
 // Values only the read-back could have filled are nulled first — see
 // nullUnknownReadBackValues.
 func (r *GatewayResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan, config GatewayResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
@@ -89,7 +90,7 @@ func (r *GatewayResource) Create(ctx context.Context, req resource.CreateRequest
 	created, err := r.client.CreateZtnaGatewayV1(createCtx, input)
 	if err != nil {
 		if !appendWriteDiagnostics(&resp.Diagnostics, err) {
-			resp.Diagnostics.AddError("Error creating Jamf Security Cloud ZTNA gateway", helpers.APIErrorDetail(err))
+			resp.Diagnostics.AddError("Error creating Jamf Security Cloud ZTNA gateway", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		}
 		return
 	}
@@ -164,6 +165,7 @@ func nullUnknownReadBackValues(plan *GatewayResourceModel) {
 
 // Read refreshes the Terraform state with the latest gateway representation.
 func (r *GatewayResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state GatewayResourceModel
 	isImport := req.State.Raw.IsNull()
 

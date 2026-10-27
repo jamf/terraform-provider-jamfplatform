@@ -75,3 +75,28 @@ func TestAccResource_ProComputerPrestageEnrollment_NameCollisionStrict(t *testin
 		},
 	})
 }
+
+func TestAccResource_ProComputerPrestageEnrollment_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	token := requireADETokenBlob(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-prestage-managed-one-" + suffix
+	two := "tf-acc-prestage-managed-two-" + suffix
+	fixture := adeFixtureBlock(suffix, token)
+	pair := func(nameOne, nameTwo string) string {
+		return fixture + collisionPrestageResource("one", nameOne) + collisionPrestageResource("two", nameTwo)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: strictCollisionProvider + pair(one, two),
+			},
+			{
+				Config:      strictCollisionProvider + pair(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Display\s+name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}

@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/devicegroups"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/groupcollision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -117,6 +118,7 @@ func deviceGroupCriteriaEqual(a, b []DeviceGroupCriteriaModel) bool {
 
 // Create creates a new Jamf Platform device group resource.
 func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, groupcollision.DeviceGroupResourceType, &resp.State)
 	var plan DeviceGroupResourceModel
 	var config DeviceGroupResourceModel
 
@@ -184,7 +186,7 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating device group",
-			helpers.APIErrorDetail(err),
+			helpers.APIErrorDetail(err)+r.pd.CollisionChecker().CreateConflictHint(err, groupcollision.DeviceGroupResourceType),
 		)
 		return
 	}
@@ -220,6 +222,7 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 
 // Read syncs the Terraform state with the latest API representation.
 func (r *DeviceGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.pd.CollisionChecker().NoteManagedState(ctx, groupcollision.DeviceGroupResourceType, &resp.State)
 	var state DeviceGroupResourceModel
 	stateAbsent := req.State.Raw.IsNull()
 

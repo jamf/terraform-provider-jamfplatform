@@ -67,3 +67,30 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_NameCollisionStrict(t *te
 		},
 	})
 }
+
+func TestAccResource_ProMobileDevicePrestageEnrollment_RenameIntoManagedDisplayNameOffersNoImportStrict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	token := requireADETokenBlob(t)
+	suffix := testhelpers.RunSuffix()
+	accCleanupOrphans(t, suffix)
+	one := "tf-acc-collide-mdprestage-one-" + suffix
+	two := "tf-acc-collide-mdprestage-two-" + suffix
+	fixture := adeFixtureBlock(suffix, token)
+
+	pair := func(nameOne, nameTwo string) string {
+		return strictCollisionProvider + fixture +
+			collisionPrestageResource("one", nameOne) +
+			strings.Replace(strings.Replace(collisionPrestageResource("two", nameTwo), "\n  scope_serial_numbers = []\n", "\n", 1), "{\n  display_name", "{\n  depends_on = [jamfplatform_pro_mobile_device_prestage_enrollment.one]\n  display_name", 1)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: pair(one, two)},
+			{
+				Config:      pair(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Display\s+name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}

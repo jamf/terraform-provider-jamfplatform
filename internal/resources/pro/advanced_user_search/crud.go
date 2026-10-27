@@ -76,6 +76,7 @@ func dsGroupCriteriaChanged(suppressed, planned []criteria.CriterionModel) bool 
 // allocates the real integer ID and returns it in the response body (which
 // carries only <id> — every other field must be read back via GET).
 func (r *AdvancedUserSearchResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan AdvancedUserSearchResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -105,7 +106,7 @@ func (r *AdvancedUserSearchResource) Create(ctx context.Context, req resource.Cr
 
 	created, err := r.client.CreateAdvancedUserSearchByID(createCtx, "0", input)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro advanced user search", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro advanced user search", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -139,6 +140,7 @@ func (r *AdvancedUserSearchResource) Create(ctx context.Context, req resource.Cr
 
 // Read refreshes the Terraform state with the latest search representation.
 func (r *AdvancedUserSearchResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state AdvancedUserSearchResourceModel
 	isImport := req.State.Raw.IsNull()
 

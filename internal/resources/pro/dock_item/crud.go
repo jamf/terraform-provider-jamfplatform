@@ -27,6 +27,7 @@ import (
 // Create creates a new Jamf Pro dock item. Classic POSTs to id="0"; the server
 // allocates the real integer ID and returns it in the response body.
 func (r *DockItemResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan DockItemResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -43,7 +44,7 @@ func (r *DockItemResource) Create(ctx context.Context, req resource.CreateReques
 
 	created, err := r.client.CreateDockItemByID(createCtx, "0", buildDockItemInput(plan))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro dock item", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro dock item", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -76,6 +77,7 @@ func (r *DockItemResource) Create(ctx context.Context, req resource.CreateReques
 
 // Read refreshes the Terraform state with the latest dock item representation.
 func (r *DockItemResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state DockItemResourceModel
 	isImport := req.State.Raw.IsNull()
 

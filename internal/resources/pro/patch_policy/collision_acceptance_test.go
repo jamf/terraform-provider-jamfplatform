@@ -53,7 +53,51 @@ func TestAccResource_ProPatchPolicy_NameCollisionWithinTitle(t *testing.T) {
 			{
 				Config:      fixtureTitle(suffix) + policyBlock("first", name) + policyBlock("second", strings.ToUpper(name)),
 				PlanOnly:    true,
-				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*patch\s+policy.*already\s+exists\s+in\s+Jamf\s+Pro.*import\s+it`),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*patch\s+policy.*already\s+exists\s+in\s+Jamf\s+Pro.*(import\s+it|already\s+managed)`),
+			},
+		},
+	})
+}
+
+// policyAfter is policyBlock with a dependency on another policy, so the two writes are
+// sequential and Jamf Pro's non-atomic duplicate check sees the first before the second.
+func policyAfter(label, name, dep string) string {
+	return strings.Replace(policyBlock(label, name), "enabled                         = false",
+		fmt.Sprintf("depends_on                      = [jamfplatform_pro_patch_policy.%s]\n\t\t\tenabled                         = false", dep), 1)
+}
+
+func TestAccResource_ProPatchPolicy_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-pp-one-" + suffix
+	two := "tf-acc-collide-pp-two-" + suffix
+	pair := func(nameTwo string) string {
+		return fixtureTitle(suffix) + policyBlock("one", one) + policyAfter("two", nameTwo, "one")
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: pair(two)},
+			{
+				Config:      pair(one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProPatchPolicy_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-collide-pp-pair-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      fixtureTitle(suffix) + policyBlock("one", name) + policyAfter("two", name, "one"),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
 			},
 		},
 	})

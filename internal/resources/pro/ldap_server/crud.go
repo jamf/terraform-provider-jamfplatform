@@ -39,6 +39,7 @@ func resolvePassword(cfg LdapServerResourceModel) *string {
 // then GET to capture server-populated defaults (timeouts, use_wildcards,
 // echoed mappings).
 func (r *LdapServerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan LdapServerResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -60,7 +61,7 @@ func (r *LdapServerResource) Create(ctx context.Context, req resource.CreateRequ
 
 	created, err := r.client.CreateLDAPServerByID(createCtx, "0", buildLdapServerInput(plan, resolvePassword(cfg)))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro LDAP server", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro LDAP server", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -94,6 +95,7 @@ func (r *LdapServerResource) Create(ctx context.Context, req resource.CreateRequ
 // Read refreshes Terraform state. Import-time refresh (req.State.Raw null)
 // sources the ID from the identity object.
 func (r *LdapServerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state LdapServerResourceModel
 	isImport := req.State.Raw.IsNull()
 

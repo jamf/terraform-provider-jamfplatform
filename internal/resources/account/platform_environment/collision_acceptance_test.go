@@ -60,3 +60,45 @@ func TestAccResource_AccountPlatformEnvironment_NameCollisionIsStrictOnly(t *tes
 		},
 	})
 }
+
+func twoEnvironmentsConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+provider "jamfplatform" {
+  name_collision_check = { include_unenforced = true }
+}
+
+resource "jamfplatform_account_platform_environment" "one" {
+  name = %q
+  type = %q
+}
+
+resource "jamfplatform_account_platform_environment" "two" {
+  depends_on = [jamfplatform_account_platform_environment.one]
+
+  name = %q
+  type = %q
+}
+`, nameOne, account.EnvironmentLabelSandbox, nameTwo, account.EnvironmentLabelSandbox)
+}
+
+func TestAccResource_AccountPlatformEnvironment_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheckAccount(t)
+	one := acceptanceName("collide-managed-one")
+	two := acceptanceName("collide-managed-two")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckEnvironmentDestroy(t),
+		Steps: []resource.TestStep{
+			{Config: twoEnvironmentsConfig(one, two)},
+			{
+				Config:      twoEnvironmentsConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_AccountPlatformEnvironment_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	t.Skip("platform environment names are an unenforced namespace: Jamf Account stores duplicates, so no refusal exists to explain")
+}

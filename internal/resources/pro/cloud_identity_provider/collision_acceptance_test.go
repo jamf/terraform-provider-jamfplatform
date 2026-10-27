@@ -52,3 +52,62 @@ resource "jamfplatform_pro_cloud_identity_provider" "second" {
 		},
 	})
 }
+
+func twoProvidersConfig(nameOne, nameTwo string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_cloud_identity_provider" "one" {
+  display_name  = %q
+  provider_name = "ENTRA_ID"
+  entra_id = {
+    tenant_id = "d5749c84-5cc5-4691-a187-4545c02ff915"
+  }
+}
+
+resource "jamfplatform_pro_cloud_identity_provider" "two" {
+  depends_on = [jamfplatform_pro_cloud_identity_provider.one]
+
+  display_name  = %q
+  provider_name = "ENTRA_ID"
+  entra_id = {
+    tenant_id = "d5749c84-5cc5-4691-a187-4545c02ff916"
+  }
+}
+`, nameOne, nameTwo)
+}
+
+func TestAccResource_ProCloudIdentityProvider_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckCloudIdentityProviderDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: twoProvidersConfig(one, two),
+			},
+			{
+				Config:      twoProvidersConfig(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Display\s+name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_ProCloudIdentityProvider_TwoNewWithOneNameExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckCloudIdentityProviderDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:      twoProvidersConfig(name, name),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

@@ -87,3 +87,88 @@ func TestAccResource_Benchmark_TitleCollision(t *testing.T) {
 		},
 	})
 }
+
+// twoBenchmarksConfig declares two benchmarks over one baseline, the second
+// depending on the first so the creates are sequential.
+func twoBenchmarksConfig(titleOne, titleTwo, baselineID, groupID, ruleBlocks string) string {
+	benchmark := `
+resource "jamfplatform_cbengine_benchmark" %q {
+  %s
+  title                = %q
+  source_baseline_id   = %q
+  enforcement_mode     = "MONITOR"
+  target_device_groups = [%q]
+  rules                = [%s]
+}
+`
+	return fmt.Sprintf(benchmark, "one", "", titleOne, baselineID, groupID, ruleBlocks) +
+		fmt.Sprintf(benchmark, "two", "depends_on = [jamfplatform_cbengine_benchmark.one]", titleTwo, baselineID, groupID, ruleBlocks)
+}
+
+func benchmarkCollisionFixture(t *testing.T) (baselineID, groupID, ruleBlocks string) {
+	t.Helper()
+	ctx := context.Background()
+	c := testhelpers.NewAcceptanceClient(t)
+	cbClient := cbSDK.New(c)
+
+	baselines, err := cbClient.ListBaselines(ctx)
+	if err != nil {
+		t.Fatalf("Failed to list baselines: %v", err)
+	}
+	if len(baselines.Baselines) == 0 {
+		t.Skip("No baselines available — CB Engine may not be enabled")
+	}
+	baselineID = baselines.Baselines[0].BaselineID
+	rules, err := cbClient.GetBaselineRules(ctx, baselineID)
+	if err != nil {
+		t.Fatalf("Failed to get rules: %v", err)
+	}
+	groups, err := dgSDK.New(c).ListDeviceGroups(ctx, nil, "")
+	if err != nil || len(groups) == 0 {
+		t.Skip("No device group available to target")
+	}
+	blocks := make([]string, 0, len(rules.Rules))
+	for _, r := range rules.Rules {
+		block := fmt.Sprintf(`{ id = %q, enabled = %t`, r.ID, r.Enabled)
+		if r.ODV != nil {
+			block += fmt.Sprintf(`, odv_value = %q`, r.ODV.Value)
+		}
+		blocks = append(blocks, block+" }")
+	}
+	return baselineID, groups[0].ID, strings.Join(blocks, ", ")
+}
+
+func TestAccResource_Benchmark_RenameIntoManagedTitleOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	baselineID, groupID, ruleBlocks := benchmarkCollisionFixture(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: twoBenchmarksConfig(one, two, baselineID, groupID, ruleBlocks)},
+			{
+				Config:      twoBenchmarksConfig(one, one, baselineID, groupID, ruleBlocks),
+				ExpectError: regexp.MustCompile(`(?s)Title\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
+
+func TestAccResource_Benchmark_TwoNewWithOneTitleExplainsTheConflict(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	baselineID, groupID, ruleBlocks := benchmarkCollisionFixture(t)
+	title := "tf-acc-collide-pair-" + testhelpers.RunSuffix()
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      twoBenchmarksConfig(title, title, baselineID, groupID, ruleBlocks),
+				ExpectError: regexp.MustCompile(`(?s)Error\s+creating\s+benchmark.*Another\s+resource\s+in\s+this\s+configuration`),
+			},
+		},
+	})
+}

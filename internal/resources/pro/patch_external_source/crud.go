@@ -35,6 +35,7 @@ import (
 // Create creates a new Jamf Pro patch external source. Classic POSTs to id="0";
 // the server allocates the real integer ID and returns it in the response body.
 func (r *PatchExternalSourceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan PatchExternalSourceResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -51,7 +52,7 @@ func (r *PatchExternalSourceResource) Create(ctx context.Context, req resource.C
 
 	created, err := r.client.CreatePatchExternalSourceByID(createCtx, "0", buildPatchExternalSourceInput(plan, types.Int64Null()))
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro patch external source", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro patch external source", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	// Defensive: the classic SDK trusts the server and would deref a nil ID; we
@@ -84,6 +85,7 @@ func (r *PatchExternalSourceResource) Create(ctx context.Context, req resource.C
 // Read refreshes the Terraform state with the latest patch external source
 // representation.
 func (r *PatchExternalSourceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state PatchExternalSourceResourceModel
 	isImport := req.State.Raw.IsNull()
 

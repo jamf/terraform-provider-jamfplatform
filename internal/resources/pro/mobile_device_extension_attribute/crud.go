@@ -28,6 +28,7 @@ import (
 // Create creates a new mobile device extension attribute. The Pro POST returns
 // only an href + id, so the ID is parsed and the full representation read back.
 func (r *MobileDeviceExtensionAttributeResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan MobileDeviceExtensionAttributeResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -50,7 +51,7 @@ func (r *MobileDeviceExtensionAttributeResource) Create(ctx context.Context, req
 
 	created, err := r.client.CreateMobileDeviceExtensionAttributeV1(createCtx, input)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro mobile device extension attribute", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro mobile device extension attribute", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == "" {
@@ -83,6 +84,7 @@ func (r *MobileDeviceExtensionAttributeResource) Create(ctx context.Context, req
 
 // Read refreshes the Terraform state with the latest EA representation.
 func (r *MobileDeviceExtensionAttributeResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state MobileDeviceExtensionAttributeResourceModel
 	isImport := req.State.Raw.IsNull()
 

@@ -6,6 +6,7 @@ package static_mobile_device_group
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 
@@ -30,4 +31,24 @@ func (r *StaticMobileDeviceGroupResource) reportNameCollision(ctx context.Contex
 			Path:      path.Root("name"),
 		}},
 	})
+}
+
+// withConflictHint appends the create-conflict hint to each error in diags when
+// err is a duplicate refusal. Two new groups declared with one name both pass the
+// plan-time check, and the second is then refused at create, so the hint names
+// that cause where the bare refusal does not.
+func (r *StaticMobileDeviceGroupResource) withConflictHint(diags diag.Diagnostics, err error) diag.Diagnostics {
+	hint := r.pd.CollisionChecker().CreateConflictHint(err, resourceTypeName)
+	if hint == "" {
+		return diags
+	}
+	var out diag.Diagnostics
+	for _, d := range diags {
+		if _, anchored := d.(diag.DiagnosticWithPath); anchored || d.Severity() != diag.SeverityError {
+			out.Append(d)
+			continue
+		}
+		out.AddError(d.Summary(), d.Detail()+hint)
+	}
+	return out
 }

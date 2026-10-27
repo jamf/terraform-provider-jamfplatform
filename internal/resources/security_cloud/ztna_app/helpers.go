@@ -75,6 +75,13 @@ const (
 // at the third, while the untranslated path above already surfaces the server's own
 // field and description.
 func appendWriteDiagnostics(diags *diag.Diagnostics, err error, hasPredefinedAppID bool) bool {
+	return appendWriteDiagnosticsHint(diags, err, hasPredefinedAppID, "")
+}
+
+// appendWriteDiagnosticsHint is appendWriteDiagnostics with a conflict hint appended to the
+// duplicate-value diagnostic, so a create refused for a value another resource in the same
+// configuration holds says so.
+func appendWriteDiagnosticsHint(diags *diag.Diagnostics, err error, hasPredefinedAppID bool, hint string) bool {
 	apiErr := jamfplatform.AsAPIError(err)
 	if apiErr == nil {
 		return false
@@ -90,7 +97,7 @@ func appendWriteDiagnostics(diags *diag.Diagnostics, err error, hasPredefinedApp
 				"Jamf Security Cloud allows a host name to match only one application across the whole tenant, "+
 					"so two applications cannot list the same one. Remove it from the application that already "+
 					"holds it, or drop it from this one — the `jamfplatform_security_cloud_ztna_apps` data source "+
-					"lists what exists. Reported by Jamf Security Cloud: "+detail.Description,
+					"lists what exists. Reported by Jamf Security Cloud: "+detail.Description+hint,
 			)
 		case codeBareIPsConflict:
 			diags.AddAttributeError(

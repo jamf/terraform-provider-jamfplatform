@@ -28,6 +28,7 @@ import (
 // allocates the real integer ID and returns it in the response body (which
 // carries only <id> — every other field must be read back via GET).
 func (r *ClassResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var plan ClassResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -50,7 +51,7 @@ func (r *ClassResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	created, err := r.client.CreateClassByID(createCtx, "0", input)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating Jamf Pro class", helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating Jamf Pro class", helpers.APIErrorDetail(err)+r.collisions.CreateConflictHint(err, resourceTypeName))
 		return
 	}
 	if created == nil || created.ID == nil {
@@ -83,6 +84,7 @@ func (r *ClassResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 // Read refreshes the Terraform state with the latest class representation.
 func (r *ClassResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state ClassResourceModel
 	isImport := req.State.Raw.IsNull()
 

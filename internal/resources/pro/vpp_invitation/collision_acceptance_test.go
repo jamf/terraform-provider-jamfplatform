@@ -69,3 +69,28 @@ func TestAccResource_ProVPPInvitation_StrictNameCollision(t *testing.T) {
 		},
 	})
 }
+
+func TestAccResource_ProVPPInvitation_RenameIntoManagedNameOffersNoImport(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	token := vppToken(t)
+	suffix := testhelpers.RunSuffix()
+	one := "tf-acc-collide-managed-one-" + suffix
+	two := "tf-acc-collide-managed-two-" + suffix
+	pair := func(nameOne, nameTwo string) string {
+		return vppLocationFixture(token, suffix) + collisionInvitation("one", nameOne) + collisionInvitation("two", nameTwo)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckVPPInvitationDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: collisionProviderBlock + pair(one, two),
+			},
+			{
+				Config:      collisionProviderBlock + pair(one, one),
+				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
+			},
+		},
+	})
+}
