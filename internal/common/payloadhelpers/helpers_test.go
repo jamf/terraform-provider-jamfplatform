@@ -103,6 +103,61 @@ func TestInjectTopLevelIdentifierValues_ReplacesUUIDs(t *testing.T) {
 	}
 }
 
+func TestStripTopLevelIdentifiers_RemovesTopLevelOnly(t *testing.T) {
+	const nested = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>PayloadType</key><string>Configuration</string>
+<key>PayloadUUID</key><string>TOP-UUID</string>
+<key>PayloadIdentifier</key><string>TOP-ID</string>
+<key>PayloadContent</key><array><dict>
+<key>PayloadType</key><string>com.apple.dock</string>
+<key>PayloadUUID</key><string>INNER-UUID</string>
+<key>PayloadIdentifier</key><string>INNER-ID</string>
+</dict></array>
+</dict></plist>`
+	out, err := StripTopLevelIdentifiers([]byte(nested))
+	if err != nil {
+		t.Fatalf("strip: %v", err)
+	}
+	got, _, err := plisthelpers.ParsePlist(out)
+	if err != nil {
+		t.Fatalf("parse output: %v", err)
+	}
+	if _, ok := got["PayloadUUID"]; ok {
+		t.Error("top-level PayloadUUID should be removed")
+	}
+	if _, ok := got["PayloadIdentifier"]; ok {
+		t.Error("top-level PayloadIdentifier should be removed")
+	}
+	inner, _ := got["PayloadContent"].([]any)
+	if len(inner) != 1 {
+		t.Fatalf("PayloadContent: got %d entries want 1", len(inner))
+	}
+	entry, _ := inner[0].(map[string]any)
+	if entry["PayloadUUID"] != "INNER-UUID" || entry["PayloadIdentifier"] != "INNER-ID" {
+		t.Errorf("nested identifiers must be untouched: %v", entry)
+	}
+}
+
+func TestStripTopLevelIdentifiers_AbsentIsNoOp(t *testing.T) {
+	const bare = `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict><key>PayloadType</key><string>Configuration</string></dict></plist>`
+	out, err := StripTopLevelIdentifiers([]byte(bare))
+	if err != nil {
+		t.Fatalf("strip: %v", err)
+	}
+	if string(out) != bare {
+		t.Errorf("payload without top-level identifiers must come back byte-identical; got %s", out)
+	}
+}
+
+func TestStripTopLevelIdentifiers_RejectsMalformed(t *testing.T) {
+	if _, err := StripTopLevelIdentifiers([]byte("not a plist")); err == nil {
+		t.Fatal("expected a parse error")
+	}
+}
+
 func TestInjectTopLevelIdentifierValues_EmptyUUID_NoOp(t *testing.T) {
 	out, err := InjectTopLevelIdentifierValues([]byte(minimalPlist), "", "")
 	if err != nil {

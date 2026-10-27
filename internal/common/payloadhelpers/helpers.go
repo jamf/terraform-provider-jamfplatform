@@ -479,6 +479,58 @@ func InjectTopLevelIdentifierValues(newPayload []byte, uuid, identifier string) 
 	return buf.Bytes(), nil
 }
 
+// StripTopLevelIdentifiers removes the top-level PayloadUUID and
+// PayloadIdentifier from newPayload so Jamf Pro assigns fresh ones.
+//
+// An authored PayloadUUID is sent to Jamf Pro verbatim on create, and Jamf Pro
+// requires it to be unique across profiles: two profiles built from one
+// template (or one exported from Jamf Pro) answer the second create with
+// `409 Duplicate payload uuid` (wire-probed 2026-10-27 against
+// proclassic/mobiledeviceconfigurationprofiles, POST). Only the top-level UUID
+// collides; a PayloadUUID repeated inside PayloadContent is accepted, and a
+// payload that is otherwise identical is refused only because its top-level
+// UUID repeats. When both are omitted Jamf Pro sets the two to the same fresh
+// UUID, which it echoes as general.uuid.
+//
+// Nested payload identifiers and UUIDs are deliberately left alone: Jamf Pro
+// keeps whatever it is sent, mints new ones on every write when they are
+// omitted, and does not rewrite references between payloads (such as a Wi-Fi
+// payload's PayloadCertificateAnchorUUID), so they belong to the author.
+func StripTopLevelIdentifiers(newPayload []byte) ([]byte, error) {
+	next, format, err := plisthelpers.ParsePlist(newPayload)
+	if err != nil {
+		return nil, fmt.Errorf("parsing new payload for identifier removal: %w", err)
+	}
+	_, hasUUID := next["PayloadUUID"]
+	_, hasIdentifier := next["PayloadIdentifier"]
+	if !hasUUID && !hasIdentifier {
+		return newPayload, nil
+	}
+	delete(next, "PayloadUUID")
+	delete(next, "PayloadIdentifier")
+	buf := &bytes.Buffer{}
+	enc := plist.NewEncoderForFormat(buf, format)
+	enc.Indent("\t")
+	if err := enc.Encode(next); err != nil {
+		return nil, fmt.Errorf("re-serialising payload after identifier removal: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+// PrepareCreateWirePayload produces the payload bytes sent on create:
+// StripTopLevelIdentifiers followed by the same structural-whitespace
+// compaction PrepareWirePayload applies, and for the same reason.
+func PrepareCreateWirePayload(newPayload []byte) ([]byte, error) {
+	prepared, err := StripTopLevelIdentifiers(newPayload)
+	if err != nil {
+		return nil, err
+	}
+	if compacted, cErr := plisthelpers.CompactStructuralWhitespace(prepared); cErr == nil {
+		prepared = compacted
+	}
+	return prepared, nil
+}
+
 // PrepareWirePayload produces the payload bytes a configuration-profile
 // resource actually sends to the Classic API: server-canonical identifier
 // injection (InjectTopLevelIdentifierValues) followed by structural-whitespace

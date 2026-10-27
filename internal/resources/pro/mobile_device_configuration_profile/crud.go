@@ -281,6 +281,23 @@ func (r *Resource) Update(ctx context.Context, req resource.UpdateRequest, resp 
 	if state.General != nil && !state.General.UUID.IsNull() && !state.General.UUID.IsUnknown() {
 		existingUUID = state.General.UUID.ValueString()
 	}
+	if existingUUID == "" {
+		live, err := r.client.GetMobileDeviceConfigurationProfileByID(updateCtx, state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Error reading mobile device configuration profile before update", helpers.APIErrorDetail(err))
+			return
+		}
+		if live != nil && live.General != nil && live.General.UUID != nil {
+			existingUUID = *live.General.UUID
+		}
+		if existingUUID == "" {
+			resp.Diagnostics.AddError(
+				"Cannot preserve the profile's identity",
+				"Neither Terraform state nor Jamf Pro holds a PayloadUUID for this profile, and an update without one would give it a new identity on enrolled devices. The provider made no change.",
+			)
+			return
+		}
+	}
 
 	// Granular scope ownership: a scope PUT replaces the whole subtree, so
 	// undeclared (null) categories must be re-emitted from the live object to

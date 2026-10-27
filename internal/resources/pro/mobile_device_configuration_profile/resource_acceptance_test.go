@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-testing/compare"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
@@ -409,6 +410,76 @@ func TestAccResource_MobileDeviceConfigurationProfile_Minimal(t *testing.T) {
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectEmptyPlan(),
 					},
+				},
+			},
+		},
+	})
+}
+
+// TestAccResource_MobileDeviceConfigurationProfile_SharedTemplateIdentifiers
+// creates two profiles from byte-identical payloads, authored top-level
+// PayloadUUID and PayloadIdentifier included. Jamf Pro refuses a second profile
+// reusing a top-level PayloadUUID with 409 Duplicate payload uuid (issue 542),
+// so this only passes because the provider removes the top-level pair on
+// create. freshPayload is deliberately not used: it injects a fresh UUID and
+// would hide the bug. Each profile must end up with its own server-assigned
+// general.uuid, and a rename and a re-plan must leave both stable.
+func TestAccResource_MobileDeviceConfigurationProfile_SharedTemplateIdentifiers(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	nameA := "tf-acc-mdcp-shared-a-" + suffix
+	nameB := "tf-acc-mdcp-shared-b-" + suffix
+	payload := readFixture(t, "profile_50.mobileconfig")
+	if !strings.HasSuffix(payload, "\n") {
+		payload += "\n"
+	}
+	cfg := func(a, b string) string {
+		return fmt.Sprintf(`
+resource "jamfplatform_pro_mobile_device_configuration_profile" "a" {
+  general = {
+    name     = %q
+    payloads = <<EOF
+%sEOF
+  }
+}
+
+resource "jamfplatform_pro_mobile_device_configuration_profile" "b" {
+  general = {
+    name     = %q
+    payloads = <<EOF
+%sEOF
+  }
+}
+`, a, payload, b, payload)
+	}
+	const addrA = "jamfplatform_pro_mobile_device_configuration_profile.a"
+	const addrB = "jamfplatform_pro_mobile_device_configuration_profile.b"
+	uuidPath := tfjsonpath.New("general").AtMapKey("uuid")
+	uuidA := statecheck.CompareValue(compare.ValuesDiffer())
+	var uuidsAfterRename = statecheck.CompareValue(compare.ValuesSame())
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg(nameA, nameB),
+				ConfigStateChecks: []statecheck.StateCheck{
+					uuidA.AddStateValue(addrA, uuidPath),
+					uuidA.AddStateValue(addrB, uuidPath),
+					uuidsAfterRename.AddStateValue(addrA, uuidPath),
+				},
+			},
+			{
+				Config: cfg(nameA+"-renamed", nameB),
+				ConfigStateChecks: []statecheck.StateCheck{
+					uuidsAfterRename.AddStateValue(addrA, uuidPath),
+				},
+			},
+			{
+				Config: cfg(nameA+"-renamed", nameB),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
 				},
 			},
 		},

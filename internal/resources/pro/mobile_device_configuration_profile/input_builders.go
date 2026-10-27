@@ -67,9 +67,15 @@ func buildGeneral(m *GeneralModel, existingUUID string) (*proclassic.MobileDevic
 
 	if v := m.Payloads.ValueString(); !m.Payloads.IsNull() && !m.Payloads.IsUnknown() && v != "" {
 		raw := []byte(v)
-		prepared, err := payloadhelpers.PrepareWirePayload(raw, existingUUID, existingUUID)
+		var prepared []byte
+		var err error
+		if existingUUID == "" {
+			prepared, err = payloadhelpers.PrepareCreateWirePayload(raw)
+		} else {
+			prepared, err = payloadhelpers.PrepareWirePayload(raw, existingUUID, existingUUID)
+		}
 		if err != nil {
-			diags.AddError("Failed to inject server-canonical PayloadUUID/PayloadIdentifier into update payload", helpers.APIErrorDetail(err))
+			diags.AddError("Failed to prepare the top-level PayloadUUID/PayloadIdentifier of the payload", helpers.APIErrorDetail(err))
 			return nil, nil, diags
 		}
 		s := proclassic.PayloadsXMLText(prepared)

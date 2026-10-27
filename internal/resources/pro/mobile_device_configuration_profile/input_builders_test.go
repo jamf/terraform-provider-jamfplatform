@@ -123,20 +123,39 @@ func TestBuildGeneral_PayloadIdentifierInjectionOnUpdate(t *testing.T) {
 	}
 }
 
-func TestBuildGeneral_PayloadIdentifierInjection_CreatePathNoOp(t *testing.T) {
+func TestBuildGeneral_CreateStripsTopLevelIdentifiersAndKeepsNested(t *testing.T) {
 	t.Parallel()
 	const newPayload = `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>
 <key>PayloadType</key><string>Configuration</string>
 <key>PayloadIdentifier</key><string>CREATE-id</string>
 <key>PayloadUUID</key><string>CREATE-uuid</string>
 <key>PayloadVersion</key><integer>1</integer>
+<key>PayloadContent</key><array><dict>
+<key>PayloadType</key><string>com.apple.applicationaccess</string>
+<key>PayloadIdentifier</key><string>NESTED-id</string>
+<key>PayloadUUID</key><string>NESTED-uuid</string>
+<key>PayloadVersion</key><integer>1</integer>
+</dict></array>
 </dict></plist>`
-	g, _, _ := buildGeneral(&GeneralModel{
+	g, prepared, diags := buildGeneral(&GeneralModel{
 		Name:     types.StringValue("x"),
 		Payloads: types.StringValue(newPayload),
 	}, "")
-	if g.Payloads == nil || !strings.Contains(string(*g.Payloads), "CREATE-id") {
-		t.Fatal("expected create-path payload untouched")
+	if diags.HasError() {
+		t.Fatalf("diags: %v", diags)
+	}
+	if g.Payloads == nil {
+		t.Fatal("expected Payloads to be set")
+	}
+	for _, gone := range []string{"CREATE-id", "CREATE-uuid"} {
+		if strings.Contains(string(*g.Payloads), gone) || strings.Contains(string(prepared), gone) {
+			t.Errorf("expected top-level %q removed on create; got %s", gone, string(*g.Payloads))
+		}
+	}
+	for _, kept := range []string{"NESTED-id", "NESTED-uuid"} {
+		if !strings.Contains(string(*g.Payloads), kept) {
+			t.Errorf("expected nested %q left alone on create; got %s", kept, string(*g.Payloads))
+		}
 	}
 }
 
