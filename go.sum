@@ -142,8 +142,8 @@ github.com/hashicorp/terraform-svchost v0.2.1 h1:ubvrTFw3Q7CsoEaX7V06PtCTKG3wu7G
 github.com/hashicorp/terraform-svchost v0.2.1/go.mod h1:zDMheBLvNzu7Q6o9TBvPqiZToJcSuCLXjAXxBslSky4=
 github.com/hashicorp/yamux v0.1.2 h1:XtB8kyFOyHXYVFnwT5C3+Bdo8gArse7j2AQ0DA0Uey8=
 github.com/hashicorp/yamux v0.1.2/go.mod h1:C+zze2n6e/7wshOZep2A70/aQU6QBRWJO/G6FT1wIns=
-github.com/jamf/jamfplatform-go-sdk v1.10.1-0.20261027182702-f6cb506dcae4 h1:/nT9xQ5eTjeMSKXWha2+ot9Ln8rNFRSnMqdYoDJlR4g=
-github.com/jamf/jamfplatform-go-sdk v1.10.1-0.20261027182702-f6cb506dcae4/go.mod h1:3mR6PpmdzUWpYy8/tCVeBnpktJP2he9Zq3ixL/crgdc=
+github.com/jamf/jamfplatform-go-sdk v1.11.0 h1:k9vBgA9FqPn1b0uQkysvsA/XRx4Nm1EDJlPHL+MdL2Q=
+github.com/jamf/jamfplatform-go-sdk v1.11.0/go.mod h1:3mR6PpmdzUWpYy8/tCVeBnpktJP2he9Zq3ixL/crgdc=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 h1:BQSFePA1RWJOlocH6Fxy8MmwDt+yVQYULKfN0RoTN8A=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99/go.mod h1:1lJo3i6rXxKeerYnT8Nvf0QmHCRC1n8sfWVwXF2Frvo=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
