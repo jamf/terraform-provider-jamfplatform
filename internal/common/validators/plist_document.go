@@ -45,10 +45,12 @@ const plistWrapperExample = `<?xml version="1.0" encoding="UTF-8"?>
 // is not one — a raw PUT of the same fragment to an existing profile 409s
 // identically (wire-probed 2026-08-24). The asymmetry was ours.
 // payloadhelpers.InjectTopLevelIdentifierValues returns early on create (no
-// identifiers to inject yet) and sends the authored bytes untouched, but on
-// update it parses the payload — plisthelpers.ParsePlist accepts a bare dict
-// fragment — and re-encodes it, and the encoder always emits a whole document.
-// So update silently repaired the payload and create could not. Gating in the
+// identifiers to inject yet) and sends the authored bytes untouched — still the
+// case for the macOS resource; the mobile device resource now strips the
+// top-level identifiers instead, which parses too — but on update it parses
+// the payload — plisthelpers.ParsePlist accepts a bare dict fragment — and
+// re-encodes it, and the encoder always emits a whole document. So update
+// silently repaired the payload and create could not. Gating in the
 // schema closes that gap from both directions: the fragment never reaches
 // either path, so neither can disagree about it again.
 func PlistDocument() validator.String {
