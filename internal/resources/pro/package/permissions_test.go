@@ -6,7 +6,9 @@ package pkg
 import (
 	"os"
 	"regexp"
+	"slices"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
@@ -100,7 +102,30 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls keeps resourceSDKMethods in sync with
 // the SDK calls in crud.go.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMethodSetMatches(t, "crud.go", resourceSDKMethods, "collision.go")
+	direct := slices.DeleteFunc(slices.Clone(resourceSDKMethods), func(m string) bool {
+		return slices.Contains(jcdsUploadSDKMethods, m)
+	})
+	assertMethodSetMatches(t, "crud.go", direct, "collision.go", "upload_route.go")
+}
+
+// TestResourceSDKMethods_DeclareJCDSUpload keeps the JCDS upload privileges in
+// the table for as long as the direct route exists, and only then.
+func TestResourceSDKMethods_DeclareJCDSUpload(t *testing.T) {
+	src, err := os.ReadFile("upload_route.go")
+	if err != nil {
+		t.Fatalf("reading upload_route.go: %v", err)
+	}
+	if !strings.Contains(string(src), "jcdsupload.Upload(") {
+		t.Fatal("upload_route.go no longer calls jcdsupload.Upload; drop jcdsUploadSDKMethods from resourceSDKMethods")
+	}
+	for _, m := range jcdsUploadSDKMethods {
+		if !slices.Contains(resourceSDKMethods, m) {
+			t.Errorf("resourceSDKMethods is missing %s, which jcdsupload.Upload calls", m)
+		}
+	}
+	if !permissions.Renders(resourcePrivileges, "jamf-cloud-distribution-service-files:create") {
+		t.Errorf("resourcePrivileges does not render the JCDS upload privilege:\n%s", resourcePrivileges)
+	}
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

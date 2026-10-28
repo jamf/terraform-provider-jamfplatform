@@ -29,6 +29,7 @@ func TestPreflightUploadDestination(t *testing.T) {
 		name      string
 		reader    stubCDPReader
 		wantError bool
+		wantRoute uploadRoute
 	}{
 		{
 			name:      "no distribution point refuses the upload",
@@ -44,20 +45,36 @@ func TestPreflightUploadDestination(t *testing.T) {
 			name:      "jamf cloud allows the upload",
 			reader:    stubCDPReader{cdp: &pro.CloudDistributionPoint{CdnType: pro.CloudDistributionPointCdnTypeJamfCloud}},
 			wantError: false,
+			wantRoute: uploadViaJCDS,
 		},
 		{
-			// No wire evidence either way for the non-Jamf-Cloud CDNs, so the
-			// check must not guess: a working configuration is not broken here.
-			name:      "amazon s3 is left alone",
+			name:      "amazon s3 uploads through the API",
 			reader:    stubCDPReader{cdp: &pro.CloudDistributionPoint{CdnType: pro.CloudDistributionPointCdnTypeAmazonS3}},
 			wantError: false,
+			wantRoute: uploadViaAPI,
 		},
 		{
 			// Fails open: the check converts a slow failure into a fast one and
 			// must not introduce a new one of its own.
-			name:      "a failed read does not block the upload",
+			name:      "a failed read does not block the upload and takes the API route",
 			reader:    stubCDPReader{err: errors.New("API request failed with status 503")},
 			wantError: false,
+			wantRoute: uploadViaAPI,
+		},
+		{
+			name:      "akamai uploads through the API",
+			reader:    stubCDPReader{cdp: &pro.CloudDistributionPoint{CdnType: pro.CloudDistributionPointCdnTypeAkamai}},
+			wantRoute: uploadViaAPI,
+		},
+		{
+			name:      "rackspace uploads through the API",
+			reader:    stubCDPReader{cdp: &pro.CloudDistributionPoint{CdnType: pro.CloudDistributionPointCdnTypeRackspaceCloudFiles}},
+			wantRoute: uploadViaAPI,
+		},
+		{
+			name:      "a type this provider has not seen uploads through the API",
+			reader:    stubCDPReader{cdp: &pro.CloudDistributionPoint{CdnType: "SOMETHING_NEW"}},
+			wantRoute: uploadViaAPI,
 		},
 	}
 
@@ -65,9 +82,12 @@ func TestPreflightUploadDestination(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			diags := preflightUploadDestination(context.Background(), tc.reader)
+			route, diags := preflightUploadDestination(context.Background(), tc.reader)
 			if got := diags.HasError(); got != tc.wantError {
 				t.Fatalf("HasError() = %v, want %v (diags: %v)", got, tc.wantError, diags)
+			}
+			if !tc.wantError && route != tc.wantRoute {
+				t.Errorf("route = %v, want %v", route, tc.wantRoute)
 			}
 			if !tc.wantError {
 				return

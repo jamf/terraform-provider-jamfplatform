@@ -4,6 +4,8 @@
 package pkg
 
 import (
+	"slices"
+
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
@@ -14,7 +16,7 @@ import (
 // to the resource MarkdownDescription. permissions_test.go asserts this list
 // stays in sync with the actual client.<Method> calls in crud.go and with the
 // SDK privilege registry.
-var resourceSDKMethods = []string{
+var resourceSDKMethods = slices.Concat([]string{
 	"CreatePackageV1",
 	"GetPackageV1",
 	"UpdatePackageV1",
@@ -30,6 +32,17 @@ var resourceSDKMethods = []string{
 	// cloud-distribution-point:read privilege, and that one goes undeclared here
 	// only because it sits in helpers.go, which permissions_test.go does not scan.
 	"GetCloudDistributionPointV1",
+}, jcdsUploadSDKMethods)
+
+// jcdsUploadSDKMethods are the two SDK methods jcdsupload.Upload makes on the
+// package resource's behalf when the tenant's distribution point is JCDS
+// (uploadBinary). The resource never names them, so permissions_test.go cannot
+// find them in a source file; it checks instead that upload_route.go calls
+// jcdsupload.Upload. Both require the same
+// jamf-cloud-distribution-service-files:create privilege.
+var jcdsUploadSDKMethods = []string{
+	"InitiateJCDSUploadV1",
+	"RenewJCDSCredentialsV1",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

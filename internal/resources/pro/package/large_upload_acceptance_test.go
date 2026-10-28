@@ -37,7 +37,20 @@ const largeUploadEnvVar = "JAMFPLATFORM_ACC_PRO_PACKAGE_LARGE_UPLOAD"
 
 const largeUploadMiBEnvVar = "JAMFPLATFORM_ACC_PRO_PACKAGE_LARGE_UPLOAD_MIB"
 
-const smallUploadBytes = 300 << 20
+const smallUploadMiBEnvVar = "JAMFPLATFORM_ACC_PRO_PACKAGE_SMALL_UPLOAD_MIB"
+
+// smallUploadBytes is the size of the smaller file in the replace scenarios,
+// 300 MiB unless JAMFPLATFORM_ACC_PRO_PACKAGE_SMALL_UPLOAD_MIB says otherwise.
+func smallUploadBytes() int64 {
+	if v, err := strconv.ParseInt(os.Getenv(smallUploadMiBEnvVar), 10, 64); err == nil && v > 0 {
+		return v << 20
+	}
+	return 300 << 20
+}
+
+func smallLabel() string {
+	return fmt.Sprintf("%d MiB", smallUploadBytes()/(1024*1024))
+}
 
 func largeUploadBytes() int64 {
 	if v, err := strconv.ParseInt(os.Getenv(largeUploadMiBEnvVar), 10, 64); err == nil && v > 0 {
@@ -163,15 +176,15 @@ func TestAccResource_ProPackage_LargeUploadScenarios(t *testing.T) {
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		CheckDestroy:             testAccCheckPackageDestroy(t),
 		Steps: []resource.TestStep{
-			step("create 300 MB", small, smallUploadBytes, func() {
-				writeRandomFile(t, small, smallUploadBytes, 1)
-				writeRandomFile(t, smallOther, smallUploadBytes, 2)
+			step("create "+smallLabel(), small, smallUploadBytes(), func() {
+				writeRandomFile(t, small, smallUploadBytes(), 1)
+				writeRandomFile(t, smallOther, smallUploadBytes(), 2)
 				writeRandomFile(t, large, largeUploadBytes(), 3)
 				writeRandomFile(t, largeSameSize, largeUploadBytes(), 4)
 			}),
-			step("replace 300 MB with "+largeLabel(), large, largeUploadBytes(), nil),
+			step("replace "+smallLabel()+" with "+largeLabel(), large, largeUploadBytes(), nil),
 			step("replace "+largeLabel()+" with "+largeLabel()+" of identical size", largeSameSize, largeUploadBytes(), nil),
-			step("replace "+largeLabel()+" with 300 MB", smallOther, smallUploadBytes, nil),
+			step("replace "+largeLabel()+" with "+smallLabel(), smallOther, smallUploadBytes(), nil),
 		},
 	})
 }

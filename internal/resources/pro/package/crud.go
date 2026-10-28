@@ -6,11 +6,12 @@
 //   pro.GetPackageV1
 //   pro.UpdatePackageV1
 //   pro.DeletePackageV1
-//   pro.UploadPackageV1
+//   pro.UploadPackageV1               (non-JCDS distribution points)
+//   jcdsupload.Upload                 (JCDS distribution point; pro.InitiateJCDSUploadV1 + pro.RenewJCDSCredentialsV1 under the hood)
 //   pro.UploadPackageManifestV1
 //   pro.DeletePackageManifestV1
 //   pro.RefreshCloudDistributionPointInventoryV1
-//   pro.GetCloudDistributionPointV1   (upload preflight — no cloud distribution point, no upload)
+//   pro.GetCloudDistributionPointV1   (upload preflight — refuses NONE, picks the upload route)
 //   pro.ListPackagesV1 (data source / list resource / collision check in collision.go)
 //   pro.ResolvePackageV1ByName (data source)
 //
@@ -43,8 +44,9 @@ import (
 //
 //  1. POST metadata via CreatePackageV1 to obtain an ID.
 //  2. If `package_file_source` is set (JCDS mode): open the source once,
-//     hash + checksum-validate, rewind, stream to UploadPackageV1, then
-//     poll until JCDS converges. The server populates every hash field
+//     hash + checksum-validate, rewind, upload by the route the tenant's
+//     cloud distribution point calls for (uploadBinary), then poll until
+//     JCDS converges. The server populates every hash field
 //     and `cloudTransferStatus`.
 //  3. If `manifest_file_source` is set: POST it to the /manifest sub-resource.
 //  4. Final GET to refresh state with server-populated fields.
@@ -66,8 +68,11 @@ func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest
 	createCtx, cancel := context.WithTimeout(ctx, createTimeout)
 	defer cancel()
 
+	var route uploadRoute
 	if isConfiguredString(plan.PackageFileSource) {
-		if diags := preflightUploadDestination(createCtx, r.client); diags.HasError() {
+		var diags diag.Diagnostics
+		route, diags = preflightUploadDestination(createCtx, r.client)
+		if diags.HasError() {
 			resp.Diagnostics.Append(diags...)
 			return
 		}
@@ -89,13 +94,13 @@ func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest
 
 	if isConfiguredString(plan.PackageFileSource) {
 		if streamingURLEnabled(plan) {
-			diags := streamURLUploadAndVerify(createCtx, r.client, &plan, fileDigests{}, "")
+			diags := streamURLUploadAndVerify(createCtx, r.client, route, &plan, fileDigests{}, "")
 			resp.Diagnostics.Append(diags...)
 			if diags.HasError() {
 				return
 			}
 		} else {
-			resp.Diagnostics.Append(openHashUploadVerify(createCtx, r.client, &plan, fileDigests{}, "")...)
+			resp.Diagnostics.Append(openHashUploadVerify(createCtx, r.client, route, &plan, fileDigests{}, "")...)
 			if resp.Diagnostics.HasError() {
 				return
 			}
@@ -212,8 +217,9 @@ func (r *PackageResource) Read(ctx context.Context, req resource.ReadRequest, re
 // JCDS source-handling: the source is opened exactly once. We hash from the
 // open handle, validate any user-supplied checksum, decide whether the local
 // bytes differ from state's recorded sha3, and (if re-upload is needed)
-// rewind the SAME handle and stream it to UploadPackageV1. URL sources are
-// downloaded exactly once per Update.
+// rewind the SAME handle and upload it by the preflight's route. URL sources are
+// downloaded exactly once per Update. An upload by the direct route under a
+// changed file_name renames the record first (renameRecordBeforeUpload).
 func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state PackageResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -240,14 +246,15 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 	// streaming path always uploads (it has no local hash to compare against
 	// state until after the stream completes).
 	if streamingURLEnabled(plan) {
-		if diags := preflightUploadDestination(updateCtx, r.client); diags.HasError() {
+		route, diags := preflightUploadDestination(updateCtx, r.client)
+		if diags.HasError() {
 			resp.Diagnostics.Append(diags...)
 			return
 		}
 		// Upload + verify FIRST so JCDS has recomputed hashes when the
 		// metadata PUT lands (see disk-staging path for full rationale).
 		previous := recordedDigestsFromState(&state)
-		streamDiags := streamURLUploadAndVerify(updateCtx, r.client, &plan, previous, state.Size.ValueString())
+		streamDiags := reuploadFromURL(updateCtx, r.client, route, &plan, &state, previous)
 		resp.Diagnostics.Append(streamDiags...)
 		if streamDiags.HasError() {
 			return
@@ -295,12 +302,15 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 		uploadName   string
 		cleanup      = func() {}
 		willReupload bool
+		route        uploadRoute
 		local        fileDigests
 		localSize    int64
 		previous     fileDigests
 	)
 	if isConfiguredString(plan.PackageFileSource) {
-		if diags := preflightUploadDestination(updateCtx, r.client); diags.HasError() {
+		var diags diag.Diagnostics
+		route, diags = preflightUploadDestination(updateCtx, r.client)
+		if diags.HasError() {
 			resp.Diagnostics.Append(diags...)
 			return
 		}
@@ -372,7 +382,7 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 		if fileName == "" {
 			fileName = uploadName
 		}
-		uploadDiags := uploadAndPoll(updateCtx, r.client, plan.ID.ValueString(), fileName, uploadFile, local, localSize, previous, state.Size.ValueString())
+		uploadDiags := reuploadFromFile(updateCtx, r.client, route, &plan, &state, fileName, uploadFile, local, localSize, previous)
 		resp.Diagnostics.Append(uploadDiags...)
 		if uploadDiags.HasError() {
 			return
@@ -511,9 +521,9 @@ func isConfiguredString(v types.String) bool {
 // openHashUploadVerify drives the JCDS upload + verification poll for
 // Create. Opens the source exactly once, hashes from the open handle,
 // validates the optional user-supplied checksum, rewinds, streams to
-// UploadPackageV1, and polls until convergence. previous is empty
+// the preflight's route, and polls until convergence. previous is empty
 // on Create.
-func openHashUploadVerify(ctx context.Context, client *pro.Client, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
+func openHashUploadVerify(ctx context.Context, client uploadClient, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
 	file, filename, cleanup, err := files.OpenUploadSource(ctx, plan.PackageFileSource.ValueString(), files.DefaultMaxBytes)
 	if err != nil {
 		return errorDiag("Error opening package binary", err.Error())
@@ -543,10 +553,11 @@ func openHashUploadVerify(ctx context.Context, client *pro.Client, plan *Package
 	if fileName == "" {
 		fileName = filename
 	}
-	return uploadAndPoll(ctx, client, plan.ID.ValueString(), fileName, file, local, sz, previous, previousSize)
+	return uploadAndPoll(ctx, client, route, plan.ID.ValueString(), fileName, file, local, sz, previous, previousSize)
 }
 
-// preflightUploadDestination refuses an upload the tenant has nowhere to put.
+// preflightUploadDestination refuses an upload the tenant has nowhere to put
+// and, when it does not, says which route the bytes take.
 //
 // Every upload ends in a verification poll that waits for the cloud distribution
 // point to recompute the binary's hash. With no cloud distribution point
@@ -558,11 +569,16 @@ func openHashUploadVerify(ctx context.Context, client *pro.Client, plan *Package
 //
 // Only cdnType NONE is refused, and only because it is unambiguous: the tenant
 // states it has no cloud distribution point at all, so no upload can converge.
-// A non-Jamf-Cloud CDN (Amazon S3, Akamai, Rackspace) is left alone — this
-// provider has no wire evidence either way for those, and a preflight that
-// guessed would break a working configuration.
+// The endpoint answers 200 with cdnType NONE for that state, never 404, so an
+// absent record is treated the same way.
 //
-// A failed read does NOT block the upload. The check exists to convert a slow
+// The route is chosen from cdnType by routeForCdnType: JAMF_CLOUD uploads
+// direct to JCDS, every other type (Amazon S3, Akamai, Rackspace) through
+// UploadPackageV1, the only route that reaches those stores.
+//
+// A failed read does NOT block the upload, and takes the API route: the direct
+// route is used only when the tenant has confirmed JCDS, because on any other
+// distribution point it strands the file in JCDS storage. The check exists to convert a slow
 // failure into a fast one; letting a transient read failure become an apply
 // failure would trade that for a new one. The upload proceeds and, if the tenant
 // really has no distribution point, ends where it does today.
@@ -581,21 +597,23 @@ func openHashUploadVerify(ctx context.Context, client *pro.Client, plan *Package
 // upload this provider completed, which a tenant with no distribution point
 // cannot have done. Where the check refuses, state carries no hash and a
 // re-upload was always going to run.
-func preflightUploadDestination(ctx context.Context, client cloudDistributionPointReader) diag.Diagnostics {
+func preflightUploadDestination(ctx context.Context, client cloudDistributionPointReader) (uploadRoute, diag.Diagnostics) {
 	cdp, err := client.GetCloudDistributionPointV1(ctx)
 	if err != nil {
-		tflog.Warn(ctx, "could not read the cloud distribution point before uploading; proceeding", map[string]any{"err": err.Error()})
-		return nil
+		tflog.Warn(ctx, "could not read the cloud distribution point before uploading; proceeding by the API route", map[string]any{"err": err.Error()})
+		return uploadViaAPI, nil
 	}
 	if cdp == nil || strings.EqualFold(cdp.CdnType, pro.CloudDistributionPointCdnTypeNone) {
-		return errorDiag(
+		return uploadViaAPI, errorDiag(
 			"No cloud distribution point is configured",
 			"This package uploads a binary, and Jamf Pro has no cloud distribution point to hold it. An uploaded file could never be verified, so the upload would run until the timeout expired.\n\n"+
 				"Configure a cloud distribution point, in Settings → Server infrastructure → Cloud distribution point or with the jamfplatform_pro_cloud_distribution_point resource; where Terraform creates it in the same run, add a depends_on. "+
 				"Or remove package_file_source to manage the package record on its own and distribute the file another way.",
 		)
 	}
-	return nil
+	route := routeForCdnType(cdp.CdnType)
+	tflog.Debug(ctx, "package upload route chosen", map[string]any{"cdn_type": cdp.CdnType, "route": route.String()})
+	return route, nil
 }
 
 // cloudDistributionPointReader is the one SDK call preflightUploadDestination
@@ -619,7 +637,7 @@ const maxUploadAttempts = 5
 // from the open/hash phase lets Update reuse the open handle from the hash
 // decision; file must be seekable so a retry can rewind and resend the same
 // bytes.
-func uploadAndPoll(ctx context.Context, client *pro.Client, id, fileName string, file io.ReadSeeker, local fileDigests, localSize int64, previous fileDigests, previousSize string) diag.Diagnostics {
+func uploadAndPoll(ctx context.Context, client uploadClient, route uploadRoute, id, fileName string, file io.ReadSeeker, local fileDigests, localSize int64, previous fileDigests, previousSize string) diag.Diagnostics {
 	for attempt := 1; ; attempt++ {
 		if attempt > 1 {
 			if _, seekErr := file.Seek(0, io.SeekStart); seekErr != nil {
@@ -634,19 +652,15 @@ func uploadAndPoll(ctx context.Context, client *pro.Client, id, fileName string,
 			"local_size":    localSize,
 			"previous_sha3": previous.sha3,
 			"attempt":       attempt,
+			"route":         route.String(),
 		})
-		href, err := client.UploadPackageV1(ctx, id, fileName, file)
-		if err != nil {
-			tflog.Error(ctx, "package upload failed", map[string]any{"err": err.Error(), "attempt": attempt})
+		if err := uploadBinary(ctx, client, route, id, fileName, file); err != nil {
+			tflog.Error(ctx, "package upload failed", map[string]any{"err": err.Error(), "attempt": attempt, "route": route.String()})
 			return errorDiag("Error uploading Jamf Pro package binary", err.Error())
 		}
-		hrefStr := ""
-		if href != nil {
-			hrefStr = href.Href
-		}
-		tflog.Info(ctx, "package upload returned", map[string]any{"id": id, "href": hrefStr, "attempt": attempt})
+		tflog.Info(ctx, "package upload returned", map[string]any{"id": id, "attempt": attempt, "route": route.String()})
 
-		convergedPkg, pollErr := PollPackageVerification(ctx, client, id, fileName, local, localSize, previous, previousSize)
+		convergedPkg, pollErr := pollPackageVerification(ctx, client, pollInterval, verifyGrace, id, fileName, local, localSize, previous, previousSize)
 		if pollErr == nil {
 			converged := recordedDigests(convergedPkg)
 			tflog.Info(ctx, "package poll converged", map[string]any{
@@ -782,9 +796,9 @@ func streamingURLEnabled(plan PackageResourceModel) bool {
 // Trade is intentional: see schema description for the user-facing
 // rationale. Caller has already enforced `package_file_source` is a URL
 // (streamingURLEnabled guards entry).
-func streamURLUploadAndVerify(ctx context.Context, client *pro.Client, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
+func streamURLUploadAndVerify(ctx context.Context, client uploadClient, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
 	for attempt := 1; ; attempt++ {
-		diags, pollErr := streamURLUploadOnce(ctx, client, plan, previous, previousSize, attempt)
+		diags, pollErr := streamURLUploadOnce(ctx, client, route, plan, previous, previousSize, attempt)
 		if diags.HasError() {
 			return diags
 		}
@@ -792,7 +806,7 @@ func streamURLUploadAndVerify(ctx context.Context, client *pro.Client, plan *Pac
 			tflog.Warn(ctx, "package URL declared no Content-Length; staging to disk instead of streaming", map[string]any{
 				"id": plan.ID.ValueString(),
 			})
-			return openHashUploadVerify(ctx, client, plan, previous, previousSize)
+			return openHashUploadVerify(ctx, client, route, plan, previous, previousSize)
 		}
 		if pollErr == nil {
 			return nil
@@ -830,7 +844,7 @@ var errStreamSizeUnknown = errors.New("package URL declared no Content-Length")
 // diagnostics for anything that fails before the poll (opening the URL,
 // streaming the upload itself); otherwise returns the poll's error (nil on
 // convergence) for the caller's retry decision.
-func streamURLUploadOnce(ctx context.Context, client *pro.Client, plan *PackageResourceModel, previous fileDigests, previousSize string, attempt int) (diag.Diagnostics, error) {
+func streamURLUploadOnce(ctx context.Context, client uploadClient, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string, attempt int) (diag.Diagnostics, error) {
 	body, urlFilename, declaredSize, err := files.OpenURLStream(ctx, plan.PackageFileSource.ValueString(), files.DefaultMaxBytes)
 	if err != nil {
 		return errorDiag("Error opening package URL stream", err.Error()), nil
@@ -865,8 +879,9 @@ func streamURLUploadOnce(ctx context.Context, client *pro.Client, plan *PackageR
 		"id":        plan.ID.ValueString(),
 		"file_name": fileName,
 		"attempt":   attempt,
+		"route":     route.String(),
 	})
-	if _, err := client.UploadPackageV1(ctx, plan.ID.ValueString(), fileName, jamfplatform.SizedReader(pr, declaredSize)); err != nil {
+	if err := uploadBinary(ctx, client, route, plan.ID.ValueString(), fileName, jamfplatform.SizedReader(pr, declaredSize)); err != nil {
 		// Drain any remaining body so the goroutine exits cleanly.
 		_ = pr.CloseWithError(err)
 		return errorDiag("Error streaming Jamf Pro package upload", err.Error()), nil
@@ -875,7 +890,7 @@ func streamURLUploadOnce(ctx context.Context, client *pro.Client, plan *PackageR
 	local := digests.sum()
 	localSize := bytesStreamed
 
-	_, pollErr := PollPackageVerification(ctx, client, plan.ID.ValueString(), fileName, local, localSize, previous, previousSize)
+	_, pollErr := pollPackageVerification(ctx, client, pollInterval, verifyGrace, plan.ID.ValueString(), fileName, local, localSize, previous, previousSize)
 	return nil, pollErr
 }
 

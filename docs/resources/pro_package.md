@@ -15,6 +15,7 @@ description: |-
   |---|---|---|---|
   | Deployment | Packages | Create, Read, Update, Delete | `packages` |
   | Infrastructure | Cloud Distribution Point | Read | `cloud-distribution-point` |
+  | Infrastructure | Jamf Cloud Distribution Service files | Create | `jamf-cloud-distribution-service-files` |
 ---
 
 # jamfplatform_pro_package (Resource)
@@ -45,6 +46,7 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 |---|---|---|---|
 | Deployment | Packages | Create, Read, Update, Delete | `packages` |
 | Infrastructure | Cloud Distribution Point | Read | `cloud-distribution-point` |
+| Infrastructure | Jamf Cloud Distribution Service files | Create | `jamf-cloud-distribution-service-files` |
 
 ## Example Usage
 
