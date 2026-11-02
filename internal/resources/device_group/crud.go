@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -193,8 +194,25 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 
 	plan.ID = types.StringValue(created.ID)
 
-	if !r.refreshDeviceGroupState(createCtx, created.ID, &plan, manageMembers, manageDescription, &resp.Diagnostics) {
-		return
+	// A failed read-back still records the group. It exists on the tenant, so
+	// returning no state orphans it and the next apply is refused for a duplicate
+	// name. A warning rather than an error: an error from a create that the
+	// server accepted taints the group, and a large smart group that is only
+	// slow to read would then be destroyed and re-created on the next apply.
+	var readDiags diag.Diagnostics
+	if !r.refreshDeviceGroupState(createCtx, created.ID, &plan, manageMembers, manageDescription, &readDiags) {
+		plan.MemberCount = types.Int64Null()
+		var detail strings.Builder
+		for _, d := range readDiags.Errors() {
+			detail.WriteString("\n\n" + d.Summary() + ": " + d.Detail())
+		}
+		resp.Diagnostics.AddWarning(
+			"Created the device group but could not read it back",
+			"The group was created with ID \""+created.ID+"\" and Terraform has recorded it, so it is not left behind to import by hand. "+
+				"State holds the configured values and a null member_count until the next refresh reads the group."+detail.String(),
+		)
+	} else {
+		resp.Diagnostics.Append(readDiags...)
 	}
 	plan.Criteria = restoreAuthoredDSGroupCriteria(plan.Criteria, authoredDSGroups)
 	plan.Criteria = restoreAuthoredGroupRefCriteria(plan.Criteria, authoredGroupRefs, dsObjectType(plan.DeviceType.ValueString()))
