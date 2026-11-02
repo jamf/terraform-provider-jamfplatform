@@ -19,6 +19,7 @@ var resourceSDKMethods = []string{
 	"GetDeviceGroup",
 	"UpdateDeviceGroup",
 	"DeleteDeviceGroup",
+	"ListDeviceGroups",
 	"ListDeviceGroupMembers",
 	"UpdateDeviceGroupMembers",
 }

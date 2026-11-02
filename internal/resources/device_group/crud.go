@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,14 +18,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/devicegroups"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/groupcollision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
-const (
-	deviceGroupCreateRetryDelay = 10 * time.Second
-	deviceGroupDeleteRetryDelay = 10 * time.Second
-)
+const deviceGroupDeleteRetryDelay = 10 * time.Second
+
+// deviceGroupCreateRetryDelay is a var so tests can shorten the create polls.
+var deviceGroupCreateRetryDelay = 10 * time.Second
 
 // isDeletePropagationConflict reports whether a device-group DELETE error is a
 // transient 406/409 raised while a dependent resource that referenced the group
@@ -183,8 +185,23 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 		}
 	}
 
+	// Snapshot same-named groups first, so a create whose response is lost can
+	// tell the groups it made from ones that were already there.
+	before, beforeErr := r.deviceGroupIDsNamed(createCtx, reqBody.Name, reqBody.DeviceType)
+
 	created, err := r.client.CreateDeviceGroup(createCtx, reqBody)
-	if err != nil {
+	var createdID string
+	switch {
+	case err == nil:
+		createdID = created.ID
+	case beforeErr == nil && createOutcomeUnknown(err):
+		var recoverDiags diag.Diagnostics
+		createdID, recoverDiags = r.recoverCreatedDeviceGroup(createCtx, reqBody.Name, reqBody.DeviceType, before, err)
+		resp.Diagnostics.Append(recoverDiags...)
+		if createdID == "" {
+			return
+		}
+	default:
 		resp.Diagnostics.AddError(
 			"Error creating device group",
 			helpers.APIErrorDetail(err)+r.pd.CollisionChecker().CreateConflictHint(err, groupcollision.DeviceGroupResourceType),
@@ -192,7 +209,7 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	plan.ID = types.StringValue(created.ID)
+	plan.ID = types.StringValue(createdID)
 
 	// A failed read-back still records the group. It exists on the tenant, so
 	// returning no state orphans it and the next apply is refused for a duplicate
@@ -200,7 +217,7 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 	// server accepted taints the group, and a large smart group that is only
 	// slow to read would then be destroyed and re-created on the next apply.
 	var readDiags diag.Diagnostics
-	if !r.refreshDeviceGroupState(createCtx, created.ID, &plan, manageMembers, manageDescription, &readDiags) {
+	if !r.refreshDeviceGroupState(createCtx, createdID, &plan, manageMembers, manageDescription, &readDiags) {
 		plan.MemberCount = types.Int64Null()
 		var detail strings.Builder
 		for _, d := range readDiags.Errors() {
@@ -208,7 +225,7 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 		}
 		resp.Diagnostics.AddWarning(
 			"Created the device group but could not read it back",
-			"The group was created with ID \""+created.ID+"\" and Terraform has recorded it, so it is not left behind to import by hand. "+
+			"The group was created with ID \""+createdID+"\" and Terraform has recorded it, so it is not left behind to import by hand. "+
 				"State holds the configured values and a null member_count until the next refresh reads the group."+detail.String(),
 		)
 	} else {
@@ -231,7 +248,7 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	tflog.Trace(ctx, "created device group", map[string]any{
-		"id":         created.ID,
+		"id":         createdID,
 		"group_type": plan.GroupType.ValueString(),
 	})
 
@@ -497,4 +514,106 @@ func (r *DeviceGroupResource) Delete(ctx context.Context, req resource.DeleteReq
 	if pollErr != nil {
 		resp.Diagnostics.AddError("Error deleting device group", helpers.APIErrorDetail(pollErr))
 	}
+}
+
+// createOutcomeUnknown reports whether a failed create may still have made the
+// group. A 4xx is a refusal. A 5xx or a lost response is not: a gateway that
+// gives up on a slow create returns 504 while the platform carries on, and
+// for a large smart group that has been seen to leave the group behind.
+func createOutcomeUnknown(err error) bool {
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+	if apiErr := jamfplatform.AsAPIError(err); apiErr != nil {
+		return apiErr.StatusCode == 0 || apiErr.StatusCode >= http.StatusInternalServerError
+	}
+	return true
+}
+
+// deviceGroupIDsNamed returns the IDs of the groups with this name and device
+// type. Jamf compares group names without regard to case, so this does too.
+func (r *DeviceGroupResource) deviceGroupIDsNamed(ctx context.Context, name, deviceType string) (map[string]bool, error) {
+	groups, err := r.client.ListDeviceGroups(ctx, nil, filters.Clause("name", "==", name))
+	if err != nil {
+		return nil, err
+	}
+	ids := map[string]bool{}
+	for _, g := range groups {
+		if strings.EqualFold(g.Name, name) && strings.EqualFold(g.DeviceType, deviceType) {
+			ids[g.ID] = true
+		}
+	}
+	return ids, nil
+}
+
+// recoverCreatedDeviceGroup finds the group a create made when the create's
+// response was lost, and returns its ID, or "" with an error diagnostic.
+//
+// It polls for same-named groups that were not there before the create, and
+// waits until two polls in a row agree, because the platform has been seen to
+// make the group twice from one request. When there is more than one, it keeps
+// the one with the highest Jamf Pro ID and reports the rest. It never deletes:
+// that would change scope without a plan showing it.
+func (r *DeviceGroupResource) recoverCreatedDeviceGroup(ctx context.Context, name, deviceType string, before map[string]bool, createErr error) (string, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	fail := func(why string) (string, diag.Diagnostics) {
+		diags.AddError("Error creating device group",
+			helpers.APIErrorDetail(createErr)+"\n\nThe create may still have made the group. "+why+
+				" Check Jamf for a group named \""+name+"\" and import it before the next apply.")
+		return "", diags
+	}
+
+	var found []string
+	pollErr := jamfplatform.PollUntil(ctx, deviceGroupCreateRetryDelay, func(pollCtx context.Context) (bool, error) {
+		now, err := r.deviceGroupIDsNamed(pollCtx, name, deviceType)
+		if err != nil {
+			return false, err
+		}
+		var fresh []string
+		for id := range now {
+			if !before[id] {
+				fresh = append(fresh, id)
+			}
+		}
+		settled := len(fresh) > 0 && len(fresh) == len(found)
+		found = fresh
+		return settled, nil
+	})
+	if len(found) == 0 {
+		if pollErr != nil {
+			return fail("Looking for it failed: " + helpers.APIErrorDetail(pollErr) + ".")
+		}
+		return fail("No new group with this name appeared before the create timeout.")
+	}
+
+	keep := found[0]
+	if len(found) > 1 {
+		best := -1
+		for _, id := range found {
+			proID, _ := resolveJamfProID(ctx, r.proClient, r.pd, id)
+			n, err := strconv.Atoi(proID.ValueString())
+			if err != nil {
+				return fail("It made " + strconv.Itoa(len(found)) + " groups with this name (" + strings.Join(found, ", ") +
+					") and their Jamf Pro IDs could not be read to choose one.")
+			}
+			if n > best {
+				best, keep = n, id
+			}
+		}
+	}
+
+	detail := "The create response was lost (" + helpers.APIErrorDetail(createErr) + "), but the group was made. " +
+		"Terraform found it by name and recorded ID \"" + keep + "\"."
+	if len(found) > 1 {
+		var extra []string
+		for _, id := range found {
+			if id != keep {
+				extra = append(extra, id)
+			}
+		}
+		detail += " Jamf made " + strconv.Itoa(len(found)) + " groups with this name from one request. " +
+			"Terraform kept the one with the highest Jamf Pro ID. Delete the others in Jamf: " + strings.Join(extra, ", ") + "."
+	}
+	diags.AddWarning("Recovered a device group whose create response was lost", detail)
+	return keep, diags
 }
