@@ -298,13 +298,13 @@ func sleepCtx(ctx context.Context, d time.Duration) bool {
 // that helper's advice for a gateway page says the request never reached Jamf
 // and nothing changed, which is the one thing this warning exists to contradict.
 func adoptedCreateWarning(id string, extras []string, createErr error) (summary, detail string) {
-	summary = "Adopted a device group the API reported as failed"
-	detail = fmt.Sprintf("The create request failed with: %s\n\nThe group exists, matches this configuration, and Terraform now manages it as %s. "+
-		"The Platform device group API can create a smart group and then fail the request, so this error does not mean the group is missing.",
+	summary = "Adopted a device group whose create reported a failure"
+	detail = fmt.Sprintf("The create failed with: %s\n\nThe group exists, matches this configuration, and Terraform now manages it as %s. "+
+		"Jamf can create a smart group and then report the create as failed, so this error does not mean the group is missing.",
 		createErr.Error(), id)
 	if len(extras) > 0 {
-		detail += fmt.Sprintf("\n\nThe same request left %d more group(s) with the same name and configuration: %s. Terraform does not manage them. "+
-			"Delete them in Jamf Pro, or with DELETE /device-groups/v1/device-groups/{id}. The provider does not delete them because a delete cannot be undone.",
+		detail += fmt.Sprintf("\n\nThe same create left %d more group(s) with the same name and configuration: %s. Terraform does not manage them. "+
+			"Delete them in Jamf Pro. The provider does not delete them because a delete cannot be undone.",
 			len(extras), strings.Join(extras, ", "))
 	}
 	return summary, detail
@@ -313,6 +313,6 @@ func adoptedCreateWarning(id string, extras []string, createErr error) (summary,
 // mismatchedCreateDetail is appended to the create error when a same-name group
 // appeared that this configuration did not ask for.
 func mismatchedCreateDetail(ids []string) string {
-	return fmt.Sprintf("\n\nIgnore any advice above that says nothing changed; it is wrong for this endpoint. A group with this name appeared while the request ran, but it does not match this configuration or could not be read back, so Terraform did not adopt it: %s. "+
-		"If one of them is the group this request made, import it with `terraform import`. If not, another writer is using this name.", strings.Join(ids, ", "))
+	return fmt.Sprintf("\n\nIgnore any advice above that says nothing changed; it is wrong for device group creates. A group with this name appeared while the create ran, but it does not match this configuration or could not be read back, so Terraform did not adopt it: %s. "+
+		"If one of them is the group this create made, import it with `terraform import`. If not, another writer is using this name.", strings.Join(ids, ", "))
 }
