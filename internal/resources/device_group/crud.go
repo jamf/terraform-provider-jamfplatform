@@ -134,6 +134,13 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	release, err := r.pd.AcquireDeviceGroupWrite(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError("Error creating device group", "Waiting for an earlier device group write to finish was interrupted: "+helpers.APIErrorDetail(err))
+		return
+	}
+	defer release()
+
 	createCtx, cancel := context.WithTimeout(ctx, createTimeout)
 	defer cancel()
 
@@ -182,13 +189,38 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 		}
 	}
 
+	before := r.snapshotNamedGroups(createCtx, reqBody.Name, reqBody.DeviceType)
+
 	created, err := r.client.CreateDeviceGroup(createCtx, reqBody)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating device group",
-			helpers.APIErrorDetail(err)+r.pd.CollisionChecker().CreateConflictHint(err, groupcollision.DeviceGroupResourceType),
-		)
-		return
+		var mismatchDetail string
+		if before.usable && isAmbiguousCreateFailure(err) {
+			if createCtx.Err() != nil {
+				var renew context.CancelFunc
+				createCtx, renew = context.WithTimeout(ctx, createTimeout)
+				defer renew()
+			}
+			result := r.reconcileCreate(createCtx, reqBody, before)
+			switch result.outcome {
+			case reconcileAdopted:
+				summary, detail := adoptedCreateWarning(result.id, result.extras, err)
+				resp.Diagnostics.AddWarning(summary, detail)
+				tflog.Warn(ctx, "adopted a device group whose create returned an error", map[string]any{
+					"id":     result.id,
+					"extras": result.extras,
+				})
+				created, err = &devicegroups.HrefRepresentation{ID: result.id}, nil
+			case reconcileMismatch:
+				mismatchDetail = mismatchedCreateDetail(result.mismatched)
+			}
+		}
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating device group",
+				helpers.APIErrorDetail(err)+mismatchDetail+r.pd.CollisionChecker().CreateConflictHint(err, groupcollision.DeviceGroupResourceType),
+			)
+			return
+		}
 	}
 
 	plan.ID = types.StringValue(created.ID)
@@ -447,6 +479,13 @@ func (r *DeviceGroupResource) Delete(ctx context.Context, req resource.DeleteReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	release, err := r.pd.AcquireDeviceGroupWrite(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError("Error deleting device group", "Waiting for an earlier device group write to finish was interrupted: "+helpers.APIErrorDetail(err))
+		return
+	}
+	defer release()
 
 	deleteCtx, cancel := context.WithTimeout(ctx, deleteTimeout)
 	defer cancel()

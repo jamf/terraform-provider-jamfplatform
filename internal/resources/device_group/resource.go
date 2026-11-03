@@ -90,7 +90,7 @@ func (r *DeviceGroupResource) IdentitySchema(ctx context.Context, req resource.I
 func (r *DeviceGroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Version:             1,
-		MarkdownDescription: "Manages a Jamf device group, static or smart. Requires **Device Group Inventory API** access." + resourcePrivileges,
+		MarkdownDescription: "Manages a Jamf device group, static or smart. Requires **Device Group Inventory API** access.\n\n~> **Large smart groups.** Creating a smart group with tens of thousands of members can return `422` (name already exists) or `504` even though the group was created. The provider checks for the group after such a failure and adopts it with a warning; if the same request left identical duplicates, it lists them and does not delete them. The provider creates and deletes device groups one at a time, so a plan with many large groups is slow rather than failing." + resourcePrivileges,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Unique identifier assigned by the platform.",

@@ -20,25 +20,27 @@ import (
 var clientCallRE = regexp.MustCompile(`\bclient\.([A-Za-z0-9]+)\(`)
 
 // calledSDKMethods returns the distinct devicegroups client method names called
-// in the named construct source file.
-func calledSDKMethods(t *testing.T, filename string) map[string]bool {
+// in the named construct source files.
+func calledSDKMethods(t *testing.T, filenames ...string) map[string]bool {
 	t.Helper()
-	src, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatalf("reading %s: %v", filename, err)
-	}
 	called := map[string]bool{}
-	for _, m := range clientCallRE.FindAllStringSubmatch(string(src), -1) {
-		called[m[1]] = true
+	for _, filename := range filenames {
+		src, err := os.ReadFile(filename)
+		if err != nil {
+			t.Fatalf("reading %s: %v", filename, err)
+		}
+		for _, m := range clientCallRE.FindAllStringSubmatch(string(src), -1) {
+			called[m[1]] = true
+		}
 	}
 	return called
 }
 
 // assertMatch fails if the source file calls an SDK method not declared, or
 // declares one it does not call — keeping the privileges table honest.
-func assertMatch(t *testing.T, filename string, declared []string) {
+func assertMatch(t *testing.T, filename string, declared []string, alsoScan ...string) {
 	t.Helper()
-	called := calledSDKMethods(t, filename)
+	called := calledSDKMethods(t, append([]string{filename}, alsoScan...)...)
 	want := map[string]bool{}
 	for _, m := range declared {
 		want[m] = true
@@ -76,10 +78,11 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 	}
 }
 
-// TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
-// not declared in resourceSDKMethods, or declares one it does not call.
+// TestResourceSDKMethods_MatchCRUDCalls fails if crud.go or reconcile.go (the
+// failed-create lookup, which is part of Create) calls an SDK method not declared
+// in resourceSDKMethods, or declares one they do not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods)
+	assertMatch(t, "crud.go", resourceSDKMethods, "reconcile.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into
