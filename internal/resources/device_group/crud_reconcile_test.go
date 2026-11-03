@@ -255,7 +255,7 @@ func TestCreate_AdoptsGroupAfterNameExists422(t *testing.T) {
 		t.Fatalf("id = %q, want the group the failed create made", got)
 	}
 	warns := resp.Diagnostics.Warnings()
-	if len(warns) != 1 || !strings.Contains(warns[0].Summary(), "adopted") {
+	if len(warns) != 1 || !strings.Contains(warns[0].Summary(), "Adopted") {
 		t.Fatalf("adoption must be reported as exactly one warning, got %v", warns)
 	}
 	if posts, _ := f.counts(); posts != 1 {
@@ -315,7 +315,7 @@ func TestCreate_DoesNotAdoptAGroupThatDiffersFromTheRequest(t *testing.T) {
 	if !resp.Diagnostics.HasError() {
 		t.Fatal("a same-name group with different criteria is someone else's and must not be adopted")
 	}
-	if detail := resp.Diagnostics.Errors()[0].Detail(); !strings.Contains(detail, reconcileTestFirst) || !strings.Contains(detail, "not adopted") {
+	if detail := resp.Diagnostics.Errors()[0].Detail(); !strings.Contains(detail, reconcileTestFirst) || !strings.Contains(detail, "did not adopt") {
 		t.Fatalf("the error must name the group it declined: %s", detail)
 	}
 }
@@ -342,7 +342,7 @@ func TestCreate_NoGroupAppearedReportsTheOriginalError(t *testing.T) {
 	if !resp.Diagnostics.HasError() {
 		t.Fatal("a 502 that made nothing must still fail")
 	}
-	if detail := resp.Diagnostics.Errors()[0].Detail(); strings.Contains(detail, "not adopted") {
+	if detail := resp.Diagnostics.Errors()[0].Detail(); strings.Contains(detail, "did not adopt") {
 		t.Fatalf("with no candidate there is nothing to decline: %s", detail)
 	}
 	if _, lists := f.counts(); lists != 1+reconcileAttempts {

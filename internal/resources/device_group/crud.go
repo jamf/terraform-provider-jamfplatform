@@ -136,7 +136,7 @@ func (r *DeviceGroupResource) Create(ctx context.Context, req resource.CreateReq
 
 	release, err := r.pd.AcquireDeviceGroupWrite(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating device group", "Waiting for an earlier device group write to finish was interrupted: "+helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error creating device group", "Stopped while waiting for an earlier device group write to finish: "+helpers.APIErrorDetail(err))
 		return
 	}
 	defer release()
@@ -482,7 +482,7 @@ func (r *DeviceGroupResource) Delete(ctx context.Context, req resource.DeleteReq
 
 	release, err := r.pd.AcquireDeviceGroupWrite(ctx)
 	if err != nil {
-		resp.Diagnostics.AddError("Error deleting device group", "Waiting for an earlier device group write to finish was interrupted: "+helpers.APIErrorDetail(err))
+		resp.Diagnostics.AddError("Error deleting device group", "Stopped while waiting for an earlier device group write to finish: "+helpers.APIErrorDetail(err))
 		return
 	}
 	defer release()
