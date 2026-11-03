@@ -71,10 +71,11 @@ type reconcileResult struct {
 // isAmbiguousCreateFailure reports whether a failed create leaves it unknown
 // whether the group was made.
 //
-// The Platform device group API creates a large smart group and then fails the
-// request: 22,000-member creates ended in `422 A resource by the specified name
-// already exists` after about 16s or in a CloudFront `504` after 30s, and in
-// every run the group existed afterwards, twice after some 504s. The client sent
+// The Platform device group API creates a smart group and then fails the
+// request. Measured with 22,000-member groups, and reported above 1,000 members
+// depending on instance load. Those creates ended in `422 A resource by the
+// specified name already exists` after about 16s or in a CloudFront `504` after
+// 30s, and in every run the group existed afterwards, twice after some 504s. The client sent
 // one POST; whatever retries does so behind it. So the response says nothing
 // about whether the group exists, and treating it as "not created" orphans a
 // live group the next apply then collides with.
@@ -299,7 +300,7 @@ func sleepCtx(ctx context.Context, d time.Duration) bool {
 func adoptedCreateWarning(id string, extras []string, createErr error) (summary, detail string) {
 	summary = "Adopted a device group the API reported as failed"
 	detail = fmt.Sprintf("The create request failed with: %s\n\nThe group exists, matches this configuration, and Terraform now manages it as %s. "+
-		"The Platform device group API can create a large smart group and then fail the request, so this error does not mean the group is missing.",
+		"The Platform device group API can create a smart group and then fail the request, so this error does not mean the group is missing.",
 		createErr.Error(), id)
 	if len(extras) > 0 {
 		detail += fmt.Sprintf("\n\nThe same request left %d more group(s) with the same name and configuration: %s. Terraform does not manage them. "+

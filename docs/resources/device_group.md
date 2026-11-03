@@ -4,7 +4,7 @@ page_title: "jamfplatform_device_group Resource - terraform-provider-jamfplatfor
 subcategory: ""
 description: |-
   Manages a Jamf device group, static or smart. Requires Device Group Inventory API access.
-  ~> Large smart groups. Creating a smart group with tens of thousands of members can return 422 (name already exists) or 504 after the API has created the group. When that happens, the provider looks for the group, adopts it, and shows a warning. If the request also left duplicates, the warning lists them; the provider does not delete them. The provider creates and deletes device groups one at a time, so a plan with many large groups runs slowly.
+  ~> Smart groups with many members. Creating a smart group can return 422 (name already exists) or 504 after the API has created the group, more often when the group has many members or the instance is under load. When that happens, the provider looks for the group, adopts it, and shows a warning. If the request also left duplicates, the warning lists them; the provider does not delete them. The provider creates and deletes device groups one at a time, so a plan with many groups runs slowly.
   Required Jamf permissions
   Jamf lists this under Platform environment scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
@@ -16,7 +16,7 @@ description: |-
 
 Manages a Jamf device group, static or smart. Requires **Device Group Inventory API** access.
 
-~> **Large smart groups.** Creating a smart group with tens of thousands of members can return `422` (name already exists) or `504` after the API has created the group. When that happens, the provider looks for the group, adopts it, and shows a warning. If the request also left duplicates, the warning lists them; the provider does not delete them. The provider creates and deletes device groups one at a time, so a plan with many large groups runs slowly.
+~> **Smart groups with many members.** Creating a smart group can return `422` (name already exists) or `504` after the API has created the group, more often when the group has many members or the instance is under load. When that happens, the provider looks for the group, adopts it, and shows a warning. If the request also left duplicates, the warning lists them; the provider does not delete them. The provider creates and deletes device groups one at a time, so a plan with many groups runs slowly.
 
 **Required Jamf permissions**
 

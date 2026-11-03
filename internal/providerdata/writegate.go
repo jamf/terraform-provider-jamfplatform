@@ -32,7 +32,7 @@ func (g *writeGate) acquire(ctx context.Context) (func(), error) {
 // own context and starts any operation deadline only after this returns: time
 // spent queued is not time the API spent working.
 //
-// The Platform device group API answers a create of a large smart group by
+// The Platform device group API answers a create of a smart group by
 // creating it and then failing the request, and the failure rate and the
 // tenant-wide damage rise with the number of writes in flight: three at once
 // produced 504s with duplicate groups, and four at once was followed by a 502
