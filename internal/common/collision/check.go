@@ -39,6 +39,8 @@ func (c *Checker) Check(ctx context.Context, req Request) diag.Diagnostics {
 		return diags
 	}
 
+	c.noteRules(req.ResourceType, req.Namespace)
+
 	fresh := newKeys(req)
 	if len(fresh) == 0 {
 		return diags

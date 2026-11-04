@@ -119,3 +119,21 @@ func TestNoteManagedState(t *testing.T) {
 	nilChecker.NoteManagedState(context.Background(), testResourceType, state(&id))
 	c.NoteManagedState(context.Background(), testResourceType, nil)
 }
+
+// TestCreateConflictHint_RecordedByCheck guards resources that call Check directly
+// instead of through ReportPlan or ReportAttributePlan: the rules the hint names are
+// recorded by the check itself, so a 409 on create is still explained.
+func TestCreateConflictHint_RecordedByCheck(t *testing.T) {
+	c := newChecker(ModeError, false)
+	conflict := &jamfplatform.APIResponseError{StatusCode: 409}
+	if got := c.CreateConflictHint(conflict, testResourceType); got != "" {
+		t.Fatalf("no rules recorded yet, hint must be empty: %q", got)
+	}
+
+	c.Check(context.Background(), request(widgetNamespace(nil, nil), []string{"a"}, nil, ""))
+
+	got := c.CreateConflictHint(conflict, testResourceType)
+	if !strings.Contains(got, "Another resource in this configuration") {
+		t.Errorf("a direct Check must record the rules the hint names:\n%q", got)
+	}
+}
