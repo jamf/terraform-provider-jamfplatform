@@ -23,7 +23,9 @@ import (
 // artifacts):
 //
 //   - `use_generic = true` or unset → the server uses the bundled macOS
-//     Generic.ppd and clears any user-supplied PPD trio values. So `ppd`,
+//     Generic.ppd and ignores any user-supplied PPD trio values (an explicit
+//     true over the API discards them; a filename stored by a UI upload is
+//     kept server-side but inert, and the provider reads it back as null). So `ppd`,
 //     `ppd_path`, and `ppd_contents` must all be unset in the user's config.
 //
 //   - `use_generic = false` → the server expects the user to supply a
@@ -79,7 +81,7 @@ func (useGenericPPDConfigValidator) ValidateResource(ctx context.Context, req re
 			resp.Diagnostics.AddAttributeError(
 				path.Root(attr),
 				fmt.Sprintf("%s forbidden when use_generic is true", attr),
-				fmt.Sprintf("`%s` cannot be set when `use_generic` is true (or omitted) — the Jamf Pro server replaces any user-supplied PPD with the bundled Generic.ppd. To supply a custom PPD set `use_generic = false` and populate `ppd_path` (and optionally `ppd` and `ppd_contents`).", attr),
+				fmt.Sprintf("`%s` cannot be set when `use_generic` is true (or omitted) — the Jamf Pro server ignores any user-supplied PPD and uses the bundled Generic.ppd. To supply a custom PPD set `use_generic = false` and populate `ppd_path` (and optionally `ppd` and `ppd_contents`).", attr),
 			)
 		}
 		return
