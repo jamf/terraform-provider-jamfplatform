@@ -6,6 +6,7 @@ package printer
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -138,8 +139,43 @@ func (noLiteralSentinelValidator) ValidateString(ctx context.Context, req valida
 	}
 }
 
+// bundledGenericPPDPathValidator rejects the bundled Generic.ppd path as a
+// `ppd_path`. Jamf Pro trims surrounding whitespace and then treats that path
+// as the generic-PPD gate, setting use_generic back to true and leaving apply
+// with different use_generic, ppd and ppd_path values than the plan. The path
+// is invalid in every mode, since use_generic = true already forbids any
+// ppd_path, so the rule reads no sibling. It compares the trimmed value
+// because a file() or heredoc source adds a trailing newline that
+// stringvalidator.NoneOf would not match.
+type bundledGenericPPDPathValidator struct{}
+
+// Description returns a plain-text description of the validator.
+func (bundledGenericPPDPathValidator) Description(context.Context) string {
+	return "ppd_path cannot be the bundled Generic.ppd path"
+}
+
+// MarkdownDescription returns the markdown description.
+func (v bundledGenericPPDPathValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+// ValidateString rejects the bundled path, ignoring surrounding whitespace.
+func (bundledGenericPPDPathValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	if strings.TrimSpace(req.ConfigValue.ValueString()) == bundledGenericPPDPath {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"ppd_path is the bundled Generic.ppd path",
+			"Jamf Pro treats the bundled macOS Generic.ppd path as a request to use the generic PPD and sets `use_generic` back to true, so the printer no longer matches this configuration. Set `use_generic = true` and omit `ppd`, `ppd_path` and `ppd_contents`, or point `ppd_path` at a specific installed PPD file.",
+		)
+	}
+}
+
 // Compile-time interface assertions.
 var (
+	_ validator.String         = bundledGenericPPDPathValidator{}
 	_ resource.ConfigValidator = useGenericPPDConfigValidator{}
 	_ validator.String         = noLiteralSentinelValidator{}
 )

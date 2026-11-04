@@ -381,7 +381,7 @@ func TestAccResource_ProPrinter_PPDValidator_RejectsBundledGenericPath(t *testin
 						ppd_path    = %q
 					}
 				`, name, bundledGenericPPDPath),
-				ExpectError: regexp.MustCompile(`ppd_path\s+value\s+must\s+be\s+none\s+of`),
+				ExpectError: regexp.MustCompile(`ppd_path\s+is\s+the\s+bundled\s+Generic\.ppd\s+path`),
 			},
 		},
 	})

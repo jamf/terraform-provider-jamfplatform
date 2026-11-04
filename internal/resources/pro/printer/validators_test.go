@@ -154,6 +154,8 @@ func TestPPDPathRejectsBundledGenericPath(t *testing.T) {
 		wantErr bool
 	}{
 		{"bundled path", types.StringValue(bundledGenericPPDPath), true},
+		{"bundled path with trailing newline", types.StringValue(bundledGenericPPDPath + "\n"), true},
+		{"bundled path padded both sides", types.StringValue("  " + bundledGenericPPDPath + "\t"), true},
 		{"custom path", types.StringValue("/private/etc/cups/ppd/Epson.ppd"), false},
 		{"different case is not the gate", types.StringValue("/system/library" + bundledGenericPPDPath[len("/System/Library"):]), false},
 		{"longer suffix is not the gate", types.StringValue(bundledGenericPPDPath + ".bak"), false},
@@ -170,5 +172,12 @@ func TestPPDPathRejectsBundledGenericPath(t *testing.T) {
 				t.Errorf("error = %v, want %v: %v", got, tc.wantErr, resp.Diagnostics)
 			}
 		})
+	}
+}
+
+func TestBundledGenericPPDPathValidator_Descriptions(t *testing.T) {
+	v := bundledGenericPPDPathValidator{}
+	if v.Description(context.Background()) == "" || v.MarkdownDescription(context.Background()) == "" {
+		t.Error("descriptions must be non-empty")
 	}
 }

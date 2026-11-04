@@ -152,7 +152,7 @@ func (r *PrinterResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Optional:            true,
 				Computed:            true,
 				Validators: []validator.String{
-					stringvalidator.NoneOf(bundledGenericPPDPath),
+					bundledGenericPPDPathValidator{},
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
