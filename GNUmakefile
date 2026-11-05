@@ -12,6 +12,7 @@ lint:
 	golangci-lint run
 	golangci-lint run --build-tags acctargets ./scripts/acctargets/
 	golangci-lint run --build-tags deprecationsweep ./scripts/deprecationsweep/
+	golangci-lint run --build-tags skipkeycanary ./scripts/skipkeycanary/
 
 generate:
 	cd tools; go generate ./...
@@ -55,7 +56,7 @@ fix: export GOTOOLCHAIN = $(GO_MOD_TOOLCHAIN)
 fix:
 	go fix ./...
 	go fix -tags acceptance ./...
-	go fix -tags acctargets,acclanes,deprecationsweep ./scripts/...
+	go fix -tags acctargets,acclanes,deprecationsweep,skipkeycanary ./scripts/...
 
 test:
 	go test -v -cover -count=1 -timeout=120s -p=10 ./...
@@ -87,6 +88,7 @@ test-scripts:
 	go test -count=1 -tags acctargets ./scripts/acctargets/
 	go test -count=1 -tags acclanes ./scripts/acclanes/
 	go test -count=1 -tags deprecationsweep ./scripts/deprecationsweep/
+	go test -count=1 -tags skipkeycanary ./scripts/skipkeycanary/
 
 # testacc-changed runs acceptance tests only for the packages affected by the
 # current change set: the changed packages plus everything that transitively

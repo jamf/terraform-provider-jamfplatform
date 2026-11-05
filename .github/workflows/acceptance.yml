@@ -205,6 +205,15 @@ jobs:
     if: needs.plan.outputs.matrix != '[]'
     runs-on: ubuntu-latest
     environment: acceptance
+    # A job-level block REPLACES the workflow-level one, so contents and pull-requests are
+    # restated. issues: write is here for one step only, the skip-key canary at the end of
+    # the pro lane, which files an issue when Jamf Pro's PreStage skip list drifts from the
+    # provider's tables. GitHub offers no step-level permission, so every lane carries it;
+    # no other step reads the token.
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write
     # The lane's ceiling comes from the lane table, and `go test -timeout` below
     # is NOT a substitute for it: that flag is per TEST BINARY, and `go test`
     # builds one per package, so at the pro lane's 110 packages a wedged package
@@ -622,6 +631,54 @@ jobs:
               echo "</details>"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # The skip-key canary rides the nightly pro lane rather than owning a workflow, so it
+      # holds the lane's own concurrency group (acceptance-lane-pro) and can never overlap the
+      # suite or another run of it. It uploads the same ADE token the suite's fixtures upload,
+      # and two uploads of one token race. A workflow of its own would have to share the group,
+      # and a group admits one pending job: a third arrival cancels the pending one, so the
+      # canary would be dropped silently or would cancel an unrelated PR's pro lane.
+      #
+      # Scheduled and manual runs only. Pull requests skip it: it probes Jamf Pro, not the
+      # change under review, and an upload of the shared ADE token per PR run would only add
+      # estate churn.
+      # `!cancelled()` rather than `always()`: a failed suite still gets its canary, a cancelled
+      # run does not start one and leave estate objects behind. Drift does not fail the step
+      # (it files an issue and exits 0); authentication, upload and cleanup errors do, and so
+      # does a missing secret.
+      - name: Require the skip-key canary credentials
+        if: ${{ !cancelled() && steps.guard.outputs.superseded != 'true' && matrix.lane == 'pro' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+        env:
+          JAMFPLATFORM_ACC_PRO_DEP_TOKEN: ${{ secrets.JAMFPLATFORM_ACC_PRO_DEP_TOKEN }}
+          CANARY_BASE_URL: ${{ secrets[format('{0}_BASE_URL', matrix.secret_prefix)] }}
+          CANARY_CLIENT_ID: ${{ secrets[format('{0}_CLIENT_ID', matrix.secret_prefix)] }}
+          CANARY_CLIENT_SECRET: ${{ secrets[format('{0}_CLIENT_SECRET', matrix.secret_prefix)] }}
+          CANARY_ENVIRONMENT_ID: ${{ secrets.JAMFPLATFORM_ACC_ENVIRONMENT_ID }}
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in CANARY_BASE_URL CANARY_CLIENT_ID CANARY_CLIENT_SECRET CANARY_ENVIRONMENT_ID \
+                      JAMFPLATFORM_ACC_PRO_DEP_TOKEN; do
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::The skip-key canary cannot run without these values:$missing"
+            exit 1
+          fi
+
+      - name: Compare PreStage skip keys
+        if: ${{ !cancelled() && steps.guard.outputs.superseded != 'true' && matrix.lane == 'pro' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JAMFPLATFORM_BASE_URL: ${{ secrets[format('{0}_BASE_URL', matrix.secret_prefix)] }}
+          JAMFPLATFORM_CLIENT_ID: ${{ secrets[format('{0}_CLIENT_ID', matrix.secret_prefix)] }}
+          JAMFPLATFORM_CLIENT_SECRET: ${{ secrets[format('{0}_CLIENT_SECRET', matrix.secret_prefix)] }}
+          JAMFPLATFORM_ENVIRONMENT_ID: ${{ secrets.JAMFPLATFORM_ACC_ENVIRONMENT_ID }}
+          JAMFPLATFORM_ACC_PRO_DEP_TOKEN: ${{ secrets.JAMFPLATFORM_ACC_PRO_DEP_TOKEN }}
+          JAMFPLATFORM_ACC_PRO_DEP_SERVER_UUID: ${{ secrets.JAMFPLATFORM_ACC_PRO_DEP_SERVER_UUID }}
+        run: go run -tags skipkeycanary ./scripts/skipkeycanary
 
   # A single required check for branch protection. Without it the protected-branch
   # config would have to list every lane by name and be edited whenever a lane is
