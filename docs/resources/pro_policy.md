@@ -182,20 +182,31 @@ resource "jamfplatform_pro_policy" "options" {
 
 ### Optional
 
+- `client_side_limitations` (Attributes) Times and days on which the policy must not run (admin UI: Options ▸ General ▸ Client-Side Limitations). Each computer enforces them from its own settings. Replaces `no_execute_on`, `no_execute_start` and `no_execute_end` under `general.date_time_limitations`; set one or the other. (see [below for nested schema](#nestedatt--client_side_limitations))
 - `directory_bindings` (Attributes Set) Directory binding assignments (admin UI: Options ▸ Directory Bindings). Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--directory_bindings))
 - `disk_encryption` (Attributes) Disk encryption configuration to apply. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--disk_encryption))
-- `dock_items` (Attributes) Dock items to add or remove. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--dock_items))
+- `dock_item_assignments` (Attributes Set) Dock items to add or remove (admin UI: Options ▸ Dock). Replaces `dock_items.dock_items`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--dock_item_assignments))
+- `dock_items` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: use `dock_item_assignments` instead, the same set without the wrapping block. The provider will not remove `dock_items` before 2027-02-15.
+
+Dock items to add or remove. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--dock_items))
 - `efi_password` (Attributes) Open Firmware / EFI password configuration (admin UI: Options ▸ EFI Password). Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--efi_password))
 - `files_and_processes` (Attributes) File and process operations (admin UI: Options ▸ Files and Processes). Attribute names mirror the Jamf Pro admin UI labels. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--files_and_processes))
 - `local_accounts` (Attributes List) Local account operations (admin UI: Options ▸ Local Accounts). Each `password` is a Terraform `WriteOnly` attribute: sent to Jamf Pro on writes, never persisted in state. Pair it with `password_wo_version` to rotate. Modelled as a List rather than a Set so the `WriteOnly` attribute is permitted inside each element; Jamf Pro matches accounts by `username`, and the order has no semantic effect. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--local_accounts))
 - `maintenance` (Attributes) Maintenance tasks to run as part of the policy. Attribute names mirror the Jamf Pro admin UI checkbox labels. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--maintenance))
 - `management_account` (Attributes) Management account configuration (admin UI: Options ▸ Management Accounts). Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--management_account))
 - `packages` (Attributes) Packages to install / cache / remove. Mirrors the admin UI's Options ▸ Packages section. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--packages))
-- `printers` (Attributes) Printers to install or remove. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--printers))
+- `printer_assignments` (Attributes Set) Printers to install or remove (admin UI: Options ▸ Printers). Replaces `printers.printers`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--printer_assignments))
+- `printers` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: use `printer_assignments` instead, the same set without the wrapping block. The provider will not remove `printers` before 2027-02-15.
+
+Printers to install or remove. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--printers))
 - `restart_options` (Attributes) Reboot configuration after the policy completes. Mirrors the admin UI's Options ▸ Restart Options section. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--restart_options))
 - `scope` (Attributes) Policy scope. Each category is independently owned: declare it (including `[]`, which clears it) and Terraform manages its members; omit it and it is left as configured outside Terraform, with updates preserving it. Targets are flat sets of Jamf Pro IDs; interpolate `jamfplatform_device_group.<x>.jamf_pro_id` to bridge from Platform Services UUIDs. Setting `all_computers = true` forbids `computer_ids`, `computer_group_ids`, `building_ids`, `department_ids`. Setting `all_jss_users = true` forbids `user_ids` and `user_group_ids`. `user_ids` / `user_group_ids` map to the admin UI's "Users" / "User Groups" lists. (see [below for nested schema](#nestedatt--scope))
-- `scripts` (Attributes) Scripts to run as part of the policy. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--scripts))
+- `script_assignments` (Attributes Set) Scripts to run as part of the policy (admin UI: Options ▸ Scripts). Each item identifies the script by ID; `name` is returned by Jamf Pro. `priority` is one of `Before`, `After`. Replaces `scripts.scripts`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--script_assignments))
+- `scripts` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: use `script_assignments` instead, the same set without the wrapping block. The provider will not remove `scripts` before 2027-02-15.
+
+Scripts to run as part of the policy. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--scripts))
 - `self_service` (Attributes) Self Service integration. Pair `display_notifications` with `notification_location` to control whether and where Self Service surfaces a notification when the policy becomes available. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--self_service))
+- `server_side_limitations` (Attributes) Dates between which the policy is active (admin UI: Options ▸ General ▸ Server-Side Limitations). Jamf Pro evaluates them in UTC on the server. It also stores epoch and UTC copies of both dates. You can compute those in Terraform with `formatdate`, so the provider does not surface them. Replaces `activation_date` and `expiration_date` under `general.date_time_limitations`; set one or the other. (see [below for nested schema](#nestedatt--server_side_limitations))
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 - `user_interaction` (Attributes) User interaction prompts shown around policy execution. The "Deferral Type" dropdown (None / Date / Duration) is modelled as `deferral_type`, with `deferral_until_utc` (Date form) and `deferral_days` (Duration form) as type-specific siblings. Switching between deferral types is an in-place change. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--user_interaction))
 
@@ -213,15 +224,21 @@ Required:
 Optional:
 
 - `category_id` (String) Jamf Pro category ID. Use `-1` to clear. Omit to leave the current value untouched.
-- `date_time_limitations` (Attributes) Optional schedule limitations for when the policy may run. Only the user-authored date/time inputs are surfaced. The derived epoch and UTC siblings Jamf Pro also stores are deterministic transforms of `activation_date` / `expiration_date`, reproducible client-side with Terraform stdlib functions such as `formatdate`. (see [below for nested schema](#nestedatt--general--date_time_limitations))
+- `date_time_limitations` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: use the top-level `server_side_limitations` (`activation_date`, `expiration_date`) and `client_side_limitations` (`no_execute_on`, `no_execute_start`, `no_execute_end`) instead, which mirror the admin UI's two tabs. `general.date_time_limitations` may be removed on or after 2027-02-15.
+
+Schedule limitations for when the policy may run. Only the user-authored date/time inputs are surfaced. The derived epoch and UTC siblings Jamf Pro also stores are deterministic transforms of `activation_date` / `expiration_date`, reproducible client-side with Terraform stdlib functions such as `formatdate`. (see [below for nested schema](#nestedatt--general--date_time_limitations))
 - `enabled` (Boolean) Whether the policy is enabled. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `frequency` (String) How often the policy runs. One of `Once per computer`, `Once per user per computer`, `Once per user`, `Once every day`, `Once every week`, `Once every month`, `Ongoing`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `limit_to_jamf_pro_assigned_user` (Boolean) Restrict the policy to the Jamf Pro-assigned user only. Mirrors Options > General > Client-Side Limitations > Limit to Jamf Pro-assigned user. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `network_limitations` (Attributes) Read-only view of the network conditions under which the policy may run. Jamf Pro derives all three attributes from `general.network_requirements` and `scope.limitations.network_segment_ids`. Declare the block as `{}` to read the derived values into state. (see [below for nested schema](#nestedatt--general--network_limitations))
+- `network_limitations` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: this read-only block repeats values that already have attributes. Read `general.network_requirements` and `scope.limitations.network_segment_ids` instead. The provider will not remove `general.network_limitations` before 2027-02-15.
+
+Read-only view of the network conditions under which the policy may run. Jamf Pro derives all three attributes from `general.network_requirements` and `scope.limitations.network_segment_ids`. Declare the block as `{}` to read the derived values into state. (see [below for nested schema](#nestedatt--general--network_limitations))
 - `network_requirements` (String) Network connection the policy requires. `Any` places no requirement; `Ethernet` restricts the policy to a wired connection. Shown in the admin UI as Options ▸ General ▸ Client-Side Limitations ▸ Network Requirements. Also drives the read-only `network_limitations.minimum_network_connection`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `notify_on_each_failed_retry` (Boolean) Notify the administrator on each failed retry. Requires `frequency = "Once per computer"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `offline` (Boolean) Allow execution while the device is offline. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `override_default_settings` (Attributes) Read-only view of the per-policy overrides of tenant-wide defaults, matching the admin UI's "Override Default Settings" panel. Jamf Pro derives each attribute from a setting that lives elsewhere. Declare the block as `{}` to read the derived values into state. (see [below for nested schema](#nestedatt--general--override_default_settings))
+- `override_default_settings` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: this read-only block repeats values that already have attributes. Read `general.target_drive` and `packages.distribution_point` instead. The provider will not remove `general.override_default_settings` before 2027-02-15.
+
+Read-only view of the per-policy overrides of tenant-wide defaults, matching the admin UI's "Override Default Settings" panel. Jamf Pro derives each attribute from a setting that lives elsewhere. Declare the block as `{}` to read the derived values into state. (see [below for nested schema](#nestedatt--general--override_default_settings))
 - `retry_attempts` (Number) Maximum retry attempts, 1–10, or `-1` for none. Any value above `-1` needs a `retry_event` other than `none`. Requires `frequency = "Once per computer"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
 - `retry_event` (String) When to retry a failed run: `none`, `trigger` (the policy's own trigger), or `check-in`. Requires `frequency = "Once per computer"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `site_id` (String) Jamf Pro site ID scoping the policy. Use `-1` for "no site". Omit to leave the current value untouched.
@@ -247,9 +264,9 @@ Optional:
 
 - `activation_date` (String) Activation date in 24-hour `YYYY-MM-DD HH:MM:SS` form (e.g. `2027-06-01 14:30:00`).
 - `expiration_date` (String) Expiration date in 24-hour `YYYY-MM-DD HH:MM:SS` form (e.g. `2027-12-31 23:59:59`).
-- `no_execute_end` (String) Daily end of the no-execute window, in 12-hour `h:MM AM` / `h:MM PM` form with the hour 1–12 and no leading zero (e.g. `7:00 AM`). Shown in the admin UI under Options ▸ General ▸ Server-Side Limitations. Applies on the days named by `no_execute_on`.
-- `no_execute_on` (Set of String) Day-of-week labels on which the policy must not execute. Three-letter abbreviations: `Sun`, `Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`.
-- `no_execute_start` (String) Daily start of the no-execute window, in 12-hour `h:MM AM` / `h:MM PM` form with the hour 1–12 and no leading zero (e.g. `5:00 PM`). Shown in the admin UI under Options ▸ General ▸ Server-Side Limitations. Applies on the days named by `no_execute_on`.
+- `no_execute_end` (String) Daily end of the no-execute window, in 12-hour `h:MM AM` / `h:MM PM` form with the hour 1–12 and no leading zero (e.g. `7:00 AM`). Shown in the admin UI under Options ▸ General ▸ Client-Side Limitations ▸ Do Not Run Between. Applies on the days named by `no_execute_on`.
+- `no_execute_on` (Set of String) Day-of-week labels on which the policy must not execute (admin UI: Do Not Run On). Three-letter abbreviations: `Sun`, `Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`.
+- `no_execute_start` (String) Daily start of the no-execute window, in 12-hour `h:MM AM` / `h:MM PM` form with the hour 1–12 and no leading zero (e.g. `5:00 PM`). Shown in the admin UI under Options ▸ General ▸ Client-Side Limitations ▸ Do Not Run Between. Applies on the days named by `no_execute_on`.
 
 
 <a id="nestedatt--general--network_limitations"></a>
@@ -274,6 +291,16 @@ Read-Only:
 
 
 
+<a id="nestedatt--client_side_limitations"></a>
+### Nested Schema for `client_side_limitations`
+
+Optional:
+
+- `no_execute_end` (String) Daily end of the no-execute window, in 12-hour `h:MM AM` / `h:MM PM` form with the hour 1–12 and no leading zero (e.g. `7:00 AM`). Shown in the admin UI under Options ▸ General ▸ Client-Side Limitations ▸ Do Not Run Between. Applies on the days named by `no_execute_on`.
+- `no_execute_on` (Set of String) Day-of-week labels on which the policy must not execute (admin UI: Do Not Run On). Three-letter abbreviations: `Sun`, `Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`.
+- `no_execute_start` (String) Daily start of the no-execute window, in 12-hour `h:MM AM` / `h:MM PM` form with the hour 1–12 and no leading zero (e.g. `5:00 PM`). Shown in the admin UI under Options ▸ General ▸ Client-Side Limitations ▸ Do Not Run Between. Applies on the days named by `no_execute_on`.
+
+
 <a id="nestedatt--directory_bindings"></a>
 ### Nested Schema for `directory_bindings`
 
@@ -296,6 +323,19 @@ Optional:
 - `disk_encryption_configuration_id` (Number) Disk encryption configuration ID to apply. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
 - `remediate_disk_encryption_configuration_id` (Number) Disk encryption configuration ID used to remediate. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
 - `remediate_key_type` (String) Key type for remediation. One of `Individual`, `Institutional`, `Individual And Institutional`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
+
+
+<a id="nestedatt--dock_item_assignments"></a>
+### Nested Schema for `dock_item_assignments`
+
+Required:
+
+- `action` (String) Dock item action. One of `Add To Beginning`, `Add To End`, `Remove`. Required.
+- `id` (String) Dock item ID.
+
+Read-Only:
+
+- `name` (String) Dock item display name. Returned by Jamf Pro.
 
 
 <a id="nestedatt--dock_items"></a>
@@ -420,6 +460,23 @@ Read-Only:
 
 
 
+<a id="nestedatt--printer_assignments"></a>
+### Nested Schema for `printer_assignments`
+
+Required:
+
+- `action` (String) Printer action. `Map` installs the printer and `Unmap` removes it. One of `Map`, `Unmap`. Required.
+- `id` (String) Printer ID.
+
+Optional:
+
+- `make_default` (Boolean) Make this printer the device's default.
+
+Read-Only:
+
+- `name` (String) Printer display name. Returned by Jamf Pro.
+
+
 <a id="nestedatt--printers"></a>
 ### Nested Schema for `printers`
 
@@ -513,6 +570,30 @@ Optional:
 
 
 
+<a id="nestedatt--script_assignments"></a>
+### Nested Schema for `script_assignments`
+
+Required:
+
+- `id` (String) Script ID.
+- `priority` (String) Run order relative to the policy's other tasks. One of `Before`, `After`. Required.
+
+Optional:
+
+- `parameter_10` (String) Parameter 10 passed to the script.
+- `parameter_11` (String) Parameter 11 passed to the script.
+- `parameter_4` (String) Parameter 4 passed to the script.
+- `parameter_5` (String) Parameter 5 passed to the script.
+- `parameter_6` (String) Parameter 6 passed to the script.
+- `parameter_7` (String) Parameter 7 passed to the script.
+- `parameter_8` (String) Parameter 8 passed to the script.
+- `parameter_9` (String) Parameter 9 passed to the script.
+
+Read-Only:
+
+- `name` (String) Script display name. Returned by Jamf Pro.
+
+
 <a id="nestedatt--scripts"></a>
 ### Nested Schema for `scripts`
 
@@ -593,6 +674,15 @@ Read-Only:
 - `filename` (String) Icon filename. Jamf Pro sets it from the icon `id`.
 - `uri` (String) Icon URI. Jamf Pro sets it from the icon `id`.
 
+
+
+<a id="nestedatt--server_side_limitations"></a>
+### Nested Schema for `server_side_limitations`
+
+Optional:
+
+- `activation_date` (String) Activation date in 24-hour `YYYY-MM-DD HH:MM:SS` form (e.g. `2027-06-01 14:30:00`).
+- `expiration_date` (String) Expiration date in 24-hour `YYYY-MM-DD HH:MM:SS` form (e.g. `2027-12-31 23:59:59`).
 
 
 <a id="nestedatt--timeouts"></a>

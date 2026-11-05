@@ -1044,15 +1044,13 @@ resource "jamfplatform_pro_policy" "test" {
   general = {
     name = %q
   }
-  scripts = {
-    scripts = [
-      {
-        id          = jamfplatform_pro_script.fixture.id
-        priority    = %q
-        parameter_4 = %q
-      },
-    ]
-  }
+  script_assignments = [
+    {
+      id          = jamfplatform_pro_script.fixture.id
+      priority    = %q
+      parameter_4 = %q
+    },
+  ]
 }
 `, scriptName, priority, policyName, scriptPolicyPriority, p4)
 }
@@ -1079,17 +1077,17 @@ func TestAccPolicyResource_ScriptsFullCoverage(t *testing.T) {
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("scripts").AtMapKey("scripts"),
+						tfjsonpath.New("script_assignments"),
 						knownvalue.SetSizeExact(1),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("scripts").AtMapKey("scripts").AtSliceIndex(0).AtMapKey("priority"),
+						tfjsonpath.New("script_assignments").AtSliceIndex(0).AtMapKey("priority"),
 						knownvalue.StringExact("Before"),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("scripts").AtMapKey("scripts").AtSliceIndex(0).AtMapKey("parameter_4"),
+						tfjsonpath.New("script_assignments").AtSliceIndex(0).AtMapKey("parameter_4"),
 						knownvalue.StringExact("tf-acc-p4-initial"),
 					),
 				},
@@ -1099,12 +1097,12 @@ func TestAccPolicyResource_ScriptsFullCoverage(t *testing.T) {
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("scripts").AtMapKey("scripts").AtSliceIndex(0).AtMapKey("priority"),
+						tfjsonpath.New("script_assignments").AtSliceIndex(0).AtMapKey("priority"),
 						knownvalue.StringExact("After"),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("scripts").AtMapKey("scripts").AtSliceIndex(0).AtMapKey("parameter_4"),
+						tfjsonpath.New("script_assignments").AtSliceIndex(0).AtMapKey("parameter_4"),
 						knownvalue.StringExact("tf-acc-p4-updated"),
 					),
 				},
@@ -1128,16 +1126,14 @@ resource "jamfplatform_pro_policy" "test" {
   general = {
     name = %q
   }
-  scripts = {
-    scripts = [
-      {
-        id          = jamfplatform_pro_script.fixture.id
-        priority    = "Before"
-        parameter_4 = ""
-        parameter_5 = "tf-acc-p5"
-      },
-    ]
-  }
+  script_assignments = [
+    {
+      id          = jamfplatform_pro_script.fixture.id
+      priority    = "Before"
+      parameter_4 = ""
+      parameter_5 = "tf-acc-p5"
+    },
+  ]
   local_accounts = [
     {
       action               = "Create"
@@ -1187,12 +1183,12 @@ func TestAccPolicyResource_EmptyStringFieldsRoundTrip(t *testing.T) {
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("scripts").AtMapKey("scripts").AtSliceIndex(0).AtMapKey("parameter_4"),
+						tfjsonpath.New("script_assignments").AtSliceIndex(0).AtMapKey("parameter_4"),
 						knownvalue.StringExact(""),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("scripts").AtMapKey("scripts").AtSliceIndex(0).AtMapKey("parameter_5"),
+						tfjsonpath.New("script_assignments").AtSliceIndex(0).AtMapKey("parameter_5"),
 						knownvalue.StringExact("tf-acc-p5"),
 					),
 				},
@@ -1212,15 +1208,13 @@ resource "jamfplatform_pro_policy" "test" {
   general = {
     name = %q
   }
-  printers = {
-    printers = [
-      {
-        id           = jamfplatform_pro_printer.fixture.id
-        action       = %q
-        make_default = %t
-      },
-    ]
-  }
+  printer_assignments = [
+    {
+      id           = jamfplatform_pro_printer.fixture.id
+      action       = %q
+      make_default = %t
+    },
+  ]
 }
 `, printerName, policyName, action, makeDefault)
 }
@@ -1251,17 +1245,17 @@ func TestAccPolicyResource_PrintersFullCoverage(t *testing.T) {
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("printers").AtMapKey("printers"),
+						tfjsonpath.New("printer_assignments"),
 						knownvalue.SetSizeExact(1),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("printers").AtMapKey("printers").AtSliceIndex(0).AtMapKey("action"),
+						tfjsonpath.New("printer_assignments").AtSliceIndex(0).AtMapKey("action"),
 						knownvalue.StringExact("Map"),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("printers").AtMapKey("printers").AtSliceIndex(0).AtMapKey("make_default"),
+						tfjsonpath.New("printer_assignments").AtSliceIndex(0).AtMapKey("make_default"),
 						knownvalue.Bool(true),
 					),
 				},
@@ -1271,12 +1265,12 @@ func TestAccPolicyResource_PrintersFullCoverage(t *testing.T) {
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("printers").AtMapKey("printers").AtSliceIndex(0).AtMapKey("action"),
+						tfjsonpath.New("printer_assignments").AtSliceIndex(0).AtMapKey("action"),
 						knownvalue.StringExact("Unmap"),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("printers").AtMapKey("printers").AtSliceIndex(0).AtMapKey("make_default"),
+						tfjsonpath.New("printer_assignments").AtSliceIndex(0).AtMapKey("make_default"),
 						knownvalue.Bool(false),
 					),
 				},
@@ -1297,14 +1291,12 @@ resource "jamfplatform_pro_policy" "test" {
   general = {
     name = %q
   }
-  dock_items = {
-    dock_items = [
-      {
-        id     = jamfplatform_pro_dock_item.fixture.id
-        action = %q
-      },
-    ]
-  }
+  dock_item_assignments = [
+    {
+      id     = jamfplatform_pro_dock_item.fixture.id
+      action = %q
+    },
+  ]
 }
 `, dockItemName, policyName, action)
 }
@@ -1327,12 +1319,12 @@ func TestAccPolicyResource_DockItemsFullCoverage(t *testing.T) {
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("dock_items").AtMapKey("dock_items"),
+						tfjsonpath.New("dock_item_assignments"),
 						knownvalue.SetSizeExact(1),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("dock_items").AtMapKey("dock_items").AtSliceIndex(0).AtMapKey("action"),
+						tfjsonpath.New("dock_item_assignments").AtSliceIndex(0).AtMapKey("action"),
 						knownvalue.StringExact("Add To End"),
 					),
 				},
@@ -1342,7 +1334,7 @@ func TestAccPolicyResource_DockItemsFullCoverage(t *testing.T) {
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
-						tfjsonpath.New("dock_items").AtMapKey("dock_items").AtSliceIndex(0).AtMapKey("action"),
+						tfjsonpath.New("dock_item_assignments").AtSliceIndex(0).AtMapKey("action"),
 						knownvalue.StringExact("Add To Beginning"),
 					),
 				},
@@ -1620,16 +1612,20 @@ func TestAccPolicyResource_UserInteractionFullCoverage(t *testing.T) {
 }
 
 func policyConfigDateTimeLimitationBad(name, attr, value string) string {
+	block := "server_side_limitations"
+	if strings.HasPrefix(attr, "no_execute") {
+		block = "client_side_limitations"
+	}
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_policy" "test" {
   general = {
     name = %q
-    date_time_limitations = {
-      %s = %q
-    }
+  }
+  %s = {
+    %s = %q
   }
 }
-`, name, attr, value)
+`, name, block, attr, value)
 }
 
 func policyConfigNoExecuteOnBad(name string, days []string) string {
@@ -1641,9 +1637,9 @@ func policyConfigNoExecuteOnBad(name string, days []string) string {
 resource "jamfplatform_pro_policy" "test" {
   general = {
     name = %q
-    date_time_limitations = {
-      no_execute_on = [%s]
-    }
+  }
+  client_side_limitations = {
+    no_execute_on = [%s]
   }
 }
 `, name, strings.Join(quoted, ", "))
@@ -1664,7 +1660,7 @@ resource "jamfplatform_pro_policy" "test" {
 }
 
 // TestAccPolicyResource_DateTimeLimitationsFormatRejection exercises each
-// regex validator on the date_time_limitations sub-block. Every step fails
+// regex validator on the server_side_limitations and client_side_limitations blocks. Every step fails
 // at plan time with a message keyed off the validator's own error text — no
 // API round-trip occurs, so these are fast and credential-cheap once the
 // acc framework is up. Wire formats are documented in policy/validators.go.
@@ -1706,11 +1702,11 @@ func TestAccPolicyResource_DateTimeLimitationsFormatRejection(t *testing.T) {
 			},
 			{
 				Config:      policyConfigNoExecuteOnBad(name, []string{"Sunday"}),
-				ExpectError: regexp.MustCompile(`must be one of`),
+				ExpectError: regexp.MustCompile(`(?s)must\s+be\s+one\s+of`),
 			},
 			{
 				Config:      policyConfigNoExecuteOnBad(name, []string{"Sun", "FOO"}),
-				ExpectError: regexp.MustCompile(`must be one of`),
+				ExpectError: regexp.MustCompile(`(?s)must\s+be\s+one\s+of`),
 			},
 		},
 	})
@@ -2892,13 +2888,15 @@ resource "jamfplatform_pro_policy" "test" {
   general = {
     name = %q
 %s
-    date_time_limitations = {
-      activation_date = "2026-02-03 04:05:06"
-      expiration_date = "2027-02-03 04:05:06"
-      no_execute_on   = ["Tue", "Thu"]
-    }
     network_limitations       = {}
     override_default_settings = {}
+  }
+  server_side_limitations = {
+    activation_date = "2026-02-03 04:05:06"
+    expiration_date = "2027-02-03 04:05:06"
+  }
+  client_side_limitations = {
+    no_execute_on = ["Tue", "Thu"]
   }
   scope = {
     targets = {
@@ -2934,34 +2932,28 @@ resource "jamfplatform_pro_policy" "test" {
       },
     ]
   }
-  scripts = {
-    scripts = [
-      {
-        id           = jamfplatform_pro_script.fixture.id
-        priority     = "Before"
-        parameter_4  = "omit-retains-p4"
-        parameter_5  = "omit-retains-p5"
-        parameter_11 = "omit-retains-p11"
-      },
-    ]
-  }
-  printers = {
-    printers = [
-      {
-        id           = jamfplatform_pro_printer.fixture.id
-        action       = "Map"
-        make_default = true
-      },
-    ]
-  }
-  dock_items = {
-    dock_items = [
-      {
-        id     = jamfplatform_pro_dock_item.fixture.id
-        action = "Add To Beginning"
-      },
-    ]
-  }
+  script_assignments = [
+    {
+      id           = jamfplatform_pro_script.fixture.id
+      priority     = "Before"
+      parameter_4  = "omit-retains-p4"
+      parameter_5  = "omit-retains-p5"
+      parameter_11 = "omit-retains-p11"
+    },
+  ]
+  printer_assignments = [
+    {
+      id           = jamfplatform_pro_printer.fixture.id
+      action       = "Map"
+      make_default = true
+    },
+  ]
+  dock_item_assignments = [
+    {
+      id     = jamfplatform_pro_dock_item.fixture.id
+      action = "Add To Beginning"
+    },
+  ]
   local_accounts = [
     {
       action               = "Create"
@@ -3461,9 +3453,10 @@ func TestAccResource_ProPolicy_OmittedBlocksRetained(t *testing.T) {
 					resource.TestCheckNoResourceAttr(policyOmitRetainsResourceAddr, "self_service.categories.#"),
 					resource.TestCheckNoResourceAttr(policyOmitRetainsResourceAddr, "scope.exclusions.department_ids.#"),
 					resource.TestCheckNoResourceAttr(policyOmitRetainsResourceAddr, "scope.limitations.ibeacon_ids.#"),
-					resource.TestCheckNoResourceAttr(policyOmitRetainsResourceAddr, "general.date_time_limitations.activation_date"),
+					resource.TestCheckNoResourceAttr(policyOmitRetainsResourceAddr, "server_side_limitations.activation_date"),
+					resource.TestCheckNoResourceAttr(policyOmitRetainsResourceAddr, "client_side_limitations.no_execute_on.#"),
 					resource.TestCheckNoResourceAttr(policyOmitRetainsResourceAddr, "local_accounts.#"),
-					resource.TestCheckNoResourceAttr(policyOmitRetainsResourceAddr, "scripts.scripts.#"),
+					resource.TestCheckNoResourceAttr(policyOmitRetainsResourceAddr, "script_assignments.#"),
 					policyRetainedOnServer(t, n),
 				),
 			},
@@ -3610,14 +3603,12 @@ resource "jamfplatform_pro_script" %q {
 			return out
 		},
 		block: func(which string) string {
-			return fmt.Sprintf(`  scripts = {
-    scripts = [{
-      id       = jamfplatform_pro_script.%s.id
-      priority = "After"
-    }]
-  }`, which)
+			return fmt.Sprintf(`  script_assignments = [{
+    id       = jamfplatform_pro_script.%s.id
+    priority = "After"
+  }]`, which)
 		},
-		name:   tfjsonpath.New("scripts").AtMapKey("scripts").AtSliceIndex(0).AtMapKey("name"),
+		name:   tfjsonpath.New("script_assignments").AtSliceIndex(0).AtMapKey("name"),
 		nameOf: func(w, s string) string { return "tf-acc-script-swap-" + w + "-" + s },
 	})
 }
@@ -3638,14 +3629,12 @@ resource "jamfplatform_pro_printer" %q {
 			return out
 		},
 		block: func(which string) string {
-			return fmt.Sprintf(`  printers = {
-    printers = [{
-      id     = jamfplatform_pro_printer.%s.id
-      action = "Map"
-    }]
-  }`, which)
+			return fmt.Sprintf(`  printer_assignments = [{
+    id     = jamfplatform_pro_printer.%s.id
+    action = "Map"
+  }]`, which)
 		},
-		name:   tfjsonpath.New("printers").AtMapKey("printers").AtSliceIndex(0).AtMapKey("name"),
+		name:   tfjsonpath.New("printer_assignments").AtSliceIndex(0).AtMapKey("name"),
 		nameOf: func(w, s string) string { return "tf-acc-printer-swap-" + w + "-" + s },
 	})
 }
@@ -3667,14 +3656,12 @@ resource "jamfplatform_pro_dock_item" %q {
 			return out
 		},
 		block: func(which string) string {
-			return fmt.Sprintf(`  dock_items = {
-    dock_items = [{
-      id     = jamfplatform_pro_dock_item.%s.id
-      action = "Add To Beginning"
-    }]
-  }`, which)
+			return fmt.Sprintf(`  dock_item_assignments = [{
+    id     = jamfplatform_pro_dock_item.%s.id
+    action = "Add To Beginning"
+  }]`, which)
 		},
-		name:   tfjsonpath.New("dock_items").AtMapKey("dock_items").AtSliceIndex(0).AtMapKey("name"),
+		name:   tfjsonpath.New("dock_item_assignments").AtSliceIndex(0).AtMapKey("name"),
 		nameOf: func(w, s string) string { return "tf-acc-dock-swap-" + w + "-" + s },
 	})
 }
@@ -3798,9 +3785,9 @@ func TestAccPolicyResource_PlanTimeChecks(t *testing.T) {
 		want    string
 	}{
 		{"pkgact", "", `packages = { packages = [{ id = "1" }] }`, `(?s)action.*required`},
-		{"scriptprio", "", `scripts = { scripts = [{ id = "1" }] }`, `(?s)priority.*required`},
-		{"printeract", "", `printers = { printers = [{ id = "1" }] }`, `(?s)action.*required`},
-		{"dockact", "", `dock_items = { dock_items = [{ id = "1" }] }`, `(?s)action.*required`},
+		{"scriptprio", "", `script_assignments = [{ id = "1" }]`, `(?s)priority.*required`},
+		{"printeract", "", `printer_assignments = [{ id = "1" }]`, `(?s)action.*required`},
+		{"dockact", "", `dock_item_assignments = [{ id = "1" }]`, `(?s)action.*required`},
 		{"acctuser", "", `local_accounts = [{ action = "Reset" }]`, `(?s)username.*required`},
 		{"applynoid", "", `disk_encryption = { action = "apply" }`, `(?s)disk_encryption_configuration_id.*required`},
 		{"remnoid", "", `disk_encryption = { action = "remediate", remediate_key_type = "Institutional" }`, `(?s)remediate_disk_encryption_configuration_id.*required`},
