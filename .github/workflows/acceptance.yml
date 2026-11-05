@@ -649,7 +649,7 @@ jobs:
       - name: Require the skip-key canary credentials
         if: ${{ !cancelled() && steps.guard.outputs.superseded != 'true' && matrix.lane == 'pro' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
         env:
-          JAMFPLATFORM_ACC_PRO_DEP_TOKEN: ${{ secrets.JAMFPLATFORM_ACC_PRO_DEP_TOKEN }}
+          CANARY_DEP_TOKEN: ${{ secrets.JAMFPLATFORM_ACC_PRO_DEP_TOKEN }}
           CANARY_BASE_URL: ${{ secrets[format('{0}_BASE_URL', matrix.secret_prefix)] }}
           CANARY_CLIENT_ID: ${{ secrets[format('{0}_CLIENT_ID', matrix.secret_prefix)] }}
           CANARY_CLIENT_SECRET: ${{ secrets[format('{0}_CLIENT_SECRET', matrix.secret_prefix)] }}
@@ -658,7 +658,7 @@ jobs:
           set -euo pipefail
           missing=""
           for name in CANARY_BASE_URL CANARY_CLIENT_ID CANARY_CLIENT_SECRET CANARY_ENVIRONMENT_ID \
-                      JAMFPLATFORM_ACC_PRO_DEP_TOKEN; do
+                      CANARY_DEP_TOKEN; do
             if [ -z "${!name}" ]; then
               missing="$missing $name"
             fi
@@ -669,6 +669,7 @@ jobs:
           fi
 
       - name: Compare PreStage skip keys
+        id: skip-key-canary
         if: ${{ !cancelled() && steps.guard.outputs.superseded != 'true' && matrix.lane == 'pro' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
         env:
           GH_TOKEN: ${{ github.token }}

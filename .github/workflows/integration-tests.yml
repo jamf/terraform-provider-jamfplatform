@@ -276,9 +276,28 @@ jobs:
                   )
 
           # 6. Nothing else in the job may carry them: a stray copy on another
-          #    step is how the originals got orphaned in the first place.
+          #    step is how the originals got orphaned in the first place. The one
+          #    exception is the skip-key canary, which needs the estate credentials
+          #    to probe Jamf Pro itself. It is matched by id, must run exactly the
+          #    canary command, and must index its secrets by the matrix prefix.
+          CANARY_STEP = "skip-key-canary"
+          CANARY_RUN = "go run -tags skipkeycanary ./scripts/skipkeycanary"
           for i, step in enumerate(steps):
               if i == runner_index:
+                  continue
+              if (step or {}).get("id") == CANARY_STEP:
+                  if ((step or {}).get("run") or "").strip() != CANARY_RUN:
+                      sys.exit(
+                          f"acceptance credential check: step id {CANARY_STEP!r} may carry credentials "
+                          f"only while it runs exactly `{CANARY_RUN}`"
+                      )
+                  for key, value in ((step or {}).get("env") or {}).items():
+                      text = str(value)
+                      if "secrets[format(" in text and "matrix.secret_prefix" not in text:
+                          sys.exit(
+                              f"acceptance credential check: {key} on the canary step indexes secrets "
+                              f"dynamically but does not use matrix.secret_prefix: {text}"
+                          )
                   continue
               stray = sorted(k for k in ((step or {}).get("env") or {}) if k.startswith("JAMFPLATFORM_"))
               if stray:
