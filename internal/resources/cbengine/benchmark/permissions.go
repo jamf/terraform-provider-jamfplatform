@@ -9,8 +9,9 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
-// resourceSDKMethods lists the SDK methods the benchmark resource's CRUD path
-// calls directly (via r.client.<Method>) in crud.go. It drives the "Required
+// resourceSDKMethods lists the SDK methods the benchmark resource calls directly
+// (via r.client.<Method>) in crud.go and collision.go, plus GetBaselineRules, which
+// the plan-time baseline check reaches through providerdata.BaselineRulesCache. It drives the "Required
 // Jamf privileges" table appended to the resource MarkdownDescription.
 // permissions_test.go asserts this list stays in sync with the actual
 // client.<Method> calls in crud.go and with the SDK privilege registry.
@@ -19,6 +20,7 @@ var resourceSDKMethods = []string{
 	"GetBenchmark",
 	"DeleteBenchmark",
 	"ListBenchmarks",
+	"GetBaselineRules",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

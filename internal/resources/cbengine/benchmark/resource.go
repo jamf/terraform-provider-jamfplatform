@@ -40,6 +40,7 @@ type BenchmarkResource struct {
 	// collisions backs the plan-time title collision check. nil when the
 	// provider's name_collision_check mode is off.
 	collisions *collision.Checker
+	baselines  *providerdata.BaselineRulesCache
 	// lock serializes creates and deletes across every benchmark in this
 	// provider instance; see providerdata.BenchmarkLock.
 	lock *providerdata.BenchmarkLock
@@ -289,7 +290,7 @@ func benchmarkResourceSchema(ctx context.Context) schema.Schema {
 							},
 						},
 						"odv_value": schema.StringAttribute{
-							MarkdownDescription: "Optional organization-defined value to apply for this rule (if applicable).",
+							MarkdownDescription: "Organization-defined value for this rule. Omit it to keep the baseline default.",
 							Optional:            true,
 							Computed:            true,
 							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -435,6 +436,7 @@ func (r *BenchmarkResource) Configure(ctx context.Context, req resource.Configur
 
 	r.impact = pd.ImpactCache()
 	r.collisions = pd.CollisionChecker()
+	r.baselines = pd.BaselineRulesCache()
 	r.lock = pd.BenchmarkLock()
 	r.client = compliancebenchmarks.New(pd.Client)
 }
