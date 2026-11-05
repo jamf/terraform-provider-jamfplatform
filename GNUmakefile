@@ -11,6 +11,7 @@ install: build
 lint:
 	golangci-lint run
 	golangci-lint run --build-tags acctargets ./scripts/acctargets/
+	golangci-lint run --build-tags deprecationsweep ./scripts/deprecationsweep/
 
 generate:
 	cd tools; go generate ./...
@@ -54,7 +55,7 @@ fix: export GOTOOLCHAIN = $(GO_MOD_TOOLCHAIN)
 fix:
 	go fix ./...
 	go fix -tags acceptance ./...
-	go fix -tags acctargets,acclanes ./scripts/...
+	go fix -tags acctargets,acclanes,deprecationsweep ./scripts/...
 
 test:
 	go test -v -cover -count=1 -timeout=120s -p=10 ./...
@@ -85,6 +86,7 @@ testacc-run:
 test-scripts:
 	go test -count=1 -tags acctargets ./scripts/acctargets/
 	go test -count=1 -tags acclanes ./scripts/acclanes/
+	go test -count=1 -tags deprecationsweep ./scripts/deprecationsweep/
 
 # testacc-changed runs acceptance tests only for the packages affected by the
 # current change set: the changed packages plus everything that transitively
@@ -122,4 +124,11 @@ acclanes-preview:
 	fi; \
 	go run -tags acclanes ./scripts/acclanes -scope "$$scope"
 
-.PHONY: fmt fix lint permissions-map test test-scripts testacc testacc-run testacc-changed acclanes-preview build install generate
+# deprecation-sweep lists the schema deprecations whose remove-after date has arrived, as a
+# markdown table. The weekly workflow runs the same tool and opens one issue per row. Override
+# TODAY to look ahead: make deprecation-sweep TODAY=2027-01-31
+TODAY ?=
+deprecation-sweep:
+	go run -tags deprecationsweep ./scripts/deprecationsweep -format markdown $(if $(TODAY),-today $(TODAY))
+
+.PHONY: fmt fix lint permissions-map test test-scripts testacc testacc-run testacc-changed acclanes-preview deprecation-sweep build install generate

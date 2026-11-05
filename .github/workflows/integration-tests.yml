@@ -86,7 +86,7 @@ jobs:
       # collide, and a combined pass means a new script tag needs adding in one
       # place. Mirrors `make lint`, which enters ./scripts/acctargets/ for the
       # same reason.
-      - run: go vet -tags acctargets,acclanes ./scripts/...
+      - run: go vet -tags acctargets,acclanes,deprecationsweep ./scripts/...
 
       # Formatting and modernisation drift, including behind every build tag. An
       # untagged `go fix ./...` cannot see the acceptance suite or scripts/, and
@@ -116,12 +116,12 @@ jobs:
           # has written it never clears.
           go fix ./... >/dev/null
           go fix -tags acceptance ./... >/dev/null
-          go fix -tags acctargets,acclanes ./scripts/... >/dev/null
+          go fix -tags acctargets,acclanes,deprecationsweep ./scripts/... >/dev/null
           git diff --exit-code || {
             echo "go fix produced changes — run these to a fixpoint locally and commit the result with your change:"
             echo "  go fix ./...                                    (repeat until clean)"
             echo "  go fix -tags acceptance ./...                   (repeat until clean)"
-            echo "  go fix -tags acctargets,acclanes ./scripts/...  (repeat until clean)"
+            echo "  go fix -tags acctargets,acclanes,deprecationsweep ./scripts/...  (repeat until clean)"
             echo "  gofmt -s -w -e main.go internal/ tools/ scripts/   (i.e. make fmt)"
             exit 1
           }

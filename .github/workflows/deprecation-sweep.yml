@@ -1,0 +1,88 @@
+name: Deprecation Sweep
+
+# Opens one tracking issue for each schema deprecation whose removal date has arrived.
+#
+# A deprecated attribute carries a marker comment (`PLATFORM-DEPRECATED` or `PRO-DEPRECATED`, with
+# `remove-after=` and `replaced-by=`) naming the earliest day it may be removed. Nothing else reads
+# that date, which is how a blueprint deprecation came to sit past its window. scripts/deprecationsweep
+# is the reader; this workflow is the part that tells a person.
+#
+# Deliberately a scheduled job and NOT a test: a check that fails when a date passes would break
+# unrelated work on a day nobody chose. The format of every marker is still enforced on each build
+# by internal/conformance, so a marker this job cannot parse never reaches main.
+#
+# Each issue is looked up by its exact title across open AND closed issues. An issue closed without
+# the attribute being removed is a decision somebody made, so the job does not reopen it or file a
+# second one the next week.
+
+on:
+  schedule:
+    # 06:00 UTC every Monday.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: deprecation-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: Sweep Expired Deprecations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Find expired markers
+        run: go run -tags deprecationsweep ./scripts/deprecationsweep > /tmp/expired.json
+
+      - name: Open an issue for each new one
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          count="$(jq 'length' /tmp/expired.json)"
+          if [ "$count" -eq 0 ]; then
+            echo "No deprecation has reached its removal date."
+            exit 0
+          fi
+
+          gh label create deprecation-removal \
+            --description "Remove a Terraform schema attribute whose deprecation window has passed" \
+            --color B60205 2>/dev/null || true
+
+          jq -c '.[]' /tmp/expired.json | while read -r row; do
+            title="$(jq -r '.title' <<<"$row")"
+            existing="$(gh issue list --label deprecation-removal --state all --limit 500 --json title \
+              | jq --arg t "$title" '[.[] | select(.title == $t)] | length')"
+            if [ "$existing" -gt 0 ]; then
+              echo "Already tracked: $title"
+              continue
+            fi
+
+            {
+              echo "A schema deprecation has reached its removal date."
+              echo
+              echo "- **Marker:** \`$(jq -r '.file' <<<"$row"):$(jq -r '.line' <<<"$row")\`"
+              echo "- **Remove after:** $(jq -r '.remove_after' <<<"$row")"
+              echo "- **Replaced by:** \`$(jq -r '.replaced_by' <<<"$row")\`"
+              reason="$(jq -r '.reason // empty' <<<"$row")"
+              if [ -n "$reason" ]; then
+                echo "- **Reason:** $reason"
+              fi
+              echo
+              echo "Remove every attribute that carries the deprecation message named at the marker, the marker itself, and any matching documentation callout. Bump the schema \`Version\` and add an \`UpgradeState\` step that drops the removed attributes from prior state. See STYLE_GUIDE.md, \"Jamf Pro Terraform schema deprecation\"."
+              echo
+              echo "Opened by the Deprecation Sweep workflow."
+            } > /tmp/issue-body
+
+            gh issue create --title "$title" --label deprecation-removal --body-file /tmp/issue-body
+          done
