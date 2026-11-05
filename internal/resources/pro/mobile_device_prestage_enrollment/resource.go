@@ -371,64 +371,6 @@ func optInt64(md string) schema.Attribute {
 	}
 }
 
-// skipSetupItemsSchema returns the SingleNestedAttribute for the
-// Setup-Assistant pane-skip checklist (45 keys, §F12). Per STYLE_GUIDE:
-// typed-pointer model ⇒ block is Optional-only; inner fields are
-// Optional+Computed.
-func skipSetupItemsSchema() schema.SingleNestedAttribute {
-	return schema.SingleNestedAttribute{
-		MarkdownDescription: "Setup Assistant panes to skip during enrolment. Each attribute corresponds to a Setup Assistant pane; `true` skips the pane. Supply the block, even empty (`skip_setup_items = {}`), to manage this section. Omitting it produces drift on the next refresh.",
-		Optional:            true,
-		Attributes: map[string]schema.Attribute{
-			"action_button":           optBool("**\"Action Button\"** pane."),
-			"android":                 optBool("**\"Move from Android\"** pane."),
-			"appearance":              optBool("**\"Appearance\"** pane."),
-			"apple_id":                optBool("**\"Apple ID\"** pane."),
-			"biometric":               optBool("**\"Biometric\"** pane (Face ID / Touch ID)."),
-			"camera_button":           optBool("**\"Camera Button\"** pane."),
-			"cloud_storage":           optBool("**\"iCloud Storage\"** pane."),
-			"diagnostics":             optBool("**\"Diagnostics\"** pane."),
-			"display_tone":            optBool("**\"True Tone\"** pane."),
-			"enable_lockdown_mode":    optBool("**\"Enable Lockdown Mode\"** pane."),
-			"express_language":        optBool("**\"Express Language\"** pane."),
-			"home_button_sensitivity": optBool("**\"Home Button Sensitivity\"** pane."),
-			"intelligence":            optBool("**\"Apple Intelligence\"** pane."),
-			"keyboard":                optBool("**\"Keyboard\"** pane."),
-			"location":                optBool("**\"Location Services\"** pane."),
-			"multitasking":            optBool("**\"Multitasking\"** pane."),
-			"os_showcase":             optBool("**\"OS Showcase\"** pane."),
-			"onboarding":              optBool("**\"Onboarding\"** pane."),
-			"passcode":                optBool("**\"Passcode\"** pane."),
-			"payment":                 optBool("**\"Apple Pay\"** pane."),
-			"preferred_language":      optBool("**\"Preferred Language\"** pane."),
-			"privacy":                 optBool("**\"Privacy\"** pane."),
-			"restore":                 optBool("**\"Restore from backup\"** pane."),
-			"restore_completed":       optBool("**\"Restore Completed\"** pane."),
-			"sim_setup":               optBool("**\"SIM Setup\"** pane."),
-			"safety":                  optBool("**\"Safety\"** pane."),
-			"safety_and_handling":     optBool("**\"Safety and Handling\"** pane."),
-			"screen_saver":            optBool("**\"Screen Saver\"** pane."),
-			"screen_time":             optBool("**\"Screen Time\"** pane."),
-			"siri":                    optBool("**\"Siri\"** pane."),
-			"software_update":         optBool("**\"Software Update\"** pane."),
-			"spoken_language":         optBool("**\"Spoken Language\"** pane."),
-			"tos":                     optBool("**\"Terms of Service\"** pane."),
-			"tv_home_screen_sync":     optBool("**\"TV Home Screen Sync\"** pane."),
-			"tv_provider_sign_in":     optBool("**\"TV Provider Sign In\"** pane."),
-			"tv_room":                 optBool("**\"TV Room\"** pane."),
-			"tap_to_setup":            optBool("**\"Tap to Setup\"** pane."),
-			"terms_of_address":        optBool("**\"Terms of Address\"** pane."),
-			"transfer_data":           optBool("**\"Transfer Data\"** pane."),
-			"update_completed":        optBool("**\"Update Completed\"** pane."),
-			"voice_selection":         optBool("**\"Voice Selection\"** pane."),
-			"watch_migration":         optBool("**\"Watch Migration\"** pane."),
-			"welcome":                 optBool("**\"Welcome\"** pane."),
-			"zoom":                    optBool("**\"Zoom\"** pane."),
-			"imessage_and_facetime":   optBool("**\"iMessage & FaceTime\"** pane."),
-		},
-	}
-}
-
 // namesSchema returns the device-naming block (spike §4.2). The novel surface
 // with no computer analog.
 func namesSchema() schema.SingleNestedAttribute {

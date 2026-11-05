@@ -80,10 +80,12 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
   }
 
   skip_setup_items = {
-    location    = true
-    apple_id    = true
-    screen_time = true
-    siri        = true
+    location             = true
+    apple_id             = true
+    screen_time          = true
+    siri                 = true
+    device_features_tour = true
+    liquid_glass         = true
   }
 
   location_information = {
@@ -150,7 +152,7 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
 - `rts_enabled` (Boolean) **"Return to Service"** enabled toggle.
 - `scope_serial_numbers` (Set of String) Set of device serial numbers assigned to this PreStage. Each serial must exist on the underlying ADE token. The full set is rewritten on every change. Jamf Pro enforces single-PreStage-per-serial: assigning a serial that is currently scoped to a different PreStage is rejected with `ALREADY_SCOPED` and there is no transparent reassignment. To move a serial between PreStages, first remove it from the holding PreStage. A serial that does not exist on the ADE token is rejected with `DEVICE_DOES_NOT_EXIST_ON_TOKEN`.
 - `send_timezone` (Boolean) **"Send Time Zone"** in the Jamf Pro admin UI.
-- `skip_setup_items` (Attributes) Setup Assistant panes to skip during enrolment. Each attribute corresponds to a Setup Assistant pane; `true` skips the pane. Supply the block, even empty (`skip_setup_items = {}`), to manage this section. Omitting it produces drift on the next refresh. (see [below for nested schema](#nestedatt--skip_setup_items))
+- `skip_setup_items` (Attributes) Setup Assistant panes to skip during enrolment. Each attribute matches a pane in the *Skip Setup Items* checklist of the Jamf Pro admin UI and takes its name from the pane's label. Set `true` to skip the pane. Supply the block, even empty (`skip_setup_items = {}`), to manage this section. Without it, the next refresh shows drift. (see [below for nested schema](#nestedatt--skip_setup_items))
 - `supervised` (Boolean) **"Supervised"** in the Jamf Pro admin UI.
 - `support_email_address` (String) **"Support Email Address"** in the Jamf Pro admin UI.
 - `support_phone_number` (String) **"Support Phone Number"** in the Jamf Pro admin UI.
@@ -233,50 +235,103 @@ Optional:
 Optional:
 
 - `action_button` (Boolean) **"Action Button"** pane.
+- `add_cellular_plan` (Boolean) **"Add Cellular Plan"** pane. Replaces `sim_setup`; set one or the other.
 - `android` (Boolean) **"Move from Android"** pane.
-- `appearance` (Boolean) **"Appearance"** pane.
-- `apple_id` (Boolean) **"Apple ID"** pane.
-- `biometric` (Boolean) **"Biometric"** pane (Face ID / Touch ID).
+- `app_analytics` (Boolean) **"App Analytics"** pane. Replaces `diagnostics`; set one or the other.
+- `appearance` (Boolean, Deprecated) ~> Deprecated: use `choose_your_look` instead, the same pane under the name the admin UI shows. The provider will not remove `appearance` before 2027-02-03.
+
+**"Choose your Look"** pane.
+- `apple_id` (Boolean) **"Apple ID and iCloud"** pane.
+- `apple_watch` (Boolean) **"Apple Watch"** pane. Replaces `watch_migration`; set one or the other.
+- `apps_and_data` (Boolean) **"Apps & Data"** pane. Replaces `restore`; set one or the other.
+- `biometric` (Boolean) **"Touch ID / Face ID"** pane.
 - `camera_button` (Boolean) **"Camera Button"** pane.
-- `cloud_storage` (Boolean) **"iCloud Storage"** pane.
-- `diagnostics` (Boolean) **"Diagnostics"** pane.
-- `display_tone` (Boolean) **"True Tone"** pane.
+- `choose_your_look` (Boolean) **"Choose your Look"** pane. Replaces `appearance`; set one or the other.
+- `cloud_storage` (Boolean) **"Cloud Storage"** pane.
+- `device_features_tour` (Boolean) **"Device Features Tour"** pane.
+- `diagnostics` (Boolean, Deprecated) ~> Deprecated: use `app_analytics` instead, the same pane under the name the admin UI shows. The provider will not remove `diagnostics` before 2027-02-03.
+
+**"App Analytics"** pane.
+- `dictation` (Boolean) **"Dictation"** pane. Replaces `spoken_language`; set one or the other.
+- `display_tone` (Boolean, Deprecated) ~> Deprecated: use `true_tone_display` instead, the same pane under the name the admin UI shows. The provider will not remove `display_tone` before 2027-02-03.
+
+**"True Tone Display"** pane.
+- `display_zoom` (Boolean) **"Display Zoom"** pane. Replaces `zoom`; set one or the other.
+- `emergency_sos` (Boolean) **"Emergency SOS"** pane. Replaces `safety`; set one or the other.
 - `enable_lockdown_mode` (Boolean) **"Enable Lockdown Mode"** pane.
-- `express_language` (Boolean) **"Express Language"** pane.
+- `express_language` (Boolean) **"Express Language Setup"** pane.
+- `get_started` (Boolean) **"Get Started"** pane. Replaces `welcome`; set one or the other.
 - `home_button_sensitivity` (Boolean) **"Home Button Sensitivity"** pane.
-- `imessage_and_facetime` (Boolean) **"iMessage & FaceTime"** pane.
-- `intelligence` (Boolean) **"Apple Intelligence"** pane.
+- `imessage_and_facetime` (Boolean) **"iMessage and FaceTime"** pane.
+- `intelligence` (Boolean) **"Intelligence"** pane.
 - `keyboard` (Boolean) **"Keyboard"** pane.
+- `liquid_glass` (Boolean) **"Liquid Glass"** pane.
 - `location` (Boolean) **"Location Services"** pane.
 - `multitasking` (Boolean) **"Multitasking"** pane.
-- `onboarding` (Boolean) **"Onboarding"** pane.
+- `new_feature_highlights` (Boolean) **"New Feature Highlights"** pane. Replaces `onboarding`; set one or the other.
+- `onboarding` (Boolean, Deprecated) ~> Deprecated: use `new_feature_highlights` instead, the same pane under the name the admin UI shows. The provider will not remove `onboarding` before 2027-02-03.
+
+**"New Feature Highlights"** pane.
+- `one_home_screen_for_every_apple_tv` (Boolean) **"One Home Screen for Every Apple TV"** pane. Replaces `tv_home_screen_sync`; set one or the other.
 - `os_showcase` (Boolean) **"OS Showcase"** pane.
-- `passcode` (Boolean) **"Passcode"** pane.
+- `passcode` (Boolean) **"Passcode Lock"** pane.
 - `payment` (Boolean) **"Apple Pay"** pane.
-- `preferred_language` (Boolean) **"Preferred Language"** pane.
+- `preferred_language` (Boolean) **"Preferred Language Order"** pane.
 - `privacy` (Boolean) **"Privacy"** pane.
-- `restore` (Boolean) **"Restore from backup"** pane.
+- `restore` (Boolean, Deprecated) ~> Deprecated: use `apps_and_data` instead, the same pane under the name the admin UI shows. The provider will not remove `restore` before 2027-02-03.
+
+**"Apps & Data"** pane.
 - `restore_completed` (Boolean) **"Restore Completed"** pane.
-- `safety` (Boolean) **"Safety"** pane.
+- `safety` (Boolean, Deprecated) ~> Deprecated: use `emergency_sos` instead, the same pane under the name the admin UI shows. The provider will not remove `safety` before 2027-02-03.
+
+**"Emergency SOS"** pane.
 - `safety_and_handling` (Boolean) **"Safety and Handling"** pane.
-- `screen_saver` (Boolean) **"Screen Saver"** pane.
+- `screen_saver` (Boolean, Deprecated) ~> Deprecated: use `see_the_world_screensaver` instead, the same pane under the name the admin UI shows. The provider will not remove `screen_saver` before 2027-02-03.
+
+**"See the World Screensaver"** pane.
 - `screen_time` (Boolean) **"Screen Time"** pane.
-- `sim_setup` (Boolean) **"SIM Setup"** pane.
+- `see_the_world_screensaver` (Boolean) **"See the World Screensaver"** pane. Replaces `screen_saver`; set one or the other.
+- `set_up_your_apple_tv` (Boolean) **"Set Up Your Apple TV"** pane. Replaces `tap_to_setup`; set one or the other.
+- `sim_setup` (Boolean, Deprecated) ~> Deprecated: use `add_cellular_plan` instead, the same pane under the name the admin UI shows. The provider will not remove `sim_setup` before 2027-02-03.
+
+**"Add Cellular Plan"** pane.
 - `siri` (Boolean) **"Siri"** pane.
 - `software_update` (Boolean) **"Software Update"** pane.
-- `spoken_language` (Boolean) **"Spoken Language"** pane.
-- `tap_to_setup` (Boolean) **"Tap to Setup"** pane.
+- `software_update_completed` (Boolean) **"Software Update Completed"** pane. Replaces `update_completed`; set one or the other.
+- `spoken_language` (Boolean, Deprecated) ~> Deprecated: use `dictation` instead, the same pane under the name the admin UI shows. The provider will not remove `spoken_language` before 2027-02-03.
+
+**"Dictation"** pane.
+- `tap_to_setup` (Boolean, Deprecated) ~> Deprecated: use `set_up_your_apple_tv` instead, the same pane under the name the admin UI shows. The provider will not remove `tap_to_setup` before 2027-02-03.
+
+**"Set Up Your Apple TV"** pane.
+- `terms_and_conditions` (Boolean) **"Terms and Conditions"** pane. Replaces `tos`; set one or the other.
 - `terms_of_address` (Boolean) **"Terms of Address"** pane.
-- `tos` (Boolean) **"Terms of Service"** pane.
+- `tos` (Boolean, Deprecated) ~> Deprecated: use `terms_and_conditions` instead, the same pane under the name the admin UI shows. The provider will not remove `tos` before 2027-02-03.
+
+**"Terms and Conditions"** pane.
 - `transfer_data` (Boolean) **"Transfer Data"** pane.
-- `tv_home_screen_sync` (Boolean) **"TV Home Screen Sync"** pane.
-- `tv_provider_sign_in` (Boolean) **"TV Provider Sign In"** pane.
-- `tv_room` (Boolean) **"TV Room"** pane.
-- `update_completed` (Boolean) **"Update Completed"** pane.
+- `true_tone_display` (Boolean) **"True Tone Display"** pane. Replaces `display_tone`; set one or the other.
+- `tv_home_screen_sync` (Boolean, Deprecated) ~> Deprecated: use `one_home_screen_for_every_apple_tv` instead, the same pane under the name the admin UI shows. The provider will not remove `tv_home_screen_sync` before 2027-02-03.
+
+**"One Home Screen for Every Apple TV"** pane.
+- `tv_provider_sign_in` (Boolean) **"Sign In to Your TV Provider"** pane.
+- `tv_room` (Boolean, Deprecated) ~> Deprecated: use `where_is_this_apple_tv` instead, the same pane under the name the admin UI shows. The provider will not remove `tv_room` before 2027-02-03.
+
+**"Where is this Apple TV?"** pane.
+- `update_completed` (Boolean, Deprecated) ~> Deprecated: use `software_update_completed` instead, the same pane under the name the admin UI shows. The provider will not remove `update_completed` before 2027-02-03.
+
+**"Software Update Completed"** pane.
 - `voice_selection` (Boolean) **"Voice Selection"** pane.
-- `watch_migration` (Boolean) **"Watch Migration"** pane.
-- `welcome` (Boolean) **"Welcome"** pane.
-- `zoom` (Boolean) **"Zoom"** pane.
+- `watch_migration` (Boolean, Deprecated) ~> Deprecated: use `apple_watch` instead, the same pane under the name the admin UI shows. The provider will not remove `watch_migration` before 2027-02-03.
+
+**"Apple Watch"** pane.
+- `welcome` (Boolean, Deprecated) ~> Deprecated: use `get_started` instead, the same pane under the name the admin UI shows. The provider will not remove `welcome` before 2027-02-03.
+
+**"Get Started"** pane.
+- `where_is_this_apple_tv` (Boolean) **"Where is this Apple TV?"** pane. Replaces `tv_room`; set one or the other.
+- `zoom` (Boolean, Deprecated) ~> Deprecated: use `display_zoom` instead, the same pane under the name the admin UI shows. The provider will not remove `zoom` before 2027-02-03.
+
+**"Display Zoom"** pane.
 
 
 <a id="nestedatt--timeouts"></a>

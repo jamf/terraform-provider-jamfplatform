@@ -97,7 +97,7 @@ func assignGetToResource(_ context.Context, plan *MobileDevicePrestageEnrollment
 	managePurchasingInformation := plan.PurchasingInformation != nil
 
 	if manageSkipSetupItems {
-		plan.SkipSetupItems = flattenSkipSetupItems(got.SkipSetupItems)
+		plan.SkipSetupItems = flattenSkipSetupItems(got.SkipSetupItems, plan.SkipSetupItems)
 	} else {
 		plan.SkipSetupItems = nil
 	}
@@ -118,59 +118,6 @@ func assignGetToResource(_ context.Context, plan *MobileDevicePrestageEnrollment
 	}
 
 	return diags
-}
-
-func flattenSkipSetupItems(m map[string]bool) *SkipSetupItemsModel {
-	if m == nil {
-		return nil
-	}
-	return &SkipSetupItemsModel{
-		ActionButton:          types.BoolValue(m["ActionButton"]),
-		Android:               types.BoolValue(m["Android"]),
-		Appearance:            types.BoolValue(m["Appearance"]),
-		AppleID:               types.BoolValue(m["AppleID"]),
-		Biometric:             types.BoolValue(m["Biometric"]),
-		CameraButton:          types.BoolValue(m["CameraButton"]),
-		CloudStorage:          types.BoolValue(m["CloudStorage"]),
-		Diagnostics:           types.BoolValue(m["Diagnostics"]),
-		DisplayTone:           types.BoolValue(m["DisplayTone"]),
-		EnableLockdownMode:    types.BoolValue(m["EnableLockdownMode"]),
-		ExpressLanguage:       types.BoolValue(m["ExpressLanguage"]),
-		HomeButtonSensitivity: types.BoolValue(m["HomeButtonSensitivity"]),
-		Intelligence:          types.BoolValue(m["Intelligence"]),
-		Keyboard:              types.BoolValue(m["Keyboard"]),
-		Location:              types.BoolValue(m["Location"]),
-		Multitasking:          types.BoolValue(m["Multitasking"]),
-		OSShowcase:            types.BoolValue(m["OSShowcase"]),
-		OnBoarding:            types.BoolValue(m["OnBoarding"]),
-		Passcode:              types.BoolValue(m["Passcode"]),
-		Payment:               types.BoolValue(m["Payment"]),
-		PreferredLanguage:     types.BoolValue(m["PreferredLanguage"]),
-		Privacy:               types.BoolValue(m["Privacy"]),
-		Restore:               types.BoolValue(m["Restore"]),
-		RestoreCompleted:      types.BoolValue(m["RestoreCompleted"]),
-		SIMSetup:              types.BoolValue(m["SIMSetup"]),
-		Safety:                types.BoolValue(m["Safety"]),
-		SafetyAndHandling:     types.BoolValue(m["SafetyAndHandling"]),
-		ScreenSaver:           types.BoolValue(m["ScreenSaver"]),
-		ScreenTime:            types.BoolValue(m["ScreenTime"]),
-		Siri:                  types.BoolValue(m["Siri"]),
-		SoftwareUpdate:        types.BoolValue(m["SoftwareUpdate"]),
-		SpokenLanguage:        types.BoolValue(m["SpokenLanguage"]),
-		TOS:                   types.BoolValue(m["TOS"]),
-		TVHomeScreenSync:      types.BoolValue(m["TVHomeScreenSync"]),
-		TVProviderSignIn:      types.BoolValue(m["TVProviderSignIn"]),
-		TVRoom:                types.BoolValue(m["TVRoom"]),
-		TapToSetup:            types.BoolValue(m["TapToSetup"]),
-		TermsOfAddress:        types.BoolValue(m["TermsOfAddress"]),
-		TransferData:          types.BoolValue(m["TransferData"]),
-		UpdateCompleted:       types.BoolValue(m["UpdateCompleted"]),
-		VoiceSelection:        types.BoolValue(m["VoiceSelection"]),
-		WatchMigration:        types.BoolValue(m["WatchMigration"]),
-		Welcome:               types.BoolValue(m["Welcome"]),
-		Zoom:                  types.BoolValue(m["Zoom"]),
-		IMessageAndFaceTime:   types.BoolValue(m["iMessageAndFaceTime"]),
-	}
 }
 
 // flattenNames maps the wire names block onto the model. prior is the model
@@ -385,65 +332,6 @@ func diffPlanAgainstGet(ctx context.Context, plan MobileDevicePrestageEnrollment
 	diffPurchasingInformation(plan.PurchasingInformation, got.PurchasingInformation, &mismatched)
 
 	return mismatched
-}
-
-func diffSkipSetupItems(plan *SkipSetupItemsModel, got map[string]bool, out *[]string) {
-	if plan == nil || got == nil {
-		return
-	}
-	check := func(field, wireKey string, v types.Bool) {
-		if v.IsNull() || v.IsUnknown() {
-			return
-		}
-		if v.ValueBool() != got[wireKey] {
-			*out = append(*out, "skip_setup_items."+field)
-		}
-	}
-	check("action_button", "ActionButton", plan.ActionButton)
-	check("android", "Android", plan.Android)
-	check("appearance", "Appearance", plan.Appearance)
-	check("apple_id", "AppleID", plan.AppleID)
-	check("biometric", "Biometric", plan.Biometric)
-	check("camera_button", "CameraButton", plan.CameraButton)
-	check("cloud_storage", "CloudStorage", plan.CloudStorage)
-	check("diagnostics", "Diagnostics", plan.Diagnostics)
-	check("display_tone", "DisplayTone", plan.DisplayTone)
-	check("enable_lockdown_mode", "EnableLockdownMode", plan.EnableLockdownMode)
-	check("express_language", "ExpressLanguage", plan.ExpressLanguage)
-	check("home_button_sensitivity", "HomeButtonSensitivity", plan.HomeButtonSensitivity)
-	check("intelligence", "Intelligence", plan.Intelligence)
-	check("keyboard", "Keyboard", plan.Keyboard)
-	check("location", "Location", plan.Location)
-	check("multitasking", "Multitasking", plan.Multitasking)
-	check("os_showcase", "OSShowcase", plan.OSShowcase)
-	check("onboarding", "OnBoarding", plan.OnBoarding)
-	check("passcode", "Passcode", plan.Passcode)
-	check("payment", "Payment", plan.Payment)
-	check("preferred_language", "PreferredLanguage", plan.PreferredLanguage)
-	check("privacy", "Privacy", plan.Privacy)
-	check("restore", "Restore", plan.Restore)
-	check("restore_completed", "RestoreCompleted", plan.RestoreCompleted)
-	check("sim_setup", "SIMSetup", plan.SIMSetup)
-	check("safety", "Safety", plan.Safety)
-	check("safety_and_handling", "SafetyAndHandling", plan.SafetyAndHandling)
-	check("screen_saver", "ScreenSaver", plan.ScreenSaver)
-	check("screen_time", "ScreenTime", plan.ScreenTime)
-	check("siri", "Siri", plan.Siri)
-	check("software_update", "SoftwareUpdate", plan.SoftwareUpdate)
-	check("spoken_language", "SpokenLanguage", plan.SpokenLanguage)
-	check("tos", "TOS", plan.TOS)
-	check("tv_home_screen_sync", "TVHomeScreenSync", plan.TVHomeScreenSync)
-	check("tv_provider_sign_in", "TVProviderSignIn", plan.TVProviderSignIn)
-	check("tv_room", "TVRoom", plan.TVRoom)
-	check("tap_to_setup", "TapToSetup", plan.TapToSetup)
-	check("terms_of_address", "TermsOfAddress", plan.TermsOfAddress)
-	check("transfer_data", "TransferData", plan.TransferData)
-	check("update_completed", "UpdateCompleted", plan.UpdateCompleted)
-	check("voice_selection", "VoiceSelection", plan.VoiceSelection)
-	check("watch_migration", "WatchMigration", plan.WatchMigration)
-	check("welcome", "Welcome", plan.Welcome)
-	check("zoom", "Zoom", plan.Zoom)
-	check("imessage_and_facetime", "iMessageAndFaceTime", plan.IMessageAndFaceTime)
 }
 
 func diffNames(plan *NamesModel, got *pro.MobileDevicePrestageNamesV3, out *[]string) {

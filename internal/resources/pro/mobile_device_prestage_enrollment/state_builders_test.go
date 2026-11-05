@@ -27,7 +27,7 @@ func newStringList(t *testing.T, in []string) types.List {
 }
 
 func TestFlattenSkipSetupItems_NilIn(t *testing.T) {
-	if got := flattenSkipSetupItems(nil); got != nil {
+	if got := flattenSkipSetupItems(nil, nil); got != nil {
 		t.Errorf("nil wire map → nil model expected, got %+v", got)
 	}
 }
@@ -41,7 +41,7 @@ func TestFlattenSkipSetupItems_RoundTripAndMissingKey(t *testing.T) {
 		"EnableLockdownMode":  false,
 		// "Zoom" deliberately omitted → must flatten to false.
 	}
-	m := flattenSkipSetupItems(wire)
+	m := flattenSkipSetupItems(wire, nil)
 	if m == nil {
 		t.Fatalf("expected non-nil model")
 	}
@@ -57,12 +57,12 @@ func TestFlattenSkipSetupItems_RoundTripAndMissingKey(t *testing.T) {
 	if m.EnableLockdownMode.ValueBool() {
 		t.Errorf("EnableLockdownMode should be false")
 	}
-	if m.Zoom.ValueBool() {
+	if m.DisplayZoom.ValueBool() {
 		t.Errorf("missing wire key Zoom must flatten to false, got true")
 	}
 
-	// All 45 model attrs must be concrete (non-null) BoolValues.
-	if m.ActionButton.IsNull() || m.WatchMigration.IsNull() || m.TVRoom.IsNull() {
+	// All current model attrs must be concrete (non-null) BoolValues.
+	if m.ActionButton.IsNull() || m.AppleWatch.IsNull() || m.WhereIsThisAppleTV.IsNull() {
 		t.Errorf("flattened model attrs must be concrete bools, not null")
 	}
 }

@@ -133,7 +133,7 @@ func buildPutInput(ctx context.Context, plan, cfg ComputerPrestageEnrollmentReso
 
 	put.LocationInformation = buildLocationInformation(plan.LocationInformation, "", 0)
 	put.PurchasingInformation = buildPurchasingInformation(plan.PurchasingInformation, "", 0)
-	put.SkipSetupItems = buildSkipSetupItemsMap(plan.SkipSetupItems)
+	put.SkipSetupItems = buildSkipSetupItemsMapOver(plan.SkipSetupItems, got.SkipSetupItems)
 
 	// accountSettings always present on PUT per F6.
 	put.AccountSettings = buildAccountSettingsRequest(plan.AccountSettings, got.AccountSettings, cfg.AccountSettings, rotateAdminPwd)
@@ -202,40 +202,6 @@ func buildPurchasingInformation(m *PurchasingInformationModel, nestedID string, 
 	out.PoDate = stringOrSentinel(m.PoDate, sentinelDateUnset)
 	out.WarrantyDate = stringOrSentinel(m.WarrantyDate, sentinelDateUnset)
 	return out
-}
-
-func buildSkipSetupItemsMap(m *SkipSetupItemsModel) *map[string]bool {
-	if m == nil {
-		return nil
-	}
-	out := map[string]bool{
-		"Biometric":                 m.Biometric.ValueBool(),
-		"FileVault":                 m.FileVault.ValueBool(),
-		"SoftwareUpdate":            m.SoftwareUpdate.ValueBool(),
-		"Diagnostics":               m.Diagnostics.ValueBool(),
-		"Accessibility":             m.Accessibility.ValueBool(),
-		"Intelligence":              m.Intelligence.ValueBool(),
-		"ScreenTime":                m.ScreenTime.ValueBool(),
-		"Siri":                      m.Siri.ValueBool(),
-		"Restore":                   m.Restore.ValueBool(),
-		"Privacy":                   m.Privacy.ValueBool(),
-		"Registration":              m.Registration.ValueBool(),
-		"EnableLockdownMode":        m.EnableLockdownMode.ValueBool(),
-		"TermsOfAddress":            m.TermsOfAddress.ValueBool(),
-		"iCloudDiagnostics":         m.ICloudDiagnostics.ValueBool(),
-		"AppleID":                   m.AppleID.ValueBool(),
-		"DisplayTone":               m.DisplayTone.ValueBool(),
-		"Appearance":                m.Appearance.ValueBool(),
-		"Payment":                   m.Payment.ValueBool(),
-		"TOS":                       m.TOS.ValueBool(),
-		"OSShowcase":                m.OSShowcase.ValueBool(),
-		"Welcome":                   m.Welcome.ValueBool(),
-		"Wallpaper":                 m.Wallpaper.ValueBool(),
-		"iCloudStorage":             m.ICloudStorage.ValueBool(),
-		"AdditionalPrivacySettings": m.AdditionalPrivacySettings.ValueBool(),
-		"Location":                  m.Location.ValueBool(),
-	}
-	return &out
 }
 
 // buildAccountSettingsRequest assembles the AccountSettingsRequest. plan

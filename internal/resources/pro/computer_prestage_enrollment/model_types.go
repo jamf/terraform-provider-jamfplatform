@@ -71,35 +71,45 @@ type ComputerPrestageEnrollmentResourceModel struct {
 	Timeouts resourceTimeouts.Value `tfsdk:"timeouts"`
 }
 
-// SkipSetupItemsModel mirrors the wire-side `skipSetupItems` map but exposes
-// each Apple Setup Assistant pane as a named snake_case attribute. Boundary
-// translation (wire-case ⇔ snake_case) lives in mappings.go.
+// SkipSetupItemsModel mirrors the wire-side `skipSetupItems` map but exposes each Apple Setup
+// Assistant pane as a named snake_case attribute, named after the admin UI label. The
+// attribute-to-wire-key table is skipItems in skip_items.go. The last fields are deprecated
+// aliases that share a wire key with an earlier one; deprecations.go names each.
 type SkipSetupItemsModel struct {
-	Biometric                 types.Bool `tfsdk:"biometric"`
-	FileVault                 types.Bool `tfsdk:"filevault"`
-	SoftwareUpdate            types.Bool `tfsdk:"software_update"`
-	Diagnostics               types.Bool `tfsdk:"diagnostics"`
-	Accessibility             types.Bool `tfsdk:"accessibility"`
-	Intelligence              types.Bool `tfsdk:"intelligence"`
-	ScreenTime                types.Bool `tfsdk:"screen_time"`
-	Siri                      types.Bool `tfsdk:"siri"`
-	Restore                   types.Bool `tfsdk:"restore"`
-	Privacy                   types.Bool `tfsdk:"privacy"`
-	Registration              types.Bool `tfsdk:"registration"`
-	EnableLockdownMode        types.Bool `tfsdk:"enable_lockdown_mode"`
-	TermsOfAddress            types.Bool `tfsdk:"terms_of_address"`
-	ICloudDiagnostics         types.Bool `tfsdk:"icloud_diagnostics"`
-	AppleID                   types.Bool `tfsdk:"apple_id"`
-	DisplayTone               types.Bool `tfsdk:"display_tone"`
-	Appearance                types.Bool `tfsdk:"appearance"`
-	Payment                   types.Bool `tfsdk:"payment"`
-	TOS                       types.Bool `tfsdk:"tos"`
-	OSShowcase                types.Bool `tfsdk:"os_showcase"`
-	Welcome                   types.Bool `tfsdk:"welcome"`
-	Wallpaper                 types.Bool `tfsdk:"wallpaper"`
-	ICloudStorage             types.Bool `tfsdk:"icloud_storage"`
-	AdditionalPrivacySettings types.Bool `tfsdk:"additional_privacy_settings"`
+	GetStarted                types.Bool `tfsdk:"get_started"`
 	Location                  types.Bool `tfsdk:"location"`
+	TransferInformation       types.Bool `tfsdk:"transfer_information"`
+	AppleID                   types.Bool `tfsdk:"apple_id"`
+	TermsAndConditions        types.Bool `tfsdk:"terms_and_conditions"`
+	Siri                      types.Bool `tfsdk:"siri"`
+	AppAnalytics              types.Bool `tfsdk:"app_analytics"`
+	Biometric                 types.Bool `tfsdk:"biometric"`
+	EnableLockdownMode        types.Bool `tfsdk:"enable_lockdown_mode"`
+	Payment                   types.Bool `tfsdk:"payment"`
+	Registration              types.Bool `tfsdk:"registration"`
+	Privacy                   types.Bool `tfsdk:"privacy"`
+	AdditionalPrivacySettings types.Bool `tfsdk:"additional_privacy_settings"`
+	FileVault                 types.Bool `tfsdk:"filevault"`
+	ICloudDiagnostics         types.Bool `tfsdk:"icloud_diagnostics"`
+	AllYourFilesInICloud      types.Bool `tfsdk:"all_your_files_in_icloud"`
+	ChooseYourLook            types.Bool `tfsdk:"choose_your_look"`
+	Wallpaper                 types.Bool `tfsdk:"wallpaper"`
+	TrueToneDisplay           types.Bool `tfsdk:"true_tone_display"`
+	ScreenTime                types.Bool `tfsdk:"screen_time"`
+	Accessibility             types.Bool `tfsdk:"accessibility"`
+	TermsOfAddress            types.Bool `tfsdk:"terms_of_address"`
+	Intelligence              types.Bool `tfsdk:"intelligence"`
+	SoftwareUpdate            types.Bool `tfsdk:"software_update"`
+	OSShowcase                types.Bool `tfsdk:"os_showcase"`
+	LiquidGlass               types.Bool `tfsdk:"liquid_glass"`
+
+	Welcome       types.Bool `tfsdk:"welcome"`
+	Restore       types.Bool `tfsdk:"restore"`
+	TOS           types.Bool `tfsdk:"tos"`
+	Diagnostics   types.Bool `tfsdk:"diagnostics"`
+	ICloudStorage types.Bool `tfsdk:"icloud_storage"`
+	Appearance    types.Bool `tfsdk:"appearance"`
+	DisplayTone   types.Bool `tfsdk:"display_tone"`
 }
 
 // LocationInformationModel is the User and Location Information nested block.

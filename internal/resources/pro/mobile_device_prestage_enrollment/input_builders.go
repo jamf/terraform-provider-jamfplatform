@@ -305,63 +305,6 @@ func buildPurchasingInformation(m *PurchasingInformationModel, nestedID string, 
 	return out
 }
 
-// buildSkipSetupItemsMap builds the wire map from the model. Sends all 45 keys
-// (the server echoes the full set, §F12); a null/unknown model bool serialises
-// as false. Returns nil when the user omitted the block.
-func buildSkipSetupItemsMap(m *SkipSetupItemsModel) *map[string]bool {
-	if m == nil {
-		return nil
-	}
-	out := map[string]bool{
-		"ActionButton":          m.ActionButton.ValueBool(),
-		"Android":               m.Android.ValueBool(),
-		"Appearance":            m.Appearance.ValueBool(),
-		"AppleID":               m.AppleID.ValueBool(),
-		"Biometric":             m.Biometric.ValueBool(),
-		"CameraButton":          m.CameraButton.ValueBool(),
-		"CloudStorage":          m.CloudStorage.ValueBool(),
-		"Diagnostics":           m.Diagnostics.ValueBool(),
-		"DisplayTone":           m.DisplayTone.ValueBool(),
-		"EnableLockdownMode":    m.EnableLockdownMode.ValueBool(),
-		"ExpressLanguage":       m.ExpressLanguage.ValueBool(),
-		"HomeButtonSensitivity": m.HomeButtonSensitivity.ValueBool(),
-		"Intelligence":          m.Intelligence.ValueBool(),
-		"Keyboard":              m.Keyboard.ValueBool(),
-		"Location":              m.Location.ValueBool(),
-		"Multitasking":          m.Multitasking.ValueBool(),
-		"OSShowcase":            m.OSShowcase.ValueBool(),
-		"OnBoarding":            m.OnBoarding.ValueBool(),
-		"Passcode":              m.Passcode.ValueBool(),
-		"Payment":               m.Payment.ValueBool(),
-		"PreferredLanguage":     m.PreferredLanguage.ValueBool(),
-		"Privacy":               m.Privacy.ValueBool(),
-		"Restore":               m.Restore.ValueBool(),
-		"RestoreCompleted":      m.RestoreCompleted.ValueBool(),
-		"SIMSetup":              m.SIMSetup.ValueBool(),
-		"Safety":                m.Safety.ValueBool(),
-		"SafetyAndHandling":     m.SafetyAndHandling.ValueBool(),
-		"ScreenSaver":           m.ScreenSaver.ValueBool(),
-		"ScreenTime":            m.ScreenTime.ValueBool(),
-		"Siri":                  m.Siri.ValueBool(),
-		"SoftwareUpdate":        m.SoftwareUpdate.ValueBool(),
-		"SpokenLanguage":        m.SpokenLanguage.ValueBool(),
-		"TOS":                   m.TOS.ValueBool(),
-		"TVHomeScreenSync":      m.TVHomeScreenSync.ValueBool(),
-		"TVProviderSignIn":      m.TVProviderSignIn.ValueBool(),
-		"TVRoom":                m.TVRoom.ValueBool(),
-		"TapToSetup":            m.TapToSetup.ValueBool(),
-		"TermsOfAddress":        m.TermsOfAddress.ValueBool(),
-		"TransferData":          m.TransferData.ValueBool(),
-		"UpdateCompleted":       m.UpdateCompleted.ValueBool(),
-		"VoiceSelection":        m.VoiceSelection.ValueBool(),
-		"WatchMigration":        m.WatchMigration.ValueBool(),
-		"Welcome":               m.Welcome.ValueBool(),
-		"Zoom":                  m.Zoom.ValueBool(),
-		"iMessageAndFaceTime":   m.IMessageAndFaceTime.ValueBool(),
-	}
-	return &out
-}
-
 // stringSetToSlice extracts a TF Set<String> into a Go []string.
 // Returns nil when the set is null/unknown.
 func stringSetToSlice(ctx context.Context, s types.Set) ([]string, diag.Diagnostics) {

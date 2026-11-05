@@ -29,6 +29,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/prestageskip"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -438,6 +439,7 @@ func (r *ComputerPrestageEnrollmentResource) ModifyPlan(ctx context.Context, req
 	}
 
 	r.reportNameCollision(ctx, req, resp)
+	prestageskip.ReconcilePlan(ctx, req, resp, skipAliases())
 
 	var cfgBundle, cfgProfile, cfgCustomization types.String
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("platform_sso_app_bundle_id"), &cfgBundle)...)
@@ -556,43 +558,6 @@ func optInt64(md string) schema.Attribute {
 		},
 		Validators: []validator.Int64{
 			int64validator.AtLeast(0),
-		},
-	}
-}
-
-// skipSetupItemsSchema returns the SingleNestedAttribute for the
-// Setup-Assistant pane-skip checklist. Per STYLE_GUIDE: typed-pointer model
-// ⇒ block is Optional-only; inner fields are Optional+Computed.
-func skipSetupItemsSchema() schema.SingleNestedAttribute {
-	return schema.SingleNestedAttribute{
-		MarkdownDescription: "Setup Assistant panes to skip during enrolment. Each attribute corresponds to a pane in the Jamf Pro admin UI's *Skip Setup Items* checklist, and `true` skips that pane. Supply the block to manage this section, even empty as `skip_setup_items = {}`. Omitting it produces drift on the next refresh.",
-		Optional:            true,
-		Attributes: map[string]schema.Attribute{
-			"biometric":                   optBool("**\"Biometric\"** pane (Face ID / Touch ID)."),
-			"filevault":                   optBool("**\"FileVault\"** pane."),
-			"software_update":             optBool("**\"Software Update\"** pane."),
-			"diagnostics":                 optBool("**\"Diagnostics\"** pane."),
-			"accessibility":               optBool("**\"Accessibility\"** pane."),
-			"intelligence":                optBool("**\"Apple Intelligence\"** pane."),
-			"screen_time":                 optBool("**\"Screen Time\"** pane."),
-			"siri":                        optBool("**\"Siri\"** pane."),
-			"restore":                     optBool("**\"Restore from backup\"** pane."),
-			"privacy":                     optBool("**\"Privacy\"** pane."),
-			"registration":                optBool("**\"Registration\"** pane."),
-			"enable_lockdown_mode":        optBool("**\"Enable Lockdown Mode\"** pane."),
-			"terms_of_address":            optBool("**\"Terms of Address\"** pane."),
-			"icloud_diagnostics":          optBool("**\"iCloud Diagnostics\"** pane."),
-			"apple_id":                    optBool("**\"Apple ID\"** pane."),
-			"display_tone":                optBool("**\"True Tone\"** pane."),
-			"appearance":                  optBool("**\"Appearance\"** pane."),
-			"payment":                     optBool("**\"Apple Pay\"** pane."),
-			"tos":                         optBool("**\"Terms of Service\"** pane."),
-			"os_showcase":                 optBool("**\"OS Showcase\"** pane."),
-			"welcome":                     optBool("**\"Welcome\"** pane."),
-			"wallpaper":                   optBool("**\"Wallpaper\"** pane."),
-			"icloud_storage":              optBool("**\"iCloud Storage\"** pane."),
-			"additional_privacy_settings": optBool("**\"Additional Privacy Settings\"** pane."),
-			"location":                    optBool("**\"Location Services\"** pane."),
 		},
 	}
 }

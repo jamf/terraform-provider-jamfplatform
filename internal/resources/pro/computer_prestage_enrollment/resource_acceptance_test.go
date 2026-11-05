@@ -222,7 +222,7 @@ func TestAccResource_ProComputerPrestageEnrollment_Full_UpdateRoundTrip(t *testi
 					resource.TestCheckResourceAttr(resourceName, "display_name", name+"-v2"),
 					resource.TestCheckResourceAttr(resourceName, "support_phone_number", "+44-1-555-0200"),
 					resource.TestCheckResourceAttr(resourceName, "skip_setup_items.filevault", "false"),
-					resource.TestCheckResourceAttr(resourceName, "skip_setup_items.icloud_storage", "true"),
+					resource.TestCheckResourceAttr(resourceName, "skip_setup_items.all_your_files_in_icloud", "true"),
 					resource.TestCheckResourceAttr(resourceName, "location_information.username", "tf-acc-user-v2"),
 					resource.TestCheckResourceAttr(resourceName, "purchasing_information.life_expectancy", "5"),
 					resource.TestCheckResourceAttr(resourceName, "account_settings.admin_username", "ladmin2"),
@@ -985,7 +985,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   skip_setup_items = {
     filevault      = true
     siri           = true
-    icloud_storage = false
+    all_your_files_in_icloud = false
   }
 
   location_information = {
@@ -1074,7 +1074,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   skip_setup_items = {
     filevault                   = false
     siri                        = false
-    icloud_storage              = true
+    all_your_files_in_icloud    = true
     additional_privacy_settings = true
   }
 

@@ -103,7 +103,7 @@ func assignGetToResource(_ context.Context, plan *ComputerPrestageEnrollmentReso
 	manageAccountSettings := plan.AccountSettings != nil
 
 	if manageSkipSetupItems {
-		plan.SkipSetupItems = flattenSkipSetupItems(got.SkipSetupItems)
+		plan.SkipSetupItems = flattenSkipSetupItems(got.SkipSetupItems, plan.SkipSetupItems)
 	} else {
 		plan.SkipSetupItems = nil
 	}
@@ -137,39 +137,6 @@ func roundTripInt64(prior types.Int64) types.Int64 {
 		return types.Int64Null()
 	}
 	return prior
-}
-
-func flattenSkipSetupItems(m map[string]bool) *SkipSetupItemsModel {
-	if m == nil {
-		return nil
-	}
-	out := &SkipSetupItemsModel{}
-	out.Biometric = types.BoolValue(m["Biometric"])
-	out.FileVault = types.BoolValue(m["FileVault"])
-	out.SoftwareUpdate = types.BoolValue(m["SoftwareUpdate"])
-	out.Diagnostics = types.BoolValue(m["Diagnostics"])
-	out.Accessibility = types.BoolValue(m["Accessibility"])
-	out.Intelligence = types.BoolValue(m["Intelligence"])
-	out.ScreenTime = types.BoolValue(m["ScreenTime"])
-	out.Siri = types.BoolValue(m["Siri"])
-	out.Restore = types.BoolValue(m["Restore"])
-	out.Privacy = types.BoolValue(m["Privacy"])
-	out.Registration = types.BoolValue(m["Registration"])
-	out.EnableLockdownMode = types.BoolValue(m["EnableLockdownMode"])
-	out.TermsOfAddress = types.BoolValue(m["TermsOfAddress"])
-	out.ICloudDiagnostics = types.BoolValue(m["iCloudDiagnostics"])
-	out.AppleID = types.BoolValue(m["AppleID"])
-	out.DisplayTone = types.BoolValue(m["DisplayTone"])
-	out.Appearance = types.BoolValue(m["Appearance"])
-	out.Payment = types.BoolValue(m["Payment"])
-	out.TOS = types.BoolValue(m["TOS"])
-	out.OSShowcase = types.BoolValue(m["OSShowcase"])
-	out.Welcome = types.BoolValue(m["Welcome"])
-	out.Wallpaper = types.BoolValue(m["Wallpaper"])
-	out.ICloudStorage = types.BoolValue(m["iCloudStorage"])
-	out.AdditionalPrivacySettings = types.BoolValue(m["AdditionalPrivacySettings"])
-	out.Location = types.BoolValue(m["Location"])
-	return out
 }
 
 func flattenLocationInformation(loc *pro.LocationInformationV2) *LocationInformationModel {
@@ -368,45 +335,6 @@ func diffPlanAgainstGet(ctx context.Context, plan ComputerPrestageEnrollmentReso
 	diffAccountSettings(plan.AccountSettings, got.AccountSettings, &mismatched)
 
 	return mismatched
-}
-
-func diffSkipSetupItems(plan *SkipSetupItemsModel, got map[string]bool, out *[]string) {
-	if plan == nil || got == nil {
-		return
-	}
-	check := func(field, wireKey string, v types.Bool) {
-		if v.IsNull() || v.IsUnknown() {
-			return
-		}
-		if v.ValueBool() != got[wireKey] {
-			*out = append(*out, "skip_setup_items."+field)
-		}
-	}
-	check("biometric", "Biometric", plan.Biometric)
-	check("filevault", "FileVault", plan.FileVault)
-	check("software_update", "SoftwareUpdate", plan.SoftwareUpdate)
-	check("diagnostics", "Diagnostics", plan.Diagnostics)
-	check("accessibility", "Accessibility", plan.Accessibility)
-	check("intelligence", "Intelligence", plan.Intelligence)
-	check("screen_time", "ScreenTime", plan.ScreenTime)
-	check("siri", "Siri", plan.Siri)
-	check("restore", "Restore", plan.Restore)
-	check("privacy", "Privacy", plan.Privacy)
-	check("registration", "Registration", plan.Registration)
-	check("enable_lockdown_mode", "EnableLockdownMode", plan.EnableLockdownMode)
-	check("terms_of_address", "TermsOfAddress", plan.TermsOfAddress)
-	check("icloud_diagnostics", "iCloudDiagnostics", plan.ICloudDiagnostics)
-	check("apple_id", "AppleID", plan.AppleID)
-	check("display_tone", "DisplayTone", plan.DisplayTone)
-	check("appearance", "Appearance", plan.Appearance)
-	check("payment", "Payment", plan.Payment)
-	check("tos", "TOS", plan.TOS)
-	check("os_showcase", "OSShowcase", plan.OSShowcase)
-	check("welcome", "Welcome", plan.Welcome)
-	check("wallpaper", "Wallpaper", plan.Wallpaper)
-	check("icloud_storage", "iCloudStorage", plan.ICloudStorage)
-	check("additional_privacy_settings", "AdditionalPrivacySettings", plan.AdditionalPrivacySettings)
-	check("location", "Location", plan.Location)
 }
 
 func diffLocationInformation(plan *LocationInformationModel, got *pro.LocationInformationV2, out *[]string) {

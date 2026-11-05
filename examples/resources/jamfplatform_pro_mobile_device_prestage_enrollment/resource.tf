@@ -52,10 +52,12 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
   }
 
   skip_setup_items = {
-    location    = true
-    apple_id    = true
-    screen_time = true
-    siri        = true
+    location             = true
+    apple_id             = true
+    screen_time          = true
+    siri                 = true
+    device_features_tour = true
+    liquid_glass         = true
   }
 
   location_information = {

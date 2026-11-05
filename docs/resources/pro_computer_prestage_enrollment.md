@@ -45,9 +45,10 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "example" {
   enable_device_based_activation_lock   = false
 
   skip_setup_items = {
-    filevault      = true
-    icloud_storage = true
-    siri           = true
+    filevault                = true
+    all_your_files_in_icloud = true
+    siri                     = true
+    liquid_glass             = true
   }
 
   location_information   = {}
@@ -113,7 +114,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "example" {
 - `region` (String) Default Setup Assistant region (ISO-3166 code, e.g. `"US"`).
 - `rotate_recovery_lock_password` (Boolean) **"Rotate Recovery Lock Password"** in the Jamf Pro admin UI.
 - `scope_serial_numbers` (Set of String) Set of device serial numbers assigned to this PreStage. Each serial must exist on the underlying ADE token. The full set is rewritten on every change. Jamf Pro enforces single-PreStage-per-serial: assigning a serial that is currently scoped to a different PreStage is rejected with a scope-conflict error and there is no transparent reassignment. To move a serial between PreStages, first remove it from the holding PreStage (e.g. in the same `terraform apply` with an explicit `depends_on` ordering or in two separate applies).
-- `skip_setup_items` (Attributes) Setup Assistant panes to skip during enrolment. Each attribute corresponds to a pane in the Jamf Pro admin UI's *Skip Setup Items* checklist, and `true` skips that pane. Supply the block to manage this section, even empty as `skip_setup_items = {}`. Omitting it produces drift on the next refresh. (see [below for nested schema](#nestedatt--skip_setup_items))
+- `skip_setup_items` (Attributes) Setup Assistant panes to skip during enrolment. Each attribute matches a pane in the *Skip Setup Items* checklist of the Jamf Pro admin UI and takes its name from the pane's label. Set `true` to skip the pane. Supply the block to manage this section, even empty as `skip_setup_items = {}`. Without it, the next refresh shows drift. (see [below for nested schema](#nestedatt--skip_setup_items))
 - `support_email_address` (String) **"Support Email Address"** in the Jamf Pro admin UI.
 - `support_phone_number` (String) **"Support Phone Number"** in the Jamf Pro admin UI.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
@@ -187,29 +188,51 @@ Optional:
 
 - `accessibility` (Boolean) **"Accessibility"** pane.
 - `additional_privacy_settings` (Boolean) **"Additional Privacy Settings"** pane.
-- `appearance` (Boolean) **"Appearance"** pane.
+- `all_your_files_in_icloud` (Boolean) **"All Your Files in iCloud"** pane. Replaces `icloud_storage`; set one or the other.
+- `app_analytics` (Boolean) **"App Analytics"** pane. Replaces `diagnostics`; set one or the other.
+- `appearance` (Boolean, Deprecated) ~> Deprecated: use `choose_your_look` instead, the same pane under the name the admin UI shows. The provider will not remove `appearance` before 2027-02-03.
+
+**"Choose your Look"** pane.
 - `apple_id` (Boolean) **"Apple ID"** pane.
-- `biometric` (Boolean) **"Biometric"** pane (Face ID / Touch ID).
-- `diagnostics` (Boolean) **"Diagnostics"** pane.
-- `display_tone` (Boolean) **"True Tone"** pane.
+- `biometric` (Boolean) **"Touch ID / Face ID"** pane.
+- `choose_your_look` (Boolean) **"Choose your Look"** pane. Replaces `appearance`; set one or the other.
+- `diagnostics` (Boolean, Deprecated) ~> Deprecated: use `app_analytics` instead, the same pane under the name the admin UI shows. The provider will not remove `diagnostics` before 2027-02-03.
+
+**"App Analytics"** pane.
+- `display_tone` (Boolean, Deprecated) ~> Deprecated: use `true_tone_display` instead, the same pane under the name the admin UI shows. The provider will not remove `display_tone` before 2027-02-03.
+
+**"True Tone Display"** pane.
 - `enable_lockdown_mode` (Boolean) **"Enable Lockdown Mode"** pane.
 - `filevault` (Boolean) **"FileVault"** pane.
+- `get_started` (Boolean) **"Get Started"** pane. Replaces `welcome`; set one or the other.
 - `icloud_diagnostics` (Boolean) **"iCloud Diagnostics"** pane.
-- `icloud_storage` (Boolean) **"iCloud Storage"** pane.
-- `intelligence` (Boolean) **"Apple Intelligence"** pane.
+- `icloud_storage` (Boolean, Deprecated) ~> Deprecated: use `all_your_files_in_icloud` instead, the same pane under the name the admin UI shows. The provider will not remove `icloud_storage` before 2027-02-03.
+
+**"All Your Files in iCloud"** pane.
+- `intelligence` (Boolean) **"Intelligence"** pane.
+- `liquid_glass` (Boolean) **"Liquid Glass"** pane.
 - `location` (Boolean) **"Location Services"** pane.
 - `os_showcase` (Boolean) **"OS Showcase"** pane.
 - `payment` (Boolean) **"Apple Pay"** pane.
 - `privacy` (Boolean) **"Privacy"** pane.
 - `registration` (Boolean) **"Registration"** pane.
-- `restore` (Boolean) **"Restore from backup"** pane.
+- `restore` (Boolean, Deprecated) ~> Deprecated: use `transfer_information` instead, the same pane under the name the admin UI shows. The provider will not remove `restore` before 2027-02-03.
+
+**"Transfer Information"** pane.
 - `screen_time` (Boolean) **"Screen Time"** pane.
 - `siri` (Boolean) **"Siri"** pane.
 - `software_update` (Boolean) **"Software Update"** pane.
+- `terms_and_conditions` (Boolean) **"Terms and Conditions"** pane. Replaces `tos`; set one or the other.
 - `terms_of_address` (Boolean) **"Terms of Address"** pane.
-- `tos` (Boolean) **"Terms of Service"** pane.
+- `tos` (Boolean, Deprecated) ~> Deprecated: use `terms_and_conditions` instead, the same pane under the name the admin UI shows. The provider will not remove `tos` before 2027-02-03.
+
+**"Terms and Conditions"** pane.
+- `transfer_information` (Boolean) **"Transfer Information"** pane. Replaces `restore`; set one or the other.
+- `true_tone_display` (Boolean) **"True Tone Display"** pane. Replaces `display_tone`; set one or the other.
 - `wallpaper` (Boolean) **"Wallpaper"** pane.
-- `welcome` (Boolean) **"Welcome"** pane.
+- `welcome` (Boolean, Deprecated) ~> Deprecated: use `get_started` instead, the same pane under the name the admin UI shows. The provider will not remove `welcome` before 2027-02-03.
+
+**"Get Started"** pane.
 
 
 <a id="nestedatt--timeouts"></a>

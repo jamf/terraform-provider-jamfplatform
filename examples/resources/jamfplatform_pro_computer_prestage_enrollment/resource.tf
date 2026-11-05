@@ -17,9 +17,10 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "example" {
   enable_device_based_activation_lock   = false
 
   skip_setup_items = {
-    filevault      = true
-    icloud_storage = true
-    siri           = true
+    filevault                = true
+    all_your_files_in_icloud = true
+    siri                     = true
+    liquid_glass             = true
   }
 
   location_information   = {}

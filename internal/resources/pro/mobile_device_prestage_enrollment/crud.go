@@ -47,6 +47,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/prestageskip"
 )
 
 // ModifyPlan marks the "server-arbitrated" fields Unknown when their planned
@@ -69,6 +70,7 @@ func (r *MobileDevicePrestageEnrollmentResource) ModifyPlan(ctx context.Context,
 		return
 	}
 	r.reportNameCollision(ctx, req, resp)
+	prestageskip.ReconcilePlan(ctx, req, resp, skipAliases())
 	var plan MobileDevicePrestageEnrollmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -407,6 +409,7 @@ func (r *MobileDevicePrestageEnrollmentResource) Update(ctx context.Context, req
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	put.SkipSetupItems = buildSkipSetupItemsMapOver(plan.SkipSetupItems, preGet.SkipSetupItems)
 	injectVersionLocks(put, preGet)
 
 	_, putErr := r.client.UpdateMobileDevicePrestageV3(updateCtx, id, put)
