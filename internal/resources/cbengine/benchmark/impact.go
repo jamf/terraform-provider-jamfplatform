@@ -34,9 +34,11 @@ func (r *BenchmarkResource) reportScopeImpact(ctx context.Context, req resource.
 	}, benchmarkImpactScope)
 }
 
-// ModifyPlan reports a title another benchmark already holds, and emits the impact
+// ModifyPlan checks the rules, organization-defined values and OS versions against the
+// source baseline, reports a title another benchmark already holds, and emits the impact
 // alert for a change to device group targeting.
 func (r *BenchmarkResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	r.validateAgainstBaseline(ctx, req, resp)
 	r.reportTitleCollision(ctx, req, resp)
 	r.reportScopeImpact(ctx, req, resp)
 }

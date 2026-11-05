@@ -123,6 +123,9 @@ type Data struct {
 
 	benchmarkMu   sync.Mutex
 	benchmarkLock *BenchmarkLock
+
+	baselineRulesMu    sync.Mutex
+	baselineRulesCache *BaselineRulesCache
 }
 
 // AISchemaCache returns the shared AI Governance product catalogue and vendor schema cache, building

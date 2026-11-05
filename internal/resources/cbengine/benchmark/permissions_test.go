@@ -94,9 +94,11 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 }
 
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
-// not declared in resourceSDKMethods, or declares one it does not call.
+// not declared in resourceSDKMethods, or declares one it does not call. The
+// baseline cache is read as well, because the plan-time baseline check calls
+// GetBaselineRules there rather than in this package.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatchFiles(t, resourceSDKMethods, "crud.go", "collision.go")
+	assertMatchFiles(t, resourceSDKMethods, "crud.go", "collision.go", "../../../providerdata/baselinerules.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

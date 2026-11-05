@@ -141,7 +141,7 @@ Required:
 
 Optional:
 
-- `odv_value` (String) Optional organization-defined value to apply for this rule (if applicable).
+- `odv_value` (String) Organization-defined value for this rule. Omit it to keep the baseline default.
 
 Read-Only:
 
