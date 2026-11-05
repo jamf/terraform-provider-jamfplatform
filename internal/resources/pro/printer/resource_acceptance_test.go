@@ -357,6 +357,36 @@ func TestAccResource_ProPrinter_PPDValidator_CustomRequiresPath(t *testing.T) {
 	})
 }
 
+// TestAccResource_ProPrinter_PPDValidator_RejectsBundledGenericPath exercises
+// the rejection of the bundled Generic.ppd path as ppd_path under
+// use_generic=false. Jamf Pro treats that exact path as the generic-PPD gate
+// and stores use_generic=true, so without the validator apply fails with
+// "Provider produced inconsistent result after apply". Should not reach apply.
+// The path is restated here because this is the external test package and
+// cannot see bundledGenericPPDPath in helpers.go.
+func TestAccResource_ProPrinter_PPDValidator_RejectsBundledGenericPath(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-printer-validate-bundled-" + suffix
+	const bundledGenericPPDPath = "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/PrintCore.framework/Resources/Generic.ppd"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+					resource "jamfplatform_pro_printer" "test" {
+						name        = %q
+						use_generic = false
+						ppd_path    = %q
+					}
+				`, name, bundledGenericPPDPath),
+				ExpectError: regexp.MustCompile(`ppd_path\s+is\s+the\s+bundled\s+Generic\.ppd\s+path`),
+			},
+		},
+	})
+}
+
 // TestAccResource_ProPrinter_PPDPathWhitespaceKept covers issue #517: classic
 // saves ppd_path without its outer whitespace (wire-verified 2026-10-20), and
 // the authored value must survive the apply with an empty re-plan.

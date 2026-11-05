@@ -138,7 +138,7 @@ func (r *PrinterResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Default:             booldefault.StaticBool(false),
 			},
 			"use_generic": schema.BoolAttribute{
-				MarkdownDescription: "Whether to use the bundled macOS Generic.ppd. When `true` (the default) Jamf Pro uses the generic PPD and clears any `ppd`, `ppd_path`, or `ppd_contents` you supplied. When `false` you must supply a concrete `ppd_path`. `ppd` and `ppd_contents` alone are not sufficient; Jamf Pro falls back to the generic PPD if `ppd_path` is missing.",
+				MarkdownDescription: "Whether to use the bundled macOS Generic.ppd. When `true` (the default), set none of `ppd`, `ppd_path` or `ppd_contents`: Jamf Pro ignores them, and the plan fails if you do. When `false`, `ppd_path` is required; `ppd` and `ppd_contents` alone make Jamf Pro fall back to the generic PPD.",
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(true),
@@ -148,9 +148,12 @@ func (r *PrinterResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Optional:            true,
 			},
 			"ppd_path": schema.StringAttribute{
-				MarkdownDescription: "Filesystem path to the PPD file on target Macs (e.g. `/Library/Printers/PPDs/Contents/Resources/HP DeskJet 2600 series.ppd`). Required when `use_generic = false`; without it Jamf Pro silently falls back to the generic PPD. Plan-time error if set with `use_generic = true`. Computed when unset: under the generic configuration Jamf Pro populates it with the bundled Generic.ppd path. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it.",
+				MarkdownDescription: "Path to the PPD file on target Macs, e.g. `/Library/Printers/PPDs/Contents/Resources/HP DeskJet 2600 series.ppd`. Required when `use_generic = false`, because Jamf Pro otherwise falls back to the generic PPD. Leave it unset when `use_generic = true`; Jamf Pro fills in the Generic.ppd path. Omit to keep the stored value; set to `\"\"` to clear it.",
 				Optional:            true,
 				Computed:            true,
+				Validators: []validator.String{
+					bundledGenericPPDPathValidator{},
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},

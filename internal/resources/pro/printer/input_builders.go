@@ -28,7 +28,7 @@ import (
 //     safe to send empty in either mode: under `use_generic = false` the
 //     gate is `ppd_path`, and an empty `<ppd>` beside a populated
 //     `<ppd_path>` leaves `use_generic` false (probed); under
-//     `use_generic = true` the server discards the trio anyway.
+//     `use_generic = true` the server ignores the trio anyway.
 //
 //   - `ppd_path` and `ppd_contents` are emitted only when set. `ppd_path` is
 //     Optional+Computed: when `use_generic = true` the server forces it to the

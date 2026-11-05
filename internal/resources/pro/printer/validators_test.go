@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -137,5 +138,46 @@ func TestIsSet(t *testing.T) {
 				t.Errorf("isSet(%v) = %v, want %v", c.in, got, c.want)
 			}
 		})
+	}
+}
+
+func TestPPDPathRejectsBundledGenericPath(t *testing.T) {
+	var sr resource.SchemaResponse
+	NewPrinterResource().(*PrinterResource).Schema(context.Background(), resource.SchemaRequest{}, &sr)
+	attr, ok := sr.Schema.Attributes["ppd_path"].(schema.StringAttribute)
+	if !ok {
+		t.Fatal("ppd_path is not a StringAttribute")
+	}
+	cases := []struct {
+		name    string
+		value   types.String
+		wantErr bool
+	}{
+		{"bundled path", types.StringValue(bundledGenericPPDPath), true},
+		{"bundled path with trailing newline", types.StringValue(bundledGenericPPDPath + "\n"), true},
+		{"bundled path padded both sides", types.StringValue("  " + bundledGenericPPDPath + "\t"), true},
+		{"custom path", types.StringValue("/private/etc/cups/ppd/Epson.ppd"), false},
+		{"different case is not the gate", types.StringValue("/system/library" + bundledGenericPPDPath[len("/System/Library"):]), false},
+		{"longer suffix is not the gate", types.StringValue(bundledGenericPPDPath + ".bak"), false},
+		{"null", types.StringNull(), false},
+		{"unknown defers", types.StringUnknown(), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var resp validator.StringResponse
+			for _, v := range attr.Validators {
+				v.ValidateString(context.Background(), validator.StringRequest{Path: path.Root("ppd_path"), ConfigValue: tc.value}, &resp)
+			}
+			if got := resp.Diagnostics.HasError(); got != tc.wantErr {
+				t.Errorf("error = %v, want %v: %v", got, tc.wantErr, resp.Diagnostics)
+			}
+		})
+	}
+}
+
+func TestBundledGenericPPDPathValidator_Descriptions(t *testing.T) {
+	v := bundledGenericPPDPathValidator{}
+	if v.Description(context.Background()) == "" || v.MarkdownDescription(context.Background()) == "" {
+		t.Error("descriptions must be non-empty")
 	}
 }
