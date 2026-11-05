@@ -105,6 +105,10 @@ type Data struct {
 
 	collisionChecker *collision.Checker
 
+	// deviceGroupWrites serialises device group creates and deletes; see
+	// AcquireDeviceGroupWrite.
+	deviceGroupWrites writeGate
+
 	aiSchemaMu    sync.Mutex
 	aiSchemaCache *aischemas.Cache
 

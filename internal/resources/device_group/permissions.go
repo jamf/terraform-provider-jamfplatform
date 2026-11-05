@@ -10,13 +10,14 @@ import (
 )
 
 // resourceSDKMethods lists the SDK methods the device_group resource's CRUD
-// path calls. It mirrors the client.<Method> calls in crud.go and drives the
+// path calls. It mirrors the client.<Method> calls in crud.go and reconcile.go and drives the
 // "Required Jamf permissions" table appended to the resource MarkdownDescription.
 // permissions_test.go asserts this list stays in sync with the actual
 // client.<Method> calls in crud.go and with the SDK privilege registry.
 var resourceSDKMethods = []string{
 	"CreateDeviceGroup",
 	"GetDeviceGroup",
+	"ListDeviceGroups",
 	"UpdateDeviceGroup",
 	"DeleteDeviceGroup",
 	"ListDeviceGroupMembers",
