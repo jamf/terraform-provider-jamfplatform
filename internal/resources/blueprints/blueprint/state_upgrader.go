@@ -6,9 +6,12 @@ package blueprint
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"maps"
 	"strconv"
 
 	resourceTimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -30,7 +33,7 @@ func (r *BlueprintResource) UpgradeState(ctx context.Context) map[int64]resource
 					return
 				}
 
-				upgraded := BlueprintResourceModel{
+				upgraded := blueprintResourceModelV4{
 					ID:                        old.ID,
 					Name:                      old.Name,
 					Description:               old.Description,
@@ -56,7 +59,7 @@ func (r *BlueprintResource) UpgradeState(ctx context.Context) map[int64]resource
 					Timeouts:                  resourceTimeouts.Value{Object: old.Timeouts},
 				}
 
-				resp.Diagnostics.Append(resp.State.Set(ctx, &upgraded)...)
+				setUpgradedState(ctx, resp, upgraded)
 			},
 		},
 		1: {
@@ -68,7 +71,7 @@ func (r *BlueprintResource) UpgradeState(ctx context.Context) map[int64]resource
 					return
 				}
 
-				upgraded := BlueprintResourceModel{
+				upgraded := blueprintResourceModelV4{
 					ID:                        old.ID,
 					Name:                      old.Name,
 					Description:               old.Description,
@@ -94,7 +97,7 @@ func (r *BlueprintResource) UpgradeState(ctx context.Context) map[int64]resource
 					Timeouts:                  resourceTimeouts.Value{Object: old.Timeouts},
 				}
 
-				resp.Diagnostics.Append(resp.State.Set(ctx, &upgraded)...)
+				setUpgradedState(ctx, resp, upgraded)
 			},
 		},
 		2: {
@@ -106,7 +109,7 @@ func (r *BlueprintResource) UpgradeState(ctx context.Context) map[int64]resource
 					return
 				}
 
-				upgraded := BlueprintResourceModel{
+				upgraded := blueprintResourceModelV4{
 					ID:                        old.ID,
 					Name:                      old.Name,
 					Description:               old.Description,
@@ -132,7 +135,7 @@ func (r *BlueprintResource) UpgradeState(ctx context.Context) map[int64]resource
 					Timeouts:                  old.Timeouts,
 				}
 
-				resp.Diagnostics.Append(resp.State.Set(ctx, &upgraded)...)
+				setUpgradedState(ctx, resp, upgraded)
 			},
 		},
 		3: {
@@ -144,10 +147,35 @@ func (r *BlueprintResource) UpgradeState(ctx context.Context) map[int64]resource
 					return
 				}
 
-				resp.Diagnostics.Append(resp.State.Set(ctx, old.upgrade())...)
+				setUpgradedState(ctx, resp, *old.upgrade())
+			},
+		},
+		4: {
+			PriorSchema: blueprintSchemaV4(ctx),
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var old blueprintResourceModelV4
+				resp.Diagnostics.Append(req.State.Get(ctx, &old)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				setUpgradedState(ctx, resp, old)
 			},
 		},
 	}
+}
+
+// setUpgradedState rewrites a V4-shaped model for the current schema and stores it. Every upgrader
+// ends here, because the framework runs exactly the one upgrader matching the stored version rather
+// than chaining them, so each older version first reaches the V4 shape and then takes this step.
+func setUpgradedState(ctx context.Context, resp *resource.UpgradeStateResponse, old blueprintResourceModelV4) {
+	upgraded, diags := old.upgrade()
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, upgraded)...)
 }
 
 // sliceToPointer converts a slice from a ListNestedBlock to a pointer for SingleNestedAttribute.
@@ -886,11 +914,11 @@ type appleDeclarationsComponentV3 struct {
 	Declarations []AppleDeclarationModel `tfsdk:"declaration"`
 }
 
-// upgrade rewrites v3 state for the current schema by unwrapping each block's declaration list.
+// upgrade rewrites v3 state as v4 by unwrapping each block's declaration list.
 // An absent component stays absent, and a component holding no declarations becomes an absent list
 // rather than an empty one: an empty list writes no component, so state must not carry one.
-func (m blueprintResourceModelV3) upgrade() *BlueprintResourceModel {
-	upgraded := &BlueprintResourceModel{
+func (m blueprintResourceModelV3) upgrade() *blueprintResourceModelV4 {
+	upgraded := &blueprintResourceModelV4{
 		ID:                        m.ID,
 		Name:                      m.Name,
 		Description:               m.Description,
@@ -946,9 +974,9 @@ func (m blueprintResourceModelV3) upgrade() *BlueprintResourceModel {
 	return upgraded
 }
 
-// blueprintSchemaV3 returns the v3 schema: the current one with apple_declarations in the shape it
-// had then. It is derived from the live attribute set rather than transcribed, because one
-// attribute changed and a hand-copied component block would duplicate every other. The prior
+// blueprintSchemaV3 returns the v3 schema: the v4 one with apple_declarations in the shape it had
+// then. It is derived from the live attribute set rather than transcribed, because one attribute
+// changed and a hand-copied component block would duplicate every other. The prior
 // schemas above already share the live components.*ComponentSchema() functions for the same reason.
 func blueprintSchemaV3(ctx context.Context) *schema.Schema {
 	blockAttributes := componentBlockAttributes()
@@ -968,11 +996,190 @@ func blueprintSchemaV3(ctx context.Context) *schema.Schema {
 		},
 	}
 
-	attributes := blueprintSchemaAttributes(ctx)
+	attributes := blueprintSchemaV4(ctx).Attributes
 	attributes["component_blocks"] = schema.ListNestedAttribute{
 		Optional:     true,
 		NestedObject: schema.NestedAttributeObject{Attributes: blockAttributes},
 	}
 
 	return &schema.Schema{Version: 3, Attributes: attributes}
+}
+
+// flatStepNameV4 is the step name v4 wrote for every blueprint authored with the top-level
+// component attributes. The upgrader gives the block that replaces them the same name, so the first
+// refresh finds state and the platform in agreement and the move to component_blocks changes
+// nothing on the service.
+const flatStepNameV4 = "Declaration group"
+
+// blueprintResourceModelV4 is the v4 state model, the last to carry the top-level component
+// attributes and the top-level activation_conditions. Those attributes held the first component
+// block only, and the v5 schema has no field for them.
+type blueprintResourceModelV4 struct {
+	ID                        types.String                                   `tfsdk:"id"`
+	Name                      types.String                                   `tfsdk:"name"`
+	Description               types.String                                   `tfsdk:"description"`
+	Deployed                  types.Bool                                     `tfsdk:"deployed"`
+	DeviceGroups              types.Set                                      `tfsdk:"device_groups"`
+	ActivationConditions      types.String                                   `tfsdk:"activation_conditions"`
+	ComponentBlocks           []ComponentBlockModel                          `tfsdk:"component_blocks"`
+	Components                []ComponentModel                               `tfsdk:"raw_component"`
+	AudioAccessorySettings    *components.AudioAccessorySettingsComponent    `tfsdk:"audio_accessory_settings"`
+	CustomDeclarations        *components.CustomDeclarationsComponent        `tfsdk:"custom_declarations"`
+	DiskManagementSettings    *components.DiskManagementPolicyComponent      `tfsdk:"disk_management_settings"`
+	MathSettings              *components.MathSettingsComponent              `tfsdk:"math_settings"`
+	PasscodePolicy            *components.PasscodePolicyComponent            `tfsdk:"passcode_policy"`
+	SafariBookmarks           *components.SafariBookmarksComponent           `tfsdk:"safari_bookmarks"`
+	SafariExtensions          *components.SafariExtensionsComponent          `tfsdk:"safari_extensions"`
+	SafariSettings            *components.SafariSettingsComponent            `tfsdk:"safari_settings"`
+	ServiceBackgroundTasks    *components.ServiceBackgroundTasksComponent    `tfsdk:"service_background_tasks"`
+	ServiceConfigurationFiles *components.ServiceConfigurationFilesComponent `tfsdk:"service_configuration_files"`
+	SoftwareUpdate            *components.SoftwareUpdateComponent            `tfsdk:"software_update"`
+	SoftwareUpdateSettings    *components.SoftwareUpdateSettingsComponent    `tfsdk:"software_update_settings"`
+	LegacyPayloads            types.Dynamic                                  `tfsdk:"legacy_payloads"`
+	Created                   types.String                                   `tfsdk:"created"`
+	Updated                   types.String                                   `tfsdk:"updated"`
+	DeploymentState           types.String                                   `tfsdk:"deployment_state"`
+	Timeouts                  resourceTimeouts.Value                         `tfsdk:"timeouts"`
+}
+
+// upgrade rewrites v4 state for the current schema. State that already holds component_blocks keeps
+// them and drops the top-level attributes, which v4 cleared in that mode anyway. State that holds
+// the top-level attributes moves them into one component block, so nothing the practitioner
+// managed is dropped: a silent drop would leave the platform holding components that state no
+// longer lists, and the next apply would delete them without a plan diff.
+//
+// The block is named flatStepNameV4 because that is the name the platform stores, and its
+// activation condition is the old top-level one. Settings of a legacy payload become the JSON
+// strings a block carries.
+func (m blueprintResourceModelV4) upgrade() (*BlueprintResourceModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	upgraded := &BlueprintResourceModel{
+		ID:              m.ID,
+		Name:            m.Name,
+		Description:     m.Description,
+		Deployed:        m.Deployed,
+		DeviceGroups:    m.DeviceGroups,
+		ComponentBlocks: m.ComponentBlocks,
+		Created:         m.Created,
+		Updated:         m.Updated,
+		DeploymentState: m.DeploymentState,
+		Timeouts:        m.Timeouts,
+	}
+
+	if len(m.ComponentBlocks) > 0 {
+		return upgraded, diags
+	}
+
+	legacyPayloads, err := blockLegacyPayloadsFromDynamic(m.LegacyPayloads)
+	if err != nil {
+		diags.AddError(
+			"Could not upgrade legacy_payloads",
+			"The top-level legacy_payloads attribute was removed. Moving it into a component block failed: "+helpers.APIErrorDetail(err)+
+				". Write the payloads under component_blocks[].legacy_payloads, with each settings object passed through jsonencode().",
+		)
+		return nil, diags
+	}
+
+	block := ComponentBlockModel{
+		Name:                      types.StringValue(flatStepNameV4),
+		ActivationConditions:      m.ActivationConditions,
+		Components:                m.Components,
+		AudioAccessorySettings:    m.AudioAccessorySettings,
+		CustomDeclarations:        m.CustomDeclarations,
+		DiskManagementSettings:    m.DiskManagementSettings,
+		MathSettings:              m.MathSettings,
+		PasscodePolicy:            m.PasscodePolicy,
+		SafariBookmarks:           m.SafariBookmarks,
+		SafariExtensions:          m.SafariExtensions,
+		SafariSettings:            m.SafariSettings,
+		ServiceBackgroundTasks:    m.ServiceBackgroundTasks,
+		ServiceConfigurationFiles: m.ServiceConfigurationFiles,
+		SoftwareUpdate:            m.SoftwareUpdate,
+		SoftwareUpdateSettings:    m.SoftwareUpdateSettings,
+		LegacyPayloads:            legacyPayloads,
+	}
+
+	if block.holdsNothing() {
+		return upgraded, diags
+	}
+
+	upgraded.ComponentBlocks = []ComponentBlockModel{block}
+	return upgraded, diags
+}
+
+// holdsNothing reports whether the block carries no component, no legacy payload and no activation
+// condition, which is what a v4 blueprint with no top-level component attributes upgrades to.
+func (b ComponentBlockModel) holdsNothing() bool {
+	return len(b.Components) == 0 &&
+		b.AudioAccessorySettings == nil &&
+		b.CustomDeclarations == nil &&
+		b.DiskManagementSettings == nil &&
+		b.MathSettings == nil &&
+		b.PasscodePolicy == nil &&
+		b.SafariBookmarks == nil &&
+		b.SafariExtensions == nil &&
+		b.SafariSettings == nil &&
+		b.ServiceBackgroundTasks == nil &&
+		b.ServiceConfigurationFiles == nil &&
+		b.SoftwareUpdate == nil &&
+		b.SoftwareUpdateSettings == nil &&
+		len(b.LegacyPayloads) == 0 &&
+		(b.ActivationConditions.IsNull() || b.ActivationConditions.IsUnknown())
+}
+
+// blockLegacyPayloadsFromDynamic converts the removed top-level dynamic legacy_payloads value into
+// a block's list. A block carries each payload's settings as a JSON object string, which
+// json.Marshal renders with sorted keys, the same canonical form jsonencode() produces.
+func blockLegacyPayloadsFromDynamic(prior types.Dynamic) ([]BlockLegacyPayloadModel, error) {
+	if prior.IsNull() || prior.IsUnknown() || prior.IsUnderlyingValueNull() || prior.IsUnderlyingValueUnknown() {
+		return nil, nil
+	}
+
+	raw, err := helpers.TerraformDynamicToJSON(prior)
+	if err != nil {
+		return nil, err
+	}
+
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, fmt.Errorf("expected a list of payload objects, got %T", raw)
+	}
+
+	payloads := make([]BlockLegacyPayloadModel, 0, len(items))
+	for i, item := range items {
+		object, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("payload %d is not an object", i)
+		}
+
+		payload := BlockLegacyPayloadModel{Settings: types.StringNull()}
+		payloadType, _ := object["payload_type"].(string)
+		payload.PayloadType = types.StringValue(payloadType)
+
+		if settings, present := object["settings"]; present && settings != nil {
+			encoded, err := json.Marshal(settings)
+			if err != nil {
+				return nil, fmt.Errorf("settings of payload %d: %w", i, err)
+			}
+			payload.Settings = types.StringValue(string(encoded))
+		}
+
+		payloads = append(payloads, payload)
+	}
+
+	return payloads, nil
+}
+
+// blueprintSchemaV4 returns the v4 schema: the current one plus the top-level component attributes
+// and activation_conditions that v5 removed. It is derived from the live attribute set for the
+// reason blueprintSchemaV3 gives, and the removed attributes reuse the live component schemas, so
+// a future change to a component cannot leave the prior schema decoding state it never held.
+func blueprintSchemaV4(ctx context.Context) *schema.Schema {
+	attributes := blueprintSchemaAttributes(ctx)
+	maps.Copy(attributes, sharedComponentAttributes())
+	attributes["activation_conditions"] = schema.StringAttribute{Optional: true}
+	attributes["legacy_payloads"] = schema.DynamicAttribute{Optional: true}
+
+	return &schema.Schema{Version: 4, Attributes: attributes}
 }

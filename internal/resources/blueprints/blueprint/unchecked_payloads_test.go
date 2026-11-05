@@ -110,7 +110,6 @@ func TestUncheckedPayloadWarnings(t *testing.T) {
 	blockLegacy := path.Root("component_blocks").AtListIndex(0).AtName("legacy_payloads")
 	blockDeclarations := path.Root("component_blocks").AtListIndex(0).AtName("apple_declarations")
 	blockCustom := path.Root("component_blocks").AtListIndex(0).AtName("custom_declarations")
-	customSet := path.Root("custom_declarations").AtName("declaration")
 
 	legacy := func(t *testing.T, settings types.String) types.List {
 		t.Helper()
@@ -212,32 +211,6 @@ func TestUncheckedPayloadWarnings(t *testing.T) {
 			},
 			want:    []path.Path{blockCustom.AtName("declaration")},
 			summary: uncheckedDeclarationSummary,
-		},
-		{
-			name: "top-level custom declaration with unknown payload",
-			values: func(t *testing.T) map[string]attr.Value {
-				return map[string]attr.Value{"custom_declarations": custom(t, path.Root("custom_declarations"), types.StringUnknown())}
-			},
-			want:    []path.Path{customSet},
-			summary: uncheckedDeclarationSummary,
-		},
-		{
-			name: "flat legacy payloads with a nested unknown",
-			values: func(t *testing.T) map[string]attr.Value {
-				settings := types.ObjectValueMust(
-					map[string]attr.Type{"PayloadContent": types.StringType},
-					map[string]attr.Value{"PayloadContent": types.StringUnknown()},
-				)
-				return map[string]attr.Value{"legacy_payloads": types.DynamicValue(settings)}
-			},
-			want:    []path.Path{path.Root("legacy_payloads")},
-			summary: uncheckedLegacyPayloadSummary,
-		},
-		{
-			name: "flat legacy payloads fully known",
-			values: func(t *testing.T) map[string]attr.Value {
-				return map[string]attr.Value{"legacy_payloads": types.DynamicValue(types.StringValue("x"))}
-			},
 		},
 		{
 			name:   "nothing configured",

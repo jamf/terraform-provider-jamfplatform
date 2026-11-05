@@ -36,8 +36,8 @@ func TestBlueprintResource_Schema(t *testing.T) {
 	}
 
 	s := resp.Schema
-	if s.Version != 4 {
-		t.Errorf("expected schema version 4, got %d", s.Version)
+	if s.Version != 5 {
+		t.Errorf("expected schema version 5, got %d", s.Version)
 	}
 
 	requiredAttrs := []string{"name", "deployed", "device_groups"}
@@ -64,7 +64,7 @@ func TestBlueprintResource_Schema(t *testing.T) {
 		}
 	}
 
-	optionalAttrs := []string{"description", "legacy_payloads", "timeouts", "raw_component"}
+	optionalAttrs := []string{"description", "timeouts", "component_blocks"}
 	for _, name := range optionalAttrs {
 		attr, ok := s.Attributes[name]
 		if !ok {
@@ -83,6 +83,11 @@ func TestBlueprintResource_SchemaComponentAttributes(t *testing.T) {
 	var resp resource.SchemaResponse
 	r.(*BlueprintResource).Schema(context.Background(), req, &resp)
 
+	blocks, ok := resp.Schema.Attributes["component_blocks"].(resourceschema.ListNestedAttribute)
+	if !ok {
+		t.Fatal("component_blocks is missing or not a ListNestedAttribute")
+	}
+
 	componentAttrs := []string{
 		"audio_accessory_settings",
 		"custom_declarations",
@@ -98,9 +103,9 @@ func TestBlueprintResource_SchemaComponentAttributes(t *testing.T) {
 		"software_update_settings",
 	}
 	for _, name := range componentAttrs {
-		attr, ok := resp.Schema.Attributes[name]
+		attr, ok := blocks.NestedObject.Attributes[name]
 		if !ok {
-			t.Errorf("missing component attribute %q", name)
+			t.Errorf("component_blocks is missing component attribute %q", name)
 			continue
 		}
 		if _, ok := attr.(resourceschema.SingleNestedAttribute); !ok {
@@ -192,31 +197,21 @@ func TestBlueprintResource_SchemaDeclarationValidators(t *testing.T) {
 	// The same validator is attached through a different interface on each: apple_declarations is a
 	// list, custom_declarations an object wrapping a set. Each attribute's kind is asserted too,
 	// because reshaping one would move where a finding lands without failing anything else.
-	objectCases := map[string]struct {
-		attributes map[string]resourceschema.Attribute
-		name       string
-	}{
-		"component_blocks[].custom_declarations": {block.NestedObject.Attributes, "custom_declarations"},
-		"custom_declarations":                    {resp.Schema.Attributes, "custom_declarations"},
-	}
-
-	for label, tc := range objectCases {
-		t.Run(label, func(t *testing.T) {
-			attribute, ok := tc.attributes[tc.name].(resourceschema.SingleNestedAttribute)
-			if !ok {
-				t.Fatalf("%s is missing or not a SingleNestedAttribute", label)
+	t.Run("component_blocks[].custom_declarations", func(t *testing.T) {
+		attribute, ok := block.NestedObject.Attributes["custom_declarations"].(resourceschema.SingleNestedAttribute)
+		if !ok {
+			t.Fatal("component_blocks[].custom_declarations is missing or not a SingleNestedAttribute")
+		}
+		found := false
+		for _, attached := range attribute.Validators {
+			if _, ok := attached.(declarationSchemaValidator); ok {
+				found = true
 			}
-			found := false
-			for _, attached := range attribute.Validators {
-				if _, ok := attached.(declarationSchemaValidator); ok {
-					found = true
-				}
-			}
-			if !found {
-				t.Errorf("no declaration schema validator is attached to %s", label)
-			}
-		})
-	}
+		}
+		if !found {
+			t.Error("no declaration schema validator is attached to component_blocks[].custom_declarations")
+		}
+	})
 
 	t.Run("component_blocks[].apple_declarations", func(t *testing.T) {
 		attribute, ok := block.NestedObject.Attributes["apple_declarations"].(resourceschema.ListNestedAttribute)

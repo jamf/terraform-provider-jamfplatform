@@ -77,29 +77,6 @@ func (d *BlueprintDataSource) Schema(ctx context.Context, req datasource.SchemaR
 				ElementType:         types.StringType,
 				Computed:            true,
 			},
-			"activation_conditions": schema.StringAttribute{
-				MarkdownDescription: "Activation condition expression that further restricts which scoped devices the blueprint applies to. Reflects the first component block only; read `component_blocks` for per-block conditions.",
-				Computed:            true,
-				DeprecationMessage:  componentAttrDeprecation,
-			},
-			"component": schema.ListNestedAttribute{
-				MarkdownDescription: "Components of the first component block. Read `component_blocks` for the components of every block.",
-				Computed:            true,
-				DeprecationMessage:  componentAttrDeprecation,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"identifier": schema.StringAttribute{
-							MarkdownDescription: "Component identifier.",
-							Computed:            true,
-						},
-						"configuration": schema.MapAttribute{
-							MarkdownDescription: "Component configuration as a map of key-value pairs.",
-							ElementType:         types.StringType,
-							Computed:            true,
-						},
-					},
-				},
-			},
 			"component_blocks": schema.ListNestedAttribute{
 				MarkdownDescription: "Ordered component blocks of the blueprint. Each block has a name, an optional activation condition, and its own components.",
 				Computed:            true,
@@ -214,16 +191,6 @@ func (d *BlueprintDataSource) Read(ctx context.Context, req datasource.ReadReque
 
 	deviceGroupsList, _ := types.ListValueFrom(context.Background(), types.StringType, scopeDeviceGroups(bp.Scope))
 
-	var activationConditions types.String
-	if len(bp.Steps) > 0 {
-		activationConditions = types.StringValue(helpers.DerefString(bp.Steps[0].ActivationPredicate))
-	}
-
-	var components []ComponentModel
-	if len(bp.Steps) > 0 {
-		components = flattenStepComponents(bp.Steps[0])
-	}
-
 	componentBlocks := make([]ComponentBlockDataSourceModel, 0, len(bp.Steps))
 	for _, step := range bp.Steps {
 		componentBlocks = append(componentBlocks, ComponentBlockDataSourceModel{
@@ -240,18 +207,16 @@ func (d *BlueprintDataSource) Read(ctx context.Context, req datasource.ReadReque
 
 	timeoutsValue := data.Timeouts
 	data = BlueprintDataSourceModel{
-		ID:                   data.ID,
-		Name:                 types.StringValue(bp.Name),
-		BlueprintID:          types.StringValue(bp.ID),
-		Description:          types.StringValue(helpers.DerefString(bp.Description)),
-		Created:              types.StringValue(bp.Created.Format(time.RFC3339)),
-		Updated:              types.StringValue(bp.Updated.Format(time.RFC3339)),
-		DeploymentState:      types.StringValue(deployState),
-		DeviceGroups:         deviceGroupsList,
-		ActivationConditions: activationConditions,
-		Components:           components,
-		ComponentBlocks:      componentBlocks,
-		Timeouts:             timeoutsValue,
+		ID:              data.ID,
+		Name:            types.StringValue(bp.Name),
+		BlueprintID:     types.StringValue(bp.ID),
+		Description:     types.StringValue(helpers.DerefString(bp.Description)),
+		Created:         types.StringValue(bp.Created.Format(time.RFC3339)),
+		Updated:         types.StringValue(bp.Updated.Format(time.RFC3339)),
+		DeploymentState: types.StringValue(deployState),
+		DeviceGroups:    deviceGroupsList,
+		ComponentBlocks: componentBlocks,
+		Timeouts:        timeoutsValue,
 	}
 
 	tflog.Trace(ctx, "read a data source")

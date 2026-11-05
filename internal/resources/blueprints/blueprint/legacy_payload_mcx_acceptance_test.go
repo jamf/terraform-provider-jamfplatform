@@ -141,12 +141,6 @@ func mcxNullDomainPayload(value int, domain, nullDomain string) legacyPayloadSpe
 	return legacyPayloadSpec{payloadType: mcxPayloadTypeName, settings: settings}
 }
 
-// mcxFlatPayload is the same payload for the deprecated top-level attribute, where settings is an
-// object rather than a JSON string.
-func mcxFlatPayload(value int, domains ...string) legacyPayloadSpec {
-	return legacyPayloadSpec{payloadType: mcxPayloadTypeName, settings: mcxPayloadContentHCL(value, domains...)}
-}
-
 // mcxSettingsWithoutPayloadContent is a custom settings payload carrying no preference dictionary at
 // all. Apple declares the dictionary required, so this is Apple's finding to report rather than the
 // domain count's — a distinction one test below pins.
@@ -161,28 +155,6 @@ var mcxAuthoredServerKeysSettings = fmt.Sprintf(
 	`{"PayloadContent":{%q:{"Forced":[{"mcx_preference_settings":{%q:1}}]}},"PayloadIdentifier":"tf-acc-authored-identifier-safe-to-delete","PayloadUUID":"tf-acc-authored-uuid-safe-to-delete"}`,
 	firstPreferenceDomain, mcxForcedKey,
 )
-
-// mcxFlatConfig renders a blueprint in the deprecated top-level `legacy_payloads` style, scoped to
-// the throwaway smart group every blueprint acceptance test builds. legacyIdentifierConfig cannot
-// express it: the flat attribute is a dynamic value whose settings are objects, not JSON strings.
-func mcxFlatConfig(groupSuffix, resourceLabel, name, description string, payloads ...legacyPayloadSpec) string {
-	var rendered strings.Builder
-	for _, payload := range payloads {
-		fmt.Fprintf(&rendered, "\t\t\t\t\t{\n\t\t\t\t\t\tpayload_type = %q\n\t\t\t\t\t\tsettings     = %s\n\t\t\t\t\t},\n", payload.payloadType, payload.settings)
-	}
-
-	return testBlueprintConfig(smartGroupHCL(groupSuffix), fmt.Sprintf(`
-			resource "jamfplatform_blueprints_blueprint" %q {
-				name          = %q
-				description   = %q
-				deployed      = false
-				device_groups = [jamfplatform_device_group.scope.id]
-
-				legacy_payloads = [
-%s				]
-			}
-		`, resourceLabel, name, description, rendered.String()))
-}
 
 // captureStoredIdentifiersForKeys returns a Check that records the stored identifier of only the
 // named payloads, so a later step can assert those survive an edit that removes or renames a
@@ -302,8 +274,7 @@ func checkMCXForcedValue(addr, attribute, domain string, want float64) resource.
 	})
 }
 
-// TestAccResource_Blueprint_LegacyPayloads_MCXSeveralDomainsRefusedAtPlan is the rule itself, on
-// both carriers, and the boundary that keeps it out of Apple's way. Nothing is applied: each step
+// TestAccResource_Blueprint_LegacyPayloads_MCXSeveralDomainsRefusedAtPlan is the rule itself and the boundary that keeps it out of Apple's way. Nothing is applied: each step
 // plans and must be refused, which is the point — the refusal has to arrive before a write, because
 // once the payload is stored nothing downstream can tell it is wrong. Jamf accepts it, the deploy
 // reports SUCCEEDED, the blueprint round-trips and every later plan settles, while the Mac silently
@@ -336,14 +307,6 @@ func TestAccResource_Blueprint_LegacyPayloads_MCXSeveralDomainsRefusedAtPlan(t *
 					name:     "Custom Settings",
 					payloads: []legacyPayloadSpec{mcxBlockPayload(1, firstPreferenceDomain, secondPreferenceDomain)},
 				}),
-				PlanOnly:    true,
-				ExpectError: regexp.MustCompile(`more than one preference`),
-			},
-			{
-				// The deprecated top-level attribute, where the same payload arrives as an object
-				// and the finding has no per-element path to land on.
-				Config: mcxFlatConfig("mcxrefused", "mcx_refused", name, "Acceptance test — safe to delete",
-					mcxFlatPayload(1, firstPreferenceDomain, secondPreferenceDomain)),
 				PlanOnly:    true,
 				ExpectError: regexp.MustCompile(`more than one preference`),
 			},
@@ -965,70 +928,6 @@ func TestAccResource_Blueprint_LegacyPayloads_MCXAuthoredServerKeysRoundTrip(t *
 				},
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(addr, "component_blocks.0.legacy_payloads.0.settings", mcxAuthoredServerKeysSettings),
-					checkStoredIdentifiersAreDistinct(t, addr, 2),
-					checkStoredIdentifiers(t, addr, recorded),
-				),
-			},
-		},
-	})
-}
-
-// TestAccResource_Blueprint_LegacyPayloads_MCXFlatCarrierKeepsDomainsApart covers the deprecated
-// top-level `legacy_payloads` attribute, which reaches every one of these code paths by a different
-// route: its settings arrive as objects rather than JSON strings, its prior values are read out of a
-// types.Dynamic, and it resolves its stored identifiers by asking for a single unnamed block and
-// taking step 0 positionally. Each of those keys on the same payload identity, so each could have
-// been left behind by the re-keying independently of the block carrier.
-//
-// Deprecated is not the same as unused. An operator who has not migrated to `component_blocks` sets
-// custom settings the same way, hits the same device behaviour and has the same claim on a stable
-// payload identity — and would have no way to notice a collapse, because both the identifier and the
-// collapse are invisible from Terraform.
-//
-// Step 2 re-applies the same configuration for the empty plan, which is the flat carrier's half of
-// the state contract: the mask, the semantic comparison and the per-identity pairing of prior
-// settings all have to agree, and two payloads of one type is where pairing by type stops working.
-// Step 3 then edits the description so the identifiers face an update they were not aimed at.
-func TestAccResource_Blueprint_LegacyPayloads_MCXFlatCarrierKeepsDomainsApart(t *testing.T) {
-	testhelpers.AccPreCheck(t)
-	suffix := testhelpers.RunSuffix()
-	name := "tf-acc-mcx-flat-" + suffix
-	addr := "jamfplatform_blueprints_blueprint.mcx_flat"
-	recorded := make(map[string]string)
-
-	config := func(description string) string {
-		return mcxFlatConfig("mcxflat", "mcx_flat", name, description,
-			mcxFlatPayload(1, firstPreferenceDomain),
-			mcxFlatPayload(2, secondPreferenceDomain))
-	}
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
-		CheckDestroy:             testAccCheckBlueprintResourcesDestroy(t),
-		Steps: []resource.TestStep{
-			{
-				Config: config("Acceptance test — safe to delete"),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet(addr, "id"),
-					resource.TestCheckNoResourceAttr(addr, "component_blocks.#"),
-					checkStoredIdentifiersAreDistinct(t, addr, 2),
-					captureStoredIdentifiers(t, addr, recorded),
-				),
-			},
-			{
-				Config: config("Acceptance test — safe to delete"),
-				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
-				},
-				Check: resource.ComposeAggregateTestCheckFunc(
-					checkStoredIdentifiersAreDistinct(t, addr, 2),
-					checkStoredIdentifiers(t, addr, recorded),
-				),
-			},
-			{
-				Config: config("Acceptance test — safe to delete, description edited"),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(addr, "description", "Acceptance test — safe to delete, description edited"),
 					checkStoredIdentifiersAreDistinct(t, addr, 2),
 					checkStoredIdentifiers(t, addr, recorded),
 				),

@@ -66,18 +66,6 @@ func uncheckedPayloadWarnings(ctx context.Context, config tfsdk.Config) diag.Dia
 		appendUncheckedCustomDeclarations(&diags, attrs["custom_declarations"], blockPath.AtName("custom_declarations"))
 	}
 
-	var custom types.Object
-	if d := config.GetAttribute(ctx, path.Root("custom_declarations"), &custom); !d.HasError() {
-		appendUncheckedCustomDeclarations(&diags, custom, path.Root("custom_declarations"))
-	}
-
-	var flat types.Dynamic
-	if d := config.GetAttribute(ctx, path.Root("legacy_payloads"), &flat); !d.HasError() && !flat.IsNull() && !isFullyKnown(ctx, flat) {
-		diags.AddAttributeWarning(path.Root("legacy_payloads"), uncheckedLegacyPayloadSummary,
-			"Terraform will not know part of legacy_payloads until apply, so the provider cannot check any "+
-				"payload in it against Apple's schemas during plan. "+uncheckedConsequence)
-	}
-
 	return diags
 }
 
@@ -169,14 +157,4 @@ func elementUnchecked(element attr.Value, typeName, contentName string) bool {
 	}
 	attrs := object.Attributes()
 	return attrs[typeName].IsUnknown() || attrs[contentName].IsUnknown()
-}
-
-// isFullyKnown reports whether a value holds no unknown at any depth. A value that cannot be converted
-// is reported as known, leaving it to the check that reads it to report what is wrong with it.
-func isFullyKnown(ctx context.Context, value attr.Value) bool {
-	raw, err := value.ToTerraformValue(ctx)
-	if err != nil {
-		return true
-	}
-	return raw.IsFullyKnown()
 }

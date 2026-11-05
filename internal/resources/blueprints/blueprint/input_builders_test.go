@@ -12,10 +12,33 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
-	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
-func TestCollectLegacyPayloads_ValidPayload(t *testing.T) {
+// blockPayloadsFrom turns payloads written as plain Go values into the typed list a component
+// block carries, encoding each settings object the way jsonencode() would.
+func blockPayloadsFrom(t *testing.T, input []any) []BlockLegacyPayloadModel {
+	t.Helper()
+
+	payloads := make([]BlockLegacyPayloadModel, 0, len(input))
+	for _, item := range input {
+		object := item.(map[string]any)
+		payload := BlockLegacyPayloadModel{
+			PayloadType: types.StringValue(object["payload_type"].(string)),
+			Settings:    types.StringNull(),
+		}
+		if settings, ok := object["settings"]; ok {
+			encoded, err := json.Marshal(settings)
+			if err != nil {
+				t.Fatalf("encoding settings: %v", err)
+			}
+			payload.Settings = types.StringValue(string(encoded))
+		}
+		payloads = append(payloads, payload)
+	}
+	return payloads
+}
+
+func TestCollectBlockLegacyPayloads_ValidPayload(t *testing.T) {
 	r := &BlueprintResource{}
 	var components []blueprints.Component
 	var diags diag.Diagnostics
@@ -29,9 +52,9 @@ func TestCollectLegacyPayloads_ValidPayload(t *testing.T) {
 			},
 		},
 	}
-	dynVal, _ := helpers.JSONToTerraformDynamic(input)
+	payloads := blockPayloadsFrom(t, input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "My Blueprint", "legacy_payloads", nil)
+	r.collectBlockLegacyPayloads(&components, &diags, payloads, "My Blueprint", "component_blocks[0]", nil)
 
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %v", diags)
@@ -68,7 +91,7 @@ func TestCollectLegacyPayloads_ValidPayload(t *testing.T) {
 	}
 }
 
-func TestCollectLegacyPayloads_NoSettings(t *testing.T) {
+func TestCollectBlockLegacyPayloads_NoSettings(t *testing.T) {
 	r := &BlueprintResource{}
 	var components []blueprints.Component
 	var diags diag.Diagnostics
@@ -78,9 +101,9 @@ func TestCollectLegacyPayloads_NoSettings(t *testing.T) {
 			"payload_type": "com.apple.wifi.managed",
 		},
 	}
-	dynVal, _ := helpers.JSONToTerraformDynamic(input)
+	payloads := blockPayloadsFrom(t, input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Blueprint", "legacy_payloads", nil)
+	r.collectBlockLegacyPayloads(&components, &diags, payloads, "Blueprint", "component_blocks[0]", nil)
 
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %v", diags)
@@ -100,7 +123,7 @@ func TestCollectLegacyPayloads_NoSettings(t *testing.T) {
 	}
 }
 
-func TestCollectLegacyPayloads_MixedTypeSettings(t *testing.T) {
+func TestCollectBlockLegacyPayloads_MixedTypeSettings(t *testing.T) {
 	r := &BlueprintResource{}
 	var components []blueprints.Component
 	var diags diag.Diagnostics
@@ -115,9 +138,9 @@ func TestCollectLegacyPayloads_MixedTypeSettings(t *testing.T) {
 			},
 		},
 	}
-	dynVal, _ := helpers.JSONToTerraformDynamic(input)
+	payloads := blockPayloadsFrom(t, input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Test", "legacy_payloads", nil)
+	r.collectBlockLegacyPayloads(&components, &diags, payloads, "Test", "component_blocks[0]", nil)
 
 	if diags.HasError() {
 		t.Fatalf("unexpected error: %v", diags)
@@ -141,36 +164,7 @@ func TestCollectLegacyPayloads_MixedTypeSettings(t *testing.T) {
 	}
 }
 
-func TestCollectLegacyPayloads_EmptyList(t *testing.T) {
-	r := &BlueprintResource{}
-	var components []blueprints.Component
-	var diags diag.Diagnostics
-
-	dynVal, _ := helpers.JSONToTerraformDynamic([]any{})
-
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Empty Blueprint", "legacy_payloads", nil)
-
-	if diags.HasError() {
-		t.Fatalf("unexpected error: %v", diags)
-	}
-	if len(components) != 1 {
-		t.Fatalf("expected 1 component, got %d", len(components))
-	}
-
-	var config map[string]any
-	if err := json.Unmarshal(components[0].Configuration, &config); err != nil {
-		t.Fatalf("failed to unmarshal configuration: %v", err)
-	}
-	payloadContent, ok := config["payloadContent"].([]any)
-	if !ok {
-		t.Fatal("expected payloadContent to be an array")
-	}
-	if len(payloadContent) != 0 {
-		t.Errorf("expected empty payload content, got %d items", len(payloadContent))
-	}
-}
-
-func TestCollectLegacyPayloads_DuplicatePayloadType(t *testing.T) {
+func TestCollectBlockLegacyPayloads_DuplicatePayloadType(t *testing.T) {
 	r := &BlueprintResource{}
 	var components []blueprints.Component
 	var diags diag.Diagnostics
@@ -189,9 +183,9 @@ func TestCollectLegacyPayloads_DuplicatePayloadType(t *testing.T) {
 			},
 		},
 	}
-	dynVal, _ := helpers.JSONToTerraformDynamic(input)
+	payloads := blockPayloadsFrom(t, input)
 
-	r.collectLegacyPayloads(&components, &diags, dynVal, "Blueprint", "legacy_payloads", nil)
+	r.collectBlockLegacyPayloads(&components, &diags, payloads, "Blueprint", "component_blocks[0]", nil)
 
 	if !diags.HasError() {
 		t.Fatal("expected error for duplicate payload_type, got none")
@@ -206,18 +200,6 @@ func TestCollectLegacyPayloads_DuplicatePayloadType(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected 'Duplicate payload_type' error, got: %v", diags)
-	}
-}
-
-func TestCollectLegacyPayloads_NullDynamic(t *testing.T) {
-	r := &BlueprintResource{}
-	var components []blueprints.Component
-	var diags diag.Diagnostics
-
-	r.collectLegacyPayloads(&components, &diags, types.DynamicNull(), "Blueprint", "legacy_payloads", nil)
-
-	if !diags.HasError() {
-		t.Error("expected error for null dynamic value")
 	}
 }
 
@@ -269,17 +251,6 @@ func sentLegacyPayloads(t *testing.T, step blueprints.BlueprintStep) map[string]
 	return sent
 }
 
-// flatModeLegacyPayloads builds the deprecated top-level legacy_payloads value for one payload.
-func flatModeLegacyPayloads(t *testing.T, payloadType string, settings map[string]any) types.Dynamic {
-	t.Helper()
-
-	value, err := helpers.JSONToTerraformDynamic([]any{map[string]any{"payload_type": payloadType, "settings": settings}})
-	if err != nil {
-		t.Fatalf("building legacy_payloads value: %v", err)
-	}
-	return value
-}
-
 // serverStampedKeysIn reports every key of a sent payload the service owns, whatever its case, so a
 // test can assert on how many arrived rather than on one spelling.
 func serverStampedKeysIn(payload map[string]any) map[string]any {
@@ -290,52 +261,6 @@ func serverStampedKeysIn(payload map[string]any) map[string]any {
 		}
 	}
 	return stamped
-}
-
-// TestBuildSteps_FlatModeTakesStepZeroIdentifiers pins flat mode's resolution to position. Flat mode
-// writes one step and reads blueprint.Steps[0] back, while resolve's name pass matches a name at any
-// index — so resolving by the flatStepName constant would hand the collapsed component the
-// identifiers of a step flat mode does not manage as soon as any stored step happens to carry that
-// name, and the read path allows that by only warning about the extra steps.
-func TestBuildSteps_FlatModeTakesStepZeroIdentifiers(t *testing.T) {
-	t.Parallel()
-
-	const payloadType = "com.apple.domains"
-
-	stepZero := legacyStepFixture(t, flatStepName, map[string]string{payloadType: "STEP-ZERO"})
-	renamedStepZero := legacyStepFixture(t, "Renamed in the Jamf web app", map[string]string{payloadType: "STEP-ZERO"})
-	laterStep := legacyStepFixture(t, flatStepName, map[string]string{payloadType: "WRONG-STEP"})
-
-	for _, tc := range []struct {
-		name  string
-		steps []blueprints.BlueprintStep
-	}{
-		{name: "step zero carries the flat step name", steps: []blueprints.BlueprintStep{stepZero}},
-		{name: "step zero is named something else", steps: []blueprints.BlueprintStep{renamedStepZero}},
-		{name: "a later step carries the flat step name", steps: []blueprints.BlueprintStep{renamedStepZero, laterStep}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			data := &BlueprintResourceModel{
-				Name:           types.StringValue("BP"),
-				LegacyPayloads: flatModeLegacyPayloads(t, payloadType, map[string]any{"EmailDomains": []any{"example.com"}}),
-			}
-			stored := newStoredLegacyPayloadIdentifiers(&blueprints.BlueprintDetail{Steps: tc.steps})
-
-			steps, diags := (&BlueprintResource{}).buildSteps(context.Background(), data, stored)
-			if diags.HasError() {
-				t.Fatalf("unexpected diagnostics: %v", diags)
-			}
-			if len(steps) != 1 {
-				t.Fatalf("flat mode built %d steps, want 1", len(steps))
-			}
-
-			if got := sentLegacyPayloads(t, steps[0])[payloadType]["payloadIdentifier"]; got != "STEP-ZERO" {
-				t.Errorf("payloadIdentifier = %v, want step zero's STEP-ZERO", got)
-			}
-		})
-	}
 }
 
 // TestBuildSteps_ServerStampedPayloadKeysAreDroppedWhateverTheCase covers the spelling the provider
@@ -378,16 +303,6 @@ func TestBuildSteps_ServerStampedPayloadKeysAreDroppedWhateverTheCase(t *testing
 							Settings:    types.StringValue(string(encoded)),
 						}},
 					}},
-				}
-			},
-		},
-		{
-			name: "flat mode",
-			data: func(t *testing.T) *BlueprintResourceModel {
-				t.Helper()
-				return &BlueprintResourceModel{
-					Name:           types.StringValue("BP"),
-					LegacyPayloads: flatModeLegacyPayloads(t, payloadType, settings),
 				}
 			},
 		},
@@ -437,13 +352,10 @@ func TestBuildSteps_ServerStampedPayloadKeysAreDroppedWhateverTheCase(t *testing
 }
 
 // TestHasLegacyPayloads pins the gate that decides whether Update reads the blueprint before
-// building its request. It has to agree with buildSteps on every input, including the precedence:
-// component_blocks displaces the deprecated flat attribute rather than adding to it, so a model
-// carrying blocks never consults the flat value.
+// building its request. It has to agree with buildSteps on every input.
 func TestHasLegacyPayloads(t *testing.T) {
 	t.Parallel()
 
-	flatValue := flatModeLegacyPayloads(t, "com.apple.domains", map[string]any{"EmailDomains": []any{"example.com"}})
 	blockWithPayload := ComponentBlockModel{
 		Name: types.StringValue("Block 1"),
 		LegacyPayloads: []BlockLegacyPayloadModel{{
@@ -458,32 +370,22 @@ func TestHasLegacyPayloads(t *testing.T) {
 		want  bool
 	}{
 		{name: "empty model", model: BlueprintResourceModel{}},
-		{name: "flat mode with payloads", model: BlueprintResourceModel{LegacyPayloads: flatValue}, want: true},
-		{name: "flat mode without payloads", model: BlueprintResourceModel{LegacyPayloads: types.DynamicNull()}},
-		{name: "flat mode with an unknown value", model: BlueprintResourceModel{LegacyPayloads: types.DynamicUnknown()}},
 		{
-			name:  "block mode with payloads",
+			name:  "payloads in a block",
 			model: BlueprintResourceModel{ComponentBlocks: []ComponentBlockModel{blockWithPayload}},
 			want:  true,
 		},
 		{
-			name:  "block mode without payloads",
+			name:  "blocks without payloads",
 			model: BlueprintResourceModel{ComponentBlocks: []ComponentBlockModel{{Name: types.StringValue("Block 1")}}},
 		},
 		{
-			name: "block mode with payloads in a later block only",
+			name: "payloads in a later block only",
 			model: BlueprintResourceModel{ComponentBlocks: []ComponentBlockModel{
 				{Name: types.StringValue("Block 1")},
 				blockWithPayload,
 			}},
 			want: true,
-		},
-		{
-			name: "block mode ignores a leftover flat value",
-			model: BlueprintResourceModel{
-				ComponentBlocks: []ComponentBlockModel{{Name: types.StringValue("Block 1")}},
-				LegacyPayloads:  flatValue,
-			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

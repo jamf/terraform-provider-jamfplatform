@@ -49,12 +49,6 @@ func blockLegacyPayloadSchemaValidator() validator.List {
 	return legacyPayloadSchemaValidator{}
 }
 
-// flatLegacyPayloadSchemaValidator validates the deprecated top-level dynamic legacy payload value,
-// whose settings arrive as objects rather than strings.
-func flatLegacyPayloadSchemaValidator() validator.Dynamic {
-	return legacyPayloadSchemaValidator{}
-}
-
 func (v legacyPayloadSchemaValidator) Description(ctx context.Context) string {
 	return v.MarkdownDescription(ctx)
 }
@@ -95,45 +89,7 @@ func (v legacyPayloadSchemaValidator) ValidateList(ctx context.Context, req vali
 		}
 
 		appendPayloadProblems(&resp.Diagnostics, payload.PayloadType.ValueString(), settings, entry, entry.AtName("payload_type"), entry.AtName("settings"))
-		appendMCXDomainProblems(&resp.Diagnostics, payload.PayloadType.ValueString(), settings, entry.AtName("settings"), "")
-	}
-}
-
-// ValidateDynamic checks the deprecated top-level dynamic legacy payload value.
-//
-// The value is skipped whole while any part of it is unknown, because TerraformDynamicToJSON turns
-// an unknown into nil and a nil setting reads as a missing one. A dynamic value carries no per-payload
-// path to skip by, and the carrier is deprecated, so the coarser skip is not worth refining.
-func (v legacyPayloadSchemaValidator) ValidateDynamic(ctx context.Context, req validator.DynamicRequest, resp *validator.DynamicResponse) {
-	if !helpers.IsConfiguredValue(req.ConfigValue) || !isFullyKnown(ctx, req.ConfigValue) {
-		return
-	}
-
-	raw, err := helpers.TerraformDynamicToJSON(req.ConfigValue)
-	if err != nil {
-		return
-	}
-	items, ok := raw.([]any)
-	if !ok {
-		// collectLegacyPayloads reports a non-list value; nothing to add here.
-		return
-	}
-
-	for i, item := range items {
-		obj, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		payloadType, _ := obj["payload_type"].(string)
-		if payloadType == "" {
-			continue
-		}
-		settings, _ := obj["settings"].(map[string]any)
-
-		// A dynamic value carries no traversable schema path for its elements, so every finding is
-		// reported against the attribute itself and located by the path in its detail.
-		appendPayloadProblems(&resp.Diagnostics, payloadType, settings, req.Path, req.Path, req.Path)
-		appendMCXDomainProblems(&resp.Diagnostics, payloadType, settings, req.Path, fmt.Sprintf("payload %d (%s)", i+1, payloadType))
+		appendMCXDomainProblems(&resp.Diagnostics, payload.PayloadType.ValueString(), settings, entry.AtName("settings"))
 	}
 }
 
@@ -175,21 +131,14 @@ func (v legacyPayloadSchemaValidator) ValidateDynamic(ctx context.Context, req v
 // multi-domain payload is actively harmful rather than merely unidiomatic; editor parity is why the
 // rule holds regardless of what a device does with it.
 //
-// payloadLabel names the payload for an operator when the attribute path cannot, and heads the
-// detail as its subject. The block carrier passes an empty string and the detail says "This
-// payload", because its path already points at the element. The deprecated flat carrier passes a
-// position and type, since a dynamic value has no traversable path for its elements and every
-// finding lands on the attribute itself.
-func appendMCXDomainProblems(diags *diag.Diagnostics, payloadType string, settings map[string]any, settingsPath path.Path, payloadLabel string) {
+// The detail says "This payload" because settingsPath already points at the element.
+func appendMCXDomainProblems(diags *diag.Diagnostics, payloadType string, settings map[string]any, settingsPath path.Path) {
 	domains, present := mcxPreferenceDomains(payloadType, settings)
 	if !present || len(domains) == 1 {
 		return
 	}
 
-	subject := "This payload"
-	if payloadLabel != "" {
-		subject = payloadLabel
-	}
+	const subject = "This payload"
 
 	if len(domains) == 0 {
 		diags.AddAttributeError(
