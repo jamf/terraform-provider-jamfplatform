@@ -3,7 +3,7 @@
 
 package mobile_device_prestage_enrollment
 
-// Schema deprecations of the skip_setup_items attributes the admin UI names differently, in
+// Schema deprecations of the attributes the admin UI names differently, in
 // one place. Each notice names its replacement and the earliest removal date, and carries the
 // greppable marker the deprecation sweep reads. On or after the date, remove the attribute
 // and its alias entry, drop it from prior state in UpgradeState, bump the schema Version, and
@@ -80,3 +80,60 @@ const skipDeprecationTVHomeScreenSync = "Deprecated: use `one_home_screen_for_ev
 // PRO-DEPRECATED remove-after=2027-02-03 replaced-by=skip_setup_items.where_is_this_apple_tv — renamed to match the admin UI label "Where is this Apple TV?".
 const skipDeprecationTVRoom = "Deprecated: use `where_is_this_apple_tv` instead, the same pane under the name the admin UI shows. " +
 	"The provider will not remove `tv_room` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=make_mdm_profile_mandatory — renamed to match the admin UI label "Make MDM Profile Mandatory".
+const deprecationMandatory = "Deprecated: use `make_mdm_profile_mandatory` instead. " +
+	"The provider will not remove `mandatory` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=prevent_unenrollment — renamed to match the admin UI label "Prevent Unenrollment", which holds the opposite value.
+const deprecationMdmRemovable = "Deprecated: use `prevent_unenrollment` instead. " +
+	"It holds the opposite value: `mdm_removable = true` is `prevent_unenrollment = false`. " +
+	"The provider will not remove `mdm_removable` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=require_credentials_for_enrollment — renamed to match the admin UI label "Require Credentials for Enrollment".
+const deprecationRequireAuthentication = "Deprecated: use `require_credentials_for_enrollment` instead. " +
+	"The provider will not remove `require_authentication` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=authentication_message — renamed to match the admin UI label "Authentication Message".
+const deprecationAuthenticationPrompt = "Deprecated: use `authentication_message` instead. " +
+	"The provider will not remove `authentication_prompt` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=supervise_devices_with_ios_12_or_earlier — renamed to match the admin UI label "Supervise Devices with iOS 12.x or earlier".
+const deprecationSupervised = "Deprecated: use `supervise_devices_with_ios_12_or_earlier` instead. " +
+	"The provider will not remove `supervised` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=automatically_advance_through_setup_assistant — renamed to match the admin UI label "Automatically advance through Setup Assistant".
+const deprecationAutoAdvanceSetup = "Deprecated: use `automatically_advance_through_setup_assistant` instead. " +
+	"The provider will not remove `auto_advance_setup` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=install_configuration_profiles_before_setup_assistant — renamed to match the admin UI label "Install configuration profiles before Setup Assistant".
+const deprecationConfigureDeviceBeforeSetupAssistant = "Deprecated: use `install_configuration_profiles_before_setup_assistant` instead. " +
+	"The provider will not remove `configure_device_before_setup_assistant` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=install_managed_apps_before_setup_assistant — renamed to match the admin UI label "Install managed apps before Setup Assistant".
+const deprecationInstallAppsDuringEnrollment = "Deprecated: use `install_managed_apps_before_setup_assistant` instead. " +
+	"The provider will not remove `install_apps_during_enrollment` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=automatically_assign_new_devices — renamed to match the admin UI label "Automatically assign new devices".
+const deprecationDefaultPrestage = "Deprecated: use `automatically_assign_new_devices` instead. " +
+	"The provider will not remove `default_prestage` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=set_time_zone — renamed to match the admin UI label "Set Time Zone".
+const deprecationSendTimezone = "Deprecated: use `set_time_zone` instead. " +
+	"The provider will not remove `send_timezone` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=enable_shared_ipad — renamed to match the admin UI label "Enable Shared iPad".
+const deprecationMultiUser = "Deprecated: use `enable_shared_ipad` instead. " +
+	"The provider will not remove `multi_user` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=allow_return_to_service — renamed to match the admin UI label "Allow use of the Return to Service option during device reset".
+const deprecationRtsEnabled = "Deprecated: use `allow_return_to_service` instead. " +
+	"The provider will not remove `rts_enabled` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=use_existing_site_membership — renamed to match the admin UI label "Use existing site membership, if applicable".
+const deprecationKeepExistingSiteMembership = "Deprecated: use `use_existing_site_membership` instead. " +
+	"The provider will not remove `keep_existing_site_membership` before 2027-02-03."
+
+// PRO-DEPRECATED remove-after=2027-02-03 replaced-by=use_existing_location_information — renamed to match the admin UI label "Use existing location information, if applicable".
+const deprecationKeepExistingLocationInformation = "Deprecated: use `use_existing_location_information` instead. " +
+	"The provider will not remove `keep_existing_location_information` before 2027-02-03."

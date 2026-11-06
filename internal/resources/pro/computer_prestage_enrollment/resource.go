@@ -29,6 +29,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/prestagealias"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/prestageskip"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -109,14 +110,12 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
-			"mandatory": schema.BoolAttribute{
-				MarkdownDescription: "**\"Make MDM Profile Mandatory\"** in the Jamf Pro admin UI.",
-				Required:            true,
-			},
-			"mdm_removable": schema.BoolAttribute{
-				MarkdownDescription: "**\"Allow MDM Profile Removal\"** in the Jamf Pro admin UI.",
-				Required:            true,
-			},
+			// Wire field: mandatory. Replaces `mandatory`, which stays for the deprecation window.
+			"make_mdm_profile_mandatory": renamedBool("**\"Make MDM Profile Mandatory\"** in the Jamf Pro admin UI. Require the user to apply the MDM profile. Replaces `mandatory`; set one or the other.", "mandatory", true, topLevelBoolModifier),
+			"mandatory":                  deprecatedBool("**\"Make MDM Profile Mandatory\"** in the Jamf Pro admin UI.", deprecationMandatory, "make_mdm_profile_mandatory", topLevelBoolModifier),
+			// Wire field: mdmRemovable. Replaces `mdm_removable`, which stays for the deprecation window.
+			"allow_mdm_profile_removal": renamedBool("**\"Allow MDM Profile Removal\"** in the Jamf Pro admin UI. Allow the user to remove the MDM profile. Replaces `mdm_removable`; set one or the other.", "mdm_removable", true, topLevelBoolModifier),
+			"mdm_removable":             deprecatedBool("**\"Allow MDM Profile Removal\"** in the Jamf Pro admin UI.", deprecationMdmRemovable, "allow_mdm_profile_removal", topLevelBoolModifier),
 			"default_prestage": schema.BoolAttribute{
 				MarkdownDescription: "When true, this PreStage becomes the tenant default. Jamf Pro enforces at most one default PreStage; setting this to `true` may cause another PreStage to be silently demoted.",
 				Optional:            true,
@@ -153,10 +152,21 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 				MarkdownDescription: "**\"Require Authentication\"** in the Jamf Pro admin UI. When `true`, users must authenticate before completing Setup Assistant.",
 				Required:            true,
 			},
-			"authentication_prompt": schema.StringAttribute{
-				MarkdownDescription: "**\"Authentication Prompt\"** message shown when `require_authentication = true`.",
+			// Wire field: authenticationPrompt. Replaces `authentication_prompt`, which stays for the deprecation window.
+			"authentication_message": schema.StringAttribute{
+				MarkdownDescription: "**\"Authentication Message\"** shown to the user when `require_authentication = true`. Replaces `authentication_prompt`; set one or the other.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"authentication_prompt": schema.StringAttribute{
+				MarkdownDescription: "~> " + deprecationAuthenticationPrompt + "\n\n**\"Authentication Message\"** shown to the user when `require_authentication = true`.",
+				DeprecationMessage:  deprecationAuthenticationPrompt,
+				Optional:            true,
+				Computed:            true,
+				Validators:          prestagealias.StringConflicts("authentication_message"),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -187,14 +197,12 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"keep_existing_location_information": schema.BoolAttribute{
-				MarkdownDescription: "**\"Keep Existing Location Information\"** in the Jamf Pro admin UI.",
-				Required:            true,
-			},
-			"keep_existing_site_membership": schema.BoolAttribute{
-				MarkdownDescription: "**\"Keep Existing Site Membership\"** in the Jamf Pro admin UI.",
-				Required:            true,
-			},
+			// Wire field: keepExistingLocationInformation. Replaces `keep_existing_location_information`, which stays for the deprecation window.
+			"use_existing_location_information":  renamedBool("**\"Use existing location information, if applicable\"** in the Jamf Pro admin UI. Replaces `keep_existing_location_information`; set one or the other.", "keep_existing_location_information", true, topLevelBoolModifier),
+			"keep_existing_location_information": deprecatedBool("**\"Use existing location information, if applicable\"** in the Jamf Pro admin UI.", deprecationKeepExistingLocationInformation, "use_existing_location_information", topLevelBoolModifier),
+			// Wire field: keepExistingSiteMembership. Replaces `keep_existing_site_membership`, which stays for the deprecation window.
+			"use_existing_site_membership":  renamedBool("**\"Use existing site membership, if applicable\"** in the Jamf Pro admin UI. Replaces `keep_existing_site_membership`; set one or the other.", "keep_existing_site_membership", true, topLevelBoolModifier),
+			"keep_existing_site_membership": deprecatedBool("**\"Use existing site membership, if applicable\"** in the Jamf Pro admin UI.", deprecationKeepExistingSiteMembership, "use_existing_site_membership", topLevelBoolModifier),
 			"enrollment_customization_id": schema.StringAttribute{
 				MarkdownDescription: "Enrollment customization ID to apply during Setup Assistant. Sentinel `\"0\"` = no customization; it is `\"0\"`, not `\"-1\"`.",
 				Optional:            true,
@@ -219,19 +227,36 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"auto_advance_setup": schema.BoolAttribute{
-				MarkdownDescription: "**\"Auto Advance Setup\"** in the Jamf Pro admin UI.",
-				Required:            true,
-			},
+			// Wire field: autoAdvanceSetup. Replaces `auto_advance_setup`, which stays for the deprecation window.
+			"automatically_advance_through_setup_assistant": renamedBool("**\"Automatically advance through Setup Assistant (macOS 11 or later only)\"** in the Jamf Pro admin UI. Automatically skips every Setup Assistant screen that can be skipped during enrollment. Replaces `auto_advance_setup`; set one or the other.", "auto_advance_setup", true, topLevelBoolModifier),
+			"auto_advance_setup":                            deprecatedBool("**\"Automatically advance through Setup Assistant (macOS 11 or later only)\"** in the Jamf Pro admin UI.", deprecationAutoAdvanceSetup, "automatically_advance_through_setup_assistant", topLevelBoolModifier),
+			// Wire field: installProfilesDuringSetup. The admin UI has no control for it: Jamf Pro refuses profiles unless it is true,
+			// so the provider derives it from the profile set. A configured value is sent as written.
 			"install_profiles_during_setup": schema.BoolAttribute{
-				MarkdownDescription: "When `true`, Jamf Pro installs the configuration profiles listed in `prestage_installed_profile_ids` during Setup Assistant.",
-				Required:            true,
+				MarkdownDescription: "~> " + deprecationInstallProfilesDuringSetup + "\n\nThe provider sends `true` whenever `configuration_profile_ids` holds a profile. Setting `false` alongside profiles is a configuration error.",
+				DeprecationMessage:  deprecationInstallProfilesDuringSetup,
+				Optional:            true,
+				Validators: []validator.Bool{
+					installProfilesFalseWithProfiles(),
+				},
 			},
-			"prestage_installed_profile_ids": schema.SetAttribute{
-				MarkdownDescription: "Set of configuration profile IDs to install during Setup Assistant when `install_profiles_during_setup = true`.",
+			// Wire field: prestageInstalledProfileIds. Replaces `prestage_installed_profile_ids`, which stays for the deprecation window.
+			"configuration_profile_ids": schema.SetAttribute{
+				MarkdownDescription: "**\"Configuration Profiles\"** pane of the Jamf Pro admin UI: the IDs of the configuration profiles to install during Setup Assistant. Replaces `prestage_installed_profile_ids`; set one or the other. Leave it empty to install none.",
 				ElementType:         types.StringType,
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"prestage_installed_profile_ids": schema.SetAttribute{
+				MarkdownDescription: "~> " + deprecationPrestageInstalledProfileIDs + "\n\n**\"Configuration Profiles\"** pane of the Jamf Pro admin UI: the IDs of the configuration profiles to install during Setup Assistant.",
+				DeprecationMessage:  deprecationPrestageInstalledProfileIDs,
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Validators:          prestagealias.SetConflicts("configuration_profile_ids"),
 				PlanModifiers: []planmodifier.Set{
 					setplanmodifier.UseStateForUnknown(),
 				},
@@ -272,11 +297,11 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 				Required:            true,
 			},
 			"enable_device_based_activation_lock": schema.BoolAttribute{
-				MarkdownDescription: "**\"Enable Device-Based Activation Lock\"** in the Jamf Pro admin UI.",
+				MarkdownDescription: "**\"Enable Activation Lock on the device (Apple School Manager, Apple Business Manager)\"** in the Jamf Pro admin UI.",
 				Required:            true,
 			},
 			"enable_recovery_lock": schema.BoolAttribute{
-				MarkdownDescription: "**\"Enable Recovery Lock\"** in the Jamf Pro admin UI.",
+				MarkdownDescription: "**\"Set Recovery Lock Password\"** in the Jamf Pro admin UI. Turns Recovery Lock on; `recovery_lock_password_type` chooses how the password is provisioned.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers: []planmodifier.Bool{
@@ -317,7 +342,7 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 				},
 			},
 			"prestage_minimum_os_target_version_type": schema.StringAttribute{
-				MarkdownDescription: "Minimum-OS enforcement mode. One of `NO_ENFORCEMENT`, `MINIMUM_OS_LATEST_VERSION`, `MINIMUM_OS_LATEST_MAJOR_VERSION`, `MINIMUM_OS_LATEST_MINOR_VERSION`, `MINIMUM_OS_SPECIFIC_VERSION`. Pair `MINIMUM_OS_SPECIFIC_VERSION` with `minimum_os_specific_version`.",
+				MarkdownDescription: "**\"Minimum required macOS version\"** in the Jamf Pro admin UI: the enforcement mode. One of `NO_ENFORCEMENT`, `MINIMUM_OS_LATEST_VERSION`, `MINIMUM_OS_LATEST_MAJOR_VERSION`, `MINIMUM_OS_LATEST_MINOR_VERSION`, `MINIMUM_OS_SPECIFIC_VERSION`. Pair `MINIMUM_OS_SPECIFIC_VERSION` with `minimum_os_specific_version`.",
 				Optional:            true,
 				Computed:            true,
 				Validators: []validator.String{
@@ -328,7 +353,7 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 				},
 			},
 			"minimum_os_specific_version": schema.StringAttribute{
-				MarkdownDescription: "Specific minimum macOS version (e.g. `\"14.5\"`). Used only when `prestage_minimum_os_target_version_type = \"MINIMUM_OS_SPECIFIC_VERSION\"`.",
+				MarkdownDescription: "**\"Minimum required macOS version\"** in the Jamf Pro admin UI: the specific version (e.g. `\"14.5\"`). Used only when `prestage_minimum_os_target_version_type = \"MINIMUM_OS_SPECIFIC_VERSION\"`.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
@@ -336,7 +361,7 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 				},
 			},
 			"psso_enabled": schema.BoolAttribute{
-				MarkdownDescription: "Whether Platform SSO is enabled for this PreStage.",
+				MarkdownDescription: "**\"Enable Simplified Setup for Platform Single Sign-on (macOS 26 or later)\"** in the Jamf Pro admin UI. Whether Platform SSO is enabled for this PreStage.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers: []planmodifier.Bool{
@@ -440,6 +465,12 @@ func (r *ComputerPrestageEnrollmentResource) ModifyPlan(ctx context.Context, req
 
 	r.reportNameCollision(ctx, req, resp)
 	prestageskip.ReconcilePlan(ctx, req, resp, skipAliases())
+	prestagealias.ReconcilePlan(ctx, req, resp, topLevelPairs)
+	var planAccount types.Object
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("account_settings"), &planAccount)...)
+	if !resp.Diagnostics.HasError() && !planAccount.IsNull() && !planAccount.IsUnknown() {
+		prestagealias.ReconcilePlan(ctx, req, resp, accountSettingsPairs)
+	}
 
 	var cfgBundle, cfgProfile, cfgCustomization types.String
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("platform_sso_app_bundle_id"), &cfgBundle)...)
@@ -604,19 +635,27 @@ func purchasingInformationSchema() schema.SingleNestedAttribute {
 
 // accountSettingsSchema returns the Account Settings block. Contains the
 // WriteOnly `admin_password` + `admin_password_wo_version` rotation pair.
-// Jamf Pro rejects mixed states (any non-default field set while
-// `payloadConfigured=false`) with 400 INVALID_CONTENT; surface that as
-// part of the user-facing constraint.
+// Jamf Pro rejects any non-default value unless its payloadConfigured flag is
+// true, so the provider derives that flag; see buildAccountSettingsRequest.
 func accountSettingsSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		MarkdownDescription: "**\"Account Settings\"** in the Jamf Pro admin UI. Supply the block to manage this section, even empty as `account_settings = {}`. Omitting it produces drift on the next refresh, because Jamf Pro always returns a populated block. When any non-default field is set, `payload_configured` must be `true`; Jamf Pro rejects mixed states.",
+		MarkdownDescription: "**\"Account Settings\"** in the Jamf Pro admin UI. Supply the block to manage this section, even empty as `account_settings = {}`. Omitting it produces drift on the next refresh, because Jamf Pro always returns a populated block.",
 		Optional:            true,
 		Attributes: map[string]schema.Attribute{
-			"payload_configured":          optBool("**\"Configure Account Settings\"** toggle. Must be `true` when any other account-settings field is non-default."),
-			"local_admin_account_enabled": optBool("**\"Create Local Administrator Account\"** in the Jamf Pro admin UI."),
-			"admin_username":              optString("**\"Username\"** for the local admin account."),
+			// Wire field: payloadConfigured. The admin UI has no control for it. Jamf Pro refuses any
+			// other non-default account setting unless it is true, so the provider derives it. State
+			// holds what the configuration wrote and nothing else.
+			"payload_configured": schema.BoolAttribute{
+				MarkdownDescription: "~> " + deprecationPayloadConfigured + "\n\nThe provider sends `true` whenever the block sets any other account setting.",
+				DeprecationMessage:  deprecationPayloadConfigured,
+				Optional:            true,
+			},
+			// Wire field: localAdminAccountEnabled. Replaces `local_admin_account_enabled`, which stays for the deprecation window.
+			"create_managed_local_administrator_account": renamedBool("**\"Create a managed local administrator account during macOS Setup Assistant\"** in the Jamf Pro admin UI. Replaces `local_admin_account_enabled`; set one or the other.", "local_admin_account_enabled", false, nestedBoolModifier),
+			"local_admin_account_enabled":                deprecatedBool("**\"Create a managed local administrator account during macOS Setup Assistant\"** in the Jamf Pro admin UI.", deprecationLocalAdminAccountEnabled, "create_managed_local_administrator_account", nestedBoolModifier),
+			"admin_username":                             optString("**\"Username\"** for the managed local administrator account."),
 			"admin_password": schema.StringAttribute{
-				MarkdownDescription: "Plaintext password for the local admin account. WriteOnly: the value is sent to Jamf Pro but never persisted in Terraform state. Bump `admin_password_wo_version` to force the provider to re-send the current value.",
+				MarkdownDescription: "**\"Password\"** for the managed local administrator account. WriteOnly: the value is sent to Jamf Pro but never persisted in Terraform state. Bump `admin_password_wo_version` to force the provider to re-send the current value.",
 				Optional:            true,
 				Sensitive:           true,
 				WriteOnly:           true,
@@ -625,10 +664,14 @@ func accountSettingsSchema() schema.SingleNestedAttribute {
 				MarkdownDescription: "Rotation trigger for the WriteOnly `admin_password`. Bump to force the provider to re-send the current password value.",
 				Optional:            true,
 			},
-			"hidden_admin_account": optBool("**\"Hide Local Admin Account\"** in the Jamf Pro admin UI."),
-			"local_user_managed":   optBool("**\"User Managed by Jamf Pro\"** in the Jamf Pro admin UI."),
+			// Wire field: hiddenAdminAccount. Replaces `hidden_admin_account`, which stays for the deprecation window.
+			"hide_managed_local_administrator_account": renamedBool("**\"Hide managed local administrator account in Users & Groups\"** in the Jamf Pro admin UI. Replaces `hidden_admin_account`; set one or the other.", "hidden_admin_account", false, nestedBoolModifier),
+			"hidden_admin_account":                     deprecatedBool("**\"Hide managed local administrator account in Users & Groups\"** in the Jamf Pro admin UI.", deprecationHiddenAdminAccount, "hide_managed_local_administrator_account", nestedBoolModifier),
+			// Wire field: localUserManaged. Replaces `local_user_managed`, which stays for the deprecation window.
+			"make_managed_local_administrator_account_mdm_enabled": renamedBool("**\"Make the managed local administrator account MDM-enabled\"** in the Jamf Pro admin UI. Replaces `local_user_managed`; set one or the other.", "local_user_managed", false, nestedBoolModifier),
+			"local_user_managed": deprecatedBool("**\"Make the managed local administrator account MDM-enabled\"** in the Jamf Pro admin UI.", deprecationLocalUserManaged, "make_managed_local_administrator_account_mdm_enabled", nestedBoolModifier),
 			"user_account_type": schema.StringAttribute{
-				MarkdownDescription: fmt.Sprintf("Account type for the primary user. One of %v. Default `\"STANDARD\"`.", userAccountTypeValues),
+				MarkdownDescription: fmt.Sprintf("**\"Local User Account Type\"** in the Jamf Pro admin UI: the type of account the user creates during enrollment. One of %v. Default `\"STANDARD\"`.", userAccountTypeValues),
 				Optional:            true,
 				Computed:            true,
 				Validators: []validator.String{
@@ -638,9 +681,9 @@ func accountSettingsSchema() schema.SingleNestedAttribute {
 					planmodifiers.UseStateForUnknownInExistingBlockString(),
 				},
 			},
-			"prefill_primary_account_info_feature_enabled": optBool("**\"Prefill Primary Account Info\"** in the Jamf Pro admin UI."),
+			"prefill_primary_account_info_feature_enabled": optBool("**\"Pre-fill primary account information\"** in the Jamf Pro admin UI."),
 			"prefill_type": schema.StringAttribute{
-				MarkdownDescription: fmt.Sprintf("How prefill values are populated. One of %v. `\"CUSTOM\"` requires `prefill_account_full_name` and `prefill_account_user_name`; `\"DEVICE_OWNER\"` populates from the assigning user.", prefillTypeValues),
+				MarkdownDescription: fmt.Sprintf("**\"Information Type\"** in the Jamf Pro admin UI: how prefill values are populated. One of %v. `\"CUSTOM\"` requires `prefill_account_full_name` and `prefill_account_user_name`; `\"DEVICE_OWNER\"` populates from the assigning user.", prefillTypeValues),
 				Optional:            true,
 				Computed:            true,
 				Validators: []validator.String{
@@ -651,9 +694,43 @@ func accountSettingsSchema() schema.SingleNestedAttribute {
 					planmodifiers.UseStateForUnknownInExistingBlockString(),
 				},
 			},
-			"prefill_account_full_name":              optString("**\"Account Full Name\"** prefill value."),
-			"prefill_account_user_name":              optString("**\"Account User Name\"** prefill value."),
-			"prevent_prefill_info_from_modification": optBool("**\"Prevent Modification\"** of prefilled info during Setup Assistant."),
+			"prefill_account_full_name": optString("**\"Account Full Name\"** prefill value."),
+			"prefill_account_user_name": optString("**\"Account User Name\"** prefill value."),
+			// Wire field: preventPrefillInfoFromModification. Replaces `prevent_prefill_info_from_modification`, which stays for the deprecation window.
+			"lock_primary_account_information":       renamedBool("**\"Lock primary account information\"** in the Jamf Pro admin UI: prevent the user changing the prefilled values during Setup Assistant. Replaces `prevent_prefill_info_from_modification`; set one or the other.", "prevent_prefill_info_from_modification", false, nestedBoolModifier),
+			"prevent_prefill_info_from_modification": deprecatedBool("**\"Lock primary account information\"** in the Jamf Pro admin UI.", deprecationPreventPrefillInfoFromModification, "lock_primary_account_information", nestedBoolModifier),
 		},
+	}
+}
+
+var (
+	topLevelBoolModifier = []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()}
+	nestedBoolModifier   = []planmodifier.Bool{planmodifiers.UseStateForUnknownInExistingBlockBool()}
+)
+
+// renamedBool returns the replacement attribute of a renamed bool. When the deprecated attribute
+// was Required, one of the two names must still be set.
+func renamedBool(md, deprecatedName string, wasRequired bool, mods []planmodifier.Bool) schema.BoolAttribute {
+	a := schema.BoolAttribute{
+		MarkdownDescription: md,
+		Optional:            true,
+		Computed:            true,
+		PlanModifiers:       mods,
+	}
+	if wasRequired {
+		a.Validators = prestagealias.BoolAtLeastOne(deprecatedName)
+	}
+	return a
+}
+
+// deprecatedBool returns the deprecated twin of a renamed bool.
+func deprecatedBool(md, message, replacement string, mods []planmodifier.Bool) schema.BoolAttribute {
+	return schema.BoolAttribute{
+		MarkdownDescription: "~> " + message + "\n\n" + md,
+		DeprecationMessage:  message,
+		Optional:            true,
+		Computed:            true,
+		Validators:          prestagealias.BoolConflicts(replacement),
+		PlanModifiers:       mods,
 	}
 }

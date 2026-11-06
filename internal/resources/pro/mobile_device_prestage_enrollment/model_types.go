@@ -56,6 +56,21 @@ type MobileDevicePrestageEnrollmentResourceModel struct {
 	RtsConfigProfileID        types.String `tfsdk:"rts_config_profile_id"`
 	RtsEnabled                types.Bool   `tfsdk:"rts_enabled"`
 
+	MakeMdmProfileMandatory                          types.Bool   `tfsdk:"make_mdm_profile_mandatory"`
+	PreventUnenrollment                              types.Bool   `tfsdk:"prevent_unenrollment"`
+	RequireCredentialsForEnrollment                  types.Bool   `tfsdk:"require_credentials_for_enrollment"`
+	AuthenticationMessage                            types.String `tfsdk:"authentication_message"`
+	SuperviseDevicesWithIos12OrEarlier               types.Bool   `tfsdk:"supervise_devices_with_ios_12_or_earlier"`
+	AutomaticallyAdvanceThroughSetupAssistant        types.Bool   `tfsdk:"automatically_advance_through_setup_assistant"`
+	InstallConfigurationProfilesBeforeSetupAssistant types.Bool   `tfsdk:"install_configuration_profiles_before_setup_assistant"`
+	InstallManagedAppsBeforeSetupAssistant           types.Bool   `tfsdk:"install_managed_apps_before_setup_assistant"`
+	AutomaticallyAssignNewDevices                    types.Bool   `tfsdk:"automatically_assign_new_devices"`
+	SetTimeZone                                      types.Bool   `tfsdk:"set_time_zone"`
+	EnableSharedIPad                                 types.Bool   `tfsdk:"enable_shared_ipad"`
+	AllowReturnToService                             types.Bool   `tfsdk:"allow_return_to_service"`
+	UseExistingSiteMembership                        types.Bool   `tfsdk:"use_existing_site_membership"`
+	UseExistingLocationInformation                   types.Bool   `tfsdk:"use_existing_location_information"`
+
 	MaximumSharedAccounts     types.Int64 `tfsdk:"maximum_shared_accounts"`
 	TemporarySessionTimeout   types.Int64 `tfsdk:"temporary_session_timeout"`
 	UserSessionTimeout        types.Int64 `tfsdk:"user_session_timeout"`
@@ -215,25 +230,34 @@ type MobileDevicePrestageEnrollmentIdentityModel struct {
 // MobileDevicePrestageEnrollmentDataSourceModel is the data source model.
 // Mirrors a scalar subset of the resource shape.
 type MobileDevicePrestageEnrollmentDataSourceModel struct {
-	ID                                     types.String             `tfsdk:"id"`
-	Name                                   types.String             `tfsdk:"name"`
-	DisplayName                            types.String             `tfsdk:"display_name"`
-	DeviceEnrollmentProgramInstanceID      types.String             `tfsdk:"device_enrollment_program_instance_id"`
-	Mandatory                              types.Bool               `tfsdk:"mandatory"`
-	MdmRemovable                           types.Bool               `tfsdk:"mdm_removable"`
-	DefaultPrestage                        types.Bool               `tfsdk:"default_prestage"`
-	RequireAuthentication                  types.Bool               `tfsdk:"require_authentication"`
-	Supervised                             types.Bool               `tfsdk:"supervised"`
-	SupportPhoneNumber                     types.String             `tfsdk:"support_phone_number"`
-	SupportEmailAddress                    types.String             `tfsdk:"support_email_address"`
-	Department                             types.String             `tfsdk:"department"`
-	AuthenticationPrompt                   types.String             `tfsdk:"authentication_prompt"`
-	SiteID                                 types.String             `tfsdk:"site_id"`
-	EnrollmentSiteID                       types.String             `tfsdk:"enrollment_site_id"`
-	EnrollmentCustomizationID              types.String             `tfsdk:"enrollment_customization_id"`
-	ProfileUUID                            types.String             `tfsdk:"profile_uuid"`
-	Timezone                               types.String             `tfsdk:"timezone"`
-	MultiUser                              types.Bool               `tfsdk:"multi_user"`
+	ID                                types.String `tfsdk:"id"`
+	Name                              types.String `tfsdk:"name"`
+	DisplayName                       types.String `tfsdk:"display_name"`
+	DeviceEnrollmentProgramInstanceID types.String `tfsdk:"device_enrollment_program_instance_id"`
+	Mandatory                         types.Bool   `tfsdk:"mandatory"`
+	MdmRemovable                      types.Bool   `tfsdk:"mdm_removable"`
+	DefaultPrestage                   types.Bool   `tfsdk:"default_prestage"`
+	RequireAuthentication             types.Bool   `tfsdk:"require_authentication"`
+	Supervised                        types.Bool   `tfsdk:"supervised"`
+	SupportPhoneNumber                types.String `tfsdk:"support_phone_number"`
+	SupportEmailAddress               types.String `tfsdk:"support_email_address"`
+	Department                        types.String `tfsdk:"department"`
+	AuthenticationPrompt              types.String `tfsdk:"authentication_prompt"`
+	SiteID                            types.String `tfsdk:"site_id"`
+	EnrollmentSiteID                  types.String `tfsdk:"enrollment_site_id"`
+	EnrollmentCustomizationID         types.String `tfsdk:"enrollment_customization_id"`
+	ProfileUUID                       types.String `tfsdk:"profile_uuid"`
+	Timezone                          types.String `tfsdk:"timezone"`
+	MultiUser                         types.Bool   `tfsdk:"multi_user"`
+
+	MakeMdmProfileMandatory            types.Bool   `tfsdk:"make_mdm_profile_mandatory"`
+	PreventUnenrollment                types.Bool   `tfsdk:"prevent_unenrollment"`
+	AutomaticallyAssignNewDevices      types.Bool   `tfsdk:"automatically_assign_new_devices"`
+	RequireCredentialsForEnrollment    types.Bool   `tfsdk:"require_credentials_for_enrollment"`
+	SuperviseDevicesWithIos12OrEarlier types.Bool   `tfsdk:"supervise_devices_with_ios_12_or_earlier"`
+	AuthenticationMessage              types.String `tfsdk:"authentication_message"`
+	EnableSharedIPad                   types.Bool   `tfsdk:"enable_shared_ipad"`
+
 	PrestageMinimumOsTargetVersionTypeIos  types.String             `tfsdk:"prestage_minimum_os_target_version_type_ios"`
 	PrestageMinimumOsTargetVersionTypeIpad types.String             `tfsdk:"prestage_minimum_os_target_version_type_ipad"`
 	Timeouts                               datasourceTimeouts.Value `tfsdk:"timeouts"`

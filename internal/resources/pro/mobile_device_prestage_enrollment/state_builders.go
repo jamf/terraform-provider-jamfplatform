@@ -27,28 +27,30 @@ func assignGetToResource(_ context.Context, plan *MobileDevicePrestageEnrollment
 	plan.DisplayName = types.StringValue(got.DisplayName)
 	plan.DeviceEnrollmentProgramInstanceID = types.StringValue(got.DeviceEnrollmentProgramInstanceID)
 
-	plan.Mandatory = types.BoolValue(got.Mandatory)
-	plan.MdmRemovable = types.BoolValue(got.MDMRemovable)
-	plan.RequireAuthentication = types.BoolValue(got.RequireAuthentication)
-	plan.Supervised = types.BoolValue(got.Supervised)
+	assignRenamed(plan, map[string]bool{
+		"mandatory":              got.Mandatory,
+		"mdm_removable":          got.MDMRemovable,
+		"require_authentication": got.RequireAuthentication,
+		"supervised":             got.Supervised,
+		"auto_advance_setup":     got.AutoAdvanceSetup,
+		"configure_device_before_setup_assistant": got.ConfigureDeviceBeforeSetupAssistant,
+		"install_apps_during_enrollment":          got.InstallAppsDuringEnrollment,
+		"default_prestage":                        got.DefaultPrestage,
+		"send_timezone":                           got.SendTimezone,
+		"multi_user":                              got.MultiUser,
+		"rts_enabled":                             got.RtsEnabled,
+		"keep_existing_site_membership":           got.KeepExistingSiteMembership,
+		"keep_existing_location_information":      got.KeepExistingLocationInformation,
+	}, got.AuthenticationPrompt)
 	plan.AllowPairing = types.BoolValue(got.AllowPairing)
-	plan.AutoAdvanceSetup = types.BoolValue(got.AutoAdvanceSetup)
-	plan.ConfigureDeviceBeforeSetupAssistant = types.BoolValue(got.ConfigureDeviceBeforeSetupAssistant)
-	plan.DefaultPrestage = types.BoolValue(got.DefaultPrestage)
-	plan.SendTimezone = types.BoolValue(got.SendTimezone)
 	plan.PreventActivationLock = types.BoolValue(got.PreventActivationLock)
 	plan.EnableDeviceBasedActivationLock = types.BoolValue(got.EnableDeviceBasedActivationLock)
-	plan.KeepExistingSiteMembership = types.BoolValue(got.KeepExistingSiteMembership)
-	plan.KeepExistingLocationInformation = types.BoolValue(got.KeepExistingLocationInformation)
-	plan.MultiUser = types.BoolValue(got.MultiUser)
 	plan.UseStorageQuotaSize = types.BoolValue(got.UseStorageQuotaSize)
 	plan.TemporarySessionOnly = types.BoolValue(got.TemporarySessionOnly)
 	plan.EnforceTemporarySessionTimeout = types.BoolValue(got.EnforceTemporarySessionTimeout)
 	plan.EnforceUserSessionTimeout = types.BoolValue(got.EnforceUserSessionTimeout)
 	plan.PreserveManagedApps = types.BoolValue(got.PreserveManagedApps)
 	plan.DoNotUseProfileFromBackup = types.BoolValue(got.DoNotUseProfileFromBackup)
-	plan.InstallAppsDuringEnrollment = types.BoolValue(got.InstallAppsDuringEnrollment)
-	plan.RtsEnabled = types.BoolValue(got.RtsEnabled)
 
 	// SDK types are plain `string`, so any wire-level null is "" by the time
 	// we see it — no null/"" flicker at the Go boundary; use the value
@@ -56,7 +58,6 @@ func assignGetToResource(_ context.Context, plan *MobileDevicePrestageEnrollment
 	// Create the prior "state" is the plan, whose omitted Optional+Computed
 	// fields are Unknown, and the helper would leak that Unknown into the
 	// State.Set. The computer sibling documents the same lesson.)
-	plan.AuthenticationPrompt = types.StringValue(got.AuthenticationPrompt)
 	plan.SupportPhoneNumber = types.StringValue(got.SupportPhoneNumber)
 	plan.SupportEmailAddress = types.StringValue(got.SupportEmailAddress)
 	plan.Department = types.StringValue(got.Department)
@@ -248,6 +249,7 @@ func stringSliceToList(in []string) types.List {
 // (wire-probed 2026-08-07), so a mismatch here really is a rollback.
 func diffPlanAgainstGet(ctx context.Context, plan MobileDevicePrestageEnrollmentResourceModel, got *pro.GetMobileDevicePrestageV3) []string {
 	var mismatched []string
+	resolveRenames(&plan)
 
 	checkStr := func(path string, planVal types.String, gotVal string) {
 		if planVal.IsNull() || planVal.IsUnknown() {
@@ -268,30 +270,30 @@ func diffPlanAgainstGet(ctx context.Context, plan MobileDevicePrestageEnrollment
 
 	checkStr("display_name", plan.DisplayName, got.DisplayName)
 	checkStr("device_enrollment_program_instance_id", plan.DeviceEnrollmentProgramInstanceID, got.DeviceEnrollmentProgramInstanceID)
-	checkBool("mandatory", plan.Mandatory, got.Mandatory)
-	checkBool("mdm_removable", plan.MdmRemovable, got.MDMRemovable)
-	checkBool("require_authentication", plan.RequireAuthentication, got.RequireAuthentication)
-	checkBool("supervised", plan.Supervised, got.Supervised)
+	checkBool("make_mdm_profile_mandatory", plan.MakeMdmProfileMandatory, got.Mandatory)
+	checkBool("prevent_unenrollment", plan.PreventUnenrollment, !got.MDMRemovable)
+	checkBool("require_credentials_for_enrollment", plan.RequireCredentialsForEnrollment, got.RequireAuthentication)
+	checkBool("supervise_devices_with_ios_12_or_earlier", plan.SuperviseDevicesWithIos12OrEarlier, got.Supervised)
 	checkBool("allow_pairing", plan.AllowPairing, got.AllowPairing)
-	checkBool("auto_advance_setup", plan.AutoAdvanceSetup, got.AutoAdvanceSetup)
-	checkBool("configure_device_before_setup_assistant", plan.ConfigureDeviceBeforeSetupAssistant, got.ConfigureDeviceBeforeSetupAssistant)
-	checkBool("default_prestage", plan.DefaultPrestage, got.DefaultPrestage)
-	checkBool("send_timezone", plan.SendTimezone, got.SendTimezone)
+	checkBool("automatically_advance_through_setup_assistant", plan.AutomaticallyAdvanceThroughSetupAssistant, got.AutoAdvanceSetup)
+	checkBool("install_configuration_profiles_before_setup_assistant", plan.InstallConfigurationProfilesBeforeSetupAssistant, got.ConfigureDeviceBeforeSetupAssistant)
+	checkBool("automatically_assign_new_devices", plan.AutomaticallyAssignNewDevices, got.DefaultPrestage)
+	checkBool("set_time_zone", plan.SetTimeZone, got.SendTimezone)
 	checkBool("prevent_activation_lock", plan.PreventActivationLock, got.PreventActivationLock)
 	checkBool("enable_device_based_activation_lock", plan.EnableDeviceBasedActivationLock, got.EnableDeviceBasedActivationLock)
-	checkBool("keep_existing_site_membership", plan.KeepExistingSiteMembership, got.KeepExistingSiteMembership)
-	checkBool("keep_existing_location_information", plan.KeepExistingLocationInformation, got.KeepExistingLocationInformation)
-	checkBool("multi_user", plan.MultiUser, got.MultiUser)
+	checkBool("use_existing_site_membership", plan.UseExistingSiteMembership, got.KeepExistingSiteMembership)
+	checkBool("use_existing_location_information", plan.UseExistingLocationInformation, got.KeepExistingLocationInformation)
+	checkBool("enable_shared_ipad", plan.EnableSharedIPad, got.MultiUser)
 	// use_storage_quota_size — EXCLUDED (§9.1).
 	// temporary_session_only — EXCLUDED (§9.1).
 	checkBool("enforce_temporary_session_timeout", plan.EnforceTemporarySessionTimeout, got.EnforceTemporarySessionTimeout)
 	checkBool("enforce_user_session_timeout", plan.EnforceUserSessionTimeout, got.EnforceUserSessionTimeout)
 	checkBool("preserve_managed_apps", plan.PreserveManagedApps, got.PreserveManagedApps)
 	checkBool("do_not_use_profile_from_backup", plan.DoNotUseProfileFromBackup, got.DoNotUseProfileFromBackup)
-	checkBool("install_apps_during_enrollment", plan.InstallAppsDuringEnrollment, got.InstallAppsDuringEnrollment)
-	checkBool("rts_enabled", plan.RtsEnabled, got.RtsEnabled)
+	checkBool("install_managed_apps_before_setup_assistant", plan.InstallManagedAppsBeforeSetupAssistant, got.InstallAppsDuringEnrollment)
+	checkBool("allow_return_to_service", plan.AllowReturnToService, got.RtsEnabled)
 
-	checkStr("authentication_prompt", plan.AuthenticationPrompt, got.AuthenticationPrompt)
+	checkStr("authentication_message", plan.AuthenticationMessage, got.AuthenticationPrompt)
 	checkStr("support_phone_number", plan.SupportPhoneNumber, got.SupportPhoneNumber)
 	checkStr("support_email_address", plan.SupportEmailAddress, got.SupportEmailAddress)
 	checkStr("department", plan.Department, got.Department)

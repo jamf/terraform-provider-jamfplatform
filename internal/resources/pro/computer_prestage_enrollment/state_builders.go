@@ -12,6 +12,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/prestagealias"
 )
 
 // assignGetToResource maps a fresh GET response onto the resource model.
@@ -25,24 +26,29 @@ func assignGetToResource(_ context.Context, plan *ComputerPrestageEnrollmentReso
 
 	plan.ID = types.StringValue(got.ID)
 	plan.DisplayName = types.StringValue(got.DisplayName)
-	plan.Mandatory = types.BoolValue(got.Mandatory)
-	plan.MdmRemovable = types.BoolValue(got.MDMRemovable)
+	plan.MakeMdmProfileMandatory = types.BoolValue(got.Mandatory)
+	plan.Mandatory = prestagealias.CarryBool(plan.Mandatory, got.Mandatory, false)
+	plan.AllowMdmProfileRemoval = types.BoolValue(got.MDMRemovable)
+	plan.MdmRemovable = prestagealias.CarryBool(plan.MdmRemovable, got.MDMRemovable, false)
 	plan.DefaultPrestage = types.BoolValue(got.DefaultPrestage)
 	plan.SupportPhoneNumber = types.StringValue(got.SupportPhoneNumber)
 	plan.SupportEmailAddress = types.StringValue(got.SupportEmailAddress)
 	plan.Department = types.StringValue(got.Department)
 	plan.RequireAuthentication = types.BoolValue(got.RequireAuthentication)
-	plan.AuthenticationPrompt = types.StringValue(got.AuthenticationPrompt)
+	plan.AuthenticationMessage = types.StringValue(got.AuthenticationPrompt)
+	plan.AuthenticationPrompt = prestagealias.CarryString(plan.AuthenticationPrompt, got.AuthenticationPrompt)
 	plan.DeviceEnrollmentProgramInstanceID = types.StringValue(got.DeviceEnrollmentProgramInstanceID)
 	plan.SiteID = types.StringValue(got.SiteID)
 	plan.EnrollmentSiteID = types.StringValue(got.EnrollmentSiteID)
-	plan.KeepExistingLocationInformation = types.BoolValue(got.KeepExistingLocationInformation)
-	plan.KeepExistingSiteMembership = types.BoolValue(got.KeepExistingSiteMembership)
+	plan.UseExistingLocationInformation = types.BoolValue(got.KeepExistingLocationInformation)
+	plan.KeepExistingLocationInformation = prestagealias.CarryBool(plan.KeepExistingLocationInformation, got.KeepExistingLocationInformation, false)
+	plan.UseExistingSiteMembership = types.BoolValue(got.KeepExistingSiteMembership)
+	plan.KeepExistingSiteMembership = prestagealias.CarryBool(plan.KeepExistingSiteMembership, got.KeepExistingSiteMembership, false)
 	plan.EnrollmentCustomizationID = types.StringValue(got.EnrollmentCustomizationID)
 	plan.Language = types.StringValue(got.Language)
 	plan.Region = types.StringValue(got.Region)
-	plan.AutoAdvanceSetup = types.BoolValue(got.AutoAdvanceSetup)
-	plan.InstallProfilesDuringSetup = types.BoolValue(got.InstallProfilesDuringSetup)
+	plan.AutomaticallyAdvanceThroughSetupAssistant = types.BoolValue(got.AutoAdvanceSetup)
+	plan.AutoAdvanceSetup = prestagealias.CarryBool(plan.AutoAdvanceSetup, got.AutoAdvanceSetup, false)
 	plan.CustomPackageDistributionPointID = types.StringValue(got.CustomPackageDistributionPointID)
 	plan.PreventActivationLock = types.BoolValue(got.PreventActivationLock)
 	plan.EnableDeviceBasedActivationLock = types.BoolValue(got.EnableDeviceBasedActivationLock)
@@ -65,7 +71,8 @@ func assignGetToResource(_ context.Context, plan *ComputerPrestageEnrollmentReso
 	plan.ProfileUUID = types.StringValue(got.ProfileUUID)
 
 	prestageIDs := stringSliceToSet(got.PrestageInstalledProfileIds)
-	plan.PrestageInstalledProfileIds = prestageIDs
+	plan.ConfigurationProfileIds = prestageIDs
+	plan.PrestageInstalledProfileIds = prestagealias.CarrySet(plan.PrestageInstalledProfileIds, prestageIDs)
 	plan.CustomPackageIds = stringSliceToSet(got.CustomPackageIds)
 	plan.AnchorCertificates = stringSliceToList(got.AnchorCertificates)
 
@@ -118,7 +125,7 @@ func assignGetToResource(_ context.Context, plan *ComputerPrestageEnrollmentReso
 		plan.PurchasingInformation = nil
 	}
 	if manageAccountSettings {
-		plan.AccountSettings = flattenAccountSettings(got.AccountSettings, state.AccountSettings)
+		plan.AccountSettings = flattenAccountSettings(got.AccountSettings, plan.AccountSettings)
 	} else {
 		plan.AccountSettings = nil
 	}
@@ -179,24 +186,38 @@ func flattenAccountSettings(got *pro.AccountSettingsResponse, prior *AccountSett
 	if got == nil {
 		return nil
 	}
-	out := &AccountSettingsModel{
-		PayloadConfigured:                       types.BoolValue(got.PayloadConfigured),
-		LocalAdminAccountEnabled:                types.BoolValue(got.LocalAdminAccountEnabled),
-		AdminUsername:                           types.StringValue(got.AdminUsername),
-		HiddenAdminAccount:                      types.BoolValue(got.HiddenAdminAccount),
-		LocalUserManaged:                        types.BoolValue(got.LocalUserManaged),
-		UserAccountType:                         types.StringValue(got.UserAccountType),
-		PrefillPrimaryAccountInfoFeatureEnabled: types.BoolValue(got.PrefillPrimaryAccountInfoFeatureEnabled),
-		PrefillType:                             types.StringValue(got.PrefillType),
-		PrefillAccountFullName:                  types.StringValue(got.PrefillAccountFullName),
-		PrefillAccountUserName:                  types.StringValue(got.PrefillAccountUserName),
-		PreventPrefillInfoFromModification:      types.BoolValue(got.PreventPrefillInfoFromModification),
-		AdminPassword:                           types.StringNull(),
-		AdminPasswordWoVersion:                  types.Int64Null(),
-	}
+	var priorModel AccountSettingsModel
 	if prior != nil {
-		out.AdminPasswordWoVersion = roundTripInt64(prior.AdminPasswordWoVersion)
+		priorModel = *prior
+	} else {
+		priorModel = AccountSettingsModel{
+			PayloadConfigured:                  types.BoolNull(),
+			LocalAdminAccountEnabled:           types.BoolNull(),
+			HiddenAdminAccount:                 types.BoolNull(),
+			LocalUserManaged:                   types.BoolNull(),
+			PreventPrefillInfoFromModification: types.BoolNull(),
+		}
 	}
+	out := &AccountSettingsModel{
+		PayloadConfigured:                              priorModel.PayloadConfigured,
+		CreateManagedLocalAdministratorAccount:         types.BoolValue(got.LocalAdminAccountEnabled),
+		LocalAdminAccountEnabled:                       prestagealias.CarryBool(priorModel.LocalAdminAccountEnabled, got.LocalAdminAccountEnabled, false),
+		AdminUsername:                                  types.StringValue(got.AdminUsername),
+		HideManagedLocalAdministratorAccount:           types.BoolValue(got.HiddenAdminAccount),
+		HiddenAdminAccount:                             prestagealias.CarryBool(priorModel.HiddenAdminAccount, got.HiddenAdminAccount, false),
+		MakeManagedLocalAdministratorAccountMdmEnabled: types.BoolValue(got.LocalUserManaged),
+		LocalUserManaged:                               prestagealias.CarryBool(priorModel.LocalUserManaged, got.LocalUserManaged, false),
+		UserAccountType:                                types.StringValue(got.UserAccountType),
+		PrefillPrimaryAccountInfoFeatureEnabled:        types.BoolValue(got.PrefillPrimaryAccountInfoFeatureEnabled),
+		PrefillType:                                    types.StringValue(got.PrefillType),
+		PrefillAccountFullName:                         types.StringValue(got.PrefillAccountFullName),
+		PrefillAccountUserName:                         types.StringValue(got.PrefillAccountUserName),
+		LockPrimaryAccountInformation:                  types.BoolValue(got.PreventPrefillInfoFromModification),
+		PreventPrefillInfoFromModification:             prestagealias.CarryBool(priorModel.PreventPrefillInfoFromModification, got.PreventPrefillInfoFromModification, false),
+		AdminPassword:                                  types.StringNull(),
+		AdminPasswordWoVersion:                         types.Int64Null(),
+	}
+	out.AdminPasswordWoVersion = roundTripInt64(priorModel.AdminPasswordWoVersion)
 	return out
 }
 
@@ -280,21 +301,27 @@ func diffPlanAgainstGet(ctx context.Context, plan ComputerPrestageEnrollmentReso
 	}
 
 	checkStr("display_name", plan.DisplayName, got.DisplayName)
+	checkBool("make_mdm_profile_mandatory", plan.MakeMdmProfileMandatory, got.Mandatory)
 	checkBool("mandatory", plan.Mandatory, got.Mandatory)
+	checkBool("allow_mdm_profile_removal", plan.AllowMdmProfileRemoval, got.MDMRemovable)
 	checkBool("mdm_removable", plan.MdmRemovable, got.MDMRemovable)
 	checkBool("default_prestage", plan.DefaultPrestage, got.DefaultPrestage)
 	checkStr("support_phone_number", plan.SupportPhoneNumber, got.SupportPhoneNumber)
 	checkStr("support_email_address", plan.SupportEmailAddress, got.SupportEmailAddress)
 	checkStr("department", plan.Department, got.Department)
 	checkBool("require_authentication", plan.RequireAuthentication, got.RequireAuthentication)
+	checkStr("authentication_message", plan.AuthenticationMessage, got.AuthenticationPrompt)
 	checkStr("authentication_prompt", plan.AuthenticationPrompt, got.AuthenticationPrompt)
 	checkStr("device_enrollment_program_instance_id", plan.DeviceEnrollmentProgramInstanceID, got.DeviceEnrollmentProgramInstanceID)
 	checkStr("enrollment_site_id", plan.EnrollmentSiteID, got.EnrollmentSiteID)
+	checkBool("use_existing_location_information", plan.UseExistingLocationInformation, got.KeepExistingLocationInformation)
 	checkBool("keep_existing_location_information", plan.KeepExistingLocationInformation, got.KeepExistingLocationInformation)
+	checkBool("use_existing_site_membership", plan.UseExistingSiteMembership, got.KeepExistingSiteMembership)
 	checkBool("keep_existing_site_membership", plan.KeepExistingSiteMembership, got.KeepExistingSiteMembership)
 	checkStr("enrollment_customization_id", plan.EnrollmentCustomizationID, got.EnrollmentCustomizationID)
 	checkStr("language", plan.Language, got.Language)
 	checkStr("region", plan.Region, got.Region)
+	checkBool("automatically_advance_through_setup_assistant", plan.AutomaticallyAdvanceThroughSetupAssistant, got.AutoAdvanceSetup)
 	checkBool("auto_advance_setup", plan.AutoAdvanceSetup, got.AutoAdvanceSetup)
 	checkBool("install_profiles_during_setup", plan.InstallProfilesDuringSetup, got.InstallProfilesDuringSetup)
 	checkStr("custom_package_distribution_point_id", plan.CustomPackageDistributionPointID, got.CustomPackageDistributionPointID)
@@ -319,9 +346,14 @@ func diffPlanAgainstGet(ctx context.Context, plan ComputerPrestageEnrollmentReso
 			mismatched = append(mismatched, "custom_package_ids")
 		}
 	}
-	if planSet, d := stringSetToSlice(ctx, plan.PrestageInstalledProfileIds); !d.HasError() && planSet != nil {
-		if !equalStringSetsUnordered(planSet, got.PrestageInstalledProfileIds) {
-			mismatched = append(mismatched, "prestage_installed_profile_ids")
+	for name, set := range map[string]types.Set{
+		"configuration_profile_ids":      plan.ConfigurationProfileIds,
+		"prestage_installed_profile_ids": plan.PrestageInstalledProfileIds,
+	} {
+		if planSet, d := stringSetToSlice(ctx, set); !d.HasError() && planSet != nil {
+			if !equalStringSetsUnordered(planSet, got.PrestageInstalledProfileIds) {
+				mismatched = append(mismatched, name)
+			}
 		}
 	}
 
@@ -418,16 +450,20 @@ func diffAccountSettings(plan *AccountSettingsModel, got *pro.AccountSettingsRes
 		}
 	}
 	checkBool("payload_configured", plan.PayloadConfigured, got.PayloadConfigured)
+	checkBool("create_managed_local_administrator_account", plan.CreateManagedLocalAdministratorAccount, got.LocalAdminAccountEnabled)
 	checkBool("local_admin_account_enabled", plan.LocalAdminAccountEnabled, got.LocalAdminAccountEnabled)
 	checkStr("admin_username", plan.AdminUsername, got.AdminUsername)
 	// admin_password is WriteOnly — never echoed; skip.
+	checkBool("hide_managed_local_administrator_account", plan.HideManagedLocalAdministratorAccount, got.HiddenAdminAccount)
 	checkBool("hidden_admin_account", plan.HiddenAdminAccount, got.HiddenAdminAccount)
+	checkBool("make_managed_local_administrator_account_mdm_enabled", plan.MakeManagedLocalAdministratorAccountMdmEnabled, got.LocalUserManaged)
 	checkBool("local_user_managed", plan.LocalUserManaged, got.LocalUserManaged)
 	checkStr("user_account_type", plan.UserAccountType, got.UserAccountType)
 	checkBool("prefill_primary_account_info_feature_enabled", plan.PrefillPrimaryAccountInfoFeatureEnabled, got.PrefillPrimaryAccountInfoFeatureEnabled)
 	checkStr("prefill_type", plan.PrefillType, got.PrefillType)
 	checkStr("prefill_account_full_name", plan.PrefillAccountFullName, got.PrefillAccountFullName)
 	checkStr("prefill_account_user_name", plan.PrefillAccountUserName, got.PrefillAccountUserName)
+	checkBool("lock_primary_account_information", plan.LockPrimaryAccountInformation, got.PreventPrefillInfoFromModification)
 	checkBool("prevent_prefill_info_from_modification", plan.PreventPrefillInfoFromModification, got.PreventPrefillInfoFromModification)
 }
 

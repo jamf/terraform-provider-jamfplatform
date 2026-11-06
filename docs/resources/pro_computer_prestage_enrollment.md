@@ -32,17 +32,16 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 # Minimal Computer PreStage Enrollment. `device_enrollment_program_instance_id`
 # must be the ID of an ADE instance already provisioned in Jamf Pro.
 resource "jamfplatform_pro_computer_prestage_enrollment" "example" {
-  display_name                          = "Standard macOS PreStage"
-  mandatory                             = true
-  mdm_removable                         = true
-  require_authentication                = false
-  device_enrollment_program_instance_id = "1"
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
-  prevent_activation_lock               = false
-  enable_device_based_activation_lock   = false
+  display_name                                  = "Standard macOS PreStage"
+  make_mdm_profile_mandatory                    = true
+  allow_mdm_profile_removal                     = true
+  require_authentication                        = false
+  device_enrollment_program_instance_id         = "1"
+  use_existing_location_information             = false
+  use_existing_site_membership                  = false
+  automatically_advance_through_setup_assistant = false
+  prevent_activation_lock                       = false
+  enable_device_based_activation_lock           = false
 
   skip_setup_items = {
     filevault                = true
@@ -54,8 +53,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "example" {
   location_information   = {}
   purchasing_information = {}
   account_settings = {
-    payload_configured                           = true
-    local_admin_account_enabled                  = true
+    create_managed_local_administrator_account   = true
     admin_username                               = "ladmin"
     admin_password                               = "ChangeMeNow!"
     admin_password_wo_version                    = 1
@@ -73,15 +71,9 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "example" {
 
 ### Required
 
-- `auto_advance_setup` (Boolean) **"Auto Advance Setup"** in the Jamf Pro admin UI.
 - `device_enrollment_program_instance_id` (String) ID of the Automated Device Enrollment (ADE) instance that backs this PreStage. Required.
 - `display_name` (String) **"Display Name"** in the Jamf Pro admin UI. Must not be blank.
-- `enable_device_based_activation_lock` (Boolean) **"Enable Device-Based Activation Lock"** in the Jamf Pro admin UI.
-- `install_profiles_during_setup` (Boolean) When `true`, Jamf Pro installs the configuration profiles listed in `prestage_installed_profile_ids` during Setup Assistant.
-- `keep_existing_location_information` (Boolean) **"Keep Existing Location Information"** in the Jamf Pro admin UI.
-- `keep_existing_site_membership` (Boolean) **"Keep Existing Site Membership"** in the Jamf Pro admin UI.
-- `mandatory` (Boolean) **"Make MDM Profile Mandatory"** in the Jamf Pro admin UI.
-- `mdm_removable` (Boolean) **"Allow MDM Profile Removal"** in the Jamf Pro admin UI.
+- `enable_device_based_activation_lock` (Boolean) **"Enable Activation Lock on the device (Apple School Manager, Apple Business Manager)"** in the Jamf Pro admin UI.
 - `prevent_activation_lock` (Boolean) **"Prevent user from enabling Activation Lock"** in the Jamf Pro admin UI.
 - `require_authentication` (Boolean) **"Require Authentication"** in the Jamf Pro admin UI. When `true`, users must authenticate before completing Setup Assistant.
 
@@ -89,24 +81,51 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "example" {
 
 > **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
 
-- `account_settings` (Attributes) **"Account Settings"** in the Jamf Pro admin UI. Supply the block to manage this section, even empty as `account_settings = {}`. Omitting it produces drift on the next refresh, because Jamf Pro always returns a populated block. When any non-default field is set, `payload_configured` must be `true`; Jamf Pro rejects mixed states. (see [below for nested schema](#nestedatt--account_settings))
+- `account_settings` (Attributes) **"Account Settings"** in the Jamf Pro admin UI. Supply the block to manage this section, even empty as `account_settings = {}`. Omitting it produces drift on the next refresh, because Jamf Pro always returns a populated block. (see [below for nested schema](#nestedatt--account_settings))
+- `allow_mdm_profile_removal` (Boolean) **"Allow MDM Profile Removal"** in the Jamf Pro admin UI. Allow the user to remove the MDM profile. Replaces `mdm_removable`; set one or the other.
 - `anchor_certificates` (List of String) Ordered list of base64-encoded PEM certificates to embed in the PreStage. Each entry must be a valid X.509 certificate in PEM format. Jamf Pro rejects malformed entries by silently discarding the whole change; the provider catches that and surfaces a hard error.
-- `authentication_prompt` (String) **"Authentication Prompt"** message shown when `require_authentication = true`.
+- `authentication_message` (String) **"Authentication Message"** shown to the user when `require_authentication = true`. Replaces `authentication_prompt`; set one or the other.
+- `authentication_prompt` (String, Deprecated) ~> Deprecated: use `authentication_message` instead. The provider will not remove `authentication_prompt` before 2027-02-03.
+
+**"Authentication Message"** shown to the user when `require_authentication = true`.
+- `auto_advance_setup` (Boolean, Deprecated) ~> Deprecated: use `automatically_advance_through_setup_assistant` instead. The provider will not remove `auto_advance_setup` before 2027-02-03.
+
+**"Automatically advance through Setup Assistant (macOS 11 or later only)"** in the Jamf Pro admin UI.
+- `automatically_advance_through_setup_assistant` (Boolean) **"Automatically advance through Setup Assistant (macOS 11 or later only)"** in the Jamf Pro admin UI. Automatically skips every Setup Assistant screen that can be skipped during enrollment. Replaces `auto_advance_setup`; set one or the other.
+- `configuration_profile_ids` (Set of String) **"Configuration Profiles"** pane of the Jamf Pro admin UI: the IDs of the configuration profiles to install during Setup Assistant. Replaces `prestage_installed_profile_ids`; set one or the other. Leave it empty to install none.
 - `custom_package_distribution_point_id` (String) Distribution point ID used to serve `custom_package_ids`. Sentinels: `"-1"` = none, `"-2"` = cloud distribution point, positive integer = specific DP ID.
 - `custom_package_ids` (Set of String) Set of custom package IDs to install during Setup Assistant. Paired with `custom_package_distribution_point_id`.
 - `default_prestage` (Boolean) When true, this PreStage becomes the tenant default. Jamf Pro enforces at most one default PreStage; setting this to `true` may cause another PreStage to be silently demoted.
 - `department` (String) **"Department"** label shown during Setup Assistant. Free-form text, *not* the department ID (`location_information.department_id`).
-- `enable_recovery_lock` (Boolean) **"Enable Recovery Lock"** in the Jamf Pro admin UI.
+- `enable_recovery_lock` (Boolean) **"Set Recovery Lock Password"** in the Jamf Pro admin UI. Turns Recovery Lock on; `recovery_lock_password_type` chooses how the password is provisioned.
 - `enrollment_customization_id` (String) Enrollment customization ID to apply during Setup Assistant. Sentinel `"0"` = no customization; it is `"0"`, not `"-1"`.
 - `enrollment_site_id` (String) Site ID applied to devices enrolled through this PreStage. Sentinel `"-1"` = no site.
+- `install_profiles_during_setup` (Boolean, Deprecated) ~> Deprecated: the provider now derives this from `configuration_profile_ids`, so remove it. The provider will not remove `install_profiles_during_setup` before 2027-02-03.
+
+The provider sends `true` whenever `configuration_profile_ids` holds a profile. Setting `false` alongside profiles is a configuration error.
+- `keep_existing_location_information` (Boolean, Deprecated) ~> Deprecated: use `use_existing_location_information` instead. The provider will not remove `keep_existing_location_information` before 2027-02-03.
+
+**"Use existing location information, if applicable"** in the Jamf Pro admin UI.
+- `keep_existing_site_membership` (Boolean, Deprecated) ~> Deprecated: use `use_existing_site_membership` instead. The provider will not remove `keep_existing_site_membership` before 2027-02-03.
+
+**"Use existing site membership, if applicable"** in the Jamf Pro admin UI.
 - `language` (String) Default Setup Assistant language (ISO-639 code, e.g. `"en"`).
 - `location_information` (Attributes) **"User and Location Information"** in the Jamf Pro admin UI. Supply the block to manage this section, even empty as `location_information = {}`. Omitting it produces drift on the next refresh, because Jamf Pro always returns a populated block. (see [below for nested schema](#nestedatt--location_information))
-- `minimum_os_specific_version` (String) Specific minimum macOS version (e.g. `"14.5"`). Used only when `prestage_minimum_os_target_version_type = "MINIMUM_OS_SPECIFIC_VERSION"`.
+- `make_mdm_profile_mandatory` (Boolean) **"Make MDM Profile Mandatory"** in the Jamf Pro admin UI. Require the user to apply the MDM profile. Replaces `mandatory`; set one or the other.
+- `mandatory` (Boolean, Deprecated) ~> Deprecated: use `make_mdm_profile_mandatory` instead. The provider will not remove `mandatory` before 2027-02-03.
+
+**"Make MDM Profile Mandatory"** in the Jamf Pro admin UI.
+- `mdm_removable` (Boolean, Deprecated) ~> Deprecated: use `allow_mdm_profile_removal` instead. The provider will not remove `mdm_removable` before 2027-02-03.
+
+**"Allow MDM Profile Removal"** in the Jamf Pro admin UI.
+- `minimum_os_specific_version` (String) **"Minimum required macOS version"** in the Jamf Pro admin UI: the specific version (e.g. `"14.5"`). Used only when `prestage_minimum_os_target_version_type = "MINIMUM_OS_SPECIFIC_VERSION"`.
 - `platform_sso_app_bundle_id` (String) Bundle identifier of the unattended Platform SSO application, for example `"com.okta.mobile"`. Mutually exclusive with `psso_config_profile_id`, which configures attended Platform SSO.
-- `prestage_installed_profile_ids` (Set of String) Set of configuration profile IDs to install during Setup Assistant when `install_profiles_during_setup = true`.
-- `prestage_minimum_os_target_version_type` (String) Minimum-OS enforcement mode. One of `NO_ENFORCEMENT`, `MINIMUM_OS_LATEST_VERSION`, `MINIMUM_OS_LATEST_MAJOR_VERSION`, `MINIMUM_OS_LATEST_MINOR_VERSION`, `MINIMUM_OS_SPECIFIC_VERSION`. Pair `MINIMUM_OS_SPECIFIC_VERSION` with `minimum_os_specific_version`.
+- `prestage_installed_profile_ids` (Set of String, Deprecated) ~> Deprecated: use `configuration_profile_ids` instead. The provider will not remove `prestage_installed_profile_ids` before 2027-02-03.
+
+**"Configuration Profiles"** pane of the Jamf Pro admin UI: the IDs of the configuration profiles to install during Setup Assistant.
+- `prestage_minimum_os_target_version_type` (String) **"Minimum required macOS version"** in the Jamf Pro admin UI: the enforcement mode. One of `NO_ENFORCEMENT`, `MINIMUM_OS_LATEST_VERSION`, `MINIMUM_OS_LATEST_MAJOR_VERSION`, `MINIMUM_OS_LATEST_MINOR_VERSION`, `MINIMUM_OS_SPECIFIC_VERSION`. Pair `MINIMUM_OS_SPECIFIC_VERSION` with `minimum_os_specific_version`.
 - `psso_config_profile_id` (String) Configuration profile ID for attended Platform SSO. Mutually exclusive with `platform_sso_app_bundle_id`, which configures unattended Platform SSO. Incompatible with an enrollment customization, so `enrollment_customization_id` must be `"0"`. Sentinel `"-1"` means none.
-- `psso_enabled` (Boolean) Whether Platform SSO is enabled for this PreStage.
+- `psso_enabled` (Boolean) **"Enable Simplified Setup for Platform Single Sign-on (macOS 26 or later)"** in the Jamf Pro admin UI. Whether Platform SSO is enabled for this PreStage.
 - `purchasing_information` (Attributes) **"Purchasing Information"** in the Jamf Pro admin UI. Supply the block to manage this section, even empty as `purchasing_information = {}`. Omitting it produces drift on the next refresh, because Jamf Pro always returns a populated block. (see [below for nested schema](#nestedatt--purchasing_information))
 - `recovery_lock_password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Recovery Lock plaintext password. Only meaningful when `recovery_lock_password_type = "MANUAL"` AND `enable_recovery_lock = true`. WriteOnly: the value is sent to Jamf Pro but never persisted in Terraform state. Bump `recovery_lock_password_wo_version` to force the provider to re-send the current value.
 - `recovery_lock_password_type` (String) How the Recovery Lock password is provisioned. `"MANUAL"` = supply `recovery_lock_password`; `"RANDOM"` = Jamf Pro generates per-device passwords.
@@ -118,6 +137,8 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "example" {
 - `support_email_address` (String) **"Support Email Address"** in the Jamf Pro admin UI.
 - `support_phone_number` (String) **"Support Phone Number"** in the Jamf Pro admin UI.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+- `use_existing_location_information` (Boolean) **"Use existing location information, if applicable"** in the Jamf Pro admin UI. Replaces `keep_existing_location_information`; set one or the other.
+- `use_existing_site_membership` (Boolean) **"Use existing site membership, if applicable"** in the Jamf Pro admin UI. Replaces `keep_existing_site_membership`; set one or the other.
 
 ### Read-Only
 
@@ -132,19 +153,33 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "example" {
 
 Optional:
 
-- `admin_password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Plaintext password for the local admin account. WriteOnly: the value is sent to Jamf Pro but never persisted in Terraform state. Bump `admin_password_wo_version` to force the provider to re-send the current value.
+- `admin_password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) **"Password"** for the managed local administrator account. WriteOnly: the value is sent to Jamf Pro but never persisted in Terraform state. Bump `admin_password_wo_version` to force the provider to re-send the current value.
 - `admin_password_wo_version` (Number) Rotation trigger for the WriteOnly `admin_password`. Bump to force the provider to re-send the current password value.
-- `admin_username` (String) **"Username"** for the local admin account.
-- `hidden_admin_account` (Boolean) **"Hide Local Admin Account"** in the Jamf Pro admin UI.
-- `local_admin_account_enabled` (Boolean) **"Create Local Administrator Account"** in the Jamf Pro admin UI.
-- `local_user_managed` (Boolean) **"User Managed by Jamf Pro"** in the Jamf Pro admin UI.
-- `payload_configured` (Boolean) **"Configure Account Settings"** toggle. Must be `true` when any other account-settings field is non-default.
+- `admin_username` (String) **"Username"** for the managed local administrator account.
+- `create_managed_local_administrator_account` (Boolean) **"Create a managed local administrator account during macOS Setup Assistant"** in the Jamf Pro admin UI. Replaces `local_admin_account_enabled`; set one or the other.
+- `hidden_admin_account` (Boolean, Deprecated) ~> Deprecated: use `hide_managed_local_administrator_account` instead. The provider will not remove `hidden_admin_account` before 2027-02-03.
+
+**"Hide managed local administrator account in Users & Groups"** in the Jamf Pro admin UI.
+- `hide_managed_local_administrator_account` (Boolean) **"Hide managed local administrator account in Users & Groups"** in the Jamf Pro admin UI. Replaces `hidden_admin_account`; set one or the other.
+- `local_admin_account_enabled` (Boolean, Deprecated) ~> Deprecated: use `create_managed_local_administrator_account` instead. The provider will not remove `local_admin_account_enabled` before 2027-02-03.
+
+**"Create a managed local administrator account during macOS Setup Assistant"** in the Jamf Pro admin UI.
+- `local_user_managed` (Boolean, Deprecated) ~> Deprecated: use `make_managed_local_administrator_account_mdm_enabled` instead. The provider will not remove `local_user_managed` before 2027-02-03.
+
+**"Make the managed local administrator account MDM-enabled"** in the Jamf Pro admin UI.
+- `lock_primary_account_information` (Boolean) **"Lock primary account information"** in the Jamf Pro admin UI: prevent the user changing the prefilled values during Setup Assistant. Replaces `prevent_prefill_info_from_modification`; set one or the other.
+- `make_managed_local_administrator_account_mdm_enabled` (Boolean) **"Make the managed local administrator account MDM-enabled"** in the Jamf Pro admin UI. Replaces `local_user_managed`; set one or the other.
+- `payload_configured` (Boolean, Deprecated) ~> Deprecated: the provider now derives this from the other `account_settings` attributes, so remove it. The provider will not remove `payload_configured` before 2027-02-03.
+
+The provider sends `true` whenever the block sets any other account setting.
 - `prefill_account_full_name` (String) **"Account Full Name"** prefill value.
 - `prefill_account_user_name` (String) **"Account User Name"** prefill value.
-- `prefill_primary_account_info_feature_enabled` (Boolean) **"Prefill Primary Account Info"** in the Jamf Pro admin UI.
-- `prefill_type` (String) How prefill values are populated. One of [CUSTOM DEVICE_OWNER]. `"CUSTOM"` requires `prefill_account_full_name` and `prefill_account_user_name`; `"DEVICE_OWNER"` populates from the assigning user.
-- `prevent_prefill_info_from_modification` (Boolean) **"Prevent Modification"** of prefilled info during Setup Assistant.
-- `user_account_type` (String) Account type for the primary user. One of [ADMINISTRATOR STANDARD SKIP]. Default `"STANDARD"`.
+- `prefill_primary_account_info_feature_enabled` (Boolean) **"Pre-fill primary account information"** in the Jamf Pro admin UI.
+- `prefill_type` (String) **"Information Type"** in the Jamf Pro admin UI: how prefill values are populated. One of [CUSTOM DEVICE_OWNER]. `"CUSTOM"` requires `prefill_account_full_name` and `prefill_account_user_name`; `"DEVICE_OWNER"` populates from the assigning user.
+- `prevent_prefill_info_from_modification` (Boolean, Deprecated) ~> Deprecated: use `lock_primary_account_information` instead. The provider will not remove `prevent_prefill_info_from_modification` before 2027-02-03.
+
+**"Lock primary account information"** in the Jamf Pro admin UI.
+- `user_account_type` (String) **"Local User Account Type"** in the Jamf Pro admin UI: the type of account the user creates during enrollment. One of [ADMINISTRATOR STANDARD SKIP]. Default `"STANDARD"`.
 
 
 <a id="nestedatt--location_information"></a>

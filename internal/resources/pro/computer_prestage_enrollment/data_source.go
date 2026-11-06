@@ -69,14 +69,17 @@ func (d *ComputerPrestageEnrollmentDataSource) Schema(ctx context.Context, req d
 				MarkdownDescription: "Display name returned by Jamf Pro.",
 				Computed:            true,
 			},
-			"mandatory":                               schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether MDM enrolment is mandatory."},
-			"mdm_removable":                           schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether the user can remove the MDM profile."},
+			"make_mdm_profile_mandatory":              schema.BoolAttribute{Computed: true, MarkdownDescription: "**\"Make MDM Profile Mandatory\"** in the Jamf Pro admin UI."},
+			"mandatory":                               schema.BoolAttribute{Computed: true, MarkdownDescription: "~> " + deprecationMandatory + "\n\n**\"Make MDM Profile Mandatory\"** in the Jamf Pro admin UI.", DeprecationMessage: deprecationMandatory},
+			"allow_mdm_profile_removal":               schema.BoolAttribute{Computed: true, MarkdownDescription: "**\"Allow MDM Profile Removal\"** in the Jamf Pro admin UI."},
+			"mdm_removable":                           schema.BoolAttribute{Computed: true, MarkdownDescription: "~> " + deprecationMdmRemovable + "\n\n**\"Allow MDM Profile Removal\"** in the Jamf Pro admin UI.", DeprecationMessage: deprecationMdmRemovable},
 			"default_prestage":                        schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether this is the tenant default PreStage."},
 			"support_phone_number":                    schema.StringAttribute{Computed: true, MarkdownDescription: "Support phone number shown during Setup Assistant."},
 			"support_email_address":                   schema.StringAttribute{Computed: true, MarkdownDescription: "Support email address shown during Setup Assistant."},
 			"department":                              schema.StringAttribute{Computed: true, MarkdownDescription: "Department label shown during Setup Assistant."},
 			"require_authentication":                  schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether users must authenticate during Setup Assistant."},
-			"authentication_prompt":                   schema.StringAttribute{Computed: true, MarkdownDescription: "Prompt shown when authentication is required."},
+			"authentication_message":                  schema.StringAttribute{Computed: true, MarkdownDescription: "**\"Authentication Message\"** shown when authentication is required."},
+			"authentication_prompt":                   schema.StringAttribute{Computed: true, MarkdownDescription: "~> " + deprecationAuthenticationPrompt + "\n\n**\"Authentication Message\"** shown when authentication is required.", DeprecationMessage: deprecationAuthenticationPrompt},
 			"device_enrollment_program_instance_id":   schema.StringAttribute{Computed: true, MarkdownDescription: "ADE instance ID backing this PreStage."},
 			"site_id":                                 schema.StringAttribute{Computed: true, MarkdownDescription: "Site ID, or `\"-1\"` when no site is set."},
 			"enrollment_site_id":                      schema.StringAttribute{Computed: true, MarkdownDescription: "Site ID applied to enrolled devices, or `\"-1\"` when no site."},
@@ -156,13 +159,16 @@ func (d *ComputerPrestageEnrollmentDataSource) Read(ctx context.Context, req dat
 	data.ID = types.StringValue(got.ID)
 	data.Name = types.StringValue(got.DisplayName)
 	data.DisplayName = types.StringValue(got.DisplayName)
+	data.MakeMdmProfileMandatory = types.BoolValue(got.Mandatory)
 	data.Mandatory = types.BoolValue(got.Mandatory)
+	data.AllowMdmProfileRemoval = types.BoolValue(got.MDMRemovable)
 	data.MdmRemovable = types.BoolValue(got.MDMRemovable)
 	data.DefaultPrestage = types.BoolValue(got.DefaultPrestage)
 	data.SupportPhoneNumber = types.StringValue(got.SupportPhoneNumber)
 	data.SupportEmailAddress = types.StringValue(got.SupportEmailAddress)
 	data.Department = types.StringValue(got.Department)
 	data.RequireAuthentication = types.BoolValue(got.RequireAuthentication)
+	data.AuthenticationMessage = types.StringValue(got.AuthenticationPrompt)
 	data.AuthenticationPrompt = types.StringValue(got.AuthenticationPrompt)
 	data.DeviceEnrollmentProgramInstanceID = types.StringValue(got.DeviceEnrollmentProgramInstanceID)
 	data.SiteID = types.StringValue(got.SiteID)

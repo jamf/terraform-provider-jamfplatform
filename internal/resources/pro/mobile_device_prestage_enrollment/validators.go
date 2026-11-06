@@ -6,8 +6,10 @@ package mobile_device_prestage_enrollment
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -107,31 +109,57 @@ func (storageQuotaConflictsWithTemporarySessionValidator) ValidateBool(ctx conte
 	)
 }
 
-// multiUserRequiresPreventActivationLock fires when multi_user (Enable Shared
-// iPad) is true but prevent_activation_lock is not also true. Jamf Pro enforces
-// this as a hard prerequisite — the server rejects the write with
-// `400 PREREQUISITE_NOT_MET: "Prevent activation lock needs to be enabled in
-// order to enable Shared iPad"` — so this surfaces it at plan time. The rule is
-// value-specific (fires only when multi_user is true), so a custom validator is
-// required per STYLE_GUIDE §Cross-field validation; off-the-shelf
-// `boolvalidator.AlsoRequires` would fire when multi_user is false too. Attached
-// to multi_user so it fires once; the error attaches to prevent_activation_lock
-// (the field the user must set). Mirrors storageQuotaConflictsWithTemporarySession.
-func multiUserRequiresPreventActivationLock() validator.Bool {
-	return multiUserRequiresPreventActivationLockValidator{}
+// attributeName is the attribute a validator request is attached to.
+func attributeName(p path.Path) string {
+	steps := p.Steps()
+	if len(steps) == 0 {
+		return p.String()
+	}
+	return steps[len(steps)-1].String()
 }
 
-type multiUserRequiresPreventActivationLockValidator struct{}
-
-func (multiUserRequiresPreventActivationLockValidator) Description(_ context.Context) string {
-	return "multi_user (Enable Shared iPad) requires prevent_activation_lock to be true."
+// readBoolPair reads the replacement and the deprecated spelling of one boolean from the
+// configuration and folds them into one value: null when neither is set, unknown when either
+// is unknown, and otherwise the replacement or the deprecated attribute (negated for an inverted
+// pair). Cross-field validators use it so a configuration that still uses the old name is held
+// to the same rule.
+func readBoolPair(ctx context.Context, cfg tfsdk.Config, newName, oldName string, invert bool) (types.Bool, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var replacement, deprecated types.Bool
+	diags.Append(cfg.GetAttribute(ctx, path.Root(newName), &replacement)...)
+	diags.Append(cfg.GetAttribute(ctx, path.Root(oldName), &deprecated)...)
+	if diags.HasError() {
+		return types.BoolNull(), diags
+	}
+	if replacement.IsUnknown() || deprecated.IsUnknown() {
+		return types.BoolUnknown(), diags
+	}
+	return pickBool(replacement, deprecated, invert), diags
 }
 
-func (v multiUserRequiresPreventActivationLockValidator) MarkdownDescription(ctx context.Context) string {
+// sharedIPadRequiresPreventActivationLock fires when Enable Shared iPad is true but
+// prevent_activation_lock is not also true. Jamf Pro enforces this as a hard prerequisite: the
+// server rejects the write with `400 PREREQUISITE_NOT_MET: "Prevent activation lock needs to be
+// enabled in order to enable Shared iPad"`, so this surfaces it at plan time. The rule is
+// value-specific (it fires only when Shared iPad is true), so a custom validator is required per
+// STYLE_GUIDE §Cross-field validation; off-the-shelf `boolvalidator.AlsoRequires` would fire when
+// it is false too. It attaches to enable_shared_ipad and its deprecated alias multi_user, and the
+// error points at prevent_activation_lock, the field the user must set.
+func sharedIPadRequiresPreventActivationLock() validator.Bool {
+	return sharedIPadRequiresPreventActivationLockValidator{}
+}
+
+type sharedIPadRequiresPreventActivationLockValidator struct{}
+
+func (sharedIPadRequiresPreventActivationLockValidator) Description(_ context.Context) string {
+	return "enable_shared_ipad requires prevent_activation_lock to be true."
+}
+
+func (v sharedIPadRequiresPreventActivationLockValidator) MarkdownDescription(ctx context.Context) string {
 	return v.Description(ctx)
 }
 
-func (multiUserRequiresPreventActivationLockValidator) ValidateBool(ctx context.Context, req validator.BoolRequest, resp *validator.BoolResponse) {
+func (sharedIPadRequiresPreventActivationLockValidator) ValidateBool(ctx context.Context, req validator.BoolRequest, resp *validator.BoolResponse) {
 	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() || !req.ConfigValue.ValueBool() {
 		return
 	}
@@ -142,69 +170,100 @@ func (multiUserRequiresPreventActivationLockValidator) ValidateBool(ctx context.
 		resp.Diagnostics.Append(d...)
 		return
 	}
-	// Defer on unknown (STYLE_GUIDE §Config-time validators MUST defer on
-	// unknown): the companion may come from a variable/for_each.
 	if pal.IsUnknown() {
 		return
 	}
 	if !pal.IsNull() && pal.ValueBool() {
-		return // prerequisite satisfied
+		return
 	}
 	resp.Diagnostics.AddAttributeError(
 		companion,
 		"prevent_activation_lock required for Shared iPad",
-		"multi_user = true (Enable Shared iPad) requires prevent_activation_lock = true; Jamf Pro rejects the configuration otherwise.",
+		attributeName(req.Path)+" = true (Enable Shared iPad) requires prevent_activation_lock = true; Jamf Pro rejects the configuration otherwise.",
 	)
 }
 
-// multiUserRequiresSupervised fires when multi_user (Enable Shared iPad) is
-// true but supervised is not also true. Unlike prevent_activation_lock (which
-// Jamf Pro rejects with a hard 400), the server SILENTLY coerces multi_user
-// back to false when the device isn't supervised — which surfaces in Terraform
-// as a "provider produced inconsistent result after apply" crash (planned
-// multi_user=true, server-echoed false). This validator turns that opaque crash
-// into a clear plan-time error. Wire-confirmed: every stored multiUser=true
-// record in local-testing probes (get-id3-shared, post-quota-request) had
-// supervised=true. Apple requires Shared iPad devices to be supervised, so
-// there is no valid multi_user=true + supervised=false config to false-reject.
-// Value-specific per STYLE_GUIDE §Cross-field validation; attached to
-// multi_user, error attaches to supervised. Mirrors
-// multiUserRequiresPreventActivationLock.
-func multiUserRequiresSupervised() validator.Bool {
-	return multiUserRequiresSupervisedValidator{}
+// sharedIPadRequiresSupervision fires when Enable Shared iPad is true but the supervision
+// setting is not also true. Unlike prevent_activation_lock, which Jamf Pro rejects with a hard
+// 400, the server silently coerces Shared iPad back to false on a device that is not supervised,
+// which Terraform reports as "provider produced inconsistent result after apply". This turns that
+// into a plan-time error. Apple requires Shared iPad devices to be supervised, so no valid
+// configuration is rejected. It reads supervise_devices_with_ios_12_or_earlier and its deprecated
+// alias supervised, and the error points at the replacement.
+func sharedIPadRequiresSupervision() validator.Bool {
+	return sharedIPadRequiresSupervisionValidator{}
 }
 
-type multiUserRequiresSupervisedValidator struct{}
+type sharedIPadRequiresSupervisionValidator struct{}
 
-func (multiUserRequiresSupervisedValidator) Description(_ context.Context) string {
-	return "multi_user (Enable Shared iPad) requires supervised to be true."
+func (sharedIPadRequiresSupervisionValidator) Description(_ context.Context) string {
+	return "enable_shared_ipad requires supervise_devices_with_ios_12_or_earlier to be true."
 }
 
-func (v multiUserRequiresSupervisedValidator) MarkdownDescription(ctx context.Context) string {
+func (v sharedIPadRequiresSupervisionValidator) MarkdownDescription(ctx context.Context) string {
 	return v.Description(ctx)
 }
 
-func (multiUserRequiresSupervisedValidator) ValidateBool(ctx context.Context, req validator.BoolRequest, resp *validator.BoolResponse) {
+func (sharedIPadRequiresSupervisionValidator) ValidateBool(ctx context.Context, req validator.BoolRequest, resp *validator.BoolResponse) {
 	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() || !req.ConfigValue.ValueBool() {
 		return
 	}
 
-	companion := path.Root("supervised")
-	var sup types.Bool
-	if d := req.Config.GetAttribute(ctx, companion, &sup); d.HasError() {
+	sup, d := readBoolPair(ctx, req.Config, "supervise_devices_with_ios_12_or_earlier", "supervised", false)
+	if d.HasError() {
 		resp.Diagnostics.Append(d...)
 		return
 	}
 	if sup.IsUnknown() {
-		return // defer (STYLE_GUIDE §Config-time validators MUST defer on unknown)
+		return
 	}
 	if !sup.IsNull() && sup.ValueBool() {
-		return // prerequisite satisfied
+		return
 	}
 	resp.Diagnostics.AddAttributeError(
-		companion,
-		"supervised required for Shared iPad",
-		"multi_user = true (Enable Shared iPad) requires supervised = true; otherwise Jamf Pro silently disables Shared iPad (Apple requires Shared iPad devices to be supervised).",
+		path.Root("supervise_devices_with_ios_12_or_earlier"),
+		"supervision required for Shared iPad",
+		attributeName(req.Path)+" = true (Enable Shared iPad) requires supervise_devices_with_ios_12_or_earlier = true; otherwise Jamf Pro turns Shared iPad off without an error, because Apple requires Shared iPad devices to be supervised.",
+	)
+}
+
+// preserveManagedAppsRequiresReturnToService fires when preserve_managed_apps is true while
+// Return to Service is explicitly disabled. The admin UI shows the control only under "Allow use
+// of the Return to Service option during device reset", so the setting means nothing without it.
+// A configuration that leaves Return to Service unset is accepted, because the value Jamf Pro
+// holds for it is not visible at validation time. It reads allow_return_to_service and its
+// deprecated alias rts_enabled.
+func preserveManagedAppsRequiresReturnToService() validator.Bool {
+	return preserveManagedAppsRequiresReturnToServiceValidator{}
+}
+
+type preserveManagedAppsRequiresReturnToServiceValidator struct{}
+
+func (preserveManagedAppsRequiresReturnToServiceValidator) Description(_ context.Context) string {
+	return "preserve_managed_apps cannot be true while allow_return_to_service is false."
+}
+
+func (v preserveManagedAppsRequiresReturnToServiceValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (preserveManagedAppsRequiresReturnToServiceValidator) ValidateBool(ctx context.Context, req validator.BoolRequest, resp *validator.BoolResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() || !req.ConfigValue.ValueBool() {
+		return
+	}
+
+	rts, d := readBoolPair(ctx, req.Config, "allow_return_to_service", "rts_enabled", false)
+	if d.HasError() {
+		resp.Diagnostics.Append(d...)
+		return
+	}
+	if rts.IsNull() || rts.IsUnknown() || rts.ValueBool() {
+		return
+	}
+	resp.Diagnostics.AddAttributeError(
+		path.Root("allow_return_to_service"),
+		"Return to Service required for preserve_managed_apps",
+		"preserve_managed_apps = true applies only while Return to Service is allowed. Set allow_return_to_service = true or drop preserve_managed_apps.",
 	)
 }
 

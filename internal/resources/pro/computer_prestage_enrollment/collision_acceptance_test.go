@@ -26,14 +26,13 @@ func collisionPrestageResource(label, name string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" %q {
   display_name                          = %q
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 

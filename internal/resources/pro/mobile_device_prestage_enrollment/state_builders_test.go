@@ -205,13 +205,17 @@ func TestDiffPlanAgainstGet_ExclusionSet(t *testing.T) {
 }
 
 // TestDiffPlanAgainstGet_DefaultPrestageIsChecked pins the counterpart: a
-// planned default_prestage that the GET contradicts is a genuine rollback.
+// planned automatically_assign_new_devices that the GET contradicts is a genuine rollback.
 func TestDiffPlanAgainstGet_DefaultPrestageIsChecked(t *testing.T) {
-	plan := MobileDevicePrestageEnrollmentResourceModel{DefaultPrestage: types.BoolValue(true)}
 	got := &pro.GetMobileDevicePrestageV3{DefaultPrestage: false}
-	diff := diffPlanAgainstGet(context.Background(), plan, got)
-	if len(diff) != 1 || diff[0] != "default_prestage" {
-		t.Fatalf("default_prestage mismatch must be reported, got %v", diff)
+	for name, plan := range map[string]MobileDevicePrestageEnrollmentResourceModel{
+		"replacement":     {AutomaticallyAssignNewDevices: types.BoolValue(true)},
+		"deprecated name": {DefaultPrestage: types.BoolValue(true)},
+	} {
+		diff := diffPlanAgainstGet(context.Background(), plan, got)
+		if len(diff) != 1 || diff[0] != "automatically_assign_new_devices" {
+			t.Fatalf("%s: default mismatch must be reported, got %v", name, diff)
+		}
 	}
 }
 

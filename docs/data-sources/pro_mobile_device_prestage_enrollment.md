@@ -53,22 +53,43 @@ output "prestage_uuid" {
 
 ### Read-Only
 
-- `authentication_prompt` (String) Prompt shown when authentication is required.
-- `default_prestage` (Boolean) Whether this is the tenant default PreStage.
+- `authentication_message` (String) **"Authentication Message"** in the Jamf Pro admin UI.
+- `authentication_prompt` (String, Deprecated) ~> Deprecated: use `authentication_message` instead. The provider will not remove `authentication_prompt` before 2027-02-03.
+
+Prompt shown when authentication is required.
+- `automatically_assign_new_devices` (Boolean) **"Automatically assign new devices"** in the Jamf Pro admin UI. `true` marks this PreStage as the tenant default.
+- `default_prestage` (Boolean, Deprecated) ~> Deprecated: use `automatically_assign_new_devices` instead. The provider will not remove `default_prestage` before 2027-02-03.
+
+Whether this is the tenant default PreStage.
 - `department` (String) Department label shown during Setup Assistant.
 - `device_enrollment_program_instance_id` (String) ADE instance ID backing this PreStage.
 - `display_name` (String) Display name returned by Jamf Pro.
+- `enable_shared_ipad` (Boolean) **"Enable Shared iPad"** in the Jamf Pro admin UI.
 - `enrollment_customization_id` (String) Enrollment customization ID, or `"0"` when no customization.
 - `enrollment_site_id` (String) Site ID applied to enrolled devices, or `"-1"` when no site.
-- `mandatory` (Boolean) Whether MDM enrolment is mandatory.
-- `mdm_removable` (Boolean) Whether the user can remove the MDM profile.
-- `multi_user` (Boolean) Whether Shared iPad is enabled.
+- `make_mdm_profile_mandatory` (Boolean) **"Make MDM Profile Mandatory for devices with iOS 12.x or earlier"** in the Jamf Pro admin UI.
+- `mandatory` (Boolean, Deprecated) ~> Deprecated: use `make_mdm_profile_mandatory` instead. The provider will not remove `mandatory` before 2027-02-03.
+
+Whether MDM enrolment is mandatory.
+- `mdm_removable` (Boolean, Deprecated) ~> Deprecated: use `prevent_unenrollment` instead. It holds the opposite value: `mdm_removable = true` is `prevent_unenrollment = false`. The provider will not remove `mdm_removable` before 2027-02-03.
+
+Whether the user can remove the MDM profile.
+- `multi_user` (Boolean, Deprecated) ~> Deprecated: use `enable_shared_ipad` instead. The provider will not remove `multi_user` before 2027-02-03.
+
+Whether Shared iPad is enabled.
 - `prestage_minimum_os_target_version_type_ios` (String) Minimum-iOS enforcement mode.
 - `prestage_minimum_os_target_version_type_ipad` (String) Minimum-iPadOS enforcement mode.
+- `prevent_unenrollment` (Boolean) **"Prevent Unenrollment"** in the Jamf Pro admin UI. `true` means the user cannot remove the MDM profile.
 - `profile_uuid` (String) MDM profile UUID assigned by Jamf Pro.
-- `require_authentication` (Boolean) Whether users must authenticate during Setup Assistant.
+- `require_authentication` (Boolean, Deprecated) ~> Deprecated: use `require_credentials_for_enrollment` instead. The provider will not remove `require_authentication` before 2027-02-03.
+
+Whether users must authenticate during Setup Assistant.
+- `require_credentials_for_enrollment` (Boolean) **"Require Credentials for Enrollment"** in the Jamf Pro admin UI.
 - `site_id` (String) Site ID, or `"-1"` when no site is set.
-- `supervised` (Boolean) Whether enrolled devices are supervised.
+- `supervise_devices_with_ios_12_or_earlier` (Boolean) **"Supervise Devices with iOS 12.x or earlier"** in the Jamf Pro admin UI.
+- `supervised` (Boolean, Deprecated) ~> Deprecated: use `supervise_devices_with_ios_12_or_earlier` instead. The provider will not remove `supervised` before 2027-02-03.
+
+Whether enrolled devices are supervised.
 - `support_email_address` (String) Support email address shown during Setup Assistant.
 - `support_phone_number` (String) Support phone number shown during Setup Assistant.
 - `timezone` (String) Time zone (IANA identifier, e.g. `"America/Chicago"`).

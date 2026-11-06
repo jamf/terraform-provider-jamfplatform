@@ -31,10 +31,11 @@ func TestComputerPrestageEnrollmentResource_Schema(t *testing.T) {
 
 	s := resp.Schema
 	required := []string{
-		"id", "display_name", "mandatory", "mdm_removable",
+		"id", "display_name", "make_mdm_profile_mandatory", "allow_mdm_profile_removal",
 		"require_authentication", "device_enrollment_program_instance_id",
-		"keep_existing_location_information", "keep_existing_site_membership",
-		"auto_advance_setup", "install_profiles_during_setup",
+		"use_existing_location_information", "use_existing_site_membership",
+		"automatically_advance_through_setup_assistant", "configuration_profile_ids",
+		"authentication_message",
 		"prevent_activation_lock", "enable_device_based_activation_lock",
 		"skip_setup_items", "location_information",
 		"purchasing_information", "account_settings",
