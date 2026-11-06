@@ -411,7 +411,7 @@ Two workflows, neither calling the other.
 |---|---|---|---|
 | `build` | `go build` + `golangci-lint run` | — | 5 min |
 | `generate` | Runs `make generate`, fails if `git diff` is non-empty | — | default |
-| `vet` | `go vet` untagged, `-tags acceptance`, and `-tags acctargets,acclanes` over `scripts/`; formatting and `go fix` drift in all three build contexts; and the meta-check that the acceptance credentials sit on the step that runs `go test` | — | 10 min |
+| `vet` | `go vet` untagged, `-tags acceptance`, and `-tags acctargets,acclanes,deprecationsweep` over `scripts/`; formatting and `go fix` drift in all three build contexts; and the meta-check that the acceptance credentials sit on the step that runs `go test` | — | 10 min |
 | `unit` | `go test -v -race -cover -count=1 ./...` | Needs `build` | 10 min |
 | `scripts` | `make test-scripts` — `acctargets` and `acclanes`, each behind its own build tag and so invisible to `./...` | Needs `build` | 10 min |
 

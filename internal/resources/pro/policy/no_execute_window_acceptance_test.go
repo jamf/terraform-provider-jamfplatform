@@ -27,11 +27,11 @@ func policyConfigNoExecuteWindow(name, start, end string) string {
 resource "jamfplatform_pro_policy" "test" {
   general = {
     name = %q
-    date_time_limitations = {
-      no_execute_on    = ["Sun", "Sat"]
-      no_execute_start = %q
-      no_execute_end   = %q
-    }
+  }
+  client_side_limitations = {
+    no_execute_on    = ["Sun", "Sat"]
+    no_execute_start = %q
+    no_execute_end   = %q
   }
 }
 `, name, start, end)
@@ -51,12 +51,12 @@ func TestAccPolicyResource_NoExecuteWindowRoundTrips(t *testing.T) {
 		return []statecheck.StateCheck{
 			statecheck.ExpectKnownValue(
 				"jamfplatform_pro_policy.test",
-				tfjsonpath.New("general").AtMapKey("date_time_limitations").AtMapKey("no_execute_start"),
+				tfjsonpath.New("client_side_limitations").AtMapKey("no_execute_start"),
 				knownvalue.StringExact(start),
 			),
 			statecheck.ExpectKnownValue(
 				"jamfplatform_pro_policy.test",
-				tfjsonpath.New("general").AtMapKey("date_time_limitations").AtMapKey("no_execute_end"),
+				tfjsonpath.New("client_side_limitations").AtMapKey("no_execute_end"),
 				knownvalue.StringExact(end),
 			),
 		}

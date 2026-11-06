@@ -1151,7 +1151,27 @@ The endpoint-version policy above governs *SDK/endpoint* moves and does not cove
    ```
 4. **Window: 90 days** from the release that ships the deprecation (Platform microservices move fast and users track the latest — no Pro-style 12-month buffer). On or after `remove-after`, the field is eligible for **batch removal**: `grep -rn "PLATFORM-DEPRECATED remove-after=" internal/resources/`, drop every field whose date has passed, and land the removal with the schema `Version` bump + `UpgradeState` that migrates old state (see [[feedback-no-state-upgraders]] — published state exists, so removals are breaking and need an upgrader).
 
-This applies only to Platform Services resources. Jamf Pro schema deprecations follow the [rename PR / major-version](#jamf-pro-resource-naming) convention instead.
+This section covers Platform Services resources. Jamf Pro, Jamf Security Cloud and Jamf Account schema changes follow [§Jamf Pro Terraform schema deprecation](#jamf-pro-terraform-schema-deprecation--90-day-window) below, which is the same procedure with its own marker.
+
+#### Jamf Pro Terraform schema deprecation — 90-day window
+
+When a Jamf Pro Terraform attribute must be renamed, moved, retyped or dropped, give users 90 days of notice. The rule applies to every `jamfplatform_pro_*` construct and to the Security Cloud, Jamf Account and AI Governance families. It governs the **Terraform surface**. A Jamf endpoint moving between versions is a separate matter, covered by the migration timeline further down.
+
+1. **Add first.** Ship the replacement attribute in the same release that deprecates the old one, and keep the old one working. Nothing breaks until the removal release.
+2. **Mark the old attribute `Deprecated`** with a user-facing `DeprecationMessage` that names the replacement and the earliest removal date, for example ``Deprecated: use `script_assignments` instead. The provider will not remove `scripts` before 2027-02-15.``
+3. **Annotate it in code** with one marker comment per deprecation, above the constant that holds the message:
+   ```go
+   // PRO-DEPRECATED remove-after=YYYY-MM-DD replaced-by=<new_attr> — <one-line reason>
+   ```
+   `PLATFORM-DEPRECATED` is the same marker for the Platform Services rule above, and both are read by the same tool. The line must begin with the marker and carry both `remove-after=` (a calendar date) and `replaced-by=` (an attribute path, or `none` when the attribute goes with no successor). The reason after the dash is optional. `internal/conformance` fails the build on a marker it cannot parse. Test files are not scanned.
+4. **Window: 90 days** from the release that ships the deprecation. The date in the message and the marker is that release date plus 90 days. A deprecation message is not rendered by `tfplugindocs`, so the registry page says nothing: put a `~> **Deprecated.** ...` callout at the top of the attribute's `MarkdownDescription` as well, the way `internal/resources/pro/activation_code/deprecation.go` does for a whole construct.
+5. **Remove in a batch.** On or after `remove-after` the attribute is eligible for removal. The removal PR deletes the attribute, its marker and its callout, bumps the schema `Version`, and adds an `UpgradeState` step that drops the attribute from prior state, because a key gone from the schema but still in stored state fails the decode. Published state exists, so removal is breaking and needs the upgrader.
+
+**An attribute that changes type cannot be deprecated under its own name.** A schema is a map from name to type, so `scripts` cannot be an object in the old shape and a set in the new one in the same release. Give the replacement a new name, keep it permanently, and do not plan a second release to rename it back. The alternative, replacing the type under the same name, makes every existing configuration fail at `terraform validate` with a type error that mentions neither a migration nor a deprecation, and no upgrader can help, since an upgrader rewrites state and never configuration. That outcome is the reason this section exists.
+
+**Reads and writes while both exist.** The old and new attributes are both Optional, and a `ConflictsWith` validator forbids setting both. Read populates whichever one state already manages, so a configuration that uses the old shape keeps planning clean. Config generation (`terraform query -generate-config-out`) and import emit only the new attribute, so a deprecated attribute is never written into new configuration.
+
+**Tracking.** Every marker gets a tracking issue labelled `deprecation-removal`. Nobody opens it at deprecation time. `.github/workflows/deprecation-sweep.yml` opens one per marker whose date has arrived, runs weekly, and finds an existing issue by its exact title across open and closed issues, so an issue closed without the removal happening is not refiled. `make deprecation-sweep` prints the same list locally (`TODAY=YYYY-MM-DD` looks ahead). This is distinct from the `deprecation-migration` label below, which tracks an endpoint Jamf is withdrawing and carries dates on Project #2.
 
 **ProClassic is unversioned**: `jamfplatform/proclassic/` functions do not carry V1/V2 suffixes. Migration timing (below) does not apply to ProClassic-backed resources. Annotation block is still recommended for documenting which SDK function is in use, but `Status:` simply tracks "current" against the SDK release in use.
 
@@ -1225,7 +1245,7 @@ When migration would require a **breaking Terraform schema change**, defer to th
 
 Every deprecation gets exactly one tracking issue, opened from the **Deprecation migration** issue template (`.github/ISSUE_TEMPLATE/deprecation_migration.md`). The conventions below are mandatory — they are what makes the set of open migrations greppable and their deadlines visible.
 
-**Label**: `deprecation-migration`, always. Add `blocked-upstream` while the SDK exposes no successor, and remove it when the successor ships. No other label substitutes: `grep`ping the label is how the quarterly audit finds outstanding migrations.
+**Label**: `deprecation-migration`, always. (A Terraform attribute removal is tracked separately, under `deprecation-removal`; see [§Jamf Pro Terraform schema deprecation](#jamf-pro-terraform-schema-deprecation--90-day-window).) Add `blocked-upstream` while the SDK exposes no successor, and remove it when the successor ships. No other label substitutes: `grep`ping the label is how the quarterly audit finds outstanding migrations.
 
 **Title format**:
 

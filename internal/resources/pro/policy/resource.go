@@ -10,10 +10,12 @@ package policy
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -170,50 +172,17 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						Computed:            true,
 					},
 					"date_time_limitations": schema.SingleNestedAttribute{
-						MarkdownDescription: "Optional schedule limitations for when the policy may run. Only the user-authored date/time inputs are surfaced. The derived epoch and UTC siblings Jamf Pro also stores are deterministic transforms of `activation_date` / `expiration_date`, reproducible client-side with Terraform stdlib functions such as `formatdate`.",
+						MarkdownDescription: generalDateTimeLimitationsDeprecatedDescription,
+						DeprecationMessage:  generalDateTimeLimitationsDeprecation,
 						Optional:            true,
-						Attributes: map[string]schema.Attribute{
-							"activation_date": schema.StringAttribute{
-								MarkdownDescription: "Activation date in 24-hour `YYYY-MM-DD HH:MM:SS` form (e.g. `2027-06-01 14:30:00`).",
-								Optional:            true,
-								Computed:            true,
-								PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
-								Validators: []validator.String{
-									stringvalidator.RegexMatches(
-										activationExpirationDatePattern,
-										"Value must be 24-hour YYYY-MM-DD HH:MM:SS (e.g. 2027-06-01 14:30:00)",
-									),
-								},
-							},
-							"expiration_date": schema.StringAttribute{
-								MarkdownDescription: "Expiration date in 24-hour `YYYY-MM-DD HH:MM:SS` form (e.g. `2027-12-31 23:59:59`).",
-								Optional:            true,
-								Computed:            true,
-								PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
-								Validators: []validator.String{
-									stringvalidator.RegexMatches(
-										activationExpirationDatePattern,
-										"Value must be 24-hour YYYY-MM-DD HH:MM:SS (e.g. 2027-12-31 23:59:59)",
-									),
-								},
-							},
-							"no_execute_on": schema.SetAttribute{
-								MarkdownDescription: "Day-of-week labels on which the policy must not execute. Three-letter abbreviations: `Sun`, `Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`.",
-								ElementType:         types.StringType,
-								Optional:            true,
-								Computed:            true,
-								Validators: []validator.Set{
-									setvalidator.ValueStringsAre(
-										stringvalidator.OneOf(proclassic.PolicyGeneralDateTimeLimitationsNoExecuteOnDayValues()...),
-									),
-								},
-							},
-							"no_execute_start": noExecuteTimeAttribute("start", "5:00 PM"),
-							"no_execute_end":   noExecuteTimeAttribute("end", "7:00 AM"),
+						Attributes:          dateTimeLimitationsAttributes(),
+						Validators: []validator.Object{
+							objectvalidator.ConflictsWith(path.MatchRoot("server_side_limitations"), path.MatchRoot("client_side_limitations")),
 						},
 					},
 					"network_limitations": schema.SingleNestedAttribute{
-						MarkdownDescription: "Read-only view of the network conditions under which the policy may run. Jamf Pro derives all three attributes from `general.network_requirements` and `scope.limitations.network_segment_ids`. Declare the block as `{}` to read the derived values into state.",
+						DeprecationMessage:  generalNetworkLimitationsDeprecation,
+						MarkdownDescription: "~> **Deprecated.** " + generalNetworkLimitationsDeprecation + "\n\n" + "Read-only view of the network conditions under which the policy may run. Jamf Pro derives all three attributes from `general.network_requirements` and `scope.limitations.network_segment_ids`. Declare the block as `{}` to read the derived values into state.",
 						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"minimum_network_connection": serverProjectedString("Minimum network connection, which Jamf Pro derives from `general.network_requirements`: `No Minimum` when that is `Any`, `Ethernet` when it is `Ethernet`. Set `general.network_requirements` to change it."),
@@ -226,7 +195,8 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						},
 					},
 					"override_default_settings": schema.SingleNestedAttribute{
-						MarkdownDescription: "Read-only view of the per-policy overrides of tenant-wide defaults, matching the admin UI's \"Override Default Settings\" panel. Jamf Pro derives each attribute from a setting that lives elsewhere. Declare the block as `{}` to read the derived values into state.",
+						DeprecationMessage:  generalOverrideDefaultSettingsDeprecation,
+						MarkdownDescription: "~> **Deprecated.** " + generalOverrideDefaultSettingsDeprecation + "\n\n" + "Read-only view of the per-policy overrides of tenant-wide defaults, matching the admin UI's \"Override Default Settings\" panel. Jamf Pro derives each attribute from a setting that lives elsewhere. Declare the block as `{}` to read the derived values into state.",
 						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"target_drive":       serverProjectedString("Target drive, mirroring `general.target_drive`. Set it there."),
@@ -236,6 +206,16 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						},
 					},
 				},
+			},
+			"server_side_limitations": schema.SingleNestedAttribute{
+				MarkdownDescription: "Dates between which the policy is active (admin UI: Options ▸ General ▸ Server-Side Limitations). Jamf Pro evaluates them in UTC on the server. It also stores epoch and UTC copies of both dates. You can compute those in Terraform with `formatdate`, so the provider does not surface them. Replaces `activation_date` and `expiration_date` under `general.date_time_limitations`; set one or the other.",
+				Optional:            true,
+				Attributes:          serverSideLimitationsAttributes(),
+			},
+			"client_side_limitations": schema.SingleNestedAttribute{
+				MarkdownDescription: "Times and days on which the policy must not run (admin UI: Options ▸ General ▸ Client-Side Limitations). Each computer enforces them from its own settings. Replaces `no_execute_on`, `no_execute_start` and `no_execute_end` under `general.date_time_limitations`; set one or the other.",
+				Optional:            true,
+				Attributes:          clientSideLimitationsAttributes(),
 			},
 			"scope": schema.SingleNestedAttribute{
 				MarkdownDescription: "Policy scope. Each category is independently owned: declare it (including `[]`, which clears it) and Terraform manages its members; omit it and it is left as configured outside Terraform, with updates preserving it. Targets are flat sets of Jamf Pro IDs; interpolate `jamfplatform_device_group.<x>.jamf_pro_id` to bridge from Platform Services UUIDs. Setting `all_computers = true` forbids `computer_ids`, `computer_group_ids`, `building_ids`, `department_ids`. Setting `all_jss_users = true` forbids `user_ids` and `user_group_ids`. `user_ids` / `user_group_ids` map to the admin UI's \"Users\" / \"User Groups\" lists.",
@@ -317,63 +297,72 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				},
 			},
 			"scripts": schema.SingleNestedAttribute{
-				MarkdownDescription: "Scripts to run as part of the policy. Omit the block to leave any existing values untouched (they are not cleared on update).",
+				MarkdownDescription: "~> **Deprecated.** " + scriptsDeprecation + "\n\n" + "Scripts to run as part of the policy. Omit the block to leave any existing values untouched (they are not cleared on update).",
+				DeprecationMessage:  scriptsDeprecation,
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"scripts": schema.SetNestedAttribute{
 						MarkdownDescription: "Set of script assignments. `priority` is one of " + markdownValueList(proclassic.PolicyScriptsScriptItemPriorityValues()) + ". Omit to leave any existing entries untouched; they are not cleared on update.",
 						Optional:            true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"id":           schema.StringAttribute{MarkdownDescription: "Script ID.", Required: true},
-								"name":         serverDerivedName("Script display name. Returned by Jamf Pro."),
-								"priority":     requiredEnum("Run order relative to the policy's other tasks.", proclassic.PolicyScriptsScriptItemPriorityValues()),
-								"parameter_4":  optComputedStringKeyed("Parameter 4 passed to the script."),
-								"parameter_5":  optComputedStringKeyed("Parameter 5 passed to the script."),
-								"parameter_6":  optComputedStringKeyed("Parameter 6 passed to the script."),
-								"parameter_7":  optComputedStringKeyed("Parameter 7 passed to the script."),
-								"parameter_8":  optComputedStringKeyed("Parameter 8 passed to the script."),
-								"parameter_9":  optComputedStringKeyed("Parameter 9 passed to the script."),
-								"parameter_10": optComputedStringKeyed("Parameter 10 passed to the script."),
-								"parameter_11": optComputedStringKeyed("Parameter 11 passed to the script."),
-							},
-						},
+						NestedObject:        schema.NestedAttributeObject{Attributes: scriptItemAttributes()},
 					},
+				},
+				Validators: []validator.Object{
+					objectvalidator.ConflictsWith(path.MatchRoot("script_assignments")),
 				},
 			},
 			"printers": schema.SingleNestedAttribute{
-				MarkdownDescription: "Printers to install or remove. Omit the block to leave any existing values untouched (they are not cleared on update).",
+				MarkdownDescription: "~> **Deprecated.** " + printersDeprecation + "\n\n" + "Printers to install or remove. Omit the block to leave any existing values untouched (they are not cleared on update).",
+				DeprecationMessage:  printersDeprecation,
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"printers": schema.SetNestedAttribute{
 						MarkdownDescription: "Set of printer assignments. Omit to leave any existing entries untouched; they are not cleared on update.",
 						Optional:            true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"id":           schema.StringAttribute{MarkdownDescription: "Printer ID.", Required: true},
-								"name":         serverDerivedName("Printer display name. Returned by Jamf Pro."),
-								"action":       requiredEnum("Printer action. `Map` installs the printer and `Unmap` removes it.", []string{"Map", "Unmap"}),
-								"make_default": optComputedBoolKeyed("Make this printer the device's default."),
-							},
-						},
+						NestedObject:        schema.NestedAttributeObject{Attributes: printerItemAttributes()},
 					},
+				},
+				Validators: []validator.Object{
+					objectvalidator.ConflictsWith(path.MatchRoot("printer_assignments")),
 				},
 			},
 			"dock_items": schema.SingleNestedAttribute{
-				MarkdownDescription: "Dock items to add or remove. Omit the block to leave any existing values untouched (they are not cleared on update).",
+				MarkdownDescription: "~> **Deprecated.** " + dockItemsDeprecation + "\n\n" + "Dock items to add or remove. Omit the block to leave any existing values untouched (they are not cleared on update).",
+				DeprecationMessage:  dockItemsDeprecation,
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"dock_items": schema.SetNestedAttribute{
 						MarkdownDescription: "Set of dock item assignments. Omit to leave any existing entries untouched; they are not cleared on update.",
 						Optional:            true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"id":     schema.StringAttribute{MarkdownDescription: "Dock item ID.", Required: true},
-								"name":   serverDerivedName("Dock item display name. Returned by Jamf Pro."),
-								"action": requiredEnum("Dock item action.", proclassic.PolicyPostDockItemsDockItemItemActionValues()),
-							},
-						},
+						NestedObject:        schema.NestedAttributeObject{Attributes: dockItemAttributes()},
 					},
+				},
+				Validators: []validator.Object{
+					objectvalidator.ConflictsWith(path.MatchRoot("dock_item_assignments")),
+				},
+			},
+			"script_assignments": schema.SetNestedAttribute{
+				MarkdownDescription: "Scripts to run as part of the policy (admin UI: Options ▸ Scripts). Each item identifies the script by ID; `name` is returned by Jamf Pro. `priority` is one of " + markdownValueList(proclassic.PolicyScriptsScriptItemPriorityValues()) + ". Replaces `scripts.scripts`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update.",
+				Optional:            true,
+				NestedObject:        schema.NestedAttributeObject{Attributes: scriptItemAttributes()},
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
+				},
+			},
+			"printer_assignments": schema.SetNestedAttribute{
+				MarkdownDescription: "Printers to install or remove (admin UI: Options ▸ Printers). Replaces `printers.printers`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update.",
+				Optional:            true,
+				NestedObject:        schema.NestedAttributeObject{Attributes: printerItemAttributes()},
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
+				},
+			},
+			"dock_item_assignments": schema.SetNestedAttribute{
+				MarkdownDescription: "Dock items to add or remove (admin UI: Options ▸ Dock). Replaces `dock_items.dock_items`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update.",
+				Optional:            true,
+				NestedObject:        schema.NestedAttributeObject{Attributes: dockItemAttributes()},
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
 			// account_maintenance is flattened into four UI-aligned peer blocks
@@ -688,7 +677,7 @@ func noExecuteTimeAttribute(edge, example string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: fmt.Sprintf(
 			"Daily %s of the no-execute window, in 12-hour `h:MM AM` / `h:MM PM` form with the hour 1–12 and no leading zero (e.g. `%s`). "+
-				"Shown in the admin UI under Options ▸ General ▸ Server-Side Limitations. Applies on the days named by `no_execute_on`.",
+				"Shown in the admin UI under Options ▸ General ▸ Client-Side Limitations ▸ Do Not Run Between. Applies on the days named by `no_execute_on`.",
 			edge, example,
 		),
 		Optional:      true,
@@ -913,5 +902,108 @@ func optComputedInt(desc string) schema.Int64Attribute {
 		Optional:            true,
 		Computed:            true,
 		PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseNonNullStateForUnknown()},
+	}
+}
+
+// serverSideLimitationsAttributes is the activation window, shared by the
+// top-level server_side_limitations block and the deprecated
+// general.date_time_limitations so the two cannot drift apart.
+func serverSideLimitationsAttributes() map[string]schema.Attribute {
+	return map[string]schema.Attribute{
+		"activation_date": schema.StringAttribute{
+			MarkdownDescription: "Activation date in 24-hour `YYYY-MM-DD HH:MM:SS` form (e.g. `2027-06-01 14:30:00`).",
+			Optional:            true,
+			Computed:            true,
+			PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+			Validators: []validator.String{
+				stringvalidator.RegexMatches(
+					activationExpirationDatePattern,
+					"Value must be 24-hour YYYY-MM-DD HH:MM:SS (e.g. 2027-06-01 14:30:00)",
+				),
+			},
+		},
+		"expiration_date": schema.StringAttribute{
+			MarkdownDescription: "Expiration date in 24-hour `YYYY-MM-DD HH:MM:SS` form (e.g. `2027-12-31 23:59:59`).",
+			Optional:            true,
+			Computed:            true,
+			PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+			Validators: []validator.String{
+				stringvalidator.RegexMatches(
+					activationExpirationDatePattern,
+					"Value must be 24-hour YYYY-MM-DD HH:MM:SS (e.g. 2027-12-31 23:59:59)",
+				),
+			},
+		},
+	}
+}
+
+// clientSideLimitationsAttributes is the do-not-run window, shared by the
+// top-level client_side_limitations block and the deprecated
+// general.date_time_limitations so the two cannot drift apart.
+func clientSideLimitationsAttributes() map[string]schema.Attribute {
+	return map[string]schema.Attribute{
+		"no_execute_on": schema.SetAttribute{
+			MarkdownDescription: "Day-of-week labels on which the policy must not execute (admin UI: Do Not Run On). Three-letter abbreviations: `Sun`, `Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`.",
+			ElementType:         types.StringType,
+			Optional:            true,
+			Computed:            true,
+			Validators: []validator.Set{
+				setvalidator.ValueStringsAre(
+					stringvalidator.OneOf(proclassic.PolicyGeneralDateTimeLimitationsNoExecuteOnDayValues()...),
+				),
+			},
+		},
+		"no_execute_start": noExecuteTimeAttribute("start", "5:00 PM"),
+		"no_execute_end":   noExecuteTimeAttribute("end", "7:00 AM"),
+	}
+}
+
+// dateTimeLimitationsAttributes is the attribute set of the deprecated
+// general.date_time_limitations block, which held both windows in one object.
+func dateTimeLimitationsAttributes() map[string]schema.Attribute {
+	out := serverSideLimitationsAttributes()
+	maps.Copy(out, clientSideLimitationsAttributes())
+	return out
+}
+
+// scriptItemAttributes is the attribute set of one script assignment, shared by the flat
+// assignments attribute and its deprecated wrapper block so the two cannot
+// drift apart.
+func scriptItemAttributes() map[string]schema.Attribute {
+	return map[string]schema.Attribute{
+		"id":           schema.StringAttribute{MarkdownDescription: "Script ID.", Required: true},
+		"name":         serverDerivedName("Script display name. Returned by Jamf Pro."),
+		"priority":     requiredEnum("Run order relative to the policy's other tasks.", proclassic.PolicyScriptsScriptItemPriorityValues()),
+		"parameter_4":  optComputedStringKeyed("Parameter 4 passed to the script."),
+		"parameter_5":  optComputedStringKeyed("Parameter 5 passed to the script."),
+		"parameter_6":  optComputedStringKeyed("Parameter 6 passed to the script."),
+		"parameter_7":  optComputedStringKeyed("Parameter 7 passed to the script."),
+		"parameter_8":  optComputedStringKeyed("Parameter 8 passed to the script."),
+		"parameter_9":  optComputedStringKeyed("Parameter 9 passed to the script."),
+		"parameter_10": optComputedStringKeyed("Parameter 10 passed to the script."),
+		"parameter_11": optComputedStringKeyed("Parameter 11 passed to the script."),
+	}
+}
+
+// printerItemAttributes is the attribute set of one printer assignment, shared by the flat
+// assignments attribute and its deprecated wrapper block so the two cannot
+// drift apart.
+func printerItemAttributes() map[string]schema.Attribute {
+	return map[string]schema.Attribute{
+		"id":           schema.StringAttribute{MarkdownDescription: "Printer ID.", Required: true},
+		"name":         serverDerivedName("Printer display name. Returned by Jamf Pro."),
+		"action":       requiredEnum("Printer action. `Map` installs the printer and `Unmap` removes it.", []string{"Map", "Unmap"}),
+		"make_default": optComputedBoolKeyed("Make this printer the device's default."),
+	}
+}
+
+// dockItemAttributes is the attribute set of one dock item assignment, shared by the flat
+// assignments attribute and its deprecated wrapper block so the two cannot
+// drift apart.
+func dockItemAttributes() map[string]schema.Attribute {
+	return map[string]schema.Attribute{
+		"id":     schema.StringAttribute{MarkdownDescription: "Dock item ID.", Required: true},
+		"name":   serverDerivedName("Dock item display name. Returned by Jamf Pro."),
+		"action": requiredEnum("Dock item action.", proclassic.PolicyPostDockItemsDockItemItemActionValues()),
 	}
 }

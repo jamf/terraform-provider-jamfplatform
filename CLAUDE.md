@@ -10,7 +10,7 @@ The Jamf Platform API client is the external Go SDK `github.com/jamf/jamfplatfor
 
 ## Companion Docs (authoritative on conflict)
 
-- `STYLE_GUIDE.md` — Go style, file conventions, schema rules, Jamf Pro naming/version/endpoint policies, scope helper, profile payload normalisation, ID/import conventions.
+- `STYLE_GUIDE.md` — Go style, file conventions, schema rules, Jamf Pro naming/version/endpoint policies, schema deprecation window (`PRO-DEPRECATED` markers, 90 days), scope helper, profile payload normalisation, ID/import conventions.
 - `TESTING.md` — test categories, commands, build tags, CI.
 - `CONTRIBUTING.md` — contribution workflow, Pro-resource workflow (incl. ProClassic SDK payload audit), release-versioning policy.
 - `README.md` — user-facing provider usage.
@@ -410,9 +410,10 @@ Jamf offers three scopes when an API integration is created, and the provider mi
 | `fix` | `go fix ./...` — rewrites deprecated API usages |
 | `lint` | `golangci-lint run` |
 | `generate` | Copyright headers + `terraform fmt examples/` + docs |
+| `deprecation-sweep` | List schema deprecations whose `remove-after` date has arrived (`scripts/deprecationsweep`; `TODAY=YYYY-MM-DD` looks ahead) |
 | `permissions-map` | Refetch `internal/common/permissions/permissions-map.md` from Jamf's permissions map article (network; not part of `generate`) |
 | `test` | Unit tests (excludes `acceptance` build tag) |
-| `test-scripts` | Unit tests for `scripts/acctargets` (behind the `acctargets` build tag, so `go test ./...` misses it) |
+| `test-scripts` | Unit tests for `scripts/acctargets`, `scripts/acclanes` and `scripts/deprecationsweep` (each behind its own build tag, so `go test ./...` misses them) |
 | `testacc` | Acceptance tests (sets `TF_ACC=1`, requires tenant) |
 | `testacc-run` | Targeted acc rerun (`RUN=<regex> PKG=<path>`) |
 

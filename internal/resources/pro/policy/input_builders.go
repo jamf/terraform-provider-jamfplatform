@@ -58,6 +58,12 @@ func buildPolicyInput(ctx context.Context, plan PolicyResourceModel, secrets *po
 		out.General = general
 	}
 
+	if (plan.ServerSideLimitations != nil || plan.ClientSideLimitations != nil) && out.General != nil {
+		dtl, d := buildPolicyDateTimeLimitations(ctx, joinDateTimeLimitations(plan.ServerSideLimitations, plan.ClientSideLimitations))
+		diags.Append(d...)
+		out.General.DateTimeLimitations = dtl
+	}
+
 	if plan.Scope != nil {
 		s, d := buildPolicyScope(ctx, plan.Scope)
 		diags.Append(d...)
@@ -72,16 +78,25 @@ func buildPolicyInput(ctx context.Context, plan PolicyResourceModel, secrets *po
 		out.PackageConfiguration = buildPolicyPackageConfiguration(plan.Packages)
 	}
 
-	if plan.Scripts != nil {
-		out.Scripts = buildPolicyScripts(plan.Scripts)
+	switch {
+	case plan.ScriptAssignments != nil:
+		out.Scripts = buildPolicyScripts(plan.ScriptAssignments)
+	case plan.Scripts != nil:
+		out.Scripts = buildPolicyScripts(plan.Scripts.Scripts)
 	}
 
-	if plan.Printers != nil {
-		out.Printers = buildPolicyPrinters(plan.Printers)
+	switch {
+	case plan.PrinterAssignments != nil:
+		out.Printers = buildPolicyPrinters(plan.PrinterAssignments)
+	case plan.Printers != nil:
+		out.Printers = buildPolicyPrinters(plan.Printers.Printers)
 	}
 
-	if plan.DockItems != nil {
-		out.DockItems = buildPolicyDockItems(plan.DockItems)
+	switch {
+	case plan.DockItemAssignments != nil:
+		out.DockItems = buildPolicyDockItems(plan.DockItemAssignments)
+	case plan.DockItems != nil:
+		out.DockItems = buildPolicyDockItems(plan.DockItems.DockItems)
 	}
 
 	// The four flattened account-maintenance blocks join back into a single
@@ -166,6 +181,30 @@ func buildPolicyGeneral(ctx context.Context, m *PolicyGeneralModel) (*proclassic
 	}
 
 	return g, diags
+}
+
+// joinDateTimeLimitations merges the two UI-aligned blocks back into the single
+// model the wire <date_time_limitations> object is built from. A side that is
+// absent contributes null attributes, which the builder omits so the server
+// keeps whatever it holds for them.
+func joinDateTimeLimitations(server *PolicyServerSideLimitationsModel, client *PolicyClientSideLimitationsModel) *PolicyGeneralDateTimeLimitationsModel {
+	out := &PolicyGeneralDateTimeLimitationsModel{
+		ActivationDate: types.StringNull(),
+		ExpirationDate: types.StringNull(),
+		NoExecuteOn:    types.SetNull(types.StringType),
+		NoExecuteStart: types.StringNull(),
+		NoExecuteEnd:   types.StringNull(),
+	}
+	if server != nil {
+		out.ActivationDate = server.ActivationDate
+		out.ExpirationDate = server.ExpirationDate
+	}
+	if client != nil {
+		out.NoExecuteOn = client.NoExecuteOn
+		out.NoExecuteStart = client.NoExecuteStart
+		out.NoExecuteEnd = client.NoExecuteEnd
+	}
+	return out
 }
 
 // buildPolicyDateTimeLimitations maps the date_time_limitations sub-block onto
@@ -475,12 +514,12 @@ func buildPolicyPackageConfiguration(m *PolicyPackagesModel) *proclassic.PolicyP
 	return out
 }
 
-func buildPolicyScripts(m *PolicyScriptsModel) *proclassic.PolicyPostScripts {
-	if len(m.Scripts) == 0 {
+func buildPolicyScripts(scripts []PolicyScriptItemModel) *proclassic.PolicyPostScripts {
+	if len(scripts) == 0 {
 		return nil
 	}
-	items := make([]proclassic.PolicyScriptsScriptItem, 0, len(m.Scripts))
-	for _, s := range m.Scripts {
+	items := make([]proclassic.PolicyScriptsScriptItem, 0, len(scripts))
+	for _, s := range scripts {
 		items = append(items, proclassic.PolicyScriptsScriptItem{
 			ID:          helpers.StringIDPtr(s.ID),
 			Priority:    helpers.OptionalStringPointer(s.Priority),
@@ -497,11 +536,9 @@ func buildPolicyScripts(m *PolicyScriptsModel) *proclassic.PolicyPostScripts {
 	return &proclassic.PolicyPostScripts{Script: &items}
 }
 
-// buildPolicyPrinters maps the printers block onto the wire payload.
+// buildPolicyPrinters maps the printer assignments onto the wire payload.
 //
-// buildPolicyPrinters maps the printers block onto the wire payload.
-//
-// A <printers> element is emitted only when the block actually names printers,
+// A <printers> element is emitted only when the list actually names printers,
 // because the element is full-replace: a PUT carrying <printers> with no
 // <printer> children clears the policy's printer list outright (wire-probed
 // against 11.31.1 on 2026-09-07, one entry to none).
@@ -512,23 +549,19 @@ func buildPolicyScripts(m *PolicyScriptsModel) *proclassic.PolicyPostScripts {
 // were configured through the admin UI with the default-printer choice toggled
 // both ways. The choice the admin UI actually persists is per printer, as
 // printers[].make_default.
-func buildPolicyPrinters(m *PolicyPrintersModel) *proclassic.PolicyPostPrinters {
-	if len(m.Printers) == 0 {
+func buildPolicyPrinters(printers []PolicyPrinterItemModel) *proclassic.PolicyPostPrinters {
+	if len(printers) == 0 {
 		return nil
 	}
-	p := &proclassic.PolicyPostPrinters{}
-	if len(m.Printers) > 0 {
-		items := make([]proclassic.PolicyPrintersPrinterItem, 0, len(m.Printers))
-		for _, pr := range m.Printers {
-			items = append(items, proclassic.PolicyPrintersPrinterItem{
-				ID:          helpers.StringIDPtr(pr.ID),
-				Action:      printerActionToWire(pr.Action),
-				MakeDefault: helpers.OptionalBoolPointer(pr.MakeDefault),
-			})
-		}
-		p.Printer = &items
+	items := make([]proclassic.PolicyPrintersPrinterItem, 0, len(printers))
+	for _, pr := range printers {
+		items = append(items, proclassic.PolicyPrintersPrinterItem{
+			ID:          helpers.StringIDPtr(pr.ID),
+			Action:      printerActionToWire(pr.Action),
+			MakeDefault: helpers.OptionalBoolPointer(pr.MakeDefault),
+		})
 	}
-	return p
+	return &proclassic.PolicyPostPrinters{Printer: &items}
 }
 
 // printerActionToWire translates the UI-canonical Terraform attribute value
@@ -555,12 +588,12 @@ func printerActionToWire(action types.String) *string {
 	}
 }
 
-func buildPolicyDockItems(m *PolicyDockItemsModel) *proclassic.PolicyPostDockItems {
-	if len(m.DockItems) == 0 {
+func buildPolicyDockItems(dockItems []PolicyDockItemModel) *proclassic.PolicyPostDockItems {
+	if len(dockItems) == 0 {
 		return nil
 	}
-	items := make([]proclassic.PolicyPostDockItemsDockItemItem, 0, len(m.DockItems))
-	for _, di := range m.DockItems {
+	items := make([]proclassic.PolicyPostDockItemsDockItemItem, 0, len(dockItems))
+	for _, di := range dockItems {
 		items = append(items, proclassic.PolicyPostDockItemsDockItemItem{
 			ID:     helpers.StringIDPtr(di.ID),
 			Action: helpers.OptionalStringPointer(di.Action),

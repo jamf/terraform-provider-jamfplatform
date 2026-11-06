@@ -42,6 +42,16 @@ type PolicyResourceModel struct {
 	Scripts     *PolicyScriptsModel       `tfsdk:"scripts"`
 	Printers    *PolicyPrintersModel      `tfsdk:"printers"`
 	DockItems   *PolicyDockItemsModel     `tfsdk:"dock_items"`
+	// ScriptAssignments, PrinterAssignments, DockItemAssignments,
+	// ServerSideLimitations and ClientSideLimitations are the successors of
+	// scripts.scripts, printers.printers, dock_items.dock_items and
+	// general.date_time_limitations. Each predecessor is mutually exclusive with
+	// its successors in configuration; see deprecations.go.
+	ScriptAssignments     []PolicyScriptItemModel           `tfsdk:"script_assignments"`
+	PrinterAssignments    []PolicyPrinterItemModel          `tfsdk:"printer_assignments"`
+	DockItemAssignments   []PolicyDockItemModel             `tfsdk:"dock_item_assignments"`
+	ServerSideLimitations *PolicyServerSideLimitationsModel `tfsdk:"server_side_limitations"`
+	ClientSideLimitations *PolicyClientSideLimitationsModel `tfsdk:"client_side_limitations"`
 	// account_maintenance is flattened into four UI-aligned peer blocks
 	// (Local Accounts / Management Accounts / Directory Bindings / EFI
 	// Password in the admin UI). The classic wire still carries them under a
@@ -92,6 +102,21 @@ type PolicyGeneralModel struct {
 type PolicyGeneralDateTimeLimitationsModel struct {
 	ActivationDate types.String `tfsdk:"activation_date"`
 	ExpirationDate types.String `tfsdk:"expiration_date"`
+	NoExecuteOn    types.Set    `tfsdk:"no_execute_on"`
+	NoExecuteStart types.String `tfsdk:"no_execute_start"`
+	NoExecuteEnd   types.String `tfsdk:"no_execute_end"`
+}
+
+// PolicyServerSideLimitationsModel is the activation window of
+// <general><date_time_limitations>, as the admin UI's Server-Side Limitations tab.
+type PolicyServerSideLimitationsModel struct {
+	ActivationDate types.String `tfsdk:"activation_date"`
+	ExpirationDate types.String `tfsdk:"expiration_date"`
+}
+
+// PolicyClientSideLimitationsModel is the do-not-run window of
+// <general><date_time_limitations>, as the admin UI's Client-Side Limitations tab.
+type PolicyClientSideLimitationsModel struct {
 	NoExecuteOn    types.Set    `tfsdk:"no_execute_on"`
 	NoExecuteStart types.String `tfsdk:"no_execute_start"`
 	NoExecuteEnd   types.String `tfsdk:"no_execute_end"`

@@ -470,8 +470,11 @@ func TestAssignPolicyResourceModel_IncludeUnmanagedHydratesFromScratch(t *testin
 	if state.Scope.Limitations != nil {
 		t.Fatalf("expected limitations nil when wire-absent; got %+v", state.Scope.Limitations)
 	}
-	if state.Scripts == nil || len(state.Scripts.Scripts) != 1 {
-		t.Fatalf("expected scripts hydrated; got %+v", state.Scripts)
+	if len(state.ScriptAssignments) != 1 {
+		t.Fatalf("expected script_assignments hydrated; got %+v", state.ScriptAssignments)
+	}
+	if state.Scripts != nil {
+		t.Fatalf("expected the deprecated scripts block left null; got %+v", state.Scripts)
 	}
 	if state.Packages == nil || len(state.Packages.Packages) != 1 {
 		t.Fatalf("expected packages hydrated; got %+v", state.Packages)
@@ -597,23 +600,23 @@ func TestFlattenPolicyAccountMaintenance_PreservesAuthoredEmptyStrings(t *testin
 // elements in order.
 func TestFlattenPolicyScripts_PreservesAuthoredEmptyParameters(t *testing.T) {
 	t.Parallel()
-	state := &PolicyScriptsModel{Scripts: []PolicyScriptItemModel{
+	prior := []PolicyScriptItemModel{
 		{ID: types.StringValue("7"), Parameter4: types.StringValue(""), Parameter5: types.StringUnknown()},
 		{ID: types.StringValue("7"), Parameter4: types.StringUnknown(), Parameter5: types.StringValue("")},
 		{ID: types.StringValue("9"), Parameter11: types.StringValue("")},
-	}}
+	}
 	sc := &proclassic.PolicyScripts{Script: &[]proclassic.PolicyScriptsScriptItem{
 		{ID: new(7), Parameter4: new(""), Parameter5: new("")},
 		{ID: new(7), Parameter4: new(""), Parameter5: new("")},
 		{ID: new(9), Parameter4: new("value"), Parameter11: new("")},
 	}}
 
-	flattenPolicyScripts(sc, state)
+	got := flattenPolicyScripts(sc, prior)
 
-	if len(state.Scripts) != 3 {
-		t.Fatalf("expected 3 scripts, got %d", len(state.Scripts))
+	if len(got) != 3 {
+		t.Fatalf("expected 3 scripts, got %d", len(got))
 	}
-	first, second, third := state.Scripts[0], state.Scripts[1], state.Scripts[2]
+	first, second, third := got[0], got[1], got[2]
 	if first.Parameter4.IsNull() || first.Parameter4.ValueString() != "" {
 		t.Errorf("first parameter_4: expected \"\", got %s", first.Parameter4)
 	}
@@ -626,8 +629,8 @@ func TestFlattenPolicyScripts_PreservesAuthoredEmptyParameters(t *testing.T) {
 	if second.Parameter5.IsNull() || second.Parameter5.ValueString() != "" {
 		t.Errorf("second parameter_5: expected \"\", got %s", second.Parameter5)
 	}
-	if got := third.Parameter4.ValueString(); got != "value" {
-		t.Errorf("third parameter_4: expected the wire value, got %q", got)
+	if v := third.Parameter4.ValueString(); v != "value" {
+		t.Errorf("third parameter_4: expected the wire value, got %q", v)
 	}
 	if third.Parameter11.IsNull() || third.Parameter11.ValueString() != "" {
 		t.Errorf("third parameter_11: expected \"\", got %s", third.Parameter11)

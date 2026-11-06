@@ -47,7 +47,10 @@ func assignPolicyResourceModel(ctx context.Context, state *PolicyResourceModel, 
 	if state.General == nil {
 		state.General = &PolicyGeneralModel{}
 	}
-	flattenPolicyGeneral(ctx, p.General, state.General, includeUnmanaged)
+	flattenPolicyGeneral(ctx, p.General, state.General)
+	if p.General != nil && p.General.DateTimeLimitations != nil {
+		flattenPolicyLimitationSides(ctx, p.General.DateTimeLimitations, state, includeUnmanaged)
+	}
 
 	// Optional sections are only refreshed when the caller (plan or current
 	// state) already manages them. Server returns every section in GET with
@@ -74,23 +77,32 @@ func assignPolicyResourceModel(ctx context.Context, state *PolicyResourceModel, 
 	if state.Packages != nil && p.PackageConfiguration != nil {
 		flattenPolicyPackageConfiguration(p.PackageConfiguration, state.Packages)
 	}
-	if includeUnmanaged && state.Scripts == nil && p.Scripts != nil {
-		state.Scripts = &PolicyScriptsModel{}
+	if includeUnmanaged && state.Scripts == nil && state.ScriptAssignments == nil && p.Scripts != nil {
+		state.ScriptAssignments = []PolicyScriptItemModel{}
 	}
 	if state.Scripts != nil && p.Scripts != nil {
-		flattenPolicyScripts(p.Scripts, state.Scripts)
+		state.Scripts.Scripts = flattenPolicyScripts(p.Scripts, state.Scripts.Scripts)
 	}
-	if includeUnmanaged && state.Printers == nil && p.Printers != nil {
-		state.Printers = &PolicyPrintersModel{}
+	if state.ScriptAssignments != nil && p.Scripts != nil {
+		state.ScriptAssignments = flattenPolicyScripts(p.Scripts, state.ScriptAssignments)
+	}
+	if includeUnmanaged && state.Printers == nil && state.PrinterAssignments == nil && p.Printers != nil {
+		state.PrinterAssignments = []PolicyPrinterItemModel{}
 	}
 	if state.Printers != nil && p.Printers != nil {
-		flattenPolicyPrinters(p.Printers, state.Printers)
+		state.Printers.Printers = flattenPolicyPrinters(p.Printers)
 	}
-	if includeUnmanaged && state.DockItems == nil && p.DockItems != nil {
-		state.DockItems = &PolicyDockItemsModel{}
+	if state.PrinterAssignments != nil && p.Printers != nil {
+		state.PrinterAssignments = flattenPolicyPrinters(p.Printers)
+	}
+	if includeUnmanaged && state.DockItems == nil && state.DockItemAssignments == nil && p.DockItems != nil {
+		state.DockItemAssignments = []PolicyDockItemModel{}
 	}
 	if state.DockItems != nil && p.DockItems != nil {
-		flattenPolicyDockItems(p.DockItems, state.DockItems)
+		state.DockItems.DockItems = flattenPolicyDockItems(p.DockItems)
+	}
+	if state.DockItemAssignments != nil && p.DockItems != nil {
+		state.DockItemAssignments = flattenPolicyDockItems(p.DockItems)
 	}
 	// The four flattened account-maintenance blocks all read from the single
 	// wire <account_maintenance> object. Each is refreshed only when the
@@ -141,22 +153,11 @@ func assignPolicyResourceModel(ctx context.Context, state *PolicyResourceModel, 
 // general.target_drive, distribution_point follows packages.distribution_point,
 // and force_afp_smb and sus follow admin UI settings no route can write. See
 // the schema descriptions in resource.go.
-func flattenPolicyGeneral(ctx context.Context, g *proclassic.PolicyGeneral, state *PolicyGeneralModel, includeUnmanaged bool) {
+func flattenPolicyGeneral(ctx context.Context, g *proclassic.PolicyGeneral, state *PolicyGeneralModel) {
 	if g == nil {
 		return
 	}
 
-	if includeUnmanaged {
-		if state.DateTimeLimitations == nil && g.DateTimeLimitations != nil {
-			state.DateTimeLimitations = &PolicyGeneralDateTimeLimitationsModel{}
-		}
-		if state.NetworkLimitations == nil && g.NetworkLimitations != nil {
-			state.NetworkLimitations = &PolicyGeneralNetworkLimitationsModel{}
-		}
-		if state.OverrideDefaultSettings == nil && g.OverrideDefaultSettings != nil {
-			state.OverrideDefaultSettings = &PolicyGeneralOverrideDefaultsModel{}
-		}
-	}
 	state.ID = helpers.StringValueFromIntPtr(g.ID)
 	state.Name = helpers.StringPointerValueOrNullTrimmed(g.Name, state.Name)
 	state.Enabled = helpers.BoolPointerValueOrNull(g.Enabled)
@@ -236,6 +237,31 @@ func flattenPolicyDateTimeLimitations(ctx context.Context, dtl *proclassic.Polic
 		}
 	} else {
 		state.NoExecuteOn = types.SetNull(types.StringType)
+	}
+}
+
+// flattenPolicyLimitationSides reads the wire <date_time_limitations> object
+// into whichever of the two UI-aligned blocks the caller manages. With
+// includeUnmanaged and neither successor nor the deprecated block in play, both
+// are allocated so config generation emits the successors.
+func flattenPolicyLimitationSides(ctx context.Context, dtl *proclassic.PolicyGeneralDateTimeLimitations, state *PolicyResourceModel, includeUnmanaged bool) {
+	if includeUnmanaged && state.General.DateTimeLimitations == nil && state.ServerSideLimitations == nil && state.ClientSideLimitations == nil {
+		state.ServerSideLimitations = &PolicyServerSideLimitationsModel{}
+		state.ClientSideLimitations = &PolicyClientSideLimitationsModel{}
+	}
+	if state.ServerSideLimitations == nil && state.ClientSideLimitations == nil {
+		return
+	}
+	joined := joinDateTimeLimitations(state.ServerSideLimitations, state.ClientSideLimitations)
+	flattenPolicyDateTimeLimitations(ctx, dtl, joined)
+	if state.ServerSideLimitations != nil {
+		state.ServerSideLimitations.ActivationDate = joined.ActivationDate
+		state.ServerSideLimitations.ExpirationDate = joined.ExpirationDate
+	}
+	if state.ClientSideLimitations != nil {
+		state.ClientSideLimitations.NoExecuteOn = joined.NoExecuteOn
+		state.ClientSideLimitations.NoExecuteStart = joined.NoExecuteStart
+		state.ClientSideLimitations.NoExecuteEnd = joined.NoExecuteEnd
 	}
 }
 
@@ -591,13 +617,12 @@ func flattenPolicyPackageConfiguration(pc *proclassic.PolicyPackageConfiguration
 // null, which the post-apply consistency check rejects. Prior elements are
 // paired by script id in order, since one script may be assigned more than
 // once.
-func flattenPolicyScripts(sc *proclassic.PolicyScripts, state *PolicyScriptsModel) {
+func flattenPolicyScripts(sc *proclassic.PolicyScripts, prior []PolicyScriptItemModel) []PolicyScriptItemModel {
 	if sc.Script == nil {
-		state.Scripts = nil
-		return
+		return nil
 	}
-	priorByID := make(map[string][]PolicyScriptItemModel, len(state.Scripts))
-	for _, prev := range state.Scripts {
+	priorByID := make(map[string][]PolicyScriptItemModel, len(prior))
+	for _, prev := range prior {
 		if helpers.IsConfiguredValue(prev.ID) {
 			priorByID[prev.ID.ValueString()] = append(priorByID[prev.ID.ValueString()], prev)
 		}
@@ -624,7 +649,7 @@ func flattenPolicyScripts(sc *proclassic.PolicyScripts, state *PolicyScriptsMode
 			Parameter11: helpers.ReconcileOptionalStringPointerTrimmed(s.Parameter11, prev.Parameter11),
 		})
 	}
-	state.Scripts = out
+	return out
 }
 
 // flattenPolicyPrinters maps the wire <printers> block onto the model.
@@ -637,10 +662,9 @@ func flattenPolicyScripts(sc *proclassic.PolicyScripts, state *PolicyScriptsMode
 // persists is per printer, as printers[].make_default, which does round-trip.
 // The attribute was removed in schema v2; see UpgradeState. Wire-probed against
 // 11.31.1 on 2026-09-07; see issue #387.
-func flattenPolicyPrinters(pr *proclassic.PolicyPrinters, state *PolicyPrintersModel) {
+func flattenPolicyPrinters(pr *proclassic.PolicyPrinters) []PolicyPrinterItemModel {
 	if pr.Printer == nil {
-		state.Printers = nil
-		return
+		return nil
 	}
 	items := *pr.Printer
 	out := make([]PolicyPrinterItemModel, 0, len(items))
@@ -652,7 +676,7 @@ func flattenPolicyPrinters(pr *proclassic.PolicyPrinters, state *PolicyPrintersM
 			MakeDefault: helpers.BoolPointerValueOrNull(p.MakeDefault),
 		})
 	}
-	state.Printers = out
+	return out
 }
 
 // printerActionFromWire is the inbound half of the UI/wire translation for
@@ -674,10 +698,9 @@ func printerActionFromWire(action *string) types.String {
 	}
 }
 
-func flattenPolicyDockItems(d *proclassic.PolicyDockItems, state *PolicyDockItemsModel) {
+func flattenPolicyDockItems(d *proclassic.PolicyDockItems) []PolicyDockItemModel {
 	if d.DockItem == nil {
-		state.DockItems = nil
-		return
+		return nil
 	}
 	items := *d.DockItem
 	out := make([]PolicyDockItemModel, 0, len(items))
@@ -688,7 +711,7 @@ func flattenPolicyDockItems(d *proclassic.PolicyDockItems, state *PolicyDockItem
 			Action: helpers.StringPointerValueOrNull(di.Action),
 		})
 	}
-	state.DockItems = out
+	return out
 }
 
 // flattenPolicyAccountMaintenance splits the single wire <account_maintenance>
