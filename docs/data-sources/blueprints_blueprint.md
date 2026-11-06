@@ -48,9 +48,7 @@ output "blueprint_example_all" {
 
 ### Read-Only
 
-- `activation_conditions` (String, Deprecated) Activation condition expression that further restricts which scoped devices the blueprint applies to. Reflects the first component block only; read `component_blocks` for per-block conditions.
 - `blueprint_id` (String) Blueprint ID.
-- `component` (Attributes List, Deprecated) Components of the first component block. Read `component_blocks` for the components of every block. (see [below for nested schema](#nestedatt--component))
 - `component_blocks` (Attributes List) Ordered component blocks of the blueprint. Each block has a name, an optional activation condition, and its own components. (see [below for nested schema](#nestedatt--component_blocks))
 - `created` (String) Created at (RFC3339).
 - `deployment_state` (String) Deployment state.
@@ -64,15 +62,6 @@ output "blueprint_example_all" {
 Optional:
 
 - `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
-
-
-<a id="nestedatt--component"></a>
-### Nested Schema for `component`
-
-Read-Only:
-
-- `configuration` (Map of String) Component configuration as a map of key-value pairs.
-- `identifier` (String) Component identifier.
 
 
 <a id="nestedatt--component_blocks"></a>

@@ -16,7 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	appleprofiles "github.com/jamf/jamfplatform-go-sdk/appleschemas/profiles"
-	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
 // payloadProblemCase pins one appleprofiles.ProblemKind to the diagnostic appendPayloadProblems
@@ -268,34 +267,6 @@ func validateBlockLegacyPayloads(t *testing.T, list types.List) diag.Diagnostics
 	return resp.Diagnostics
 }
 
-// validateFlatLegacyPayloads runs the deprecated top-level validator over the same payloads, where
-// settings arrive as objects rather than JSON strings.
-func validateFlatLegacyPayloads(t *testing.T, payloads ...[2]string) diag.Diagnostics {
-	t.Helper()
-
-	items := make([]any, 0, len(payloads))
-	for _, payload := range payloads {
-		var settings map[string]any
-		if err := json.Unmarshal([]byte(payload[1]), &settings); err != nil {
-			t.Fatalf("decoding settings for the flat carrier: %v", err)
-		}
-		items = append(items, map[string]any{"payload_type": payload[0], "settings": settings})
-	}
-
-	value, err := helpers.JSONToTerraformDynamic(items)
-	if err != nil {
-		t.Fatalf("building the flat legacy_payloads value: %v", err)
-	}
-
-	var resp validator.DynamicResponse
-	flatLegacyPayloadSchemaValidator().ValidateDynamic(
-		context.Background(),
-		validator.DynamicRequest{Path: path.Root("legacy_payloads"), ConfigValue: value},
-		&resp,
-	)
-	return resp.Diagnostics
-}
-
 // TestLegacyPayloadValidator_SeveralPreferenceDomainsIsAnError covers the finding no other layer can
 // produce. Apple declares the dictionary the domains sit under as free-form, so appleprofiles stops
 // descending at it, and Jamf stores every domain faithfully — the loss happens on the device, which
@@ -318,14 +289,6 @@ func TestLegacyPayloadValidator_SeveralPreferenceDomainsIsAnError(t *testing.T) 
 				return validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, settings}))
 			},
 			want: legacyPayloadsListPath().AtListIndex(0).AtName("settings"),
-		},
-		{
-			name: "flat carrier",
-			diags: func(t *testing.T) diag.Diagnostics {
-				t.Helper()
-				return validateFlatLegacyPayloads(t, [2]string{mcxPayloadType, settings})
-			},
-			want: path.Root("legacy_payloads"),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -372,10 +335,7 @@ func TestLegacyPayloadValidator_OnePreferenceDomainPasses(t *testing.T) {
 	settings := mcxSettings(t, "com.example.only")
 
 	if diags := validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, settings})); diags.HasError() {
-		t.Errorf("the block carrier rejected a single preference domain: %v", diags.Errors())
-	}
-	if diags := validateFlatLegacyPayloads(t, [2]string{mcxPayloadType, settings}); diags.HasError() {
-		t.Errorf("the flat carrier rejected a single preference domain: %v", diags.Errors())
+		t.Errorf("the validator rejected a single preference domain: %v", diags.Errors())
 	}
 }
 
@@ -400,13 +360,6 @@ func TestLegacyPayloadValidator_NoPreferenceDomainsIsRefused(t *testing.T) {
 			diags: func(t *testing.T) diag.Diagnostics {
 				t.Helper()
 				return validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, settings}))
-			},
-		},
-		{
-			name: "flat carrier",
-			diags: func(t *testing.T) diag.Diagnostics {
-				t.Helper()
-				return validateFlatLegacyPayloads(t, [2]string{mcxPayloadType, settings})
 			},
 		},
 	} {
@@ -484,10 +437,7 @@ func TestLegacyPayloadValidator_NullDomainIsNotADomain(t *testing.T) {
 
 		value := settings(t, map[string]any{"com.example.kept": domain, "com.example.nulled": nil})
 		if diags := validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{mcxPayloadType, value})); diags.HasError() {
-			t.Errorf("the block carrier refused a payload the platform stores as one domain: %v", diags.Errors())
-		}
-		if diags := validateFlatLegacyPayloads(t, [2]string{mcxPayloadType, value}); diags.HasError() {
-			t.Errorf("the flat carrier refused a payload the platform stores as one domain: %v", diags.Errors())
+			t.Errorf("the validator refused a payload the platform stores as one domain: %v", diags.Errors())
 		}
 	})
 
@@ -658,12 +608,12 @@ func TestMCXPayloadTypeIsAppleDeclared(t *testing.T) {
 // TestLegacyPayloadValidator_SkipsUnknownSettings pins issue #484. Terraform validates before it
 // plans, with module variables and each.key or each.value still unknown, and the validator used to
 // read unknown settings as an empty payload and report every required key missing, failing a valid
-// configuration on every plan. Both carriers must skip without a diagnostic and leave the check to
+// configuration on every plan. The validator must skip without a diagnostic and leave the check to
 // the planning call, where the value is resolved.
 func TestLegacyPayloadValidator_SkipsUnknownSettings(t *testing.T) {
 	t.Parallel()
 
-	t.Run("block carrier", func(t *testing.T) {
+	t.Run("an unknown settings string", func(t *testing.T) {
 		t.Parallel()
 
 		elementType := legacyPayloadElementType()
@@ -681,30 +631,6 @@ func TestLegacyPayloadValidator_SkipsUnknownSettings(t *testing.T) {
 
 		if diags := validateBlockLegacyPayloads(t, list); len(diags) != 0 {
 			t.Errorf("unknown settings produced diagnostics: %v", diags)
-		}
-	})
-
-	t.Run("flat carrier", func(t *testing.T) {
-		t.Parallel()
-
-		settings := types.ObjectValueMust(
-			map[string]attr.Type{"PayloadContent": types.StringType},
-			map[string]attr.Value{"PayloadContent": types.StringUnknown()},
-		)
-		payload := types.ObjectValueMust(
-			map[string]attr.Type{"payload_type": types.StringType, "settings": settings.Type(context.Background())},
-			map[string]attr.Value{"payload_type": types.StringValue(mcxPayloadType), "settings": settings},
-		)
-		value := types.DynamicValue(types.TupleValueMust([]attr.Type{payload.Type(context.Background())}, []attr.Value{payload}))
-
-		var resp validator.DynamicResponse
-		flatLegacyPayloadSchemaValidator().ValidateDynamic(
-			context.Background(),
-			validator.DynamicRequest{Path: path.Root("legacy_payloads"), ConfigValue: value},
-			&resp,
-		)
-		if len(resp.Diagnostics) != 0 {
-			t.Errorf("a nested unknown setting produced diagnostics: %v", resp.Diagnostics)
 		}
 	})
 }

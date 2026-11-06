@@ -51,12 +51,12 @@ func TestBlueprintResource_SchemaComponentBlocks(t *testing.T) {
 	}
 }
 
-func TestBlueprintResource_FlatComponentAttrsDeprecated(t *testing.T) {
+func TestBlueprintResource_FlatComponentAttrsRemoved(t *testing.T) {
 	r := NewBlueprintResource()
 	var resp resource.SchemaResponse
 	r.(*BlueprintResource).Schema(context.Background(), resource.SchemaRequest{}, &resp)
 
-	deprecated := []string{
+	removed := []string{
 		"activation_conditions",
 		"legacy_payloads",
 		"raw_component",
@@ -73,21 +73,19 @@ func TestBlueprintResource_FlatComponentAttrsDeprecated(t *testing.T) {
 		"software_update",
 		"software_update_settings",
 	}
-	for _, name := range deprecated {
-		attr, ok := resp.Schema.Attributes[name]
-		if !ok {
-			t.Errorf("missing flat attribute %q", name)
-			continue
-		}
-		if attr.GetDeprecationMessage() == "" {
-			t.Errorf("flat attribute %q should carry a DeprecationMessage", name)
+	for _, name := range removed {
+		if _, ok := resp.Schema.Attributes[name]; ok {
+			t.Errorf("top-level attribute %q was removed in schema version 5 and belongs inside component_blocks", name)
 		}
 	}
 
-	// Blueprint-level attributes must NOT be deprecated.
-	for _, name := range []string{"name", "description", "deployed", "device_groups"} {
-		if resp.Schema.Attributes[name].GetDeprecationMessage() != "" {
-			t.Errorf("blueprint-level attribute %q must not be deprecated", name)
+	if resp.Schema.Version != 5 {
+		t.Errorf("expected schema version 5, got %d", resp.Schema.Version)
+	}
+
+	for name, attr := range resp.Schema.Attributes {
+		if attr.GetDeprecationMessage() != "" {
+			t.Errorf("attribute %q still carries a deprecation message", name)
 		}
 	}
 }
@@ -103,6 +101,11 @@ func TestBlueprintDataSource_SchemaComponentBlocks(t *testing.T) {
 	}
 	if !attr.IsComputed() {
 		t.Error("data source component_blocks should be computed")
+	}
+	for _, name := range []string{"activation_conditions", "component"} {
+		if _, ok := resp.Schema.Attributes[name]; ok {
+			t.Errorf("data source attribute %q was removed with the flat resource attributes", name)
+		}
 	}
 }
 
@@ -156,31 +159,6 @@ func TestBuildSteps_BlockMode(t *testing.T) {
 	}
 	if len(steps[1].Components) != 1 || steps[1].Components[0].Identifier != "com.jamf.ddm.passcode-settings" {
 		t.Errorf("expected step 1 to carry the passcode component, got %+v", steps[1].Components)
-	}
-}
-
-func TestBuildSteps_FlatMode(t *testing.T) {
-	r := &BlueprintResource{}
-	data := &BlueprintResourceModel{
-		Name:                 types.StringValue("BP"),
-		ActivationConditions: types.StringValue("ANY x"),
-		Components: []ComponentModel{
-			{Identifier: types.StringValue("com.jamf.ddm.disk-management"), Configuration: types.MapNull(types.StringType)},
-		},
-	}
-
-	steps, diags := r.buildSteps(context.Background(), data, nil)
-	if diags.HasError() {
-		t.Fatalf("unexpected diagnostics: %v", diags)
-	}
-	if len(steps) != 1 {
-		t.Fatalf("expected 1 flat step, got %d", len(steps))
-	}
-	if steps[0].Name == nil || *steps[0].Name != flatStepName {
-		t.Errorf("expected flat step name %q, got %v", flatStepName, steps[0].Name)
-	}
-	if steps[0].ActivationPredicate == nil || *steps[0].ActivationPredicate != "ANY x" {
-		t.Errorf("expected flat step activation predicate 'ANY x', got %v", steps[0].ActivationPredicate)
 	}
 }
 
@@ -247,53 +225,9 @@ func TestUpdateModelFromAPIResponse_BlockMode(t *testing.T) {
 	if len(model.ComponentBlocks[2].Components) != 0 {
 		t.Errorf("com.jamf.ai-governance must not also land in raw_component, got %+v", model.ComponentBlocks[2].Components)
 	}
-
-	// Flat attributes must be cleared in block mode.
-	if model.Components != nil {
-		t.Error("expected flat raw_component nil in block mode")
-	}
-	if !model.ActivationConditions.IsNull() {
-		t.Error("expected flat activation_conditions null in block mode")
-	}
 }
 
-func TestUpdateModelFromAPIResponse_FlatModeMultiStepWarns(t *testing.T) {
-	ctx := context.Background()
-	model := &BlueprintResourceModel{
-		Components: []ComponentModel{
-			{Identifier: types.StringValue("com.jamf.ddm.disk-management"), Configuration: types.MapNull(types.StringType)},
-		},
-	}
-	blueprint := &blueprints.BlueprintDetail{
-		DeploymentState: &blueprints.DeploymentState{State: "DEPLOYED"},
-		Steps: []blueprints.BlueprintStep{
-			{Components: []blueprints.Component{{Identifier: "com.jamf.ddm.disk-management", Configuration: json.RawMessage(`{"externalStorage":"deny"}`)}}},
-			{Components: []blueprints.Component{{Identifier: "com.jamf.ddm.math-settings", Configuration: json.RawMessage(`{}`)}}},
-		},
-	}
-
-	diags := updateModelFromAPIResponse(ctx, model, blueprint)
-	if diags.HasError() {
-		t.Fatalf("unexpected error diagnostics: %v", diags)
-	}
-	if diags.WarningsCount() == 0 {
-		t.Fatal("expected a migration warning for a multi-step blueprint in flat mode")
-	}
-	found := false
-	for _, d := range diags.Warnings() {
-		if d.Summary() == "Blueprint has multiple component blocks" {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("expected 'Blueprint has multiple component blocks' warning, got %v", diags)
-	}
-	if model.ComponentBlocks != nil {
-		t.Error("flat mode must not populate component_blocks")
-	}
-}
-
-func TestUpdateModelFromAPIResponse_EmptyPriorUsesBlockMode(t *testing.T) {
+func TestUpdateModelFromAPIResponse_EmptyPriorReadsEveryStep(t *testing.T) {
 	ctx := context.Background()
 	model := &BlueprintResourceModel{}
 	blueprint := &blueprints.BlueprintDetail{
@@ -307,9 +241,6 @@ func TestUpdateModelFromAPIResponse_EmptyPriorUsesBlockMode(t *testing.T) {
 
 	if len(model.ComponentBlocks) != 1 {
 		t.Fatalf("expected empty prior to read as one block, got %d blocks", len(model.ComponentBlocks))
-	}
-	if model.Components != nil {
-		t.Error("expected flat raw_component nil when reading in block mode")
 	}
 }
 
@@ -797,36 +728,6 @@ func TestBuildSteps_TypedAndRawComponentConflictEmitsNoStep(t *testing.T) {
 	}
 	if len(steps) != 0 {
 		t.Fatalf("expected no steps, got %+v", steps)
-	}
-}
-
-// TestBuildSteps_FlatLegacyPayloadsAndRawComponentConflictEmitsNoStep covers the one overlap the
-// deprecated flat authoring style has to check for itself, because flatComponentsAsBlock cannot
-// carry the dynamic legacy payload value.
-func TestBuildSteps_FlatLegacyPayloadsAndRawComponentConflictEmitsNoStep(t *testing.T) {
-	r := &BlueprintResource{}
-	data := &BlueprintResourceModel{
-		Name:           types.StringValue("BP"),
-		LegacyPayloads: flatLegacyPayloadsValue(t),
-		Components: []ComponentModel{
-			{Identifier: types.StringValue(legacyConfigProfileIdentifier), Configuration: types.MapNull(types.StringType)},
-		},
-	}
-
-	steps, diags := r.buildSteps(context.Background(), data, nil)
-	if !diags.HasError() {
-		t.Fatal("expected an error for legacy_payloads set alongside a raw_component for the same component")
-	}
-	if len(steps) != 0 {
-		t.Fatalf("expected no steps, got %+v", steps)
-	}
-
-	detail := diags.Errors()[0].Detail()
-	if !strings.Contains(detail, "legacy_payloads") || !strings.Contains(detail, "raw_component") {
-		t.Errorf("error must name both attributes, got %q", detail)
-	}
-	if strings.Contains(detail, legacyConfigProfileIdentifier) {
-		t.Errorf("user-facing text must not carry the wire identifier, got %q", detail)
 	}
 }
 

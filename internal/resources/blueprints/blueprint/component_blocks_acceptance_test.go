@@ -7,7 +7,6 @@ package blueprint_test
 
 import (
 	"fmt"
-	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -119,8 +118,6 @@ func TestAccResource_Blueprint_ComponentBlocks(t *testing.T) {
 					resource.TestCheckResourceAttr(res, "component_blocks.1.name", "Software Update Settings"),
 					resource.TestCheckResourceAttr(res, "component_blocks.2.name", "Math Settings"),
 					resource.TestCheckResourceAttrSet(res, "component_blocks.2.activation_conditions"),
-					// Flat attributes stay null in block mode.
-					resource.TestCheckNoResourceAttr(res, "passcode_policy.%"),
 				),
 			},
 			{
@@ -149,42 +146,6 @@ func TestAccResource_Blueprint_ComponentBlocks(t *testing.T) {
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
 				},
-			},
-		},
-	})
-}
-
-// TestAccResource_Blueprint_ComponentBlocks_ConflictsWithFlat proves the two authoring styles are
-// mutually exclusive: declaring a flat component attribute alongside component_blocks fails at plan.
-func TestAccResource_Blueprint_ComponentBlocks_ConflictsWithFlat(t *testing.T) {
-	testhelpers.AccPreCheck(t)
-	suffix := testhelpers.RunSuffix()
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testBlueprintConfig(smartGroupHCL("conflict"), fmt.Sprintf(`
-					resource "jamfplatform_blueprints_blueprint" "conflict" {
-						name          = "tf-acc-bp-conflict-%s"
-						deployed      = false
-						device_groups = [jamfplatform_device_group.scope.id]
-
-						passcode_policy = {
-							require_passcode = true
-						}
-
-						component_blocks = [
-							{
-								name = "X"
-								math_settings = {
-									system_behavior_math_notes = true
-								}
-							},
-						]
-					}
-				`, suffix)),
-				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
 			},
 		},
 	})

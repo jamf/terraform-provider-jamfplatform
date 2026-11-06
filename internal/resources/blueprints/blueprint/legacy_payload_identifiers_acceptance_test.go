@@ -69,12 +69,10 @@ const (
 // The settings each payload type is authored with. They are HCL expressions rather than JSON so the
 // configurations below read as something an operator would write.
 const (
-	accessibilitySettings        = `jsonencode({ closeViewFarPoint = 5 })`
-	accessibilitySettingsEdited  = `jsonencode({ closeViewFarPoint = 9 })`
-	domainsSettings              = `jsonencode({ EmailDomains = ["tf-acc-safe-to-delete.example"] })`
-	fileProviderSettings         = `jsonencode({ ManagementAllowsRemoteSyncing = true })`
-	flatAccessibilitySettingsHCL = `{ closeViewFarPoint = 5 }`
-	flatDomainsSettingsHCL       = `{ EmailDomains = ["tf-acc-safe-to-delete.example"] }`
+	accessibilitySettings       = `jsonencode({ closeViewFarPoint = 5 })`
+	accessibilitySettingsEdited = `jsonencode({ closeViewFarPoint = 9 })`
+	domainsSettings             = `jsonencode({ EmailDomains = ["tf-acc-safe-to-delete.example"] })`
+	fileProviderSettings        = `jsonencode({ ManagementAllowsRemoteSyncing = true })`
 )
 
 // legacyPayloadSpec is one authored legacy payload: its Apple payload type and the HCL expression
@@ -631,69 +629,6 @@ func TestAccResource_Blueprint_LegacyPayloads_IdentifiersNeverReachState(t *test
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
 				},
 				Check: checkStoredIdentifiers(t, addr, recorded),
-			},
-		},
-	})
-}
-
-// TestAccResource_Blueprint_LegacyPayloads_FlatModePreservesIdentifiers covers the deprecated
-// top-level `legacy_payloads` attribute, which had no coverage of this at any level. It resolves its
-// stored identifiers differently from a block: flat mode writes and reads exactly one step, so it
-// asks for the identifiers of a single unnamed block and takes step 0 positionally. Matching on the
-// provider's own "Declaration group" step name instead would hand flat mode the identifiers of a
-// step it does not manage whenever a stored step elsewhere carried that name.
-//
-// Deprecated is not the same as unused, and an operator who has not yet migrated has the same claim
-// on a stable payload identity as one who has.
-func TestAccResource_Blueprint_LegacyPayloads_FlatModePreservesIdentifiers(t *testing.T) {
-	testhelpers.AccPreCheck(t)
-	suffix := testhelpers.RunSuffix()
-	name := "tf-acc-lpid-flat-" + suffix
-	addr := "jamfplatform_blueprints_blueprint.lpid_flat"
-	recorded := make(map[string]string)
-
-	config := func(description string) string {
-		return testBlueprintConfig(smartGroupHCL("lpidflat"), fmt.Sprintf(`
-			resource "jamfplatform_blueprints_blueprint" "lpid_flat" {
-				name          = %q
-				description   = %q
-				deployed      = false
-				device_groups = [jamfplatform_device_group.scope.id]
-
-				legacy_payloads = [
-					{
-						payload_type = %q
-						settings     = %s
-					},
-					{
-						payload_type = %q
-						settings     = %s
-					},
-				]
-			}
-		`, name, description,
-			accessibilityPayloadType, flatAccessibilitySettingsHCL,
-			domainsPayloadType, flatDomainsSettingsHCL))
-	}
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
-		CheckDestroy:             testAccCheckBlueprintResourcesDestroy(t),
-		Steps: []resource.TestStep{
-			{
-				Config: config("Acceptance test — safe to delete"),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet(addr, "id"),
-					resource.TestCheckNoResourceAttr(addr, "component_blocks.#"),
-					captureStoredIdentifiers(t, addr, recorded),
-				),
-			},
-			{
-				Config: config("Acceptance test — safe to delete, description edited"),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(addr, "description", "Acceptance test — safe to delete, description edited"),
-					checkStoredIdentifiers(t, addr, recorded),
-				),
 			},
 		},
 	})

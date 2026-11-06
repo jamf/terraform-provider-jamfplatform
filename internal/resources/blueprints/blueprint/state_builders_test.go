@@ -6,14 +6,12 @@ package blueprint
 import (
 	"context"
 	"encoding/json"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
-	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
 func TestParseComponentConfiguration_Found(t *testing.T) {
@@ -74,100 +72,6 @@ func TestParseComponentConfiguration_InvalidJSON(t *testing.T) {
 	}
 	if string(rawConfig) != "{invalid" {
 		t.Errorf("expected raw bytes returned as-is, got %q", string(rawConfig))
-	}
-}
-
-func TestFlattenFlatLegacyPayloads_WithPayloads(t *testing.T) {
-	apiComponents := map[string]blueprints.Component{
-		"com.jamf.ddm-configuration-profile": {
-			Identifier:    "com.jamf.ddm-configuration-profile",
-			Configuration: json.RawMessage(`{"payloadDisplayName":"Test","payloadContent":[{"payloadType":"com.apple.wifi.managed","payloadIdentifier":"test-uuid","SSID_STR":"TestNetwork"}]}`),
-		},
-	}
-
-	got := flattenFlatLegacyPayloads(types.DynamicNull(), apiComponents, map[string]struct{}{})
-
-	if got.IsNull() {
-		t.Fatal("expected non-null legacy payloads")
-	}
-
-	raw, err := helpers.TerraformDynamicToJSON(got)
-	if err != nil {
-		t.Fatalf("failed to convert dynamic to JSON: %v", err)
-	}
-	items, ok := raw.([]any)
-	if !ok {
-		t.Fatalf("expected list, got %T", raw)
-	}
-	if len(items) != 1 {
-		t.Fatalf("expected 1 payload, got %d", len(items))
-	}
-
-	payload, ok := items[0].(map[string]any)
-	if !ok {
-		t.Fatal("expected payload to be a map")
-	}
-	if payload["payload_type"] != "com.apple.wifi.managed" {
-		t.Errorf("expected payload_type 'com.apple.wifi.managed', got %v", payload["payload_type"])
-	}
-
-	settings, ok := payload["settings"].(map[string]any)
-	if !ok {
-		t.Fatal("expected settings to be a map")
-	}
-	if settings["SSID_STR"] != "TestNetwork" {
-		t.Errorf("expected SSID_STR 'TestNetwork', got %v", settings["SSID_STR"])
-	}
-	if _, exists := settings["payloadType"]; exists {
-		t.Error("payloadType should not be in settings")
-	}
-}
-
-func TestFlattenFlatLegacyPayloads_NoComponent(t *testing.T) {
-	existingDyn, _ := helpers.JSONToTerraformDynamic([]any{map[string]any{"payload_type": "should be cleared"}})
-	got := flattenFlatLegacyPayloads(existingDyn, map[string]blueprints.Component{}, map[string]struct{}{})
-
-	if !got.IsNull() {
-		t.Error("expected null legacy payloads when component is absent")
-	}
-}
-
-func TestFlattenFlatLegacyPayloads_HandledAsRaw(t *testing.T) {
-	apiComponents := map[string]blueprints.Component{
-		"com.jamf.ddm-configuration-profile": {
-			Identifier:    "com.jamf.ddm-configuration-profile",
-			Configuration: json.RawMessage(`{"payloadContent":[{"payloadType":"com.apple.wifi.managed"}]}`),
-		},
-	}
-	rawIdentifiers := map[string]struct{}{
-		"com.jamf.ddm-configuration-profile": {},
-	}
-
-	existingDyn, _ := helpers.JSONToTerraformDynamic([]any{map[string]any{"payload_type": "existing"}})
-	got := flattenFlatLegacyPayloads(existingDyn, apiComponents, rawIdentifiers)
-
-	raw, err := helpers.TerraformDynamicToJSON(got)
-	if err != nil {
-		t.Fatalf("failed to convert: %v", err)
-	}
-	items := raw.([]any)
-	if len(items) != 1 {
-		t.Error("expected legacy payloads to remain unchanged when handled as raw")
-	}
-}
-
-func TestFlattenFlatLegacyPayloads_NoPayloadContent(t *testing.T) {
-	apiComponents := map[string]blueprints.Component{
-		"com.jamf.ddm-configuration-profile": {
-			Identifier:    "com.jamf.ddm-configuration-profile",
-			Configuration: json.RawMessage(`{"payloadDisplayName":"Test"}`),
-		},
-	}
-
-	got := flattenFlatLegacyPayloads(types.DynamicNull(), apiComponents, map[string]struct{}{})
-
-	if !got.IsNull() {
-		t.Error("expected null legacy payloads when payloadContent is absent")
 	}
 }
 
@@ -248,9 +152,11 @@ func TestUpdateModelFromAPIResponse_NotDeployed(t *testing.T) {
 func TestUpdateModelFromAPIResponse_RawComponents(t *testing.T) {
 	ctx := t.Context()
 	model := &BlueprintResourceModel{
-		Components: []ComponentModel{
-			{Identifier: types.StringValue("com.jamf.ddm.disk-management")},
-		},
+		ComponentBlocks: []ComponentBlockModel{{
+			Components: []ComponentModel{
+				{Identifier: types.StringValue("com.jamf.ddm.disk-management")},
+			},
+		}},
 	}
 
 	blueprint := &blueprints.BlueprintDetail{
@@ -269,11 +175,11 @@ func TestUpdateModelFromAPIResponse_RawComponents(t *testing.T) {
 
 	updateModelFromAPIResponse(ctx, model, blueprint)
 
-	if len(model.Components) != 1 {
-		t.Fatalf("expected 1 raw component, got %d", len(model.Components))
+	if len(model.ComponentBlocks) != 1 || len(model.ComponentBlocks[0].Components) != 1 {
+		t.Fatalf("expected 1 block with 1 raw component, got %+v", model.ComponentBlocks)
 	}
-	if model.Components[0].Identifier.ValueString() != "com.jamf.ddm.disk-management" {
-		t.Errorf("expected identifier 'com.jamf.ddm.disk-management', got %q", model.Components[0].Identifier.ValueString())
+	if got := model.ComponentBlocks[0].Components[0].Identifier.ValueString(); got != "com.jamf.ddm.disk-management" {
+		t.Errorf("expected identifier 'com.jamf.ddm.disk-management', got %q", got)
 	}
 }
 
@@ -287,82 +193,8 @@ func TestUpdateModelFromAPIResponse_NoSteps(t *testing.T) {
 
 	updateModelFromAPIResponse(ctx, model, blueprint)
 
-	if model.Components != nil {
-		t.Error("expected nil components when no steps")
-	}
-}
-
-// TestUpdateLegacyPayloadsFromAPI_PreservesConfigShapeOnMatch pins the issue
-// #282 fix: when the server response is semantically identical to the incoming
-// (configuration-shaped) value, the reader keeps that value verbatim so the
-// dynamic null-typing does not manufacture a diff.
-func TestFlattenFlatLegacyPayloads_PreservesConfigShapeOnMatch(t *testing.T) {
-	prior, err := helpers.JSONToTerraformDynamic([]any{
-		map[string]any{
-			"payload_type": "com.apple.notificationsettings",
-			"settings": map[string]any{
-				"NotificationSettings": []any{
-					map[string]any{
-						"BundleIdentifier":     "com.apple.tips",
-						"AlertType":            float64(0),
-						"BadgesEnabled":        nil,
-						"NotificationsEnabled": false,
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("failed to build prior value: %v", err)
-	}
-
-	apiComponents := map[string]blueprints.Component{
-		"com.jamf.ddm-configuration-profile": {
-			Identifier:    "com.jamf.ddm-configuration-profile",
-			Configuration: json.RawMessage(`{"payloadContent":[{"payloadType":"com.apple.notificationsettings","payloadIdentifier":"generated-uuid","NotificationSettings":[{"BundleIdentifier":"com.apple.tips","AlertType":0,"BadgesEnabled":null,"NotificationsEnabled":false}]}]}`),
-		},
-	}
-
-	got := flattenFlatLegacyPayloads(prior, apiComponents, map[string]struct{}{})
-
-	if !got.Equal(prior) {
-		t.Errorf("expected config-shaped prior value to be preserved on semantic match, got %#v", got)
-	}
-}
-
-// TestUpdateLegacyPayloadsFromAPI_OverwritesOnMismatch verifies that a genuine
-// server-side difference is still surfaced rather than masked by the reconcile.
-func TestFlattenFlatLegacyPayloads_OverwritesOnMismatch(t *testing.T) {
-	prior, err := helpers.JSONToTerraformDynamic([]any{
-		map[string]any{
-			"payload_type": "com.apple.notificationsettings",
-			"settings":     map[string]any{"BundleIdentifier": "com.apple.tips.old"},
-		},
-	})
-	if err != nil {
-		t.Fatalf("failed to build prior value: %v", err)
-	}
-
-	apiComponents := map[string]blueprints.Component{
-		"com.jamf.ddm-configuration-profile": {
-			Identifier:    "com.jamf.ddm-configuration-profile",
-			Configuration: json.RawMessage(`{"payloadContent":[{"payloadType":"com.apple.notificationsettings","BundleIdentifier":"com.apple.tips.new"}]}`),
-		},
-	}
-
-	got := flattenFlatLegacyPayloads(prior, apiComponents, map[string]struct{}{})
-
-	if got.Equal(prior) {
-		t.Fatal("expected differing server value to overwrite the prior value")
-	}
-
-	raw, err := helpers.TerraformDynamicToJSON(got)
-	if err != nil {
-		t.Fatalf("failed to convert result: %v", err)
-	}
-	settings := raw.([]any)[0].(map[string]any)["settings"].(map[string]any)
-	if settings["BundleIdentifier"] != "com.apple.tips.new" {
-		t.Errorf("expected overwritten value 'com.apple.tips.new', got %v", settings["BundleIdentifier"])
+	if model.ComponentBlocks != nil {
+		t.Error("expected nil component_blocks when no steps")
 	}
 }
 
@@ -561,93 +393,6 @@ func TestFlattenBlockLegacyPayloads_SurfacesDiscardedNonNullKey(t *testing.T) {
 	}
 	if got[0].Settings.ValueString() != `{"allowSafariPrivateBrowsing":false}` {
 		t.Errorf("expected state to move to the wire truth, got %q", got[0].Settings.ValueString())
-	}
-}
-
-func TestFlattenFlatLegacyPayloads_MasksServerStampedMetadata(t *testing.T) {
-	apiComponents := map[string]blueprints.Component{
-		"com.jamf.ddm-configuration-profile": {
-			Identifier: "com.jamf.ddm-configuration-profile",
-			Configuration: json.RawMessage(`{"payloadDisplayName":"bp","payloadContent":[{` +
-				`"payloadType":"com.apple.applicationaccess","payloadIdentifier":"pi","payloadUUID":"pi",` +
-				`"payloadVersion":1,"payloadDisplayName":"Restrictions","payloadOrganization":"JAMF Software",` +
-				`"allowSafariPrivateBrowsing":false}]}`),
-		},
-	}
-	prior, err := helpers.JSONToTerraformDynamic([]any{map[string]any{
-		"payload_type": "com.apple.applicationaccess",
-		"settings":     map[string]any{"allowSafariPrivateBrowsing": false},
-	}})
-	if err != nil {
-		t.Fatalf("failed to build prior dynamic: %v", err)
-	}
-
-	got := flattenFlatLegacyPayloads(prior, apiComponents, map[string]struct{}{})
-
-	if !got.Equal(prior) {
-		t.Errorf("expected the prior dynamic preserved once the stamped metadata is masked, got %v", got)
-	}
-}
-
-func TestFlattenFlatLegacyPayloads_MasksStampedMetadataOnImport(t *testing.T) {
-	// Import has no prior value to mask against, so the stamped metadata must still be dropped —
-	// otherwise the imported state carries keys no configuration would ever declare.
-	apiComponents := map[string]blueprints.Component{
-		"com.jamf.ddm-configuration-profile": {
-			Identifier: "com.jamf.ddm-configuration-profile",
-			Configuration: json.RawMessage(`{"payloadDisplayName":"bp","payloadContent":[{` +
-				`"payloadType":"com.apple.applicationaccess","payloadIdentifier":"pi","payloadUUID":"pi",` +
-				`"payloadVersion":1,"payloadDisplayName":"Restrictions","payloadOrganization":"JAMF Software",` +
-				`"allowSafariPrivateBrowsing":false}]}`),
-		},
-	}
-
-	got := flattenFlatLegacyPayloads(types.DynamicNull(), apiComponents, map[string]struct{}{})
-
-	raw, err := helpers.TerraformDynamicToJSON(got)
-	if err != nil {
-		t.Fatalf("failed to convert dynamic to JSON: %v", err)
-	}
-	settings := raw.([]any)[0].(map[string]any)["settings"].(map[string]any)
-	for _, key := range serverStampedPayloadKeys {
-		if _, exists := settings[key]; exists {
-			t.Errorf("expected %s masked out of settings on import, got %v", key, settings)
-		}
-	}
-	if _, exists := settings["allowSafariPrivateBrowsing"]; !exists {
-		t.Errorf("expected the real payload key kept, got %v", settings)
-	}
-}
-
-// TestFlattenFlatLegacyPayloads_KeepsAuthoredServiceOwnedMetadata is the deprecated top-level
-// attribute's half of TestFlattenBlockLegacyPayloads_KeepsAuthoredServiceOwnedMetadata. The
-// attribute is no more Computed than the block one, so a one-sided mask fails an apply there too.
-func TestFlattenFlatLegacyPayloads_KeepsAuthoredServiceOwnedMetadata(t *testing.T) {
-	apiComponents := map[string]blueprints.Component{
-		"com.jamf.ddm-configuration-profile": {
-			Identifier: "com.jamf.ddm-configuration-profile",
-			Configuration: json.RawMessage(`{"payloadDisplayName":"bp","payloadContent":[{` +
-				`"payloadType":"com.apple.applicationaccess","payloadIdentifier":"SERVER-IDENT","payloadUUID":"SERVER-IDENT",` +
-				`"payloadVersion":1,"payloadDisplayName":"Restrictions","payloadOrganization":"JAMF Software",` +
-				`"allowSafariPrivateBrowsing":false}]}`),
-		},
-	}
-	prior, err := helpers.JSONToTerraformDynamic([]any{map[string]any{
-		"payload_type": "com.apple.applicationaccess",
-		"settings": map[string]any{
-			"allowSafariPrivateBrowsing": false,
-			"payloadIdentifier":          "AUTHORED-IDENT",
-			"payloadUUID":                "AUTHORED-UUID",
-		},
-	}})
-	if err != nil {
-		t.Fatalf("failed to build prior dynamic: %v", err)
-	}
-
-	got := flattenFlatLegacyPayloads(prior, apiComponents, map[string]struct{}{})
-
-	if !got.Equal(prior) {
-		t.Errorf("expected the prior dynamic preserved once the service-owned metadata is masked, got %v", got)
 	}
 }
 
@@ -920,59 +665,16 @@ func TestRestoreRedactedValues_DoesNotSubstituteNonRedactedValue(t *testing.T) {
 	}
 }
 
-// --- Block-only components in flat mode ---
+// --- Typed components in blocks ---
 
-// TestUpdateFlatComponentsFromAPI_KeepsBlockOnlyComponentInRawComponent pins the fallback that
-// stops a flat-mode read losing a component the flat attributes cannot represent. Dropping it is
-// silent and destructive: a flat-mode apply rewrites every step from state, so a component absent
-// from state is deleted from the blueprint with nothing in the plan to show it.
-func TestUpdateFlatComponentsFromAPI_KeepsBlockOnlyComponentInRawComponent(t *testing.T) {
+// TestUpdateComponentBlocksFromAPI_TypedComponentStaysOutOfRawComponent pins that a component with a
+// typed component_blocks attribute is read into that attribute only. Writing raw_component as well
+// would populate both at once, which fails an apply with "Provider produced inconsistent result
+// after apply".
+func TestUpdateComponentBlocksFromAPI_TypedComponentStaysOutOfRawComponent(t *testing.T) {
 	ctx := context.Background()
 
-	for identifier := range blockOnlyComponentIdentifiers {
-		t.Run(identifier, func(t *testing.T) {
-			model := &BlueprintResourceModel{
-				Components: []ComponentModel{
-					{Identifier: types.StringValue("com.jamf.custom.x"), Configuration: types.MapNull(types.StringType)},
-				},
-			}
-			blueprint := &blueprints.BlueprintDetail{
-				DeploymentState: &blueprints.DeploymentState{State: "DEPLOYED"},
-				Steps: []blueprints.BlueprintStep{{
-					Components: []blueprints.Component{
-						{Identifier: identifier, Configuration: json.RawMessage(`{}`)},
-						{Identifier: "com.jamf.custom.x", Configuration: json.RawMessage(`{"k":"v"}`)},
-					},
-				}},
-			}
-
-			diags := updateModelFromAPIResponse(ctx, model, blueprint)
-			if diags.HasError() {
-				t.Fatalf("unexpected error diagnostics: %v", diags)
-			}
-			if model.ComponentBlocks != nil {
-				t.Fatal("expected a flat-mode read, got component_blocks populated")
-			}
-
-			var identifiers []string
-			for _, comp := range model.Components {
-				identifiers = append(identifiers, comp.Identifier.ValueString())
-			}
-			if len(identifiers) != 2 || identifiers[0] != identifier || identifiers[1] != "com.jamf.custom.x" {
-				t.Fatalf("expected %q retained in raw_component in the platform's component order, got %v", identifier, identifiers)
-			}
-		})
-	}
-}
-
-// TestUpdateComponentBlocksFromAPI_BlockOnlyComponentStaysTypedInBlockMode is the other half: the
-// fallback is flat-mode only, and a block-mode read that also wrote raw_component would populate the
-// typed attribute and raw_component at once, which fails an apply with "Provider produced
-// inconsistent result after apply".
-func TestUpdateComponentBlocksFromAPI_BlockOnlyComponentStaysTypedInBlockMode(t *testing.T) {
-	ctx := context.Background()
-
-	for identifier := range blockOnlyComponentIdentifiers {
+	for _, identifier := range []string{"com.jamf.ai-governance", appleDeclarationsIdentifier} {
 		t.Run(identifier, func(t *testing.T) {
 			model := &BlueprintResourceModel{}
 			blueprint := &blueprints.BlueprintDetail{
@@ -994,50 +696,6 @@ func TestUpdateComponentBlocksFromAPI_BlockOnlyComponentStaysTypedInBlockMode(t 
 				t.Errorf("%q has a typed component_blocks attribute, so a block-mode read must not also write raw_component, got %+v", identifier, got)
 			}
 		})
-	}
-}
-
-// TestBlockOnlyComponentIdentifiers_CoversEveryTypedComponentWithoutFlatField is the durable guard
-// behind the fallback above. A typed component identifier with no BlueprintResourceModel field is
-// unrepresentable in flat mode, so it must be registered in blockOnlyComponentIdentifiers or a
-// flat-mode read drops it. The check reads the model's tfsdk tags rather than a hand-kept list, so
-// the next block-only component fails here instead of silently reintroducing the drop.
-func TestBlockOnlyComponentIdentifiers_CoversEveryTypedComponentWithoutFlatField(t *testing.T) {
-	flatFields := make(map[string]struct{})
-	modelType := reflect.TypeFor[BlueprintResourceModel]()
-	for field := range modelType.Fields() {
-		if tag, ok := field.Tag.Lookup("tfsdk"); ok {
-			flatFields[tag] = struct{}{}
-		}
-	}
-
-	attributeFor := make(map[string]string, len(stronglyTypedComponentIdentifiers))
-	for _, tc := range typedComponentCases() {
-		attributeFor[tc.identifier] = tc.schemaAttribute
-	}
-
-	for identifier := range stronglyTypedComponentIdentifiers {
-		attribute, known := attributeFor[identifier]
-		if !known {
-			t.Errorf("stronglyTypedComponentIdentifiers entry %q has no typedComponentCases row, so its flat representation cannot be checked", identifier)
-			continue
-		}
-
-		_, hasFlatField := flatFields[attribute]
-		_, blockOnly := blockOnlyComponentIdentifiers[identifier]
-
-		switch {
-		case hasFlatField && blockOnly:
-			t.Errorf("%q has the BlueprintResourceModel field %q, so it must not be in blockOnlyComponentIdentifiers — it would land in raw_component as well as its flat attribute", identifier, attribute)
-		case !hasFlatField && !blockOnly:
-			t.Errorf("%q maps to component_blocks attribute %q, which BlueprintResourceModel has no field for, so a flat-mode read has nowhere to put it — register it in blockOnlyComponentIdentifiers or a flat-mode read drops it and the next apply deletes it", identifier, attribute)
-		}
-	}
-
-	for identifier := range blockOnlyComponentIdentifiers {
-		if _, typed := stronglyTypedComponentIdentifiers[identifier]; !typed {
-			t.Errorf("blockOnlyComponentIdentifiers entry %q is not strongly typed, so it already stays in raw_component and the entry is inert", identifier)
-		}
 	}
 }
 

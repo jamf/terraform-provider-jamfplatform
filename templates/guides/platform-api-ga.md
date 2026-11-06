@@ -413,13 +413,78 @@ the title's current assignments and rewriting the whole set, instead of leaving 
 merge each version in turn. An assignment created in the Jamf Pro UI between that read and the
 write can therefore be lost. Do not edit a title's **Definition** tab while an apply is in flight.
 
-### Deprecated, not yet removed: the flat blueprint component attributes
+### Removed: the flat blueprint component attributes
 
-**No action needed yet.** The flat top-level component attributes on
-`jamfplatform_blueprints_blueprint`, together with the
-top-level `activation_conditions` and `legacy_payloads`, are superseded by named, ordered
-`component_blocks`. They remain present and functional, and may be removed on or after **22
-October 2026**. Migrate ahead of that date. `terraform plan` reports every attribute that needs it.
+**Action needed if the configuration sets any of them.** `jamfplatform_blueprints_blueprint` no
+longer accepts the top-level component attributes (`raw_component`, `audio_accessory_settings`,
+`custom_declarations`, `disk_management_settings`, `math_settings`, `passcode_policy`,
+`safari_bookmarks`, `safari_extensions`, `safari_settings`, `service_background_tasks`,
+`service_configuration_files`, `software_update`, `software_update_settings`), `legacy_payloads`
+or `activation_conditions`. Their deprecation notice gave 22 October 2026 as the earliest removal
+date. Move each one into an entry of `component_blocks`, which takes the same components, its own
+`activation_conditions` and a `legacy_payloads` list whose `settings` are JSON strings.
+
+State needs no edit. The state upgrade moves whatever the top-level attributes held into one
+component block named `Declaration group`, which is the name the platform already stores, so no
+component leaves the blueprint. Set that name on the block in your configuration, or the plan
+reports a rename:
+
+```hcl
+# Before
+resource "jamfplatform_blueprints_blueprint" "example" {
+  name          = "Baseline"
+  deployed      = true
+  device_groups = [jamfplatform_device_group.fleet.id]
+
+  activation_conditions = "ANY @property(jamf.device.osVersion) >= '15.0'"
+
+  passcode_policy = {
+    require_passcode = true
+    minimum_length   = 8
+  }
+
+  legacy_payloads = [
+    {
+      payload_type = "com.apple.dock"
+      settings     = { tilesize = 48 }
+    },
+  ]
+}
+
+# After
+resource "jamfplatform_blueprints_blueprint" "example" {
+  name          = "Baseline"
+  deployed      = true
+  device_groups = [jamfplatform_device_group.fleet.id]
+
+  component_blocks = [
+    {
+      name                  = "Declaration group"
+      activation_conditions = "ANY @property(jamf.device.osVersion) >= '15.0'"
+
+      passcode_policy = {
+        require_passcode = true
+        minimum_length   = 8
+      }
+
+      legacy_payloads = [
+        {
+          payload_type = "com.apple.dock"
+          settings     = jsonencode({ tilesize = 48 })
+        },
+      ]
+    },
+  ]
+}
+```
+
+The top-level attributes could only represent the first step of a blueprint. State now holds every
+step, so a blueprint with more than one step plans the others for removal until `component_blocks`
+declares them. Read the plan before you apply it.
+
+The `jamfplatform_blueprints_blueprint` data source drops its `activation_conditions` and
+`component` attributes for the same reason. Read `component_blocks`, which lists every block with
+its own activation condition and components.
 
 ### Now read-only: `unmanaged_sync_threshold` on `jamfplatform_security_cloud_uem_connect`
 

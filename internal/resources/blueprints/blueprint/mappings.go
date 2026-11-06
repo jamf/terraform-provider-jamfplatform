@@ -60,19 +60,6 @@ var stronglyTypedComponentIdentifiers = map[string]struct{}{
 	appleDeclarationsIdentifier:                                                          {},
 }
 
-// blockOnlyComponentIdentifiers lists the strongly-typed components the provider offers only inside
-// component_blocks. The flat top-level component style is deprecated and removed on or after
-// 2026-10-22, so no component added after it was deprecated gains a flat attribute — which leaves a
-// flat-mode read with nowhere to put one. Such a component is kept in raw_component rather than
-// dropped, because a flat-mode apply rewrites every step: a component missing from state is deleted
-// from the blueprint with no plan diff showing the deletion. Every entry must also appear in
-// stronglyTypedComponentIdentifiers, and state_builders_test.go pins that a typed component with no
-// BlueprintResourceModel field is registered here.
-var blockOnlyComponentIdentifiers = map[string]struct{}{
-	"com.jamf.ai-governance":    {},
-	appleDeclarationsIdentifier: {},
-}
-
 // legacyPayloadSettingsBehaviour documents how Jamf treats the settings written for a legacy payload,
 // appended to every legacy-payload schema description. It deliberately covers only what an author
 // cannot learn from a diagnostic: what the provider absorbs silently, and the one case it cannot fix

@@ -18,91 +18,47 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/blueprints/blueprint/components"
 )
 
-// flatStepName is the single step name used when a blueprint is authored with the deprecated flat
-// top-level component attributes (no component_blocks).
-const flatStepName = "Declaration group"
-
-// buildSteps converts the model into the ordered SDK steps for a create/update request. In block
-// mode (component_blocks set) it emits one step per block, preserving order, per-block name, and
-// per-block activation condition. In the deprecated flat mode it emits the single "Declaration
-// group" step carrying every top-level component and the top-level activation condition.
+// buildSteps converts the model into the ordered SDK steps for a create/update request: one step
+// per component block, preserving order, per-block name, and per-block activation condition.
 //
 // A block's legacy payloads are checked for a raw_component overlap inside collectBlockComponents,
-// which carries them; the deprecated flat value is not carried there, because the flat (dynamic) and
-// block (JSON-string) shapes differ, so flat mode checks that one overlap itself.
+// which carries them.
 //
 // stored carries the legacy payload identifiers the service has already assigned, so an update
 // writes them back rather than letting the service mint replacements; it is nil on create. See
-// storedLegacyPayloadIdentifiers.
-//
-// Block mode resolves those identifiers by block name, but flat mode resolves positionally, by
-// asking for one unnamed block. Step 0 is the only step flat mode writes and the only one it reads
-// back (see updateFlatComponentsFromAPI), whereas resolve's name pass matches a name at any index —
-// so asking for the flatStepName constant would hand flat mode the identifiers of a step it does not
-// manage whenever a stored step at another index carries that name, an arrangement the read path
-// permits because it only warns about the extra steps. The name is the provider's own constant
-// rather than anything an operator wrote, so matching on it would honour no authoring intent.
+// storedLegacyPayloadIdentifiers. They resolve by block name ahead of position, so inserting or
+// reordering a block cannot shift one block's identifiers onto another's payloads.
 func (r *BlueprintResource) buildSteps(ctx context.Context, data *BlueprintResourceModel, stored *storedLegacyPayloadIdentifiers) ([]blueprints.BlueprintStep, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	blueprintName := data.Name.ValueString()
 
-	if len(data.ComponentBlocks) > 0 {
-		blockNames := make([]types.String, len(data.ComponentBlocks))
-		for i, block := range data.ComponentBlocks {
-			blockNames[i] = block.Name
-		}
-		storedByBlock := stored.resolve(blockNames)
-
-		steps := make([]blueprints.BlueprintStep, 0, len(data.ComponentBlocks))
-		for i, block := range data.ComponentBlocks {
-			components, blockDiags := r.collectBlockComponents(ctx, block)
-			if !blockDiags.HasError() {
-				r.collectBlockLegacyPayloads(&components, &blockDiags, block.LegacyPayloads, blueprintName, describeBlockPosition(i, block.Name), storedByBlock[i])
-			}
-			diags.Append(blockDiags...)
-			if blockDiags.HasError() {
-				continue
-			}
-			steps = append(steps, blueprints.BlueprintStep{
-				Name:                block.Name.ValueStringPointer(),
-				ActivationPredicate: block.ActivationConditions.ValueStringPointer(),
-				Components:          components,
-			})
-		}
-		return steps, diags
+	blockNames := make([]types.String, len(data.ComponentBlocks))
+	for i, block := range data.ComponentBlocks {
+		blockNames[i] = block.Name
 	}
+	storedByBlock := stored.resolve(blockNames)
 
-	flatBlock := data.flatComponentsAsBlock()
-	components, flatDiags := r.collectBlockComponents(ctx, flatBlock)
-	if !data.LegacyPayloads.IsNull() && !data.LegacyPayloads.IsUnknown() {
-		flatDiags.Append(rawComponentOverlapDiags("", flatBlock.Components, []typedComponentAttribute{
-			{name: "legacy_payloads", identifier: legacyConfigProfileIdentifier},
-		})...)
-		if !flatDiags.HasError() {
-			r.collectLegacyPayloads(&components, &flatDiags, data.LegacyPayloads, blueprintName, "legacy_payloads", stored.resolve([]types.String{types.StringNull()})[0])
+	steps := make([]blueprints.BlueprintStep, 0, len(data.ComponentBlocks))
+	for i, block := range data.ComponentBlocks {
+		components, blockDiags := r.collectBlockComponents(ctx, block)
+		if !blockDiags.HasError() {
+			r.collectBlockLegacyPayloads(&components, &blockDiags, block.LegacyPayloads, blueprintName, describeBlockPosition(i, block.Name), storedByBlock[i])
 		}
-	}
-	diags.Append(flatDiags...)
-
-	if flatDiags.HasError() {
-		return nil, diags
-	}
-
-	stepName := flatStepName
-	steps := []blueprints.BlueprintStep{
-		{
-			Name:                &stepName,
+		diags.Append(blockDiags...)
+		if blockDiags.HasError() {
+			continue
+		}
+		steps = append(steps, blueprints.BlueprintStep{
+			Name:                block.Name.ValueStringPointer(),
+			ActivationPredicate: block.ActivationConditions.ValueStringPointer(),
 			Components:          components,
-			ActivationPredicate: data.ActivationConditions.ValueStringPointer(),
-		},
+		})
 	}
 	return steps, diags
 }
 
 // collectBlockComponents gathers the raw and strongly-typed components of one block into SDK
-// component values. Legacy payloads are collected separately by the caller because the flat
-// (dynamic) and block (JSON-string) shapes differ. The flat top-level authoring style reuses this
-// by passing data.flatComponentsAsBlock(); each entry in component_blocks passes its own carrier.
+// component values. Legacy payloads are collected separately by the caller.
 //
 // A block authoring a strongly-typed component alongside a raw_component for the same component is
 // rejected before anything is built, so the block emits nothing. The platform stores both: a step
@@ -280,8 +236,7 @@ func populatedTypedComponentAttributes(block ComponentBlockModel) []typedCompone
 // component as one of the block's raw_component entries, one error per overlap. See
 // collectBlockComponents for why an overlap cannot be written.
 //
-// blockName locates the overlap for an author who has many blocks, and is empty for the deprecated
-// flat style, which has only the one implicit step to look at.
+// blockName locates the overlap for an author who has many blocks.
 func rawComponentOverlapDiags(blockName string, rawComponents []ComponentModel, attributes []typedComponentAttribute) diag.Diagnostics {
 	var diags diag.Diagnostics
 	rawIdentifiers := rawIdentifierSet(rawComponents)
@@ -328,47 +283,10 @@ func (r *BlueprintResource) collectSingleComponent(allComponents *[]blueprints.C
 	*allComponents = append(*allComponents, *clientComp)
 }
 
-// legacyPayloadEntry is one legacy payload flattened to its payload type and settings map, the
-// common shape both the flat (dynamic) and block (JSON-string) legacy collectors reduce to.
+// legacyPayloadEntry is one legacy payload flattened to its payload type and settings map.
 type legacyPayloadEntry struct {
 	PayloadType string
 	Settings    map[string]any
-}
-
-// collectLegacyPayloads builds the legacy configuration profile component from the deprecated
-// dynamic top-level legacy_payloads value.
-func (r *BlueprintResource) collectLegacyPayloads(allComponents *[]blueprints.Component, diags *diag.Diagnostics, legacyPayloads types.Dynamic, blueprintName, location string, storedIdentifiers map[string]string) {
-	raw, err := helpers.TerraformDynamicToJSON(legacyPayloads)
-	if err != nil {
-		diags.AddError("Error reading legacy payloads", "Could not convert legacy payloads to JSON: "+helpers.APIErrorDetail(err))
-		return
-	}
-
-	items, ok := raw.([]any)
-	if !ok {
-		diags.AddError("Invalid legacy_payloads", "Expected a list of objects, got a non-list value.")
-		return
-	}
-
-	entries := make([]legacyPayloadEntry, 0, len(items))
-	for _, item := range items {
-		obj, ok := item.(map[string]any)
-		if !ok {
-			diags.AddError("Invalid legacy_payloads entry", "Each legacy payload must be an object.")
-			return
-		}
-
-		payloadType, _ := obj["payload_type"].(string)
-		entry := legacyPayloadEntry{PayloadType: payloadType}
-		if settings, exists := obj["settings"]; exists {
-			if settingsMap, ok := settings.(map[string]any); ok {
-				entry.Settings = settingsMap
-			}
-		}
-		entries = append(entries, entry)
-	}
-
-	r.appendLegacyConfigProfile(allComponents, diags, entries, blueprintName, location, storedIdentifiers)
 }
 
 // collectBlockLegacyPayloads builds the legacy configuration profile component from a block's

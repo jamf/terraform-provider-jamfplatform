@@ -37,7 +37,7 @@ const activationConditionsReason = "activation conditions can require or rule ou
 // shape the impact package counts.
 //
 // device_groups is the blueprint's audience and is counted. Any non-empty
-// activation condition — the blueprint's own or a component block's — gates
+// activation condition on a component block gates
 // which devices the blueprint applies to even when it names no group (an
 // OS-version test narrows just as a group test does), so each one caveats the
 // figure as ambiguous. Groups the expressions name are additionally reported
@@ -57,9 +57,6 @@ func blueprintImpactScope(ctx context.Context, m *BlueprintResourceModel) impact
 		}
 		conditions++
 		mentioned = append(mentioned, groupIDPattern.FindAllString(expr, -1)...)
-	}
-	if !m.ActivationConditions.IsNull() && !m.ActivationConditions.IsUnknown() {
-		collect(m.ActivationConditions.ValueString())
 	}
 	for _, blk := range m.ComponentBlocks {
 		if !blk.ActivationConditions.IsNull() && !blk.ActivationConditions.IsUnknown() {

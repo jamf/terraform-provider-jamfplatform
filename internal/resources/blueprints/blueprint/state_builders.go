@@ -20,13 +20,9 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/resources/blueprints/blueprint/components"
 )
 
-// updateModelFromAPIResponse updates the Terraform model with data from the API response. It
-// selects between the deprecated flat top-level attributes and ordered component_blocks based on
-// which the prior model used (a fresh/empty model — import, list resource — defaults to blocks).
+// updateModelFromAPIResponse updates the Terraform model with data from the API response.
 func updateModelFromAPIResponse(ctx context.Context, model *BlueprintResourceModel, blueprint *blueprints.BlueprintDetail) diag.Diagnostics {
 	var diags diag.Diagnostics
-
-	blockMode := len(model.ComponentBlocks) > 0 || !model.hasFlatComponents()
 
 	model.ID = types.StringValue(blueprint.ID)
 	model.Name = types.StringValue(blueprint.Name)
@@ -44,18 +40,13 @@ func updateModelFromAPIResponse(ctx context.Context, model *BlueprintResourceMod
 	deviceGroupsSet, _ := types.SetValueFrom(context.Background(), types.StringType, scopeDeviceGroups(blueprint.Scope))
 	model.DeviceGroups = deviceGroupsSet
 
-	if blockMode {
-		updateComponentBlocksFromAPI(ctx, &diags, model, blueprint)
-	} else {
-		updateFlatComponentsFromAPI(ctx, &diags, model, blueprint)
-	}
+	updateComponentBlocksFromAPI(ctx, &diags, model, blueprint)
 
 	model.Timeouts = helpers.EnsureResourceTimeouts(model.Timeouts, blueprintTimeoutAttributeTypes)
 	return diags
 }
 
-// updateComponentBlocksFromAPI populates model.ComponentBlocks from every wire step (block mode)
-// and clears the deprecated flat attributes so state carries a single representation.
+// updateComponentBlocksFromAPI populates model.ComponentBlocks from every wire step.
 func updateComponentBlocksFromAPI(ctx context.Context, diags *diag.Diagnostics, model *BlueprintResourceModel, blueprint *blueprints.BlueprintDetail) {
 	prior := model.ComponentBlocks
 	blocks := make([]ComponentBlockModel, 0, len(blueprint.Steps))
@@ -74,7 +65,7 @@ func updateComponentBlocksFromAPI(ctx context.Context, diags *diag.Diagnostics, 
 			priorActivation = prior[i].ActivationConditions
 		}
 
-		block, apiComponentsByID := mapStepComponents(ctx, diags, step, priorRaw, false)
+		block, apiComponentsByID := mapStepComponents(ctx, diags, step, priorRaw)
 		block.Name = helpers.ReconcileOptionalStringPointer(step.Name, priorName)
 		block.ActivationConditions = helpers.ReconcileOptionalStringPointer(step.ActivationPredicate, priorActivation)
 		block.LegacyPayloads = flattenBlockLegacyPayloads(priorLegacy, apiComponentsByID, priorRaw)
@@ -86,39 +77,6 @@ func updateComponentBlocksFromAPI(ctx context.Context, diags *diag.Diagnostics, 
 		model.ComponentBlocks = blocks
 	} else {
 		model.ComponentBlocks = nil
-	}
-
-	model.applyFlatComponentsFromBlock(ComponentBlockModel{})
-	model.LegacyPayloads = types.DynamicNull()
-	model.ActivationConditions = types.StringNull()
-}
-
-// updateFlatComponentsFromAPI populates the deprecated flat top-level attributes from the first
-// step (flat mode). When the blueprint has more than one step it also emits a migration warning:
-// the flat attributes cannot represent the extra blocks, so applying would collapse them.
-//
-// It asks mapStepComponents to keep a blockOnlyComponentIdentifiers component in raw_component,
-// because the flat attributes have no field for one and dropping it from state would delete it from
-// the blueprint on the next apply without a plan diff.
-func updateFlatComponentsFromAPI(ctx context.Context, diags *diag.Diagnostics, model *BlueprintResourceModel, blueprint *blueprints.BlueprintDetail) {
-	priorRaw := rawIdentifierSet(model.Components)
-
-	var step blueprints.BlueprintStep
-	if len(blueprint.Steps) > 0 {
-		step = blueprint.Steps[0]
-	}
-
-	block, apiComponentsByID := mapStepComponents(ctx, diags, step, priorRaw, true)
-	model.applyFlatComponentsFromBlock(block)
-	model.LegacyPayloads = flattenFlatLegacyPayloads(model.LegacyPayloads, apiComponentsByID, priorRaw)
-	model.ActivationConditions = helpers.ReconcileOptionalStringPointer(step.ActivationPredicate, model.ActivationConditions)
-
-	if len(blueprint.Steps) > 1 {
-		diags.AddWarning(
-			"Blueprint has multiple component blocks",
-			"This blueprint has multiple component blocks, but the configuration uses the deprecated top-level component attributes, which can only represent the first block. "+
-				"Only the first block is reflected in state, and applying this configuration would remove the others. Migrate to `component_blocks` to manage every block.",
-		)
 	}
 }
 
@@ -138,13 +96,8 @@ func rawIdentifierSet(components []ComponentModel) map[string]struct{} {
 // ComponentBlockModel carrier, and returns the step's components keyed by identifier so the caller
 // can flatten the components assembled here rather than in the components package. It leaves Name,
 // ActivationConditions, LegacyPayloads and AppleDeclarations unset — the caller reconciles those.
-//
-// retainBlockOnlyAsRaw keeps a blockOnlyComponentIdentifiers component in raw_component instead of
-// skipping it as strongly typed, and only the flat-mode caller sets it: block mode has a typed
-// attribute for every such component, so retaining it there would populate the typed attribute and
-// raw_component at once. The mode is threaded in rather than the flat caller appending the fallback
-// afterwards, so a retained component keeps its position in the platform's component order.
-func mapStepComponents(ctx context.Context, diags *diag.Diagnostics, step blueprints.BlueprintStep, priorRawIdentifiers map[string]struct{}, retainBlockOnlyAsRaw bool) (ComponentBlockModel, map[string]blueprints.Component) {
+
+func mapStepComponents(ctx context.Context, diags *diag.Diagnostics, step blueprints.BlueprintStep, priorRawIdentifiers map[string]struct{}) (ComponentBlockModel, map[string]blueprints.Component) {
 	var block ComponentBlockModel
 
 	apiComponentsByID := make(map[string]blueprints.Component)
@@ -155,8 +108,7 @@ func mapStepComponents(ctx context.Context, diags *diag.Diagnostics, step bluepr
 
 		_, handledAsRaw := priorRawIdentifiers[comp.Identifier]
 		_, isTyped := stronglyTypedComponentIdentifiers[comp.Identifier]
-		_, blockOnly := blockOnlyComponentIdentifiers[comp.Identifier]
-		if isTyped && !handledAsRaw && (!retainBlockOnlyAsRaw || !blockOnly) {
+		if isTyped && !handledAsRaw {
 			continue
 		}
 
@@ -526,70 +478,6 @@ func pruneJSONNulls(value any) any {
 	}
 }
 
-// flattenFlatLegacyPayloads renders the wire legacy payloads into the deprecated top-level dynamic
-// value. When the user manages the configuration profile as a raw_component it is left untouched;
-// when the server value is semantically identical to the prior value that prior value is preserved
-// (the dynamic null-typing reconcile — see dynamicPayloadsMatchJSON).
-func flattenFlatLegacyPayloads(prior types.Dynamic, apiComponentsByID map[string]blueprints.Component, rawIdentifiers map[string]struct{}) types.Dynamic {
-	if _, handledAsRaw := rawIdentifiers[legacyConfigProfileIdentifier]; handledAsRaw {
-		return prior
-	}
-
-	items := legacyPayloadItems(apiComponentsByID, priorSettingsFromDynamic(prior))
-	if len(items) == 0 {
-		return types.DynamicNull()
-	}
-
-	if dynamicPayloadsMatchJSON(prior, items) {
-		return prior
-	}
-
-	dynVal, err := helpers.JSONToTerraformDynamic(items)
-	if err != nil {
-		return types.DynamicNull()
-	}
-	return dynVal
-}
-
-// priorSettingsFromDynamic reads the author's per-payload settings out of the deprecated top-level
-// dynamic value, keyed by legacyPayloadIdentity, so the wire payloads can be masked against what
-// was actually written. It returns nil when the prior value carries nothing usable (import, or a
-// first create with no prior state).
-//
-// A key the service owns is dropped as it is read (see providerMaskedPayloadKeys), because nothing
-// downstream may treat one as authored: the provider strips it from every write, so
-// appendLegacyPayloadDiscardWarnings would otherwise name a key the provider removed as one Jamf
-// discarded, and send the operator to Apple's documentation over a key that is not theirs to set.
-func priorSettingsFromDynamic(prior types.Dynamic) map[string]map[string]any {
-	if prior.IsNull() || prior.IsUnknown() {
-		return nil
-	}
-
-	raw, err := helpers.TerraformDynamicToJSON(prior)
-	if err != nil {
-		return nil
-	}
-
-	items, ok := raw.([]any)
-	if !ok {
-		return nil
-	}
-
-	settingsByIdentity := make(map[string]map[string]any, len(items))
-	for _, item := range items {
-		obj, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		payloadType, _ := obj["payload_type"].(string)
-		if settings, ok := obj["settings"].(map[string]any); ok {
-			deleteProviderMaskedPayloadKeys(settings)
-			settingsByIdentity[legacyPayloadIdentity(payloadType, settings)] = settings
-		}
-	}
-	return settingsByIdentity
-}
-
 // priorSettingsFromBlockPayloads reads the author's per-payload settings out of a block's typed
 // legacy payload list, keyed by legacyPayloadIdentity, decoding each settings JSON string. It
 // returns nil when nothing was authored. A key the service owns is dropped as it is read, for the
@@ -799,62 +687,6 @@ func jsonValueMatchesObject(prior any, settings map[string]any) bool {
 	return bytes.Equal(priorBytes, settingsBytes)
 }
 
-// dynamicPayloadsMatchJSON reports whether the prior dynamic value is
-// semantically identical to the server-derived payload items, comparing their
-// canonical JSON encodings with the authored side's explicit nulls pruned (see
-// pruneJSONNulls). Numbers normalise to float64 on both sides and
-// json.Marshal sorts object keys, so the comparison is order-independent for
-// object keys and insensitive to the dynamic null-typing that otherwise causes
-// a perpetual diff.
-//
-// The authored side also loses the metadata keys the service owns, for the reason
-// legacyPayloadSettingsMatch gives about the block attribute: legacyPayloadItems has already taken
-// them off the items this compares against, and the deprecated top-level attribute is no more
-// Computed than the block one, so a one-sided removal would fail the apply.
-func dynamicPayloadsMatchJSON(prior types.Dynamic, apiItems []any) bool {
-	if prior.IsNull() || prior.IsUnknown() {
-		return false
-	}
-
-	priorJSON, err := helpers.TerraformDynamicToJSON(prior)
-	if err != nil {
-		return false
-	}
-	deleteFlatPayloadProviderMaskedKeys(priorJSON)
-
-	priorBytes, err := json.Marshal(pruneJSONNulls(priorJSON))
-	if err != nil {
-		return false
-	}
-
-	apiBytes, err := json.Marshal(apiItems)
-	if err != nil {
-		return false
-	}
-
-	return bytes.Equal(priorBytes, apiBytes)
-}
-
-// deleteFlatPayloadProviderMaskedKeys removes the keys the service owns from every item's settings in
-// a decoded copy of the deprecated top-level payload list (see providerMaskedPayloadKeys). It edits
-// the value in place, which is safe because helpers.TerraformDynamicToJSON builds a fresh structure
-// per call and the state value the flattener preserves is the types.Dynamic itself.
-func deleteFlatPayloadProviderMaskedKeys(items any) {
-	list, ok := items.([]any)
-	if !ok {
-		return
-	}
-	for _, item := range list {
-		object, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		if settings, ok := object["settings"].(map[string]any); ok {
-			deleteProviderMaskedPayloadKeys(settings)
-		}
-	}
-}
-
 // checkLegacyPayloadDiscards warns when the blueprints service did not store a legacy payload as it
 // was written. The service validates each payload against Apple's profile-specific payload schema
 // for that payload type (the same key vocabulary as apple/device-management `mdm/profiles`) and
@@ -872,22 +704,13 @@ func deleteFlatPayloadProviderMaskedKeys(items any) {
 func checkLegacyPayloadDiscards(planned *BlueprintResourceModel, blueprint *blueprints.BlueprintDetail) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	if len(planned.ComponentBlocks) > 0 {
-		for i, block := range planned.ComponentBlocks {
-			var step blueprints.BlueprintStep
-			if i < len(blueprint.Steps) {
-				step = blueprint.Steps[i]
-			}
-			appendLegacyPayloadDiscardWarnings(&diags, priorSettingsFromBlockPayloads(block.LegacyPayloads), step, describeBlockPosition(i, block.Name))
+	for i, block := range planned.ComponentBlocks {
+		var step blueprints.BlueprintStep
+		if i < len(blueprint.Steps) {
+			step = blueprint.Steps[i]
 		}
-		return diags
+		appendLegacyPayloadDiscardWarnings(&diags, priorSettingsFromBlockPayloads(block.LegacyPayloads), step, describeBlockPosition(i, block.Name))
 	}
-
-	var step blueprints.BlueprintStep
-	if len(blueprint.Steps) > 0 {
-		step = blueprint.Steps[0]
-	}
-	appendLegacyPayloadDiscardWarnings(&diags, priorSettingsFromDynamic(planned.LegacyPayloads), step, "legacy_payloads")
 
 	return diags
 }

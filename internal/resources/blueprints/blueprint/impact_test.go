@@ -28,8 +28,7 @@ func uuidSet(t *testing.T, vals ...string) types.Set {
 
 func TestBlueprintImpactScopeCountsDeviceGroups(t *testing.T) {
 	got := blueprintImpactScope(context.Background(), &BlueprintResourceModel{
-		DeviceGroups:         uuidSet(t, groupA),
-		ActivationConditions: types.StringNull(),
+		DeviceGroups: uuidSet(t, groupA),
 	})
 	if got.DeviceType != impact.DeviceTypeAny {
 		t.Fatalf("a blueprint can target either estate, so the device type must span both: %v", got.DeviceType)
@@ -46,8 +45,10 @@ func TestBlueprintImpactScopeNamesActivationConditionGroupsWithoutCountingThem(t
 	// An activation condition can require a group or rule one out, so its groups
 	// are surfaced by name but must not move the figure.
 	got := blueprintImpactScope(context.Background(), &BlueprintResourceModel{
-		DeviceGroups:         uuidSet(t, groupA),
-		ActivationConditions: types.StringValue("ANY @property(jamf.device.groups) IN {'" + groupB + "'}"),
+		DeviceGroups: uuidSet(t, groupA),
+		ComponentBlocks: []ComponentBlockModel{
+			{ActivationConditions: types.StringValue("ANY @property(jamf.device.groups) IN {'" + groupB + "'}")},
+		},
 	})
 	if len(got.PlatformGroupIDs) != 1 || got.PlatformGroupIDs[0] != groupA {
 		t.Fatalf("only device_groups may be counted: %v", got.PlatformGroupIDs)
@@ -65,8 +66,7 @@ func TestBlueprintImpactScopeNamesActivationConditionGroupsWithoutCountingThem(t
 
 func TestBlueprintImpactScopeCollectsComponentBlockConditions(t *testing.T) {
 	got := blueprintImpactScope(context.Background(), &BlueprintResourceModel{
-		DeviceGroups:         uuidSet(t),
-		ActivationConditions: types.StringNull(),
+		DeviceGroups: uuidSet(t),
 		ComponentBlocks: []ComponentBlockModel{
 			{Name: types.StringValue("one"), ActivationConditions: types.StringValue("ANY @property(jamf.device.groups) IN {'" + groupA + "'}")},
 			{Name: types.StringValue("two"), ActivationConditions: types.StringNull()},
@@ -80,9 +80,9 @@ func TestBlueprintImpactScopeCollectsComponentBlockConditions(t *testing.T) {
 func TestBlueprintImpactScopeDeduplicatesRepeatedMentions(t *testing.T) {
 	expr := "ANY @property(jamf.device.groups) IN {'" + groupA + "','" + groupA + "'}"
 	got := blueprintImpactScope(context.Background(), &BlueprintResourceModel{
-		DeviceGroups:         uuidSet(t),
-		ActivationConditions: types.StringValue(expr),
+		DeviceGroups: uuidSet(t),
 		ComponentBlocks: []ComponentBlockModel{
+			{ActivationConditions: types.StringValue(expr)},
 			{ActivationConditions: types.StringValue(expr)},
 		},
 	})
@@ -98,11 +98,11 @@ func TestBlueprintImpactScopeFlagsConditionsWithNoGroups(t *testing.T) {
 	// An OS-version condition names no group yet still gates which devices the
 	// blueprint applies to, so the figure must carry the ambiguity caveat.
 	got := blueprintImpactScope(context.Background(), &BlueprintResourceModel{
-		DeviceGroups:         uuidSet(t, groupA),
-		ActivationConditions: types.StringValue("ANY @property(jamf.device.osVersion) >= '15.0'"),
+		DeviceGroups: uuidSet(t, groupA),
 		ComponentBlocks: []ComponentBlockModel{
-			{Name: types.StringValue("one"), ActivationConditions: types.StringValue("ANY @property(jamf.device.modelName) CONTAINS 'MacBook'")},
-			{Name: types.StringValue("two"), ActivationConditions: types.StringNull()},
+			{Name: types.StringValue("one"), ActivationConditions: types.StringValue("ANY @property(jamf.device.osVersion) >= '15.0'")},
+			{Name: types.StringValue("two"), ActivationConditions: types.StringValue("ANY @property(jamf.device.modelName) CONTAINS 'MacBook'")},
+			{Name: types.StringValue("three"), ActivationConditions: types.StringNull()},
 		},
 	})
 	if len(got.MentionedPlatformIDs) != 0 {
@@ -123,10 +123,10 @@ func TestBlueprintImpactScopeIgnoresBlankConditions(t *testing.T) {
 	// An expression that is empty or whitespace gates nothing and must not
 	// caveat the figure.
 	got := blueprintImpactScope(context.Background(), &BlueprintResourceModel{
-		DeviceGroups:         uuidSet(t, groupA),
-		ActivationConditions: types.StringValue("   "),
+		DeviceGroups: uuidSet(t, groupA),
 		ComponentBlocks: []ComponentBlockModel{
-			{Name: types.StringValue("one"), ActivationConditions: types.StringValue("")},
+			{Name: types.StringValue("one"), ActivationConditions: types.StringValue("   ")},
+			{Name: types.StringValue("two"), ActivationConditions: types.StringValue("")},
 		},
 	})
 	if len(got.Unresolvable) != 0 {
@@ -136,8 +136,7 @@ func TestBlueprintImpactScopeIgnoresBlankConditions(t *testing.T) {
 
 func TestBlueprintImpactScopeUnknownDeviceGroupsIsPending(t *testing.T) {
 	got := blueprintImpactScope(context.Background(), &BlueprintResourceModel{
-		DeviceGroups:         types.SetUnknown(types.StringType),
-		ActivationConditions: types.StringNull(),
+		DeviceGroups: types.SetUnknown(types.StringType),
 	})
 	if len(got.PendingPaths) != 1 || got.PendingPaths[0] != "device_groups" {
 		t.Fatalf("a group created by this plan must be recorded as pending, got %v", got.PendingPaths)

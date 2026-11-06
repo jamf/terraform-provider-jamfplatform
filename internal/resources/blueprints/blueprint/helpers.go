@@ -6,7 +6,6 @@ package blueprint
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"maps"
 	"slices"
 	"strconv"
@@ -356,32 +355,6 @@ func (s *storedLegacyPayloadIdentifiers) resolve(blockNames []types.String) []ma
 	}
 
 	return resolved
-}
-
-// describeBlueprintBlocks renders one numbered line per component block, naming the block and the
-// components it carries, for the diagnostic that lists what a flat-mode configuration cannot hold
-// (see checkFlatModeBlockLoss). An unnamed block is labelled so its position stays readable.
-func describeBlueprintBlocks(steps []blueprints.BlueprintStep) string {
-	var b strings.Builder
-	for i, step := range steps {
-		name := "(unnamed)"
-		if step.Name != nil && *step.Name != "" {
-			name = *step.Name
-		}
-
-		identifiers := make([]string, 0, len(step.Components))
-		for _, comp := range step.Components {
-			identifiers = append(identifiers, comp.Identifier)
-		}
-
-		components := "no components"
-		if len(identifiers) > 0 {
-			components = strings.Join(identifiers, ", ")
-		}
-
-		fmt.Fprintf(&b, "  %d. %s — %s\n", i+1, name, components)
-	}
-	return b.String()
 }
 
 // setNestedValue sets a value in a nested map structure using underscore notation.

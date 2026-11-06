@@ -6,49 +6,13 @@ package blueprint
 import (
 	"errors"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform"
-	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/gatewaystub"
 )
-
-func TestDescribeBlueprintBlocks(t *testing.T) {
-	named := "Passcode"
-	empty := ""
-
-	got := describeBlueprintBlocks([]blueprints.BlueprintStep{
-		{
-			Name: &named,
-			Components: []blueprints.Component{
-				{Identifier: "com.jamf.ddm.passcode-settings"},
-				{Identifier: "com.jamf.ddm.math-settings"},
-			},
-		},
-		{Name: nil, Components: []blueprints.Component{{Identifier: "com.jamf.ddm.safari-settings"}}},
-		{Name: &empty, Components: nil},
-	})
-
-	want := strings.Join([]string{
-		"  1. Passcode — com.jamf.ddm.passcode-settings, com.jamf.ddm.math-settings",
-		"  2. (unnamed) — com.jamf.ddm.safari-settings",
-		"  3. (unnamed) — no components",
-		"",
-	}, "\n")
-
-	if got != want {
-		t.Errorf("describeBlueprintBlocks() =\n%q\nwant\n%q", got, want)
-	}
-}
-
-func TestDescribeBlueprintBlocks_NoSteps(t *testing.T) {
-	if got := describeBlueprintBlocks(nil); got != "" {
-		t.Errorf("describeBlueprintBlocks(nil) = %q, want empty", got)
-	}
-}
 
 func TestSetNestedValue_SimpleString(t *testing.T) {
 	obj := make(map[string]any)
