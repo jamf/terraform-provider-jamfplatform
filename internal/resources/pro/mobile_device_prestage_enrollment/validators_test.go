@@ -5,6 +5,7 @@ package mobile_device_prestage_enrollment
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -248,107 +249,155 @@ func TestTemporarySessionTimeoutMinimum_DefersWhenEnforceUnknown(t *testing.T) {
 // The timezone validator tests moved to internal/common/validators/timezone_test.go
 // alongside the promoted validators.IANATimeZone().
 
-// --- multiUserRequiresPreventActivationLock --------------------------------
+// --- sharedIPadRequiresPreventActivationLock --------------------------------
 
-func TestMultiUserRequiresPreventActivationLock_SatisfiedWhenBothTrue(t *testing.T) {
+func TestSharedIPadRequiresPreventActivationLock_SatisfiedWhenBothTrue(t *testing.T) {
 	cfg := buildConfig(t, map[string]any{"prevent_activation_lock": true})
-	out := runBoolValidator(t, multiUserRequiresPreventActivationLock(),
-		cfg, "multi_user", types.BoolValue(true))
+	out := runBoolValidator(t, sharedIPadRequiresPreventActivationLock(),
+		cfg, "enable_shared_ipad", types.BoolValue(true))
 	if len(out) != 0 {
-		t.Errorf("multi_user=true + prevent_activation_lock=true must not fire, got %v", out)
+		t.Errorf("enable_shared_ipad=true + prevent_activation_lock=true must not fire, got %v", out)
 	}
 }
 
-func TestMultiUserRequiresPreventActivationLock_FiresWhenCompanionFalse(t *testing.T) {
+func TestSharedIPadRequiresPreventActivationLock_FiresWhenCompanionFalse(t *testing.T) {
 	cfg := buildConfig(t, map[string]any{"prevent_activation_lock": false})
-	out := runBoolValidator(t, multiUserRequiresPreventActivationLock(),
-		cfg, "multi_user", types.BoolValue(true))
+	out := runBoolValidator(t, sharedIPadRequiresPreventActivationLock(),
+		cfg, "enable_shared_ipad", types.BoolValue(true))
 	if len(out) == 0 {
-		t.Errorf("multi_user=true + prevent_activation_lock=false must fire")
+		t.Errorf("enable_shared_ipad=true + prevent_activation_lock=false must fire")
 	}
 }
 
-func TestMultiUserRequiresPreventActivationLock_FiresWhenCompanionNull(t *testing.T) {
+func TestSharedIPadRequiresPreventActivationLock_FiresWhenCompanionNull(t *testing.T) {
 	cfg := buildConfig(t, map[string]any{"prevent_activation_lock": nullBool{}})
-	out := runBoolValidator(t, multiUserRequiresPreventActivationLock(),
-		cfg, "multi_user", types.BoolValue(true))
+	out := runBoolValidator(t, sharedIPadRequiresPreventActivationLock(),
+		cfg, "enable_shared_ipad", types.BoolValue(true))
 	if len(out) == 0 {
-		t.Errorf("multi_user=true + prevent_activation_lock omitted (null) must fire")
+		t.Errorf("enable_shared_ipad=true + prevent_activation_lock omitted (null) must fire")
 	}
 }
 
-func TestMultiUserRequiresPreventActivationLock_DefersWhenCompanionUnknown(t *testing.T) {
+func TestSharedIPadRequiresPreventActivationLock_DefersWhenCompanionUnknown(t *testing.T) {
 	// STYLE_GUIDE §Config-time validators MUST defer on unknown: a companion
 	// sourced from a variable/for_each is Unknown at validate/plan time.
 	cfg := buildConfig(t, map[string]any{"prevent_activation_lock": unknownBool{}})
-	out := runBoolValidator(t, multiUserRequiresPreventActivationLock(),
-		cfg, "multi_user", types.BoolValue(true))
+	out := runBoolValidator(t, sharedIPadRequiresPreventActivationLock(),
+		cfg, "enable_shared_ipad", types.BoolValue(true))
 	if len(out) != 0 {
 		t.Errorf("unknown companion must defer (no diagnostic), got %v", out)
 	}
 }
 
-func TestMultiUserRequiresPreventActivationLock_ShortCircuitsWhenMultiUserFalse(t *testing.T) {
+func TestSharedIPadRequiresPreventActivationLock_ShortCircuitsWhenMultiUserFalse(t *testing.T) {
 	cfg := buildConfig(t, map[string]any{"prevent_activation_lock": false})
-	out := runBoolValidator(t, multiUserRequiresPreventActivationLock(),
-		cfg, "multi_user", types.BoolValue(false))
+	out := runBoolValidator(t, sharedIPadRequiresPreventActivationLock(),
+		cfg, "enable_shared_ipad", types.BoolValue(false))
 	if len(out) != 0 {
-		t.Errorf("multi_user=false must short-circuit, got %v", out)
+		t.Errorf("enable_shared_ipad=false must short-circuit, got %v", out)
 	}
 }
 
-func TestMultiUserRequiresPreventActivationLock_DefersWhenMultiUserUnknown(t *testing.T) {
+func TestSharedIPadRequiresPreventActivationLock_DefersWhenMultiUserUnknown(t *testing.T) {
 	cfg := buildConfig(t, map[string]any{"prevent_activation_lock": false})
-	out := runBoolValidator(t, multiUserRequiresPreventActivationLock(),
-		cfg, "multi_user", types.BoolUnknown())
+	out := runBoolValidator(t, sharedIPadRequiresPreventActivationLock(),
+		cfg, "enable_shared_ipad", types.BoolUnknown())
 	if len(out) != 0 {
-		t.Errorf("multi_user unknown must defer, got %v", out)
+		t.Errorf("enable_shared_ipad unknown must defer, got %v", out)
 	}
 }
 
-// --- multiUserRequiresSupervised -------------------------------------------
+// --- sharedIPadRequiresSupervision -------------------------------------------
 
-func TestMultiUserRequiresSupervised_SatisfiedWhenBothTrue(t *testing.T) {
-	cfg := buildConfig(t, map[string]any{"supervised": true})
-	out := runBoolValidator(t, multiUserRequiresSupervised(),
-		cfg, "multi_user", types.BoolValue(true))
+func TestSharedIPadRequiresSupervision_SatisfiedWhenBothTrue(t *testing.T) {
+	cfg := buildConfig(t, map[string]any{"supervise_devices_with_ios_12_or_earlier": true, "supervised": nullBool{}})
+	out := runBoolValidator(t, sharedIPadRequiresSupervision(),
+		cfg, "enable_shared_ipad", types.BoolValue(true))
 	if len(out) != 0 {
-		t.Errorf("multi_user=true + supervised=true must not fire, got %v", out)
+		t.Errorf("enable_shared_ipad=true + supervised=true must not fire, got %v", out)
 	}
 }
 
-func TestMultiUserRequiresSupervised_FiresWhenCompanionFalse(t *testing.T) {
-	cfg := buildConfig(t, map[string]any{"supervised": false})
-	out := runBoolValidator(t, multiUserRequiresSupervised(),
-		cfg, "multi_user", types.BoolValue(true))
+func TestSharedIPadRequiresSupervision_FiresWhenCompanionFalse(t *testing.T) {
+	cfg := buildConfig(t, map[string]any{"supervise_devices_with_ios_12_or_earlier": false, "supervised": nullBool{}})
+	out := runBoolValidator(t, sharedIPadRequiresSupervision(),
+		cfg, "enable_shared_ipad", types.BoolValue(true))
 	if len(out) == 0 {
-		t.Errorf("multi_user=true + supervised=false must fire")
+		t.Errorf("enable_shared_ipad=true + supervised=false must fire")
 	}
 }
 
-func TestMultiUserRequiresSupervised_FiresWhenCompanionNull(t *testing.T) {
-	cfg := buildConfig(t, map[string]any{"supervised": nullBool{}})
-	out := runBoolValidator(t, multiUserRequiresSupervised(),
-		cfg, "multi_user", types.BoolValue(true))
+func TestSharedIPadRequiresSupervision_FiresWhenCompanionNull(t *testing.T) {
+	cfg := buildConfig(t, map[string]any{"supervise_devices_with_ios_12_or_earlier": nullBool{}, "supervised": nullBool{}})
+	out := runBoolValidator(t, sharedIPadRequiresSupervision(),
+		cfg, "enable_shared_ipad", types.BoolValue(true))
 	if len(out) == 0 {
-		t.Errorf("multi_user=true + supervised omitted (null) must fire")
+		t.Errorf("enable_shared_ipad=true + supervised omitted (null) must fire")
 	}
 }
 
-func TestMultiUserRequiresSupervised_DefersWhenCompanionUnknown(t *testing.T) {
-	cfg := buildConfig(t, map[string]any{"supervised": unknownBool{}})
-	out := runBoolValidator(t, multiUserRequiresSupervised(),
-		cfg, "multi_user", types.BoolValue(true))
+func TestSharedIPadRequiresSupervision_DefersWhenCompanionUnknown(t *testing.T) {
+	cfg := buildConfig(t, map[string]any{"supervise_devices_with_ios_12_or_earlier": unknownBool{}, "supervised": nullBool{}})
+	out := runBoolValidator(t, sharedIPadRequiresSupervision(),
+		cfg, "enable_shared_ipad", types.BoolValue(true))
 	if len(out) != 0 {
 		t.Errorf("unknown companion must defer (no diagnostic), got %v", out)
 	}
 }
 
-func TestMultiUserRequiresSupervised_ShortCircuitsWhenMultiUserFalse(t *testing.T) {
-	cfg := buildConfig(t, map[string]any{"supervised": false})
-	out := runBoolValidator(t, multiUserRequiresSupervised(),
-		cfg, "multi_user", types.BoolValue(false))
+func TestSharedIPadRequiresSupervision_ShortCircuitsWhenMultiUserFalse(t *testing.T) {
+	cfg := buildConfig(t, map[string]any{"supervise_devices_with_ios_12_or_earlier": false, "supervised": nullBool{}})
+	out := runBoolValidator(t, sharedIPadRequiresSupervision(),
+		cfg, "enable_shared_ipad", types.BoolValue(false))
 	if len(out) != 0 {
-		t.Errorf("multi_user=false must short-circuit, got %v", out)
+		t.Errorf("enable_shared_ipad=false must short-circuit, got %v", out)
+	}
+}
+
+func TestSharedIPadRequiresSupervision_HonoursTheDeprecatedSpelling(t *testing.T) {
+	cfg := buildConfig(t, map[string]any{"supervise_devices_with_ios_12_or_earlier": nullBool{}, "supervised": true})
+	if out := runBoolValidator(t, sharedIPadRequiresSupervision(), cfg, "multi_user", types.BoolValue(true)); len(out) != 0 {
+		t.Errorf("supervised = true must satisfy the rule, got %v", out)
+	}
+	cfg = buildConfig(t, map[string]any{"supervise_devices_with_ios_12_or_earlier": nullBool{}, "supervised": false})
+	out := runBoolValidator(t, sharedIPadRequiresSupervision(), cfg, "multi_user", types.BoolValue(true))
+	if len(out) != 1 || !strings.Contains(out[0], "multi_user") {
+		t.Errorf("supervised = false must fire and name the attribute it was set on, got %v", out)
+	}
+}
+
+func TestSharedIPadRequiresPreventActivationLock_NamesTheAttributeItWasSetOn(t *testing.T) {
+	cfg := buildConfig(t, map[string]any{"prevent_activation_lock": false})
+	out := runBoolValidator(t, sharedIPadRequiresPreventActivationLock(), cfg, "multi_user", types.BoolValue(true))
+	if len(out) != 1 || !strings.Contains(out[0], "multi_user") {
+		t.Errorf("got %v", out)
+	}
+}
+
+func TestPreserveManagedAppsRequiresReturnToService(t *testing.T) {
+	both := func(newV, oldV any) tfsdk.Config {
+		return buildConfig(t, map[string]any{"allow_return_to_service": newV, "rts_enabled": oldV})
+	}
+	tests := []struct {
+		name  string
+		cfg   tfsdk.Config
+		value types.Bool
+		fires bool
+	}{
+		{"rts allowed", both(true, nullBool{}), types.BoolValue(true), false},
+		{"rts allowed by the deprecated name", both(nullBool{}, true), types.BoolValue(true), false},
+		{"rts denied", both(false, nullBool{}), types.BoolValue(true), true},
+		{"rts denied by the deprecated name", both(nullBool{}, false), types.BoolValue(true), true},
+		{"rts unset is accepted", both(nullBool{}, nullBool{}), types.BoolValue(true), false},
+		{"rts unknown defers", both(unknownBool{}, nullBool{}), types.BoolValue(true), false},
+		{"false is always fine", both(false, nullBool{}), types.BoolValue(false), false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			out := runBoolValidator(t, preserveManagedAppsRequiresReturnToService(), tc.cfg, "preserve_managed_apps", tc.value)
+			if (len(out) != 0) != tc.fires {
+				t.Errorf("fires = %v, want %v (%v)", len(out) != 0, tc.fires, out)
+			}
+		})
 	}
 }

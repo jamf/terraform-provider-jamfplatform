@@ -27,28 +27,30 @@ func assignGetToResource(_ context.Context, plan *MobileDevicePrestageEnrollment
 	plan.DisplayName = types.StringValue(got.DisplayName)
 	plan.DeviceEnrollmentProgramInstanceID = types.StringValue(got.DeviceEnrollmentProgramInstanceID)
 
-	plan.Mandatory = types.BoolValue(got.Mandatory)
-	plan.MdmRemovable = types.BoolValue(got.MDMRemovable)
-	plan.RequireAuthentication = types.BoolValue(got.RequireAuthentication)
-	plan.Supervised = types.BoolValue(got.Supervised)
+	assignRenamed(plan, map[string]bool{
+		"mandatory":              got.Mandatory,
+		"mdm_removable":          got.MDMRemovable,
+		"require_authentication": got.RequireAuthentication,
+		"supervised":             got.Supervised,
+		"auto_advance_setup":     got.AutoAdvanceSetup,
+		"configure_device_before_setup_assistant": got.ConfigureDeviceBeforeSetupAssistant,
+		"install_apps_during_enrollment":          got.InstallAppsDuringEnrollment,
+		"default_prestage":                        got.DefaultPrestage,
+		"send_timezone":                           got.SendTimezone,
+		"multi_user":                              got.MultiUser,
+		"rts_enabled":                             got.RtsEnabled,
+		"keep_existing_site_membership":           got.KeepExistingSiteMembership,
+		"keep_existing_location_information":      got.KeepExistingLocationInformation,
+	}, got.AuthenticationPrompt)
 	plan.AllowPairing = types.BoolValue(got.AllowPairing)
-	plan.AutoAdvanceSetup = types.BoolValue(got.AutoAdvanceSetup)
-	plan.ConfigureDeviceBeforeSetupAssistant = types.BoolValue(got.ConfigureDeviceBeforeSetupAssistant)
-	plan.DefaultPrestage = types.BoolValue(got.DefaultPrestage)
-	plan.SendTimezone = types.BoolValue(got.SendTimezone)
 	plan.PreventActivationLock = types.BoolValue(got.PreventActivationLock)
 	plan.EnableDeviceBasedActivationLock = types.BoolValue(got.EnableDeviceBasedActivationLock)
-	plan.KeepExistingSiteMembership = types.BoolValue(got.KeepExistingSiteMembership)
-	plan.KeepExistingLocationInformation = types.BoolValue(got.KeepExistingLocationInformation)
-	plan.MultiUser = types.BoolValue(got.MultiUser)
 	plan.UseStorageQuotaSize = types.BoolValue(got.UseStorageQuotaSize)
 	plan.TemporarySessionOnly = types.BoolValue(got.TemporarySessionOnly)
 	plan.EnforceTemporarySessionTimeout = types.BoolValue(got.EnforceTemporarySessionTimeout)
 	plan.EnforceUserSessionTimeout = types.BoolValue(got.EnforceUserSessionTimeout)
 	plan.PreserveManagedApps = types.BoolValue(got.PreserveManagedApps)
 	plan.DoNotUseProfileFromBackup = types.BoolValue(got.DoNotUseProfileFromBackup)
-	plan.InstallAppsDuringEnrollment = types.BoolValue(got.InstallAppsDuringEnrollment)
-	plan.RtsEnabled = types.BoolValue(got.RtsEnabled)
 
 	// SDK types are plain `string`, so any wire-level null is "" by the time
 	// we see it — no null/"" flicker at the Go boundary; use the value
@@ -56,7 +58,6 @@ func assignGetToResource(_ context.Context, plan *MobileDevicePrestageEnrollment
 	// Create the prior "state" is the plan, whose omitted Optional+Computed
 	// fields are Unknown, and the helper would leak that Unknown into the
 	// State.Set. The computer sibling documents the same lesson.)
-	plan.AuthenticationPrompt = types.StringValue(got.AuthenticationPrompt)
 	plan.SupportPhoneNumber = types.StringValue(got.SupportPhoneNumber)
 	plan.SupportEmailAddress = types.StringValue(got.SupportEmailAddress)
 	plan.Department = types.StringValue(got.Department)
@@ -97,7 +98,7 @@ func assignGetToResource(_ context.Context, plan *MobileDevicePrestageEnrollment
 	managePurchasingInformation := plan.PurchasingInformation != nil
 
 	if manageSkipSetupItems {
-		plan.SkipSetupItems = flattenSkipSetupItems(got.SkipSetupItems)
+		plan.SkipSetupItems = flattenSkipSetupItems(got.SkipSetupItems, plan.SkipSetupItems)
 	} else {
 		plan.SkipSetupItems = nil
 	}
@@ -118,59 +119,6 @@ func assignGetToResource(_ context.Context, plan *MobileDevicePrestageEnrollment
 	}
 
 	return diags
-}
-
-func flattenSkipSetupItems(m map[string]bool) *SkipSetupItemsModel {
-	if m == nil {
-		return nil
-	}
-	return &SkipSetupItemsModel{
-		ActionButton:          types.BoolValue(m["ActionButton"]),
-		Android:               types.BoolValue(m["Android"]),
-		Appearance:            types.BoolValue(m["Appearance"]),
-		AppleID:               types.BoolValue(m["AppleID"]),
-		Biometric:             types.BoolValue(m["Biometric"]),
-		CameraButton:          types.BoolValue(m["CameraButton"]),
-		CloudStorage:          types.BoolValue(m["CloudStorage"]),
-		Diagnostics:           types.BoolValue(m["Diagnostics"]),
-		DisplayTone:           types.BoolValue(m["DisplayTone"]),
-		EnableLockdownMode:    types.BoolValue(m["EnableLockdownMode"]),
-		ExpressLanguage:       types.BoolValue(m["ExpressLanguage"]),
-		HomeButtonSensitivity: types.BoolValue(m["HomeButtonSensitivity"]),
-		Intelligence:          types.BoolValue(m["Intelligence"]),
-		Keyboard:              types.BoolValue(m["Keyboard"]),
-		Location:              types.BoolValue(m["Location"]),
-		Multitasking:          types.BoolValue(m["Multitasking"]),
-		OSShowcase:            types.BoolValue(m["OSShowcase"]),
-		OnBoarding:            types.BoolValue(m["OnBoarding"]),
-		Passcode:              types.BoolValue(m["Passcode"]),
-		Payment:               types.BoolValue(m["Payment"]),
-		PreferredLanguage:     types.BoolValue(m["PreferredLanguage"]),
-		Privacy:               types.BoolValue(m["Privacy"]),
-		Restore:               types.BoolValue(m["Restore"]),
-		RestoreCompleted:      types.BoolValue(m["RestoreCompleted"]),
-		SIMSetup:              types.BoolValue(m["SIMSetup"]),
-		Safety:                types.BoolValue(m["Safety"]),
-		SafetyAndHandling:     types.BoolValue(m["SafetyAndHandling"]),
-		ScreenSaver:           types.BoolValue(m["ScreenSaver"]),
-		ScreenTime:            types.BoolValue(m["ScreenTime"]),
-		Siri:                  types.BoolValue(m["Siri"]),
-		SoftwareUpdate:        types.BoolValue(m["SoftwareUpdate"]),
-		SpokenLanguage:        types.BoolValue(m["SpokenLanguage"]),
-		TOS:                   types.BoolValue(m["TOS"]),
-		TVHomeScreenSync:      types.BoolValue(m["TVHomeScreenSync"]),
-		TVProviderSignIn:      types.BoolValue(m["TVProviderSignIn"]),
-		TVRoom:                types.BoolValue(m["TVRoom"]),
-		TapToSetup:            types.BoolValue(m["TapToSetup"]),
-		TermsOfAddress:        types.BoolValue(m["TermsOfAddress"]),
-		TransferData:          types.BoolValue(m["TransferData"]),
-		UpdateCompleted:       types.BoolValue(m["UpdateCompleted"]),
-		VoiceSelection:        types.BoolValue(m["VoiceSelection"]),
-		WatchMigration:        types.BoolValue(m["WatchMigration"]),
-		Welcome:               types.BoolValue(m["Welcome"]),
-		Zoom:                  types.BoolValue(m["Zoom"]),
-		IMessageAndFaceTime:   types.BoolValue(m["iMessageAndFaceTime"]),
-	}
 }
 
 // flattenNames maps the wire names block onto the model. prior is the model
@@ -301,6 +249,7 @@ func stringSliceToList(in []string) types.List {
 // (wire-probed 2026-08-07), so a mismatch here really is a rollback.
 func diffPlanAgainstGet(ctx context.Context, plan MobileDevicePrestageEnrollmentResourceModel, got *pro.GetMobileDevicePrestageV3) []string {
 	var mismatched []string
+	resolveRenames(&plan)
 
 	checkStr := func(path string, planVal types.String, gotVal string) {
 		if planVal.IsNull() || planVal.IsUnknown() {
@@ -321,30 +270,30 @@ func diffPlanAgainstGet(ctx context.Context, plan MobileDevicePrestageEnrollment
 
 	checkStr("display_name", plan.DisplayName, got.DisplayName)
 	checkStr("device_enrollment_program_instance_id", plan.DeviceEnrollmentProgramInstanceID, got.DeviceEnrollmentProgramInstanceID)
-	checkBool("mandatory", plan.Mandatory, got.Mandatory)
-	checkBool("mdm_removable", plan.MdmRemovable, got.MDMRemovable)
-	checkBool("require_authentication", plan.RequireAuthentication, got.RequireAuthentication)
-	checkBool("supervised", plan.Supervised, got.Supervised)
+	checkBool("make_mdm_profile_mandatory", plan.MakeMdmProfileMandatory, got.Mandatory)
+	checkBool("prevent_unenrollment", plan.PreventUnenrollment, !got.MDMRemovable)
+	checkBool("require_credentials_for_enrollment", plan.RequireCredentialsForEnrollment, got.RequireAuthentication)
+	checkBool("supervise_devices_with_ios_12_or_earlier", plan.SuperviseDevicesWithIos12OrEarlier, got.Supervised)
 	checkBool("allow_pairing", plan.AllowPairing, got.AllowPairing)
-	checkBool("auto_advance_setup", plan.AutoAdvanceSetup, got.AutoAdvanceSetup)
-	checkBool("configure_device_before_setup_assistant", plan.ConfigureDeviceBeforeSetupAssistant, got.ConfigureDeviceBeforeSetupAssistant)
-	checkBool("default_prestage", plan.DefaultPrestage, got.DefaultPrestage)
-	checkBool("send_timezone", plan.SendTimezone, got.SendTimezone)
+	checkBool("automatically_advance_through_setup_assistant", plan.AutomaticallyAdvanceThroughSetupAssistant, got.AutoAdvanceSetup)
+	checkBool("install_configuration_profiles_before_setup_assistant", plan.InstallConfigurationProfilesBeforeSetupAssistant, got.ConfigureDeviceBeforeSetupAssistant)
+	checkBool("automatically_assign_new_devices", plan.AutomaticallyAssignNewDevices, got.DefaultPrestage)
+	checkBool("set_time_zone", plan.SetTimeZone, got.SendTimezone)
 	checkBool("prevent_activation_lock", plan.PreventActivationLock, got.PreventActivationLock)
 	checkBool("enable_device_based_activation_lock", plan.EnableDeviceBasedActivationLock, got.EnableDeviceBasedActivationLock)
-	checkBool("keep_existing_site_membership", plan.KeepExistingSiteMembership, got.KeepExistingSiteMembership)
-	checkBool("keep_existing_location_information", plan.KeepExistingLocationInformation, got.KeepExistingLocationInformation)
-	checkBool("multi_user", plan.MultiUser, got.MultiUser)
+	checkBool("use_existing_site_membership", plan.UseExistingSiteMembership, got.KeepExistingSiteMembership)
+	checkBool("use_existing_location_information", plan.UseExistingLocationInformation, got.KeepExistingLocationInformation)
+	checkBool("enable_shared_ipad", plan.EnableSharedIPad, got.MultiUser)
 	// use_storage_quota_size — EXCLUDED (§9.1).
 	// temporary_session_only — EXCLUDED (§9.1).
 	checkBool("enforce_temporary_session_timeout", plan.EnforceTemporarySessionTimeout, got.EnforceTemporarySessionTimeout)
 	checkBool("enforce_user_session_timeout", plan.EnforceUserSessionTimeout, got.EnforceUserSessionTimeout)
 	checkBool("preserve_managed_apps", plan.PreserveManagedApps, got.PreserveManagedApps)
 	checkBool("do_not_use_profile_from_backup", plan.DoNotUseProfileFromBackup, got.DoNotUseProfileFromBackup)
-	checkBool("install_apps_during_enrollment", plan.InstallAppsDuringEnrollment, got.InstallAppsDuringEnrollment)
-	checkBool("rts_enabled", plan.RtsEnabled, got.RtsEnabled)
+	checkBool("install_managed_apps_before_setup_assistant", plan.InstallManagedAppsBeforeSetupAssistant, got.InstallAppsDuringEnrollment)
+	checkBool("allow_return_to_service", plan.AllowReturnToService, got.RtsEnabled)
 
-	checkStr("authentication_prompt", plan.AuthenticationPrompt, got.AuthenticationPrompt)
+	checkStr("authentication_message", plan.AuthenticationMessage, got.AuthenticationPrompt)
 	checkStr("support_phone_number", plan.SupportPhoneNumber, got.SupportPhoneNumber)
 	checkStr("support_email_address", plan.SupportEmailAddress, got.SupportEmailAddress)
 	checkStr("department", plan.Department, got.Department)
@@ -385,65 +334,6 @@ func diffPlanAgainstGet(ctx context.Context, plan MobileDevicePrestageEnrollment
 	diffPurchasingInformation(plan.PurchasingInformation, got.PurchasingInformation, &mismatched)
 
 	return mismatched
-}
-
-func diffSkipSetupItems(plan *SkipSetupItemsModel, got map[string]bool, out *[]string) {
-	if plan == nil || got == nil {
-		return
-	}
-	check := func(field, wireKey string, v types.Bool) {
-		if v.IsNull() || v.IsUnknown() {
-			return
-		}
-		if v.ValueBool() != got[wireKey] {
-			*out = append(*out, "skip_setup_items."+field)
-		}
-	}
-	check("action_button", "ActionButton", plan.ActionButton)
-	check("android", "Android", plan.Android)
-	check("appearance", "Appearance", plan.Appearance)
-	check("apple_id", "AppleID", plan.AppleID)
-	check("biometric", "Biometric", plan.Biometric)
-	check("camera_button", "CameraButton", plan.CameraButton)
-	check("cloud_storage", "CloudStorage", plan.CloudStorage)
-	check("diagnostics", "Diagnostics", plan.Diagnostics)
-	check("display_tone", "DisplayTone", plan.DisplayTone)
-	check("enable_lockdown_mode", "EnableLockdownMode", plan.EnableLockdownMode)
-	check("express_language", "ExpressLanguage", plan.ExpressLanguage)
-	check("home_button_sensitivity", "HomeButtonSensitivity", plan.HomeButtonSensitivity)
-	check("intelligence", "Intelligence", plan.Intelligence)
-	check("keyboard", "Keyboard", plan.Keyboard)
-	check("location", "Location", plan.Location)
-	check("multitasking", "Multitasking", plan.Multitasking)
-	check("os_showcase", "OSShowcase", plan.OSShowcase)
-	check("onboarding", "OnBoarding", plan.OnBoarding)
-	check("passcode", "Passcode", plan.Passcode)
-	check("payment", "Payment", plan.Payment)
-	check("preferred_language", "PreferredLanguage", plan.PreferredLanguage)
-	check("privacy", "Privacy", plan.Privacy)
-	check("restore", "Restore", plan.Restore)
-	check("restore_completed", "RestoreCompleted", plan.RestoreCompleted)
-	check("sim_setup", "SIMSetup", plan.SIMSetup)
-	check("safety", "Safety", plan.Safety)
-	check("safety_and_handling", "SafetyAndHandling", plan.SafetyAndHandling)
-	check("screen_saver", "ScreenSaver", plan.ScreenSaver)
-	check("screen_time", "ScreenTime", plan.ScreenTime)
-	check("siri", "Siri", plan.Siri)
-	check("software_update", "SoftwareUpdate", plan.SoftwareUpdate)
-	check("spoken_language", "SpokenLanguage", plan.SpokenLanguage)
-	check("tos", "TOS", plan.TOS)
-	check("tv_home_screen_sync", "TVHomeScreenSync", plan.TVHomeScreenSync)
-	check("tv_provider_sign_in", "TVProviderSignIn", plan.TVProviderSignIn)
-	check("tv_room", "TVRoom", plan.TVRoom)
-	check("tap_to_setup", "TapToSetup", plan.TapToSetup)
-	check("terms_of_address", "TermsOfAddress", plan.TermsOfAddress)
-	check("transfer_data", "TransferData", plan.TransferData)
-	check("update_completed", "UpdateCompleted", plan.UpdateCompleted)
-	check("voice_selection", "VoiceSelection", plan.VoiceSelection)
-	check("watch_migration", "WatchMigration", plan.WatchMigration)
-	check("welcome", "Welcome", plan.Welcome)
-	check("zoom", "Zoom", plan.Zoom)
-	check("imessage_and_facetime", "iMessageAndFaceTime", plan.IMessageAndFaceTime)
 }
 
 func diffNames(plan *NamesModel, got *pro.MobileDevicePrestageNamesV3, out *[]string) {

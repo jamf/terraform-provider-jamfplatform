@@ -53,15 +53,24 @@ output "prestage_uuid" {
 
 ### Read-Only
 
-- `authentication_prompt` (String) Prompt shown when authentication is required.
+- `allow_mdm_profile_removal` (Boolean) **"Allow MDM Profile Removal"** in the Jamf Pro admin UI.
+- `authentication_message` (String) **"Authentication Message"** shown when authentication is required.
+- `authentication_prompt` (String, Deprecated) ~> Deprecated: use `authentication_message` instead. The provider will not remove `authentication_prompt` before 2027-02-03.
+
+**"Authentication Message"** shown when authentication is required.
 - `default_prestage` (Boolean) Whether this is the tenant default PreStage.
 - `department` (String) Department label shown during Setup Assistant.
 - `device_enrollment_program_instance_id` (String) ADE instance ID backing this PreStage.
 - `display_name` (String) Display name returned by Jamf Pro.
 - `enrollment_customization_id` (String) Enrollment customization ID, or `"0"` when no customization.
 - `enrollment_site_id` (String) Site ID applied to enrolled devices, or `"-1"` when no site.
-- `mandatory` (Boolean) Whether MDM enrolment is mandatory.
-- `mdm_removable` (Boolean) Whether the user can remove the MDM profile.
+- `make_mdm_profile_mandatory` (Boolean) **"Make MDM Profile Mandatory"** in the Jamf Pro admin UI.
+- `mandatory` (Boolean, Deprecated) ~> Deprecated: use `make_mdm_profile_mandatory` instead. The provider will not remove `mandatory` before 2027-02-03.
+
+**"Make MDM Profile Mandatory"** in the Jamf Pro admin UI.
+- `mdm_removable` (Boolean, Deprecated) ~> Deprecated: use `allow_mdm_profile_removal` instead. The provider will not remove `mdm_removable` before 2027-02-03.
+
+**"Allow MDM Profile Removal"** in the Jamf Pro admin UI.
 - `minimum_os_specific_version` (String) Specific minimum macOS version (used only when target type is `MINIMUM_OS_SPECIFIC_VERSION`).
 - `prestage_minimum_os_target_version_type` (String) Minimum-OS enforcement mode.
 - `profile_uuid` (String) MDM profile UUID assigned by Jamf Pro.

@@ -71,9 +71,9 @@ func TestBuildSkipSetupItemsMap(t *testing.T) {
 			t.Errorf("wire key %q: want %v, got (ok=%v, val=%v)", k, want, ok, got)
 		}
 	}
-	// All 25 wire keys must be present even when zero-valued in the model.
-	if len(wire) != 25 {
-		t.Errorf("map should always carry all 25 wire keys; got %d", len(wire))
+	// All 26 wire keys must be present even when zero-valued in the model.
+	if len(wire) != 26 {
+		t.Errorf("map should always carry all 26 wire keys; got %d", len(wire))
 	}
 }
 

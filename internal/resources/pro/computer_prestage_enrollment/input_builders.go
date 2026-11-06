@@ -6,11 +6,13 @@ package computer_prestage_enrollment
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/prestagealias"
 )
 
 // buildPostInput translates the plan (and config-side WriteOnly secrets) into
@@ -20,23 +22,22 @@ func buildPostInput(ctx context.Context, plan, cfg ComputerPrestageEnrollmentRes
 
 	post := &pro.PostComputerPrestageV3{
 		DisplayName:                        plan.DisplayName.ValueString(),
-		Mandatory:                          plan.Mandatory.ValueBool(),
-		MDMRemovable:                       plan.MdmRemovable.ValueBool(),
+		Mandatory:                          prestagealias.Effective(plan.MakeMdmProfileMandatory, plan.Mandatory, false, false),
+		MDMRemovable:                       prestagealias.Effective(plan.AllowMdmProfileRemoval, plan.MdmRemovable, false, false),
 		DefaultPrestage:                    plan.DefaultPrestage.ValueBool(),
 		SupportPhoneNumber:                 plan.SupportPhoneNumber.ValueString(),
 		SupportEmailAddress:                plan.SupportEmailAddress.ValueString(),
 		Department:                         plan.Department.ValueString(),
 		RequireAuthentication:              plan.RequireAuthentication.ValueBool(),
-		AuthenticationPrompt:               plan.AuthenticationPrompt.ValueString(),
+		AuthenticationPrompt:               prestagealias.EffectiveString(plan.AuthenticationMessage, plan.AuthenticationPrompt, ""),
 		DeviceEnrollmentProgramInstanceID:  plan.DeviceEnrollmentProgramInstanceID.ValueString(),
 		EnrollmentSiteID:                   stringOrSentinel(plan.EnrollmentSiteID, sentinelNoneIDDash1),
-		KeepExistingLocationInformation:    plan.KeepExistingLocationInformation.ValueBool(),
-		KeepExistingSiteMembership:         plan.KeepExistingSiteMembership.ValueBool(),
+		KeepExistingLocationInformation:    prestagealias.Effective(plan.UseExistingLocationInformation, plan.KeepExistingLocationInformation, false, false),
+		KeepExistingSiteMembership:         prestagealias.Effective(plan.UseExistingSiteMembership, plan.KeepExistingSiteMembership, false, false),
 		EnrollmentCustomizationID:          helpers.OptionalStringPointer(plan.EnrollmentCustomizationID),
 		Language:                           helpers.OptionalStringPointer(plan.Language),
 		Region:                             helpers.OptionalStringPointer(plan.Region),
-		AutoAdvanceSetup:                   plan.AutoAdvanceSetup.ValueBool(),
-		InstallProfilesDuringSetup:         plan.InstallProfilesDuringSetup.ValueBool(),
+		AutoAdvanceSetup:                   prestagealias.Effective(plan.AutomaticallyAdvanceThroughSetupAssistant, plan.AutoAdvanceSetup, false, false),
 		CustomPackageDistributionPointID:   stringOrSentinel(plan.CustomPackageDistributionPointID, sentinelNoneIDDash1),
 		PreventActivationLock:              plan.PreventActivationLock.ValueBool(),
 		EnableDeviceBasedActivationLock:    plan.EnableDeviceBasedActivationLock.ValueBool(),
@@ -50,9 +51,10 @@ func buildPostInput(ctx context.Context, plan, cfg ComputerPrestageEnrollmentRes
 		PssoConfigProfileID:                helpers.OptionalStringPointer(plan.PssoConfigProfileID),
 	}
 
-	prestageIDs, d := stringSetToSlice(ctx, plan.PrestageInstalledProfileIds)
+	prestageIDs, d := stringSetToSlice(ctx, effectiveSet(plan.ConfigurationProfileIds, plan.PrestageInstalledProfileIds))
 	diags.Append(d...)
 	post.PrestageInstalledProfileIds = nilSafeStringSlice(prestageIDs)
+	post.InstallProfilesDuringSetup = installProfilesDuringSetup(plan.InstallProfilesDuringSetup, prestageIDs)
 
 	customIDs, d := stringSetToSlice(ctx, plan.CustomPackageIds)
 	diags.Append(d...)
@@ -88,23 +90,22 @@ func buildPutInput(ctx context.Context, plan, cfg ComputerPrestageEnrollmentReso
 
 	put := &pro.PutComputerPrestageV3{
 		DisplayName:                        plan.DisplayName.ValueString(),
-		Mandatory:                          plan.Mandatory.ValueBool(),
-		MDMRemovable:                       plan.MdmRemovable.ValueBool(),
+		Mandatory:                          prestagealias.Effective(plan.MakeMdmProfileMandatory, plan.Mandatory, false, false),
+		MDMRemovable:                       prestagealias.Effective(plan.AllowMdmProfileRemoval, plan.MdmRemovable, false, false),
 		DefaultPrestage:                    plan.DefaultPrestage.ValueBool(),
 		SupportPhoneNumber:                 plan.SupportPhoneNumber.ValueString(),
 		SupportEmailAddress:                plan.SupportEmailAddress.ValueString(),
 		Department:                         plan.Department.ValueString(),
 		RequireAuthentication:              plan.RequireAuthentication.ValueBool(),
-		AuthenticationPrompt:               plan.AuthenticationPrompt.ValueString(),
+		AuthenticationPrompt:               prestagealias.EffectiveString(plan.AuthenticationMessage, plan.AuthenticationPrompt, ""),
 		DeviceEnrollmentProgramInstanceID:  plan.DeviceEnrollmentProgramInstanceID.ValueString(),
 		EnrollmentSiteID:                   stringOrSentinel(plan.EnrollmentSiteID, sentinelNoneIDDash1),
-		KeepExistingLocationInformation:    plan.KeepExistingLocationInformation.ValueBool(),
-		KeepExistingSiteMembership:         plan.KeepExistingSiteMembership.ValueBool(),
+		KeepExistingLocationInformation:    prestagealias.Effective(plan.UseExistingLocationInformation, plan.KeepExistingLocationInformation, false, false),
+		KeepExistingSiteMembership:         prestagealias.Effective(plan.UseExistingSiteMembership, plan.KeepExistingSiteMembership, false, false),
 		EnrollmentCustomizationID:          helpers.OptionalStringPointer(plan.EnrollmentCustomizationID),
 		Language:                           helpers.OptionalStringPointer(plan.Language),
 		Region:                             helpers.OptionalStringPointer(plan.Region),
-		AutoAdvanceSetup:                   plan.AutoAdvanceSetup.ValueBool(),
-		InstallProfilesDuringSetup:         plan.InstallProfilesDuringSetup.ValueBool(),
+		AutoAdvanceSetup:                   prestagealias.Effective(plan.AutomaticallyAdvanceThroughSetupAssistant, plan.AutoAdvanceSetup, false, false),
 		CustomPackageDistributionPointID:   stringOrSentinel(plan.CustomPackageDistributionPointID, sentinelNoneIDDash1),
 		PreventActivationLock:              plan.PreventActivationLock.ValueBool(),
 		EnableDeviceBasedActivationLock:    plan.EnableDeviceBasedActivationLock.ValueBool(),
@@ -118,9 +119,10 @@ func buildPutInput(ctx context.Context, plan, cfg ComputerPrestageEnrollmentReso
 		PssoConfigProfileID:                helpers.OptionalStringPointer(plan.PssoConfigProfileID),
 	}
 
-	prestageIDs, d := stringSetToSlice(ctx, plan.PrestageInstalledProfileIds)
+	prestageIDs, d := stringSetToSlice(ctx, effectiveSet(plan.ConfigurationProfileIds, plan.PrestageInstalledProfileIds))
 	diags.Append(d...)
 	put.PrestageInstalledProfileIds = nilSafeStringSlice(prestageIDs)
+	put.InstallProfilesDuringSetup = installProfilesDuringSetup(plan.InstallProfilesDuringSetup, prestageIDs)
 
 	customIDs, d := stringSetToSlice(ctx, plan.CustomPackageIds)
 	diags.Append(d...)
@@ -133,7 +135,7 @@ func buildPutInput(ctx context.Context, plan, cfg ComputerPrestageEnrollmentReso
 
 	put.LocationInformation = buildLocationInformation(plan.LocationInformation, "", 0)
 	put.PurchasingInformation = buildPurchasingInformation(plan.PurchasingInformation, "", 0)
-	put.SkipSetupItems = buildSkipSetupItemsMap(plan.SkipSetupItems)
+	put.SkipSetupItems = buildSkipSetupItemsMapOver(plan.SkipSetupItems, got.SkipSetupItems)
 
 	// accountSettings always present on PUT per F6.
 	put.AccountSettings = buildAccountSettingsRequest(plan.AccountSettings, got.AccountSettings, cfg.AccountSettings, rotateAdminPwd)
@@ -204,40 +206,6 @@ func buildPurchasingInformation(m *PurchasingInformationModel, nestedID string, 
 	return out
 }
 
-func buildSkipSetupItemsMap(m *SkipSetupItemsModel) *map[string]bool {
-	if m == nil {
-		return nil
-	}
-	out := map[string]bool{
-		"Biometric":                 m.Biometric.ValueBool(),
-		"FileVault":                 m.FileVault.ValueBool(),
-		"SoftwareUpdate":            m.SoftwareUpdate.ValueBool(),
-		"Diagnostics":               m.Diagnostics.ValueBool(),
-		"Accessibility":             m.Accessibility.ValueBool(),
-		"Intelligence":              m.Intelligence.ValueBool(),
-		"ScreenTime":                m.ScreenTime.ValueBool(),
-		"Siri":                      m.Siri.ValueBool(),
-		"Restore":                   m.Restore.ValueBool(),
-		"Privacy":                   m.Privacy.ValueBool(),
-		"Registration":              m.Registration.ValueBool(),
-		"EnableLockdownMode":        m.EnableLockdownMode.ValueBool(),
-		"TermsOfAddress":            m.TermsOfAddress.ValueBool(),
-		"iCloudDiagnostics":         m.ICloudDiagnostics.ValueBool(),
-		"AppleID":                   m.AppleID.ValueBool(),
-		"DisplayTone":               m.DisplayTone.ValueBool(),
-		"Appearance":                m.Appearance.ValueBool(),
-		"Payment":                   m.Payment.ValueBool(),
-		"TOS":                       m.TOS.ValueBool(),
-		"OSShowcase":                m.OSShowcase.ValueBool(),
-		"Welcome":                   m.Welcome.ValueBool(),
-		"Wallpaper":                 m.Wallpaper.ValueBool(),
-		"iCloudStorage":             m.ICloudStorage.ValueBool(),
-		"AdditionalPrivacySettings": m.AdditionalPrivacySettings.ValueBool(),
-		"Location":                  m.Location.ValueBool(),
-	}
-	return &out
-}
-
 // buildAccountSettingsRequest assembles the AccountSettingsRequest. plan
 // carries non-secret fields; cfg supplies the WriteOnly admin_password
 // plaintext (only when rotate=true). got is used as a source of the
@@ -249,17 +217,17 @@ func buildAccountSettingsRequest(plan *AccountSettingsModel, got *pro.AccountSet
 	out := &pro.AccountSettingsRequest{}
 
 	if plan != nil {
-		out.PayloadConfigured = boolPtrFromTF(plan.PayloadConfigured)
-		out.LocalAdminAccountEnabled = boolPtrFromTF(plan.LocalAdminAccountEnabled)
+		out.PayloadConfigured = payloadConfiguredFor(plan, cfg)
+		out.LocalAdminAccountEnabled = effectiveBoolPtr(plan.CreateManagedLocalAdministratorAccount, plan.LocalAdminAccountEnabled)
 		out.AdminUsername = stringPtrFromTF(plan.AdminUsername)
-		out.HiddenAdminAccount = boolPtrFromTF(plan.HiddenAdminAccount)
-		out.LocalUserManaged = boolPtrFromTF(plan.LocalUserManaged)
+		out.HiddenAdminAccount = effectiveBoolPtr(plan.HideManagedLocalAdministratorAccount, plan.HiddenAdminAccount)
+		out.LocalUserManaged = effectiveBoolPtr(plan.MakeManagedLocalAdministratorAccountMdmEnabled, plan.LocalUserManaged)
 		out.UserAccountType = stringPtrFromTF(plan.UserAccountType)
 		out.PrefillPrimaryAccountInfoFeatureEnabled = boolPtrFromTF(plan.PrefillPrimaryAccountInfoFeatureEnabled)
 		out.PrefillType = stringPtrFromTF(plan.PrefillType)
 		out.PrefillAccountFullName = stringPtrFromTF(plan.PrefillAccountFullName)
 		out.PrefillAccountUserName = stringPtrFromTF(plan.PrefillAccountUserName)
-		out.PreventPrefillInfoFromModification = boolPtrFromTF(plan.PreventPrefillInfoFromModification)
+		out.PreventPrefillInfoFromModification = effectiveBoolPtr(plan.LockPrimaryAccountInformation, plan.PreventPrefillInfoFromModification)
 	}
 
 	if rotate && cfg != nil && !cfg.AdminPassword.IsNull() && !cfg.AdminPassword.IsUnknown() && cfg.AdminPassword.ValueString() != "" {
@@ -268,6 +236,59 @@ func buildAccountSettingsRequest(plan *AccountSettingsModel, got *pro.AccountSet
 	}
 
 	return out
+}
+
+// effectiveBoolPtr returns the replacement attribute's value, then the deprecated one's, or nil
+// when neither holds a value.
+func effectiveBoolPtr(replacement, deprecated types.Bool) *bool {
+	if p := boolPtrFromTF(replacement); p != nil {
+		return p
+	}
+	return boolPtrFromTF(deprecated)
+}
+
+// effectiveSet returns the replacement set when it holds a value, and the deprecated one
+// otherwise.
+func effectiveSet(replacement, deprecated types.Set) types.Set {
+	if !replacement.IsNull() && !replacement.IsUnknown() {
+		return replacement
+	}
+	return deprecated
+}
+
+// installProfilesDuringSetup is the flag Jamf Pro needs alongside the profile list. A configured
+// value is sent as written, and otherwise the flag follows whether any profile is listed.
+func installProfilesDuringSetup(configured types.Bool, ids []string) bool {
+	if !configured.IsNull() && !configured.IsUnknown() {
+		return configured.ValueBool()
+	}
+	return len(ids) > 0
+}
+
+// payloadConfiguredFor is the account-settings switch Jamf Pro requires whenever another account
+// setting is non-default. A configured value is sent as written. Otherwise it is true when the
+// configuration sets any account setting, and unset for an empty block. It reads the
+// configuration, not the plan, because the plan fills unset attributes from state on Update.
+func payloadConfiguredFor(plan, cfg *AccountSettingsModel) *bool {
+	if p := boolPtrFromTF(plan.PayloadConfigured); p != nil {
+		return p
+	}
+	if cfg == nil {
+		cfg = plan
+	}
+	set := func(v attr.Value) bool { return !v.IsNull() }
+	if set(cfg.CreateManagedLocalAdministratorAccount) || set(cfg.LocalAdminAccountEnabled) ||
+		set(cfg.AdminUsername) || set(cfg.AdminPassword) ||
+		set(cfg.HideManagedLocalAdministratorAccount) || set(cfg.HiddenAdminAccount) ||
+		set(cfg.MakeManagedLocalAdministratorAccountMdmEnabled) || set(cfg.LocalUserManaged) ||
+		set(cfg.UserAccountType) ||
+		set(cfg.PrefillPrimaryAccountInfoFeatureEnabled) || set(cfg.PrefillType) ||
+		set(cfg.PrefillAccountFullName) || set(cfg.PrefillAccountUserName) ||
+		set(cfg.LockPrimaryAccountInformation) || set(cfg.PreventPrefillInfoFromModification) {
+		t := true
+		return &t
+	}
+	return nil
 }
 
 // plaintextRecoveryPassword reads the WriteOnly recovery_lock_password from

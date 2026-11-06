@@ -5,13 +5,13 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
   display_name                          = "Standard iPad PreStage"
   device_enrollment_program_instance_id = "1"
 
-  mandatory              = true
-  mdm_removable          = false
-  require_authentication = false
-  supervised             = true
-  allow_pairing          = true
-  auto_advance_setup     = false
-  default_prestage       = false
+  make_mdm_profile_mandatory                    = true
+  prevent_unenrollment                          = true
+  require_credentials_for_enrollment            = false
+  supervise_devices_with_ios_12_or_earlier      = true
+  allow_pairing                                 = true
+  automatically_advance_through_setup_assistant = false
+  automatically_assign_new_devices              = false
 
   support_phone_number  = "+1-555-0100"
   support_email_address = "helpdesk@example.com"
@@ -34,7 +34,7 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
   # Shared iPad. storage_quota_size_megabytes is read-only (Computed): Jamf Pro
   # recalculates it server-side, so set it in the Jamf Pro admin UI, not here.
   # use_storage_quota_size and temporary_session_only are mutually exclusive.
-  multi_user              = true
+  enable_shared_ipad      = true
   maximum_shared_accounts = 8
   use_storage_quota_size  = true
   temporary_session_only  = false
@@ -52,10 +52,12 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
   }
 
   skip_setup_items = {
-    location    = true
-    apple_id    = true
-    screen_time = true
-    siri        = true
+    location             = true
+    apple_id             = true
+    screen_time          = true
+    siri                 = true
+    device_features_tour = true
+    liquid_glass         = true
   }
 
   location_information = {

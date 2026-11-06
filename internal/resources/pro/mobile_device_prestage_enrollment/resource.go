@@ -108,45 +108,9 @@ func (r *MobileDevicePrestageEnrollmentResource) Schema(ctx context.Context, req
 				},
 			},
 
-			"mandatory":              optBool("**\"Make MDM Profile Mandatory\"** in the Jamf Pro admin UI."),
-			"mdm_removable":          optBool("**\"Allow MDM Profile Removal\"** in the Jamf Pro admin UI."),
-			"require_authentication": optBool("**\"Require Authentication\"** in the Jamf Pro admin UI."),
-			"supervised":             optBool("**\"Supervised\"** in the Jamf Pro admin UI."),
-			"allow_pairing":          optBool("**\"Allow Pairing\"** in the Jamf Pro admin UI."),
-			"auto_advance_setup":     optBool("**\"Auto Advance Setup\"** (tvOS) in the Jamf Pro admin UI."),
-			"configure_device_before_setup_assistant": optBool("**\"Configure device before Setup Assistant\"** in the Jamf Pro admin UI."),
-			// Jamf Pro allows at most one default PreStage per device type.
-			// Setting this to true is honored only when no other PreStage is
-			// currently the default; if another already holds it the write is
-			// REJECTED with 400 ALREADY_DEFAULT and nothing is stored — it is NOT
-			// silently kept false. diagnoseAlreadyDefault turns that into an
-			// actionable diagnostic, and ModifyPlan deliberately leaves this
-			// attribute alone (see the note there).
-			"default_prestage": schema.BoolAttribute{
-				MarkdownDescription: "When true, this PreStage becomes the tenant default for new devices. Jamf Pro allows at most one default PreStage and will not move the default automatically: if another PreStage already holds it, the apply fails. Set `default_prestage = false` on the current holder first. Where both are managed by Terraform, make the release land before the claim: apply it on its own, or add a `depends_on` from this resource to the one giving up the default.",
-				Optional:            true,
-				Computed:            true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"send_timezone":                       optBool("**\"Send Time Zone\"** in the Jamf Pro admin UI."),
+			"allow_pairing":                       optBool("**\"Pairing\"** in the Jamf Pro admin UI, under *Settings for Supervised Devices*. Allows devices to connect to Mac computers."),
 			"prevent_activation_lock":             optBool("**\"Prevent user from enabling Activation Lock\"** in the Jamf Pro admin UI."),
-			"enable_device_based_activation_lock": optBool("**\"Enable Device-Based Activation Lock\"** in the Jamf Pro admin UI."),
-			"keep_existing_site_membership":       optBool("**\"Keep Existing Site Membership\"** in the Jamf Pro admin UI."),
-			"keep_existing_location_information":  optBool("**\"Keep Existing Location Information\"** in the Jamf Pro admin UI."),
-			"multi_user": schema.BoolAttribute{
-				MarkdownDescription: "**\"Enable Shared iPad\"** in the Jamf Pro admin UI. Requires both `supervised = true` and `prevent_activation_lock = true`. Jamf Pro rejects Shared iPad otherwise: `prevent_activation_lock` fails with a hard error, and `supervised` silently disables Shared iPad.",
-				Optional:            true,
-				Computed:            true,
-				Validators: []validator.Bool{
-					multiUserRequiresPreventActivationLock(),
-					multiUserRequiresSupervised(),
-				},
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
-			},
+			"enable_device_based_activation_lock": optBool("**\"Enable Activation Lock on the device (Apple School Manager, Apple Business Manager)\"** in the Jamf Pro admin UI."),
 			"use_storage_quota_size": schema.BoolAttribute{
 				MarkdownDescription: "**\"Use Storage Quota Size\"** shared-iPad storage mode. Mutually exclusive with `temporary_session_only`: Jamf Pro forces this to `false` when `temporary_session_only = true`.",
 				Optional:            true,
@@ -161,12 +125,9 @@ func (r *MobileDevicePrestageEnrollmentResource) Schema(ctx context.Context, req
 			"temporary_session_only":            optBool("**\"Temporary Session Only\"** shared-iPad storage mode. Mutually exclusive with `use_storage_quota_size`: Jamf Pro forces `use_storage_quota_size` to `false` when this is `true`."),
 			"enforce_temporary_session_timeout": optBool("**\"Enforce Temporary Session Timeout\"** in the Jamf Pro admin UI."),
 			"enforce_user_session_timeout":      optBool("**\"Enforce User Session Timeout\"** in the Jamf Pro admin UI."),
-			"preserve_managed_apps":             optBool("**\"Preserve Managed Apps\"** in the Jamf Pro admin UI."),
-			"do_not_use_profile_from_backup":    optBool("**\"Do not use profile from backup\"** in the Jamf Pro admin UI."),
-			"install_apps_during_enrollment":    optBool("**\"Install managed apps before Setup Assistant\"** in the Jamf Pro admin UI."),
-			"rts_enabled":                       optBool("**\"Return to Service\"** enabled toggle."),
+			"preserve_managed_apps":             optBool("**\"Preserve managed apps\"** in the Jamf Pro admin UI. The admin UI shows it only while Return to Service is allowed (`allow_return_to_service`), and the provider rejects `true` when that is `false`.", preserveManagedAppsRequiresReturnToService()),
+			"do_not_use_profile_from_backup":    optBool("Has no control in the Jamf Pro admin UI."),
 
-			"authentication_prompt": optString("**\"Authentication Prompt\"** message shown when `require_authentication = true`."),
 			"support_phone_number":  optString("**\"Support Phone Number\"** in the Jamf Pro admin UI."),
 			"support_email_address": optString("**\"Support Email Address\"** in the Jamf Pro admin UI."),
 			"department":            optString("**\"Department\"** label shown during Setup Assistant. Free-form text; *not* the department ID (`location_information.department_id`)."),
@@ -303,6 +264,7 @@ func (r *MobileDevicePrestageEnrollmentResource) Schema(ctx context.Context, req
 			}),
 		},
 	}
+	addRenamedAttributes(resp.Schema.Attributes)
 }
 
 // Configure wires the Jamf Pro client into the resource.
@@ -335,11 +297,12 @@ func (r *MobileDevicePrestageEnrollmentResource) ImportState(ctx context.Context
 // so a plan can collapse to a no-op and the non-null variant would leave each
 // null-prior leaf Unknown in it (STYLE_GUIDE rule 1a). The in-existing-block
 // modifier carries a null prior only when the block is already in state.
-func optBool(md string) schema.Attribute {
+func optBool(md string, vals ...validator.Bool) schema.Attribute {
 	return schema.BoolAttribute{
 		MarkdownDescription: md,
 		Optional:            true,
 		Computed:            true,
+		Validators:          vals,
 		PlanModifiers: []planmodifier.Bool{
 			planmodifiers.UseStateForUnknownInExistingBlockBool(),
 		},
@@ -367,64 +330,6 @@ func optInt64(md string) schema.Attribute {
 		},
 		Validators: []validator.Int64{
 			int64validator.AtLeast(0),
-		},
-	}
-}
-
-// skipSetupItemsSchema returns the SingleNestedAttribute for the
-// Setup-Assistant pane-skip checklist (45 keys, §F12). Per STYLE_GUIDE:
-// typed-pointer model ⇒ block is Optional-only; inner fields are
-// Optional+Computed.
-func skipSetupItemsSchema() schema.SingleNestedAttribute {
-	return schema.SingleNestedAttribute{
-		MarkdownDescription: "Setup Assistant panes to skip during enrolment. Each attribute corresponds to a Setup Assistant pane; `true` skips the pane. Supply the block, even empty (`skip_setup_items = {}`), to manage this section. Omitting it produces drift on the next refresh.",
-		Optional:            true,
-		Attributes: map[string]schema.Attribute{
-			"action_button":           optBool("**\"Action Button\"** pane."),
-			"android":                 optBool("**\"Move from Android\"** pane."),
-			"appearance":              optBool("**\"Appearance\"** pane."),
-			"apple_id":                optBool("**\"Apple ID\"** pane."),
-			"biometric":               optBool("**\"Biometric\"** pane (Face ID / Touch ID)."),
-			"camera_button":           optBool("**\"Camera Button\"** pane."),
-			"cloud_storage":           optBool("**\"iCloud Storage\"** pane."),
-			"diagnostics":             optBool("**\"Diagnostics\"** pane."),
-			"display_tone":            optBool("**\"True Tone\"** pane."),
-			"enable_lockdown_mode":    optBool("**\"Enable Lockdown Mode\"** pane."),
-			"express_language":        optBool("**\"Express Language\"** pane."),
-			"home_button_sensitivity": optBool("**\"Home Button Sensitivity\"** pane."),
-			"intelligence":            optBool("**\"Apple Intelligence\"** pane."),
-			"keyboard":                optBool("**\"Keyboard\"** pane."),
-			"location":                optBool("**\"Location Services\"** pane."),
-			"multitasking":            optBool("**\"Multitasking\"** pane."),
-			"os_showcase":             optBool("**\"OS Showcase\"** pane."),
-			"onboarding":              optBool("**\"Onboarding\"** pane."),
-			"passcode":                optBool("**\"Passcode\"** pane."),
-			"payment":                 optBool("**\"Apple Pay\"** pane."),
-			"preferred_language":      optBool("**\"Preferred Language\"** pane."),
-			"privacy":                 optBool("**\"Privacy\"** pane."),
-			"restore":                 optBool("**\"Restore from backup\"** pane."),
-			"restore_completed":       optBool("**\"Restore Completed\"** pane."),
-			"sim_setup":               optBool("**\"SIM Setup\"** pane."),
-			"safety":                  optBool("**\"Safety\"** pane."),
-			"safety_and_handling":     optBool("**\"Safety and Handling\"** pane."),
-			"screen_saver":            optBool("**\"Screen Saver\"** pane."),
-			"screen_time":             optBool("**\"Screen Time\"** pane."),
-			"siri":                    optBool("**\"Siri\"** pane."),
-			"software_update":         optBool("**\"Software Update\"** pane."),
-			"spoken_language":         optBool("**\"Spoken Language\"** pane."),
-			"tos":                     optBool("**\"Terms of Service\"** pane."),
-			"tv_home_screen_sync":     optBool("**\"TV Home Screen Sync\"** pane."),
-			"tv_provider_sign_in":     optBool("**\"TV Provider Sign In\"** pane."),
-			"tv_room":                 optBool("**\"TV Room\"** pane."),
-			"tap_to_setup":            optBool("**\"Tap to Setup\"** pane."),
-			"terms_of_address":        optBool("**\"Terms of Address\"** pane."),
-			"transfer_data":           optBool("**\"Transfer Data\"** pane."),
-			"update_completed":        optBool("**\"Update Completed\"** pane."),
-			"voice_selection":         optBool("**\"Voice Selection\"** pane."),
-			"watch_migration":         optBool("**\"Watch Migration\"** pane."),
-			"welcome":                 optBool("**\"Welcome\"** pane."),
-			"zoom":                    optBool("**\"Zoom\"** pane."),
-			"imessage_and_facetime":   optBool("**\"iMessage & FaceTime\"** pane."),
 		},
 	}
 }

@@ -56,6 +56,21 @@ type MobileDevicePrestageEnrollmentResourceModel struct {
 	RtsConfigProfileID        types.String `tfsdk:"rts_config_profile_id"`
 	RtsEnabled                types.Bool   `tfsdk:"rts_enabled"`
 
+	MakeMdmProfileMandatory                          types.Bool   `tfsdk:"make_mdm_profile_mandatory"`
+	PreventUnenrollment                              types.Bool   `tfsdk:"prevent_unenrollment"`
+	RequireCredentialsForEnrollment                  types.Bool   `tfsdk:"require_credentials_for_enrollment"`
+	AuthenticationMessage                            types.String `tfsdk:"authentication_message"`
+	SuperviseDevicesWithIos12OrEarlier               types.Bool   `tfsdk:"supervise_devices_with_ios_12_or_earlier"`
+	AutomaticallyAdvanceThroughSetupAssistant        types.Bool   `tfsdk:"automatically_advance_through_setup_assistant"`
+	InstallConfigurationProfilesBeforeSetupAssistant types.Bool   `tfsdk:"install_configuration_profiles_before_setup_assistant"`
+	InstallManagedAppsBeforeSetupAssistant           types.Bool   `tfsdk:"install_managed_apps_before_setup_assistant"`
+	AutomaticallyAssignNewDevices                    types.Bool   `tfsdk:"automatically_assign_new_devices"`
+	SetTimeZone                                      types.Bool   `tfsdk:"set_time_zone"`
+	EnableSharedIPad                                 types.Bool   `tfsdk:"enable_shared_ipad"`
+	AllowReturnToService                             types.Bool   `tfsdk:"allow_return_to_service"`
+	UseExistingSiteMembership                        types.Bool   `tfsdk:"use_existing_site_membership"`
+	UseExistingLocationInformation                   types.Bool   `tfsdk:"use_existing_location_information"`
+
 	MaximumSharedAccounts     types.Int64 `tfsdk:"maximum_shared_accounts"`
 	TemporarySessionTimeout   types.Int64 `tfsdk:"temporary_session_timeout"`
 	UserSessionTimeout        types.Int64 `tfsdk:"user_session_timeout"`
@@ -102,56 +117,76 @@ type PrestageDeviceNameModel struct {
 	Used       types.Bool   `tfsdk:"used"`
 }
 
-// SkipSetupItemsModel mirrors the wire-side `skipSetupItems` map but exposes
-// each Apple Setup Assistant pane as a named snake_case attribute. Boundary
-// translation (wire-case ⇔ snake_case) lives in the build / flatten / diff
-// functions. 45 keys (§F12).
+// SkipSetupItemsModel mirrors the wire-side `skipSetupItems` map but exposes each Apple Setup
+// Assistant pane as a named snake_case attribute, named after the admin UI label. The
+// attribute-to-wire-key table is skipItems in skip_items.go. The last fields are deprecated
+// aliases that share a wire key with an earlier one; deprecations.go names each.
 type SkipSetupItemsModel struct {
-	ActionButton          types.Bool `tfsdk:"action_button"`
-	Android               types.Bool `tfsdk:"android"`
-	Appearance            types.Bool `tfsdk:"appearance"`
-	AppleID               types.Bool `tfsdk:"apple_id"`
-	Biometric             types.Bool `tfsdk:"biometric"`
-	CameraButton          types.Bool `tfsdk:"camera_button"`
-	CloudStorage          types.Bool `tfsdk:"cloud_storage"`
-	Diagnostics           types.Bool `tfsdk:"diagnostics"`
-	DisplayTone           types.Bool `tfsdk:"display_tone"`
-	EnableLockdownMode    types.Bool `tfsdk:"enable_lockdown_mode"`
-	ExpressLanguage       types.Bool `tfsdk:"express_language"`
-	HomeButtonSensitivity types.Bool `tfsdk:"home_button_sensitivity"`
-	Intelligence          types.Bool `tfsdk:"intelligence"`
-	Keyboard              types.Bool `tfsdk:"keyboard"`
-	Location              types.Bool `tfsdk:"location"`
-	Multitasking          types.Bool `tfsdk:"multitasking"`
-	OSShowcase            types.Bool `tfsdk:"os_showcase"`
-	OnBoarding            types.Bool `tfsdk:"onboarding"`
-	Passcode              types.Bool `tfsdk:"passcode"`
-	Payment               types.Bool `tfsdk:"payment"`
-	PreferredLanguage     types.Bool `tfsdk:"preferred_language"`
-	Privacy               types.Bool `tfsdk:"privacy"`
-	Restore               types.Bool `tfsdk:"restore"`
-	RestoreCompleted      types.Bool `tfsdk:"restore_completed"`
-	SIMSetup              types.Bool `tfsdk:"sim_setup"`
-	Safety                types.Bool `tfsdk:"safety"`
-	SafetyAndHandling     types.Bool `tfsdk:"safety_and_handling"`
-	ScreenSaver           types.Bool `tfsdk:"screen_saver"`
-	ScreenTime            types.Bool `tfsdk:"screen_time"`
-	Siri                  types.Bool `tfsdk:"siri"`
-	SoftwareUpdate        types.Bool `tfsdk:"software_update"`
-	SpokenLanguage        types.Bool `tfsdk:"spoken_language"`
-	TOS                   types.Bool `tfsdk:"tos"`
-	TVHomeScreenSync      types.Bool `tfsdk:"tv_home_screen_sync"`
-	TVProviderSignIn      types.Bool `tfsdk:"tv_provider_sign_in"`
-	TVRoom                types.Bool `tfsdk:"tv_room"`
-	TapToSetup            types.Bool `tfsdk:"tap_to_setup"`
-	TermsOfAddress        types.Bool `tfsdk:"terms_of_address"`
-	TransferData          types.Bool `tfsdk:"transfer_data"`
-	UpdateCompleted       types.Bool `tfsdk:"update_completed"`
-	VoiceSelection        types.Bool `tfsdk:"voice_selection"`
-	WatchMigration        types.Bool `tfsdk:"watch_migration"`
-	Welcome               types.Bool `tfsdk:"welcome"`
-	Zoom                  types.Bool `tfsdk:"zoom"`
-	IMessageAndFaceTime   types.Bool `tfsdk:"imessage_and_facetime"`
+	Location                     types.Bool `tfsdk:"location"`
+	Siri                         types.Bool `tfsdk:"siri"`
+	AppleID                      types.Bool `tfsdk:"apple_id"`
+	TermsAndConditions           types.Bool `tfsdk:"terms_and_conditions"`
+	AppAnalytics                 types.Bool `tfsdk:"app_analytics"`
+	Privacy                      types.Bool `tfsdk:"privacy"`
+	AppsAndData                  types.Bool `tfsdk:"apps_and_data"`
+	Android                      types.Bool `tfsdk:"android"`
+	Passcode                     types.Bool `tfsdk:"passcode"`
+	AddCellularPlan              types.Bool `tfsdk:"add_cellular_plan"`
+	HomeButtonSensitivity        types.Bool `tfsdk:"home_button_sensitivity"`
+	Biometric                    types.Bool `tfsdk:"biometric"`
+	EnableLockdownMode           types.Bool `tfsdk:"enable_lockdown_mode"`
+	Payment                      types.Bool `tfsdk:"payment"`
+	DisplayZoom                  types.Bool `tfsdk:"display_zoom"`
+	TrueToneDisplay              types.Bool `tfsdk:"true_tone_display"`
+	CloudStorage                 types.Bool `tfsdk:"cloud_storage"`
+	AppleWatch                   types.Bool `tfsdk:"apple_watch"`
+	NewFeatureHighlights         types.Bool `tfsdk:"new_feature_highlights"`
+	IMessageAndFaceTime          types.Bool `tfsdk:"imessage_and_facetime"`
+	ScreenTime                   types.Bool `tfsdk:"screen_time"`
+	SoftwareUpdate               types.Bool `tfsdk:"software_update"`
+	ChooseYourLook               types.Bool `tfsdk:"choose_your_look"`
+	ExpressLanguage              types.Bool `tfsdk:"express_language"`
+	PreferredLanguage            types.Bool `tfsdk:"preferred_language"`
+	GetStarted                   types.Bool `tfsdk:"get_started"`
+	TransferData                 types.Bool `tfsdk:"transfer_data"`
+	RestoreCompleted             types.Bool `tfsdk:"restore_completed"`
+	SoftwareUpdateCompleted      types.Bool `tfsdk:"software_update_completed"`
+	EmergencySOS                 types.Bool `tfsdk:"emergency_sos"`
+	SafetyAndHandling            types.Bool `tfsdk:"safety_and_handling"`
+	TermsOfAddress               types.Bool `tfsdk:"terms_of_address"`
+	VoiceSelection               types.Bool `tfsdk:"voice_selection"`
+	Intelligence                 types.Bool `tfsdk:"intelligence"`
+	ActionButton                 types.Bool `tfsdk:"action_button"`
+	CameraButton                 types.Bool `tfsdk:"camera_button"`
+	Multitasking                 types.Bool `tfsdk:"multitasking"`
+	OSShowcase                   types.Bool `tfsdk:"os_showcase"`
+	Dictation                    types.Bool `tfsdk:"dictation"`
+	Keyboard                     types.Bool `tfsdk:"keyboard"`
+	DeviceFeaturesTour           types.Bool `tfsdk:"device_features_tour"`
+	LiquidGlass                  types.Bool `tfsdk:"liquid_glass"`
+	SetUpYourAppleTV             types.Bool `tfsdk:"set_up_your_apple_tv"`
+	SeeTheWorldScreensaver       types.Bool `tfsdk:"see_the_world_screensaver"`
+	OneHomeScreenForEveryAppleTV types.Bool `tfsdk:"one_home_screen_for_every_apple_tv"`
+	TVProviderSignIn             types.Bool `tfsdk:"tv_provider_sign_in"`
+	WhereIsThisAppleTV           types.Bool `tfsdk:"where_is_this_apple_tv"`
+
+	TOS              types.Bool `tfsdk:"tos"`
+	Diagnostics      types.Bool `tfsdk:"diagnostics"`
+	Restore          types.Bool `tfsdk:"restore"`
+	SIMSetup         types.Bool `tfsdk:"sim_setup"`
+	Zoom             types.Bool `tfsdk:"zoom"`
+	DisplayTone      types.Bool `tfsdk:"display_tone"`
+	WatchMigration   types.Bool `tfsdk:"watch_migration"`
+	OnBoarding       types.Bool `tfsdk:"onboarding"`
+	Appearance       types.Bool `tfsdk:"appearance"`
+	Welcome          types.Bool `tfsdk:"welcome"`
+	UpdateCompleted  types.Bool `tfsdk:"update_completed"`
+	Safety           types.Bool `tfsdk:"safety"`
+	SpokenLanguage   types.Bool `tfsdk:"spoken_language"`
+	TapToSetup       types.Bool `tfsdk:"tap_to_setup"`
+	ScreenSaver      types.Bool `tfsdk:"screen_saver"`
+	TVHomeScreenSync types.Bool `tfsdk:"tv_home_screen_sync"`
+	TVRoom           types.Bool `tfsdk:"tv_room"`
 }
 
 // LocationInformationModel is the User and Location Information nested block.
@@ -195,25 +230,34 @@ type MobileDevicePrestageEnrollmentIdentityModel struct {
 // MobileDevicePrestageEnrollmentDataSourceModel is the data source model.
 // Mirrors a scalar subset of the resource shape.
 type MobileDevicePrestageEnrollmentDataSourceModel struct {
-	ID                                     types.String             `tfsdk:"id"`
-	Name                                   types.String             `tfsdk:"name"`
-	DisplayName                            types.String             `tfsdk:"display_name"`
-	DeviceEnrollmentProgramInstanceID      types.String             `tfsdk:"device_enrollment_program_instance_id"`
-	Mandatory                              types.Bool               `tfsdk:"mandatory"`
-	MdmRemovable                           types.Bool               `tfsdk:"mdm_removable"`
-	DefaultPrestage                        types.Bool               `tfsdk:"default_prestage"`
-	RequireAuthentication                  types.Bool               `tfsdk:"require_authentication"`
-	Supervised                             types.Bool               `tfsdk:"supervised"`
-	SupportPhoneNumber                     types.String             `tfsdk:"support_phone_number"`
-	SupportEmailAddress                    types.String             `tfsdk:"support_email_address"`
-	Department                             types.String             `tfsdk:"department"`
-	AuthenticationPrompt                   types.String             `tfsdk:"authentication_prompt"`
-	SiteID                                 types.String             `tfsdk:"site_id"`
-	EnrollmentSiteID                       types.String             `tfsdk:"enrollment_site_id"`
-	EnrollmentCustomizationID              types.String             `tfsdk:"enrollment_customization_id"`
-	ProfileUUID                            types.String             `tfsdk:"profile_uuid"`
-	Timezone                               types.String             `tfsdk:"timezone"`
-	MultiUser                              types.Bool               `tfsdk:"multi_user"`
+	ID                                types.String `tfsdk:"id"`
+	Name                              types.String `tfsdk:"name"`
+	DisplayName                       types.String `tfsdk:"display_name"`
+	DeviceEnrollmentProgramInstanceID types.String `tfsdk:"device_enrollment_program_instance_id"`
+	Mandatory                         types.Bool   `tfsdk:"mandatory"`
+	MdmRemovable                      types.Bool   `tfsdk:"mdm_removable"`
+	DefaultPrestage                   types.Bool   `tfsdk:"default_prestage"`
+	RequireAuthentication             types.Bool   `tfsdk:"require_authentication"`
+	Supervised                        types.Bool   `tfsdk:"supervised"`
+	SupportPhoneNumber                types.String `tfsdk:"support_phone_number"`
+	SupportEmailAddress               types.String `tfsdk:"support_email_address"`
+	Department                        types.String `tfsdk:"department"`
+	AuthenticationPrompt              types.String `tfsdk:"authentication_prompt"`
+	SiteID                            types.String `tfsdk:"site_id"`
+	EnrollmentSiteID                  types.String `tfsdk:"enrollment_site_id"`
+	EnrollmentCustomizationID         types.String `tfsdk:"enrollment_customization_id"`
+	ProfileUUID                       types.String `tfsdk:"profile_uuid"`
+	Timezone                          types.String `tfsdk:"timezone"`
+	MultiUser                         types.Bool   `tfsdk:"multi_user"`
+
+	MakeMdmProfileMandatory            types.Bool   `tfsdk:"make_mdm_profile_mandatory"`
+	PreventUnenrollment                types.Bool   `tfsdk:"prevent_unenrollment"`
+	AutomaticallyAssignNewDevices      types.Bool   `tfsdk:"automatically_assign_new_devices"`
+	RequireCredentialsForEnrollment    types.Bool   `tfsdk:"require_credentials_for_enrollment"`
+	SuperviseDevicesWithIos12OrEarlier types.Bool   `tfsdk:"supervise_devices_with_ios_12_or_earlier"`
+	AuthenticationMessage              types.String `tfsdk:"authentication_message"`
+	EnableSharedIPad                   types.Bool   `tfsdk:"enable_shared_ipad"`
+
 	PrestageMinimumOsTargetVersionTypeIos  types.String             `tfsdk:"prestage_minimum_os_target_version_type_ios"`
 	PrestageMinimumOsTargetVersionTypeIpad types.String             `tfsdk:"prestage_minimum_os_target_version_type_ipad"`
 	Timeouts                               datasourceTimeouts.Value `tfsdk:"timeouts"`

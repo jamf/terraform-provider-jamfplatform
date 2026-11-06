@@ -413,7 +413,7 @@ Jamf offers three scopes when an API integration is created, and the provider mi
 | `deprecation-sweep` | List schema deprecations whose `remove-after` date has arrived (`scripts/deprecationsweep`; `TODAY=YYYY-MM-DD` looks ahead) |
 | `permissions-map` | Refetch `internal/common/permissions/permissions-map.md` from Jamf's permissions map article (network; not part of `generate`) |
 | `test` | Unit tests (excludes `acceptance` build tag) |
-| `test-scripts` | Unit tests for `scripts/acctargets`, `scripts/acclanes` and `scripts/deprecationsweep` (each behind its own build tag, so `go test ./...` misses them) |
+| `test-scripts` | Unit tests for `scripts/acctargets`, `scripts/acclanes`, `scripts/deprecationsweep` and `scripts/skipkeycanary` (each behind its own build tag, so `go test ./...` misses them) |
 | `testacc` | Acceptance tests (sets `TF_ACC=1`, requires tenant) |
 | `testacc-run` | Targeted acc rerun (`RUN=<regex> PKG=<path>`) |
 

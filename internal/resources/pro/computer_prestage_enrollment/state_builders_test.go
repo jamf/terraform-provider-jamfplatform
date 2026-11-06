@@ -13,7 +13,7 @@ import (
 )
 
 func TestFlattenSkipSetupItems_NilIn(t *testing.T) {
-	if got := flattenSkipSetupItems(nil); got != nil {
+	if got := flattenSkipSetupItems(nil, nil); got != nil {
 		t.Errorf("nil wire map → nil model expected, got %+v", got)
 	}
 }
@@ -46,7 +46,7 @@ func TestFlattenSkipSetupItems_CompleteWireMap(t *testing.T) {
 		"AdditionalPrivacySettings": false,
 		"Location":                  false,
 	}
-	m := flattenSkipSetupItems(wire)
+	m := flattenSkipSetupItems(wire, nil)
 	if m == nil {
 		t.Fatalf("expected non-nil model")
 	}
@@ -56,8 +56,8 @@ func TestFlattenSkipSetupItems_CompleteWireMap(t *testing.T) {
 	if !m.ICloudDiagnostics.ValueBool() {
 		t.Errorf("iCloudDiagnostics wire→ICloudDiagnostics not copied")
 	}
-	if !m.ICloudStorage.ValueBool() {
-		t.Errorf("iCloudStorage wire→ICloudStorage not copied")
+	if !m.AllYourFilesInICloud.ValueBool() {
+		t.Errorf("iCloudStorage wire→AllYourFilesInICloud not copied")
 	}
 	if !m.AppleID.ValueBool() {
 		t.Errorf("AppleID not copied")

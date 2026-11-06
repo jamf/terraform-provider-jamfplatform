@@ -17,27 +17,26 @@ import (
 type ComputerPrestageEnrollmentResourceModel struct {
 	ID types.String `tfsdk:"id"`
 
-	DisplayName                       types.String `tfsdk:"display_name"`
-	Mandatory                         types.Bool   `tfsdk:"mandatory"`
-	MdmRemovable                      types.Bool   `tfsdk:"mdm_removable"`
-	DefaultPrestage                   types.Bool   `tfsdk:"default_prestage"`
-	SupportPhoneNumber                types.String `tfsdk:"support_phone_number"`
-	SupportEmailAddress               types.String `tfsdk:"support_email_address"`
-	Department                        types.String `tfsdk:"department"`
-	RequireAuthentication             types.Bool   `tfsdk:"require_authentication"`
-	AuthenticationPrompt              types.String `tfsdk:"authentication_prompt"`
-	DeviceEnrollmentProgramInstanceID types.String `tfsdk:"device_enrollment_program_instance_id"`
-	SiteID                            types.String `tfsdk:"site_id"`
-	EnrollmentSiteID                  types.String `tfsdk:"enrollment_site_id"`
-	KeepExistingLocationInformation   types.Bool   `tfsdk:"keep_existing_location_information"`
-	KeepExistingSiteMembership        types.Bool   `tfsdk:"keep_existing_site_membership"`
-	EnrollmentCustomizationID         types.String `tfsdk:"enrollment_customization_id"`
-	Language                          types.String `tfsdk:"language"`
-	Region                            types.String `tfsdk:"region"`
-	AutoAdvanceSetup                  types.Bool   `tfsdk:"auto_advance_setup"`
-	InstallProfilesDuringSetup        types.Bool   `tfsdk:"install_profiles_during_setup"`
+	DisplayName                               types.String `tfsdk:"display_name"`
+	MakeMdmProfileMandatory                   types.Bool   `tfsdk:"make_mdm_profile_mandatory"`
+	AllowMdmProfileRemoval                    types.Bool   `tfsdk:"allow_mdm_profile_removal"`
+	DefaultPrestage                           types.Bool   `tfsdk:"default_prestage"`
+	SupportPhoneNumber                        types.String `tfsdk:"support_phone_number"`
+	SupportEmailAddress                       types.String `tfsdk:"support_email_address"`
+	Department                                types.String `tfsdk:"department"`
+	RequireAuthentication                     types.Bool   `tfsdk:"require_authentication"`
+	AuthenticationMessage                     types.String `tfsdk:"authentication_message"`
+	DeviceEnrollmentProgramInstanceID         types.String `tfsdk:"device_enrollment_program_instance_id"`
+	SiteID                                    types.String `tfsdk:"site_id"`
+	EnrollmentSiteID                          types.String `tfsdk:"enrollment_site_id"`
+	UseExistingLocationInformation            types.Bool   `tfsdk:"use_existing_location_information"`
+	UseExistingSiteMembership                 types.Bool   `tfsdk:"use_existing_site_membership"`
+	EnrollmentCustomizationID                 types.String `tfsdk:"enrollment_customization_id"`
+	Language                                  types.String `tfsdk:"language"`
+	Region                                    types.String `tfsdk:"region"`
+	AutomaticallyAdvanceThroughSetupAssistant types.Bool   `tfsdk:"automatically_advance_through_setup_assistant"`
 
-	PrestageInstalledProfileIds      types.Set    `tfsdk:"prestage_installed_profile_ids"`
+	ConfigurationProfileIds          types.Set    `tfsdk:"configuration_profile_ids"`
 	CustomPackageIds                 types.Set    `tfsdk:"custom_package_ids"`
 	CustomPackageDistributionPointID types.String `tfsdk:"custom_package_distribution_point_id"`
 	AnchorCertificates               types.List   `tfsdk:"anchor_certificates"`
@@ -68,38 +67,57 @@ type ComputerPrestageEnrollmentResourceModel struct {
 
 	ScopeSerialNumbers types.Set `tfsdk:"scope_serial_numbers"`
 
+	Mandatory                       types.Bool   `tfsdk:"mandatory"`
+	MdmRemovable                    types.Bool   `tfsdk:"mdm_removable"`
+	AuthenticationPrompt            types.String `tfsdk:"authentication_prompt"`
+	KeepExistingLocationInformation types.Bool   `tfsdk:"keep_existing_location_information"`
+	KeepExistingSiteMembership      types.Bool   `tfsdk:"keep_existing_site_membership"`
+	AutoAdvanceSetup                types.Bool   `tfsdk:"auto_advance_setup"`
+	InstallProfilesDuringSetup      types.Bool   `tfsdk:"install_profiles_during_setup"`
+	PrestageInstalledProfileIds     types.Set    `tfsdk:"prestage_installed_profile_ids"`
+
 	Timeouts resourceTimeouts.Value `tfsdk:"timeouts"`
 }
 
-// SkipSetupItemsModel mirrors the wire-side `skipSetupItems` map but exposes
-// each Apple Setup Assistant pane as a named snake_case attribute. Boundary
-// translation (wire-case ⇔ snake_case) lives in mappings.go.
+// SkipSetupItemsModel mirrors the wire-side `skipSetupItems` map but exposes each Apple Setup
+// Assistant pane as a named snake_case attribute, named after the admin UI label. The
+// attribute-to-wire-key table is skipItems in skip_items.go. The last fields are deprecated
+// aliases that share a wire key with an earlier one; deprecations.go names each.
 type SkipSetupItemsModel struct {
-	Biometric                 types.Bool `tfsdk:"biometric"`
-	FileVault                 types.Bool `tfsdk:"filevault"`
-	SoftwareUpdate            types.Bool `tfsdk:"software_update"`
-	Diagnostics               types.Bool `tfsdk:"diagnostics"`
-	Accessibility             types.Bool `tfsdk:"accessibility"`
-	Intelligence              types.Bool `tfsdk:"intelligence"`
-	ScreenTime                types.Bool `tfsdk:"screen_time"`
-	Siri                      types.Bool `tfsdk:"siri"`
-	Restore                   types.Bool `tfsdk:"restore"`
-	Privacy                   types.Bool `tfsdk:"privacy"`
-	Registration              types.Bool `tfsdk:"registration"`
-	EnableLockdownMode        types.Bool `tfsdk:"enable_lockdown_mode"`
-	TermsOfAddress            types.Bool `tfsdk:"terms_of_address"`
-	ICloudDiagnostics         types.Bool `tfsdk:"icloud_diagnostics"`
-	AppleID                   types.Bool `tfsdk:"apple_id"`
-	DisplayTone               types.Bool `tfsdk:"display_tone"`
-	Appearance                types.Bool `tfsdk:"appearance"`
-	Payment                   types.Bool `tfsdk:"payment"`
-	TOS                       types.Bool `tfsdk:"tos"`
-	OSShowcase                types.Bool `tfsdk:"os_showcase"`
-	Welcome                   types.Bool `tfsdk:"welcome"`
-	Wallpaper                 types.Bool `tfsdk:"wallpaper"`
-	ICloudStorage             types.Bool `tfsdk:"icloud_storage"`
-	AdditionalPrivacySettings types.Bool `tfsdk:"additional_privacy_settings"`
+	GetStarted                types.Bool `tfsdk:"get_started"`
 	Location                  types.Bool `tfsdk:"location"`
+	TransferInformation       types.Bool `tfsdk:"transfer_information"`
+	AppleID                   types.Bool `tfsdk:"apple_id"`
+	TermsAndConditions        types.Bool `tfsdk:"terms_and_conditions"`
+	Siri                      types.Bool `tfsdk:"siri"`
+	AppAnalytics              types.Bool `tfsdk:"app_analytics"`
+	Biometric                 types.Bool `tfsdk:"biometric"`
+	EnableLockdownMode        types.Bool `tfsdk:"enable_lockdown_mode"`
+	Payment                   types.Bool `tfsdk:"payment"`
+	Registration              types.Bool `tfsdk:"registration"`
+	Privacy                   types.Bool `tfsdk:"privacy"`
+	AdditionalPrivacySettings types.Bool `tfsdk:"additional_privacy_settings"`
+	FileVault                 types.Bool `tfsdk:"filevault"`
+	ICloudDiagnostics         types.Bool `tfsdk:"icloud_diagnostics"`
+	AllYourFilesInICloud      types.Bool `tfsdk:"all_your_files_in_icloud"`
+	ChooseYourLook            types.Bool `tfsdk:"choose_your_look"`
+	Wallpaper                 types.Bool `tfsdk:"wallpaper"`
+	TrueToneDisplay           types.Bool `tfsdk:"true_tone_display"`
+	ScreenTime                types.Bool `tfsdk:"screen_time"`
+	Accessibility             types.Bool `tfsdk:"accessibility"`
+	TermsOfAddress            types.Bool `tfsdk:"terms_of_address"`
+	Intelligence              types.Bool `tfsdk:"intelligence"`
+	SoftwareUpdate            types.Bool `tfsdk:"software_update"`
+	OSShowcase                types.Bool `tfsdk:"os_showcase"`
+	LiquidGlass               types.Bool `tfsdk:"liquid_glass"`
+
+	Welcome       types.Bool `tfsdk:"welcome"`
+	Restore       types.Bool `tfsdk:"restore"`
+	TOS           types.Bool `tfsdk:"tos"`
+	Diagnostics   types.Bool `tfsdk:"diagnostics"`
+	ICloudStorage types.Bool `tfsdk:"icloud_storage"`
+	Appearance    types.Bool `tfsdk:"appearance"`
+	DisplayTone   types.Bool `tfsdk:"display_tone"`
 }
 
 // LocationInformationModel is the User and Location Information nested block.
@@ -138,19 +156,24 @@ type PurchasingInformationModel struct {
 // is WriteOnly + `AdminPasswordWoVersion` is the rotation trigger.
 // Server-assigned `id` and `versionLock` are managed internally.
 type AccountSettingsModel struct {
-	PayloadConfigured                       types.Bool   `tfsdk:"payload_configured"`
-	LocalAdminAccountEnabled                types.Bool   `tfsdk:"local_admin_account_enabled"`
-	AdminUsername                           types.String `tfsdk:"admin_username"`
-	AdminPassword                           types.String `tfsdk:"admin_password"`
-	AdminPasswordWoVersion                  types.Int64  `tfsdk:"admin_password_wo_version"`
-	HiddenAdminAccount                      types.Bool   `tfsdk:"hidden_admin_account"`
-	LocalUserManaged                        types.Bool   `tfsdk:"local_user_managed"`
-	UserAccountType                         types.String `tfsdk:"user_account_type"`
-	PrefillPrimaryAccountInfoFeatureEnabled types.Bool   `tfsdk:"prefill_primary_account_info_feature_enabled"`
-	PrefillType                             types.String `tfsdk:"prefill_type"`
-	PrefillAccountFullName                  types.String `tfsdk:"prefill_account_full_name"`
-	PrefillAccountUserName                  types.String `tfsdk:"prefill_account_user_name"`
-	PreventPrefillInfoFromModification      types.Bool   `tfsdk:"prevent_prefill_info_from_modification"`
+	CreateManagedLocalAdministratorAccount         types.Bool   `tfsdk:"create_managed_local_administrator_account"`
+	AdminUsername                                  types.String `tfsdk:"admin_username"`
+	AdminPassword                                  types.String `tfsdk:"admin_password"`
+	AdminPasswordWoVersion                         types.Int64  `tfsdk:"admin_password_wo_version"`
+	HideManagedLocalAdministratorAccount           types.Bool   `tfsdk:"hide_managed_local_administrator_account"`
+	MakeManagedLocalAdministratorAccountMdmEnabled types.Bool   `tfsdk:"make_managed_local_administrator_account_mdm_enabled"`
+	UserAccountType                                types.String `tfsdk:"user_account_type"`
+	PrefillPrimaryAccountInfoFeatureEnabled        types.Bool   `tfsdk:"prefill_primary_account_info_feature_enabled"`
+	PrefillType                                    types.String `tfsdk:"prefill_type"`
+	PrefillAccountFullName                         types.String `tfsdk:"prefill_account_full_name"`
+	PrefillAccountUserName                         types.String `tfsdk:"prefill_account_user_name"`
+	LockPrimaryAccountInformation                  types.Bool   `tfsdk:"lock_primary_account_information"`
+
+	PayloadConfigured                  types.Bool `tfsdk:"payload_configured"`
+	LocalAdminAccountEnabled           types.Bool `tfsdk:"local_admin_account_enabled"`
+	HiddenAdminAccount                 types.Bool `tfsdk:"hidden_admin_account"`
+	LocalUserManaged                   types.Bool `tfsdk:"local_user_managed"`
+	PreventPrefillInfoFromModification types.Bool `tfsdk:"prevent_prefill_info_from_modification"`
 }
 
 // ComputerPrestageEnrollmentIdentityModel represents the identity object used
@@ -166,6 +189,8 @@ type ComputerPrestageEnrollmentDataSourceModel struct {
 	ID                                 types.String             `tfsdk:"id"`
 	Name                               types.String             `tfsdk:"name"`
 	DisplayName                        types.String             `tfsdk:"display_name"`
+	MakeMdmProfileMandatory            types.Bool               `tfsdk:"make_mdm_profile_mandatory"`
+	AllowMdmProfileRemoval             types.Bool               `tfsdk:"allow_mdm_profile_removal"`
 	Mandatory                          types.Bool               `tfsdk:"mandatory"`
 	MdmRemovable                       types.Bool               `tfsdk:"mdm_removable"`
 	DefaultPrestage                    types.Bool               `tfsdk:"default_prestage"`
@@ -173,6 +198,7 @@ type ComputerPrestageEnrollmentDataSourceModel struct {
 	SupportEmailAddress                types.String             `tfsdk:"support_email_address"`
 	Department                         types.String             `tfsdk:"department"`
 	RequireAuthentication              types.Bool               `tfsdk:"require_authentication"`
+	AuthenticationMessage              types.String             `tfsdk:"authentication_message"`
 	AuthenticationPrompt               types.String             `tfsdk:"authentication_prompt"`
 	DeviceEnrollmentProgramInstanceID  types.String             `tfsdk:"device_enrollment_program_instance_id"`
 	SiteID                             types.String             `tfsdk:"site_id"`

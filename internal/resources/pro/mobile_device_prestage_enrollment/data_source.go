@@ -69,24 +69,31 @@ func (d *MobileDevicePrestageEnrollmentDataSource) Schema(ctx context.Context, r
 				Computed:            true,
 			},
 			"device_enrollment_program_instance_id": schema.StringAttribute{Computed: true, MarkdownDescription: "ADE instance ID backing this PreStage."},
-			"mandatory":                             schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether MDM enrolment is mandatory."},
-			"mdm_removable":                         schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether the user can remove the MDM profile."},
-			"default_prestage":                      schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether this is the tenant default PreStage."},
-			"require_authentication":                schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether users must authenticate during Setup Assistant."},
-			"supervised":                            schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether enrolled devices are supervised."},
+			"mandatory":                             schema.BoolAttribute{Computed: true, MarkdownDescription: "~> " + deprecationMandatory + "\n\nWhether MDM enrolment is mandatory.", DeprecationMessage: deprecationMandatory},
+			"mdm_removable":                         schema.BoolAttribute{Computed: true, MarkdownDescription: "~> " + deprecationMdmRemovable + "\n\nWhether the user can remove the MDM profile.", DeprecationMessage: deprecationMdmRemovable},
+			"default_prestage":                      schema.BoolAttribute{Computed: true, MarkdownDescription: "~> " + deprecationDefaultPrestage + "\n\nWhether this is the tenant default PreStage.", DeprecationMessage: deprecationDefaultPrestage},
+			"require_authentication":                schema.BoolAttribute{Computed: true, MarkdownDescription: "~> " + deprecationRequireAuthentication + "\n\nWhether users must authenticate during Setup Assistant.", DeprecationMessage: deprecationRequireAuthentication},
+			"supervised":                            schema.BoolAttribute{Computed: true, MarkdownDescription: "~> " + deprecationSupervised + "\n\nWhether enrolled devices are supervised.", DeprecationMessage: deprecationSupervised},
 			"support_phone_number":                  schema.StringAttribute{Computed: true, MarkdownDescription: "Support phone number shown during Setup Assistant."},
 			"support_email_address":                 schema.StringAttribute{Computed: true, MarkdownDescription: "Support email address shown during Setup Assistant."},
 			"department":                            schema.StringAttribute{Computed: true, MarkdownDescription: "Department label shown during Setup Assistant."},
-			"authentication_prompt":                 schema.StringAttribute{Computed: true, MarkdownDescription: "Prompt shown when authentication is required."},
+			"authentication_prompt":                 schema.StringAttribute{Computed: true, MarkdownDescription: "~> " + deprecationAuthenticationPrompt + "\n\nPrompt shown when authentication is required.", DeprecationMessage: deprecationAuthenticationPrompt},
 			"site_id":                               schema.StringAttribute{Computed: true, MarkdownDescription: "Site ID, or `\"-1\"` when no site is set."},
 			"enrollment_site_id":                    schema.StringAttribute{Computed: true, MarkdownDescription: "Site ID applied to enrolled devices, or `\"-1\"` when no site."},
 			"enrollment_customization_id":           schema.StringAttribute{Computed: true, MarkdownDescription: "Enrollment customization ID, or `\"0\"` when no customization."},
 			"profile_uuid":                          schema.StringAttribute{Computed: true, MarkdownDescription: "MDM profile UUID assigned by Jamf Pro."},
 			"timezone":                              schema.StringAttribute{Computed: true, MarkdownDescription: "Time zone (IANA identifier, e.g. `\"America/Chicago\"`)."},
-			"multi_user":                            schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether Shared iPad is enabled."},
+			"multi_user":                            schema.BoolAttribute{Computed: true, MarkdownDescription: "~> " + deprecationMultiUser + "\n\nWhether Shared iPad is enabled.", DeprecationMessage: deprecationMultiUser},
 			"prestage_minimum_os_target_version_type_ios":  schema.StringAttribute{Computed: true, MarkdownDescription: "Minimum-iOS enforcement mode."},
 			"prestage_minimum_os_target_version_type_ipad": schema.StringAttribute{Computed: true, MarkdownDescription: "Minimum-iPadOS enforcement mode."},
-			"timeouts": timeouts.Attributes(ctx),
+			"make_mdm_profile_mandatory":                   schema.BoolAttribute{Computed: true, MarkdownDescription: "**\"Make MDM Profile Mandatory for devices with iOS 12.x or earlier\"** in the Jamf Pro admin UI."},
+			"prevent_unenrollment":                         schema.BoolAttribute{Computed: true, MarkdownDescription: "**\"Prevent Unenrollment\"** in the Jamf Pro admin UI. `true` means the user cannot remove the MDM profile."},
+			"automatically_assign_new_devices":             schema.BoolAttribute{Computed: true, MarkdownDescription: "**\"Automatically assign new devices\"** in the Jamf Pro admin UI. `true` marks this PreStage as the tenant default."},
+			"require_credentials_for_enrollment":           schema.BoolAttribute{Computed: true, MarkdownDescription: "**\"Require Credentials for Enrollment\"** in the Jamf Pro admin UI."},
+			"supervise_devices_with_ios_12_or_earlier":     schema.BoolAttribute{Computed: true, MarkdownDescription: "**\"Supervise Devices with iOS 12.x or earlier\"** in the Jamf Pro admin UI."},
+			"authentication_message":                       schema.StringAttribute{Computed: true, MarkdownDescription: "**\"Authentication Message\"** in the Jamf Pro admin UI."},
+			"enable_shared_ipad":                           schema.BoolAttribute{Computed: true, MarkdownDescription: "**\"Enable Shared iPad\"** in the Jamf Pro admin UI."},
+			"timeouts":                                     timeouts.Attributes(ctx),
 		},
 	}
 }
@@ -173,6 +180,13 @@ func (d *MobileDevicePrestageEnrollmentDataSource) Read(ctx context.Context, req
 	data.ProfileUUID = types.StringValue(got.ProfileUUID)
 	data.Timezone = types.StringValue(got.Timezone)
 	data.MultiUser = types.BoolValue(got.MultiUser)
+	data.MakeMdmProfileMandatory = types.BoolValue(got.Mandatory)
+	data.PreventUnenrollment = types.BoolValue(!got.MDMRemovable)
+	data.AutomaticallyAssignNewDevices = types.BoolValue(got.DefaultPrestage)
+	data.RequireCredentialsForEnrollment = types.BoolValue(got.RequireAuthentication)
+	data.SuperviseDevicesWithIos12OrEarlier = types.BoolValue(got.Supervised)
+	data.AuthenticationMessage = types.StringValue(got.AuthenticationPrompt)
+	data.EnableSharedIPad = types.BoolValue(got.MultiUser)
 	data.PrestageMinimumOsTargetVersionTypeIos = types.StringValue(got.PrestageMinimumOsTargetVersionTypeIos)
 	data.PrestageMinimumOsTargetVersionTypeIpad = types.StringValue(got.PrestageMinimumOsTargetVersionTypeIpad)
 

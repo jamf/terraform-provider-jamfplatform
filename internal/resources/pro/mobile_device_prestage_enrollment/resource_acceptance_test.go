@@ -186,7 +186,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Minimal(t *testing.T) {
 func TestAccResource_ProMobileDevicePrestageEnrollment_Full_UpdateRoundTrip(t *testing.T) {
 	testhelpers.AccPreCheck(t)
 	token := requireADETokenBlob(t)
-	// require_authentication = true (config V1) needs a Directory Service on the
+	// require_credentials_for_enrollment = true (config V1) needs a Directory Service on the
 	// tenant or Create returns PREREQUISITE_NOT_MET; stand up the shared Okta
 	// LDAP server fixture and depend on it.
 	ldapEnv := testhelpers.RequireOktaLdapEnv(t)
@@ -260,7 +260,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_SharedIpad_StorageQuota(t
 			{
 				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageStorageQuotaConfig(name, 5),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "multi_user", "true"),
+					resource.TestCheckResourceAttr(resourceName, "enable_shared_ipad", "true"),
 					resource.TestCheckResourceAttr(resourceName, "use_storage_quota_size", "true"),
 					// Read-only: populated by Jamf Pro, never set in HCL.
 					resource.TestCheckResourceAttrSet(resourceName, "storage_quota_size_megabytes"),
@@ -294,7 +294,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_SharedIpad_TemporarySessi
 			{
 				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageTemporarySessionConfig(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "multi_user", "true"),
+					resource.TestCheckResourceAttr(resourceName, "enable_shared_ipad", "true"),
 					resource.TestCheckResourceAttr(resourceName, "temporary_session_only", "true"),
 				),
 			},
@@ -458,8 +458,8 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
     delete = "1m"
   }
 
-  multi_user              = true
-  supervised              = true
+  enable_shared_ipad              = true
+  supervise_devices_with_ios_12_or_earlier              = true
   prevent_activation_lock = true
   use_storage_quota_size  = true
   temporary_session_only  = true
@@ -496,8 +496,8 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
     delete = "1m"
   }
 
-  multi_user                        = true
-  supervised                        = true
+  enable_shared_ipad                        = true
+  supervise_devices_with_ios_12_or_earlier                        = true
   prevent_activation_lock           = true
   temporary_session_only            = true
   enforce_temporary_session_timeout = true
@@ -776,14 +776,14 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
     update = "1m"
     delete = "1m"
   }
-  mandatory                             = true
-  mdm_removable                         = true
-  supervised                            = true
+  make_mdm_profile_mandatory                             = true
+  prevent_unenrollment                         = false
+  supervise_devices_with_ios_12_or_earlier                            = true
   support_phone_number                  = "+44-1-555-0100"
   support_email_address                 = "ops@example.test"
   department                            = "Operations"
-  require_authentication                = true
-  authentication_prompt                 = "Welcome to acceptance"
+  require_credentials_for_enrollment                = true
+  authentication_message                 = "Welcome to acceptance"
 
   skip_setup_items = {
     biometric = true
@@ -831,14 +831,14 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
     update = "1m"
     delete = "1m"
   }
-  mandatory                             = false
-  mdm_removable                         = false
-  supervised                            = true
+  make_mdm_profile_mandatory                             = false
+  prevent_unenrollment                         = true
+  supervise_devices_with_ios_12_or_earlier                            = true
   support_phone_number                  = "+44-1-555-0200"
   support_email_address                 = "newops@example.test"
   department                            = "NewOps"
-  require_authentication                = false
-  authentication_prompt                 = "Updated prompt"
+  require_credentials_for_enrollment                = false
+  authentication_message                 = "Updated prompt"
 
   skip_setup_items = {
     biometric = false
@@ -892,14 +892,14 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
     update = "1m"
     delete = "1m"
   }
-  mandatory                             = false
-  mdm_removable                         = false
-  supervised                            = true
+  make_mdm_profile_mandatory                             = false
+  prevent_unenrollment                         = true
+  supervise_devices_with_ios_12_or_earlier                            = true
   support_phone_number                  = "+44-1-555-0200"
   support_email_address                 = "newops@example.test"
   department                            = "NewOps"
-  require_authentication                = false
-  authentication_prompt                 = "Updated prompt"
+  require_credentials_for_enrollment                = false
+  authentication_message                 = "Updated prompt"
 
   scope_serial_numbers = []
 }
@@ -923,8 +923,8 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
     delete = "1m"
   }
 
-  multi_user              = true
-  supervised              = true
+  enable_shared_ipad              = true
+  supervise_devices_with_ios_12_or_earlier              = true
   prevent_activation_lock = true
   use_storage_quota_size  = true
   maximum_shared_accounts = %d
@@ -952,8 +952,8 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
     delete = "1m"
   }
 
-  multi_user                        = true
-  supervised                        = true
+  enable_shared_ipad                        = true
+  supervise_devices_with_ios_12_or_earlier                        = true
   prevent_activation_lock           = true
   temporary_session_only            = true
   enforce_temporary_session_timeout = true

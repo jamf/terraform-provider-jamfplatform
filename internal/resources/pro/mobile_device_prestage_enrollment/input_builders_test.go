@@ -75,9 +75,9 @@ func TestBuildSkipSetupItemsMap(t *testing.T) {
 			t.Errorf("wire key %q: want %v, got (ok=%v, val=%v)", k, want, ok, got)
 		}
 	}
-	// All 45 wire keys must be present even when zero-valued in the model.
-	if len(wire) != 45 {
-		t.Errorf("map should always carry all 45 wire keys; got %d", len(wire))
+	// All 47 wire keys must be present even when zero-valued in the model.
+	if len(wire) != 47 {
+		t.Errorf("map should always carry all 47 wire keys; got %d", len(wire))
 	}
 }
 
@@ -429,8 +429,8 @@ func TestBuildPostInput_SkipSetupItemsPopulated(t *testing.T) {
 	if post.SkipSetupItems == nil {
 		t.Fatalf("populated skip_setup_items must produce a non-nil map")
 	}
-	if len(*post.SkipSetupItems) != 45 {
-		t.Errorf("skip_setup_items map must carry all 45 keys, got %d", len(*post.SkipSetupItems))
+	if len(*post.SkipSetupItems) != 47 {
+		t.Errorf("skip_setup_items map must carry all 47 keys, got %d", len(*post.SkipSetupItems))
 	}
 	if post.StorageQuotaSizeMegabytes != 2048 {
 		t.Errorf("storage 2048 must pass through, got %d", post.StorageQuotaSizeMegabytes)

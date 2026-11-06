@@ -212,7 +212,7 @@ func TestAccResource_ProComputerPrestageEnrollment_Full_UpdateRoundTrip(t *testi
 					resource.TestCheckResourceAttr(resourceName, "skip_setup_items.filevault", "true"),
 					resource.TestCheckResourceAttr(resourceName, "location_information.username", "tf-acc-user"),
 					resource.TestCheckResourceAttr(resourceName, "purchasing_information.apple_care_id", "AC-1"),
-					resource.TestCheckResourceAttr(resourceName, "account_settings.payload_configured", "true"),
+					resource.TestCheckResourceAttr(resourceName, "account_settings.create_managed_local_administrator_account", "true"),
 					resource.TestCheckResourceAttr(resourceName, "account_settings.admin_username", "ladmin1"),
 				),
 			},
@@ -222,7 +222,7 @@ func TestAccResource_ProComputerPrestageEnrollment_Full_UpdateRoundTrip(t *testi
 					resource.TestCheckResourceAttr(resourceName, "display_name", name+"-v2"),
 					resource.TestCheckResourceAttr(resourceName, "support_phone_number", "+44-1-555-0200"),
 					resource.TestCheckResourceAttr(resourceName, "skip_setup_items.filevault", "false"),
-					resource.TestCheckResourceAttr(resourceName, "skip_setup_items.icloud_storage", "true"),
+					resource.TestCheckResourceAttr(resourceName, "skip_setup_items.all_your_files_in_icloud", "true"),
 					resource.TestCheckResourceAttr(resourceName, "location_information.username", "tf-acc-user-v2"),
 					resource.TestCheckResourceAttr(resourceName, "purchasing_information.life_expectancy", "5"),
 					resource.TestCheckResourceAttr(resourceName, "account_settings.admin_username", "ladmin2"),
@@ -478,14 +478,13 @@ func testAccComputerPrestageMultiScopeConfig(name string, serials []string) stri
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -553,14 +552,13 @@ func testAccTwoComputerPrestagesScopeConflictConfig(nameBase, serial string, bCl
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "a" {
   display_name                          = "%s-a"
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -573,14 +571,13 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "a" {
 
 resource "jamfplatform_pro_computer_prestage_enrollment" "b" {
   display_name                          = "%s-b"
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -634,14 +631,13 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_RandomConflictsWi
 				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-random-with-pwd-%s"
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -670,14 +666,13 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_PasswordRequiresE
 				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-pwd-disabled-%s"
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -706,19 +701,17 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_PrefillCustomRequ
 				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-prefill-custom-missing-names-%s"
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
   account_settings = {
-    payload_configured = true
     prefill_type       = "CUSTOM"
   }
 }
@@ -742,14 +735,13 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_PssoModesMutually
 				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-psso-conflict-%s"
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -777,14 +769,13 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_AttendedPssoConfl
 				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-attended-ec-conflict-%s"
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -812,14 +803,13 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadRecoveryLockTy
 				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-bad-rl-type-%s"
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -845,14 +835,13 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadPrefillType(t 
 				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-bad-prefill-%s"
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -880,14 +869,13 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadUserAccountTyp
 				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-bad-uat-%s"
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -915,14 +903,13 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadMinOsTarget(t 
 				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-bad-min-os-%s"
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -941,14 +928,13 @@ func testAccComputerPrestageMinimalConfig(name string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -966,26 +952,25 @@ func testAccComputerPrestageFullConfigV1(name string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   default_prestage                      = false
   support_phone_number                  = "+44-1-555-0100"
   support_email_address                 = "ops@example.test"
   department                            = "Operations"
   require_authentication                = true
-  authentication_prompt                 = "Welcome to acceptance"
+  authentication_message                 = "Welcome to acceptance"
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
   skip_setup_items = {
     filevault      = true
     siri           = true
-    icloud_storage = false
+    all_your_files_in_icloud = false
   }
 
   location_information = {
@@ -1000,8 +985,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   }
 
   account_settings = {
-    payload_configured                           = true
-    local_admin_account_enabled                  = true
+    create_managed_local_administrator_account                  = true
     admin_username                               = "ladmin1"
     admin_password                               = "InitialP@ss1"
     admin_password_wo_version                    = 1
@@ -1026,19 +1010,18 @@ func testAccComputerPrestageBlocksRemovedConfig(name string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = false
-  mdm_removable                         = false
+  make_mdm_profile_mandatory                             = false
+  allow_mdm_profile_removal                         = false
   default_prestage                      = false
   support_phone_number                  = "+44-1-555-0200"
   support_email_address                 = "newops@example.test"
   department                            = "NewOps"
   require_authentication                = false
-  authentication_prompt                 = "Updated prompt"
+  authentication_message                 = "Updated prompt"
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = true
-  keep_existing_site_membership         = true
-  auto_advance_setup                    = true
-  install_profiles_during_setup         = false
+  use_existing_location_information    = true
+  use_existing_site_membership         = true
+  automatically_advance_through_setup_assistant                    = true
   prevent_activation_lock               = true
   enable_device_based_activation_lock   = false
 
@@ -1055,26 +1038,25 @@ func testAccComputerPrestageFullConfigV2(name string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = false
-  mdm_removable                         = false
+  make_mdm_profile_mandatory                             = false
+  allow_mdm_profile_removal                         = false
   default_prestage                      = false
   support_phone_number                  = "+44-1-555-0200"
   support_email_address                 = "newops@example.test"
   department                            = "NewOps"
   require_authentication                = false
-  authentication_prompt                 = "Updated prompt"
+  authentication_message                 = "Updated prompt"
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = true
-  keep_existing_site_membership         = true
-  auto_advance_setup                    = true
-  install_profiles_during_setup         = false
+  use_existing_location_information    = true
+  use_existing_site_membership         = true
+  automatically_advance_through_setup_assistant                    = true
   prevent_activation_lock               = true
   enable_device_based_activation_lock   = false
 
   skip_setup_items = {
     filevault                   = false
     siri                        = false
-    icloud_storage              = true
+    all_your_files_in_icloud    = true
     additional_privacy_settings = true
   }
 
@@ -1092,8 +1074,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   }
 
   account_settings = {
-    payload_configured                           = true
-    local_admin_account_enabled                  = true
+    create_managed_local_administrator_account                  = true
     admin_username                               = "ladmin2"
     admin_password                               = "RotatedP@ss2"
     admin_password_wo_version                    = 2
@@ -1115,14 +1096,13 @@ func testAccComputerPrestageRecoveryLockManualConfig(name string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -1142,14 +1122,13 @@ func testAccComputerPrestageRecoveryLockRandomConfig(name string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -1167,19 +1146,17 @@ func testAccComputerPrestagePrefillCustomConfig(name string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
   account_settings = {
-    payload_configured                           = true
     prefill_primary_account_info_feature_enabled = true
     prefill_type                                 = "CUSTOM"
     prefill_account_full_name                    = "Acc Test"
@@ -1196,19 +1173,17 @@ func testAccComputerPrestagePrefillDeviceOwnerConfig(name string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
   account_settings = {
-    payload_configured                           = true
     prefill_primary_account_info_feature_enabled = true
     prefill_type                                 = "DEVICE_OWNER"
   }
@@ -1227,14 +1202,13 @@ func testAccComputerPrestageScopeConfig(name, serial string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -1251,14 +1225,13 @@ func testAccComputerPrestageAnchorsConfig(name, anchors string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
 
@@ -1277,20 +1250,19 @@ func testAccComputerPrestageBlocksConfig(name string, declared bool) string {
 		blocks = `
   location_information   = { username = "tf-acc-user" }
   purchasing_information = { vendor = "tf-acc-vendor" }
-  account_settings       = { payload_configured = false }
+  account_settings       = {}
   skip_setup_items       = { siri = true }`
 	}
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = %q
-  mandatory                             = true
-  mdm_removable                         = true
+  make_mdm_profile_mandatory                             = true
+  allow_mdm_profile_removal                         = true
   require_authentication                = false
   device_enrollment_program_instance_id = %s
-  keep_existing_location_information    = false
-  keep_existing_site_membership         = false
-  auto_advance_setup                    = false
-  install_profiles_during_setup         = false
+  use_existing_location_information    = false
+  use_existing_site_membership         = false
+  automatically_advance_through_setup_assistant                    = false
   prevent_activation_lock               = false
   enable_device_based_activation_lock   = false
   scope_serial_numbers                  = []%s

@@ -33,13 +33,13 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
   display_name                          = "Standard iPad PreStage"
   device_enrollment_program_instance_id = "1"
 
-  mandatory              = true
-  mdm_removable          = false
-  require_authentication = false
-  supervised             = true
-  allow_pairing          = true
-  auto_advance_setup     = false
-  default_prestage       = false
+  make_mdm_profile_mandatory                    = true
+  prevent_unenrollment                          = true
+  require_credentials_for_enrollment            = false
+  supervise_devices_with_ios_12_or_earlier      = true
+  allow_pairing                                 = true
+  automatically_advance_through_setup_assistant = false
+  automatically_assign_new_devices              = false
 
   support_phone_number  = "+1-555-0100"
   support_email_address = "helpdesk@example.com"
@@ -62,7 +62,7 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
   # Shared iPad. storage_quota_size_megabytes is read-only (Computed): Jamf Pro
   # recalculates it server-side, so set it in the Jamf Pro admin UI, not here.
   # use_storage_quota_size and temporary_session_only are mutually exclusive.
-  multi_user              = true
+  enable_shared_ipad      = true
   maximum_shared_accounts = 8
   use_storage_quota_size  = true
   temporary_session_only  = false
@@ -80,10 +80,12 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
   }
 
   skip_setup_items = {
-    location    = true
-    apple_id    = true
-    screen_time = true
-    siri        = true
+    location             = true
+    apple_id             = true
+    screen_time          = true
+    siri                 = true
+    device_features_tour = true
+    liquid_glass         = true
   }
 
   location_information = {
@@ -114,49 +116,91 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
 
 ### Optional
 
-- `allow_pairing` (Boolean) **"Allow Pairing"** in the Jamf Pro admin UI.
+- `allow_pairing` (Boolean) **"Pairing"** in the Jamf Pro admin UI, under *Settings for Supervised Devices*. Allows devices to connect to Mac computers.
+- `allow_return_to_service` (Boolean) **"Allow use of the Return to Service option during device reset"** in the Jamf Pro admin UI. Replaces `rts_enabled`; set one or the other.
 - `anchor_certificates` (List of String) Ordered list of base64-encoded PEM certificates to embed in the PreStage. Each entry must be a valid X.509 certificate in PEM format. Jamf Pro rejects a malformed entry by silently discarding the whole change; the provider catches that and raises a hard error.
-- `authentication_prompt` (String) **"Authentication Prompt"** message shown when `require_authentication = true`.
-- `auto_advance_setup` (Boolean) **"Auto Advance Setup"** (tvOS) in the Jamf Pro admin UI.
-- `configure_device_before_setup_assistant` (Boolean) **"Configure device before Setup Assistant"** in the Jamf Pro admin UI.
-- `default_prestage` (Boolean) When true, this PreStage becomes the tenant default for new devices. Jamf Pro allows at most one default PreStage and will not move the default automatically: if another PreStage already holds it, the apply fails. Set `default_prestage = false` on the current holder first. Where both are managed by Terraform, make the release land before the claim: apply it on its own, or add a `depends_on` from this resource to the one giving up the default.
+- `authentication_message` (String) **"Authentication Message"** in the Jamf Pro admin UI. Shown to the user when `require_credentials_for_enrollment = true`. Replaces `authentication_prompt`; set one or the other.
+- `authentication_prompt` (String, Deprecated) ~> Deprecated: use `authentication_message` instead. The provider will not remove `authentication_prompt` before 2027-02-03.
+
+**"Authentication Message"** in the Jamf Pro admin UI. Shown to the user when `require_credentials_for_enrollment = true`.
+- `auto_advance_setup` (Boolean, Deprecated) ~> Deprecated: use `automatically_advance_through_setup_assistant` instead. The provider will not remove `auto_advance_setup` before 2027-02-03.
+
+**"Automatically advance through Setup Assistant (tvOS only)"** in the Jamf Pro admin UI.
+- `automatically_advance_through_setup_assistant` (Boolean) **"Automatically advance through Setup Assistant (tvOS only)"** in the Jamf Pro admin UI. Replaces `auto_advance_setup`; set one or the other.
+- `automatically_assign_new_devices` (Boolean) **"Automatically assign new devices"** in the Jamf Pro admin UI. When true, this PreStage becomes the tenant default for new devices. Jamf Pro allows at most one default PreStage and will not move the default automatically: if another PreStage already holds it, the apply fails. Set it to `false` on the current holder first. Where both are managed by Terraform, make the release land before the claim: apply it on its own, or add a `depends_on` from this resource to the one giving up the default. Replaces `default_prestage`; set one or the other.
+- `configure_device_before_setup_assistant` (Boolean, Deprecated) ~> Deprecated: use `install_configuration_profiles_before_setup_assistant` instead. The provider will not remove `configure_device_before_setup_assistant` before 2027-02-03.
+
+**"Install configuration profiles before Setup Assistant"** in the Jamf Pro admin UI.
+- `default_prestage` (Boolean, Deprecated) ~> Deprecated: use `automatically_assign_new_devices` instead. The provider will not remove `default_prestage` before 2027-02-03.
+
+**"Automatically assign new devices"** in the Jamf Pro admin UI. When true, this PreStage becomes the tenant default for new devices. Jamf Pro allows at most one default PreStage and will not move the default automatically: if another PreStage already holds it, the apply fails. Set it to `false` on the current holder first. Where both are managed by Terraform, make the release land before the claim: apply it on its own, or add a `depends_on` from this resource to the one giving up the default.
 - `department` (String) **"Department"** label shown during Setup Assistant. Free-form text; *not* the department ID (`location_information.department_id`).
-- `do_not_use_profile_from_backup` (Boolean) **"Do not use profile from backup"** in the Jamf Pro admin UI.
-- `enable_device_based_activation_lock` (Boolean) **"Enable Device-Based Activation Lock"** in the Jamf Pro admin UI.
+- `do_not_use_profile_from_backup` (Boolean) Has no control in the Jamf Pro admin UI.
+- `enable_device_based_activation_lock` (Boolean) **"Enable Activation Lock on the device (Apple School Manager, Apple Business Manager)"** in the Jamf Pro admin UI.
+- `enable_shared_ipad` (Boolean) **"Enable Shared iPad"** in the Jamf Pro admin UI. Requires `prevent_activation_lock = true` and supervision. Jamf Pro rejects Shared iPad without `prevent_activation_lock`, and turns it off without an error on a device that is not supervised. Replaces `multi_user`; set one or the other.
 - `enforce_temporary_session_timeout` (Boolean) **"Enforce Temporary Session Timeout"** in the Jamf Pro admin UI.
 - `enforce_user_session_timeout` (Boolean) **"Enforce User Session Timeout"** in the Jamf Pro admin UI.
 - `enrollment_customization_id` (String) Enrollment customization ID to apply during Setup Assistant. Sentinel `"0"` = no customization (note: `"0"`, not `"-1"`). Invalid IDs are silently coerced to `"0"`.
 - `enrollment_site_id` (String) Site ID applied to devices enrolled through this PreStage. Sentinel `"-1"` = no site.
-- `install_apps_during_enrollment` (Boolean) **"Install managed apps before Setup Assistant"** in the Jamf Pro admin UI.
-- `keep_existing_location_information` (Boolean) **"Keep Existing Location Information"** in the Jamf Pro admin UI.
-- `keep_existing_site_membership` (Boolean) **"Keep Existing Site Membership"** in the Jamf Pro admin UI.
+- `install_apps_during_enrollment` (Boolean, Deprecated) ~> Deprecated: use `install_managed_apps_before_setup_assistant` instead. The provider will not remove `install_apps_during_enrollment` before 2027-02-03.
+
+**"Install managed apps before Setup Assistant"** in the Jamf Pro admin UI.
+- `install_configuration_profiles_before_setup_assistant` (Boolean) **"Install configuration profiles before Setup Assistant"** in the Jamf Pro admin UI. Replaces `configure_device_before_setup_assistant`; set one or the other.
+- `install_managed_apps_before_setup_assistant` (Boolean) **"Install managed apps before Setup Assistant"** in the Jamf Pro admin UI. Replaces `install_apps_during_enrollment`; set one or the other.
+- `keep_existing_location_information` (Boolean, Deprecated) ~> Deprecated: use `use_existing_location_information` instead. The provider will not remove `keep_existing_location_information` before 2027-02-03.
+
+**"Use existing location information, if applicable"** in the Jamf Pro admin UI.
+- `keep_existing_site_membership` (Boolean, Deprecated) ~> Deprecated: use `use_existing_site_membership` instead. The provider will not remove `keep_existing_site_membership` before 2027-02-03.
+
+**"Use existing site membership, if applicable"** in the Jamf Pro admin UI.
 - `language` (String) Default Setup Assistant language (ISO-639 code, e.g. `"en"`). Invalid values are silently coerced to empty by Jamf Pro.
 - `location_information` (Attributes) **"User and Location Information"** in the Jamf Pro admin UI. Supply the block, even empty (`location_information = {}`), to manage this section. Omitting it produces drift on the next refresh, because Jamf Pro always returns a populated block. (see [below for nested schema](#nestedatt--location_information))
-- `mandatory` (Boolean) **"Make MDM Profile Mandatory"** in the Jamf Pro admin UI.
+- `make_mdm_profile_mandatory` (Boolean) **"Make MDM Profile Mandatory for devices with iOS 12.x or earlier"** in the Jamf Pro admin UI. Replaces `mandatory`; set one or the other.
+- `mandatory` (Boolean, Deprecated) ~> Deprecated: use `make_mdm_profile_mandatory` instead. The provider will not remove `mandatory` before 2027-02-03.
+
+**"Make MDM Profile Mandatory for devices with iOS 12.x or earlier"** in the Jamf Pro admin UI.
 - `maximum_shared_accounts` (Number) **"Number of users"** for Shared iPad.
-- `mdm_removable` (Boolean) **"Allow MDM Profile Removal"** in the Jamf Pro admin UI.
+- `mdm_removable` (Boolean, Deprecated) ~> Deprecated: use `prevent_unenrollment` instead. It holds the opposite value: `mdm_removable = true` is `prevent_unenrollment = false`. The provider will not remove `mdm_removable` before 2027-02-03.
+
+**"Prevent Unenrollment"** in the Jamf Pro admin UI. Disallows the user from removing the MDM profile. `true` is the opposite of the deprecated `mdm_removable`.
 - `minimum_os_specific_version_ios` (String) Specific minimum iOS version (e.g. `"17.1"`). Used only when `prestage_minimum_os_target_version_type_ios = "MINIMUM_OS_SPECIFIC_VERSION"`.
 - `minimum_os_specific_version_ipad` (String) Specific minimum iPadOS version (e.g. `"17.1"`). Used only when `prestage_minimum_os_target_version_type_ipad = "MINIMUM_OS_SPECIFIC_VERSION"`.
-- `multi_user` (Boolean) **"Enable Shared iPad"** in the Jamf Pro admin UI. Requires both `supervised = true` and `prevent_activation_lock = true`. Jamf Pro rejects Shared iPad otherwise: `prevent_activation_lock` fails with a hard error, and `supervised` silently disables Shared iPad.
+- `multi_user` (Boolean, Deprecated) ~> Deprecated: use `enable_shared_ipad` instead. The provider will not remove `multi_user` before 2027-02-03.
+
+**"Enable Shared iPad"** in the Jamf Pro admin UI. Requires `prevent_activation_lock = true` and supervision. Jamf Pro rejects Shared iPad without `prevent_activation_lock`, and turns it off without an error on a device that is not supervised.
 - `names` (Attributes) **"Mobile device names"** in the Jamf Pro admin UI. Supply the block, even empty (`names = {}`), to manage device naming. Omitting it produces drift on the next refresh, because Jamf Pro always returns a populated block. A bare `names = {}` leaves device naming *unconfigured*, which is how the Jamf Pro admin UI decides not to show naming at all. Set at least one field below for naming to take effect. (see [below for nested schema](#nestedatt--names))
-- `preserve_managed_apps` (Boolean) **"Preserve Managed Apps"** in the Jamf Pro admin UI.
+- `preserve_managed_apps` (Boolean) **"Preserve managed apps"** in the Jamf Pro admin UI. The admin UI shows it only while Return to Service is allowed (`allow_return_to_service`), and the provider rejects `true` when that is `false`.
 - `prestage_minimum_os_target_version_type_ios` (String) Minimum-iOS enforcement mode. One of `NO_ENFORCEMENT`, `MINIMUM_OS_LATEST_VERSION`, `MINIMUM_OS_LATEST_MAJOR_VERSION`, `MINIMUM_OS_LATEST_MINOR_VERSION`, `MINIMUM_OS_SPECIFIC_VERSION`. Pair `MINIMUM_OS_SPECIFIC_VERSION` with `minimum_os_specific_version_ios`.
 - `prestage_minimum_os_target_version_type_ipad` (String) Minimum-iPadOS enforcement mode. One of `NO_ENFORCEMENT`, `MINIMUM_OS_LATEST_VERSION`, `MINIMUM_OS_LATEST_MAJOR_VERSION`, `MINIMUM_OS_LATEST_MINOR_VERSION`, `MINIMUM_OS_SPECIFIC_VERSION`. Pair `MINIMUM_OS_SPECIFIC_VERSION` with `minimum_os_specific_version_ipad`.
 - `prevent_activation_lock` (Boolean) **"Prevent user from enabling Activation Lock"** in the Jamf Pro admin UI.
+- `prevent_unenrollment` (Boolean) **"Prevent Unenrollment"** in the Jamf Pro admin UI. Disallows the user from removing the MDM profile. `true` is the opposite of the deprecated `mdm_removable`. Replaces `mdm_removable`; set one or the other.
 - `purchasing_information` (Attributes) **"Purchasing Information"** in the Jamf Pro admin UI. Supply the block, even empty (`purchasing_information = {}`), to manage this section. Omitting it produces drift on the next refresh, because Jamf Pro always returns a populated block. (see [below for nested schema](#nestedatt--purchasing_information))
 - `region` (String) Default Setup Assistant region (ISO-3166 code, e.g. `"US"`). Invalid values are silently coerced to empty by Jamf Pro.
-- `require_authentication` (Boolean) **"Require Authentication"** in the Jamf Pro admin UI.
+- `require_authentication` (Boolean, Deprecated) ~> Deprecated: use `require_credentials_for_enrollment` instead. The provider will not remove `require_authentication` before 2027-02-03.
+
+**"Require Credentials for Enrollment"** in the Jamf Pro admin UI. Jamf Pro ignores it for devices with iOS 13 or later when `enrollment_customization_id` names an enrollment customization. Configure authentication in the enrollment customization instead.
+- `require_credentials_for_enrollment` (Boolean) **"Require Credentials for Enrollment"** in the Jamf Pro admin UI. Jamf Pro ignores it for devices with iOS 13 or later when `enrollment_customization_id` names an enrollment customization. Configure authentication in the enrollment customization instead. Replaces `require_authentication`; set one or the other.
 - `rts_config_profile_id` (String) Return to Service configuration profile ID. Sentinel `"-1"` = none.
-- `rts_enabled` (Boolean) **"Return to Service"** enabled toggle.
+- `rts_enabled` (Boolean, Deprecated) ~> Deprecated: use `allow_return_to_service` instead. The provider will not remove `rts_enabled` before 2027-02-03.
+
+**"Allow use of the Return to Service option during device reset"** in the Jamf Pro admin UI.
 - `scope_serial_numbers` (Set of String) Set of device serial numbers assigned to this PreStage. Each serial must exist on the underlying ADE token. The full set is rewritten on every change. Jamf Pro enforces single-PreStage-per-serial: assigning a serial that is currently scoped to a different PreStage is rejected with `ALREADY_SCOPED` and there is no transparent reassignment. To move a serial between PreStages, first remove it from the holding PreStage. A serial that does not exist on the ADE token is rejected with `DEVICE_DOES_NOT_EXIST_ON_TOKEN`.
-- `send_timezone` (Boolean) **"Send Time Zone"** in the Jamf Pro admin UI.
-- `skip_setup_items` (Attributes) Setup Assistant panes to skip during enrolment. Each attribute corresponds to a Setup Assistant pane; `true` skips the pane. Supply the block, even empty (`skip_setup_items = {}`), to manage this section. Omitting it produces drift on the next refresh. (see [below for nested schema](#nestedatt--skip_setup_items))
-- `supervised` (Boolean) **"Supervised"** in the Jamf Pro admin UI.
+- `send_timezone` (Boolean, Deprecated) ~> Deprecated: use `set_time_zone` instead. The provider will not remove `send_timezone` before 2027-02-03.
+
+**"Set Time Zone"** in the Jamf Pro admin UI. Sends `timezone` to the device.
+- `set_time_zone` (Boolean) **"Set Time Zone"** in the Jamf Pro admin UI. Sends `timezone` to the device. Replaces `send_timezone`; set one or the other.
+- `skip_setup_items` (Attributes) Setup Assistant panes to skip during enrolment. Each attribute matches a pane in the *Skip Setup Items* checklist of the Jamf Pro admin UI and takes its name from the pane's label. Set `true` to skip the pane. Supply the block, even empty (`skip_setup_items = {}`), to manage this section. Without it, the next refresh shows drift. (see [below for nested schema](#nestedatt--skip_setup_items))
+- `supervise_devices_with_ios_12_or_earlier` (Boolean) **"Supervise Devices with iOS 12.x or earlier"** in the Jamf Pro admin UI. Replaces `supervised`; set one or the other.
+- `supervised` (Boolean, Deprecated) ~> Deprecated: use `supervise_devices_with_ios_12_or_earlier` instead. The provider will not remove `supervised` before 2027-02-03.
+
+**"Supervise Devices with iOS 12.x or earlier"** in the Jamf Pro admin UI.
 - `support_email_address` (String) **"Support Email Address"** in the Jamf Pro admin UI.
 - `support_phone_number` (String) **"Support Phone Number"** in the Jamf Pro admin UI.
 - `temporary_session_only` (Boolean) **"Temporary Session Only"** shared-iPad storage mode. Mutually exclusive with `use_storage_quota_size`: Jamf Pro forces `use_storage_quota_size` to `false` when this is `true`.
 - `temporary_session_timeout` (Number) **"Temporary Session Timeout"** (minutes). With enforcement on, Jamf Pro silently discards a value below the UI minimum of 30.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+- `use_existing_location_information` (Boolean) **"Use existing location information, if applicable"** in the Jamf Pro admin UI. Replaces `keep_existing_location_information`; set one or the other.
+- `use_existing_site_membership` (Boolean) **"Use existing site membership, if applicable"** in the Jamf Pro admin UI. Replaces `keep_existing_site_membership`; set one or the other.
 - `use_storage_quota_size` (Boolean) **"Use Storage Quota Size"** shared-iPad storage mode. Mutually exclusive with `temporary_session_only`: Jamf Pro forces this to `false` when `temporary_session_only = true`.
 - `user_session_timeout` (Number) **"User Session Timeout"** (minutes).
 
@@ -233,50 +277,103 @@ Optional:
 Optional:
 
 - `action_button` (Boolean) **"Action Button"** pane.
+- `add_cellular_plan` (Boolean) **"Add Cellular Plan"** pane. Replaces `sim_setup`; set one or the other.
 - `android` (Boolean) **"Move from Android"** pane.
-- `appearance` (Boolean) **"Appearance"** pane.
-- `apple_id` (Boolean) **"Apple ID"** pane.
-- `biometric` (Boolean) **"Biometric"** pane (Face ID / Touch ID).
+- `app_analytics` (Boolean) **"App Analytics"** pane. Replaces `diagnostics`; set one or the other.
+- `appearance` (Boolean, Deprecated) ~> Deprecated: use `choose_your_look` instead, the same pane under the name the admin UI shows. The provider will not remove `appearance` before 2027-02-03.
+
+**"Choose your Look"** pane.
+- `apple_id` (Boolean) **"Apple ID and iCloud"** pane.
+- `apple_watch` (Boolean) **"Apple Watch"** pane. Replaces `watch_migration`; set one or the other.
+- `apps_and_data` (Boolean) **"Apps & Data"** pane. Replaces `restore`; set one or the other.
+- `biometric` (Boolean) **"Touch ID / Face ID"** pane.
 - `camera_button` (Boolean) **"Camera Button"** pane.
-- `cloud_storage` (Boolean) **"iCloud Storage"** pane.
-- `diagnostics` (Boolean) **"Diagnostics"** pane.
-- `display_tone` (Boolean) **"True Tone"** pane.
+- `choose_your_look` (Boolean) **"Choose your Look"** pane. Replaces `appearance`; set one or the other.
+- `cloud_storage` (Boolean) **"Cloud Storage"** pane.
+- `device_features_tour` (Boolean) **"Device Features Tour"** pane.
+- `diagnostics` (Boolean, Deprecated) ~> Deprecated: use `app_analytics` instead, the same pane under the name the admin UI shows. The provider will not remove `diagnostics` before 2027-02-03.
+
+**"App Analytics"** pane.
+- `dictation` (Boolean) **"Dictation"** pane. Replaces `spoken_language`; set one or the other.
+- `display_tone` (Boolean, Deprecated) ~> Deprecated: use `true_tone_display` instead, the same pane under the name the admin UI shows. The provider will not remove `display_tone` before 2027-02-03.
+
+**"True Tone Display"** pane.
+- `display_zoom` (Boolean) **"Display Zoom"** pane. Replaces `zoom`; set one or the other.
+- `emergency_sos` (Boolean) **"Emergency SOS"** pane. Replaces `safety`; set one or the other.
 - `enable_lockdown_mode` (Boolean) **"Enable Lockdown Mode"** pane.
-- `express_language` (Boolean) **"Express Language"** pane.
+- `express_language` (Boolean) **"Express Language Setup"** pane.
+- `get_started` (Boolean) **"Get Started"** pane. Replaces `welcome`; set one or the other.
 - `home_button_sensitivity` (Boolean) **"Home Button Sensitivity"** pane.
-- `imessage_and_facetime` (Boolean) **"iMessage & FaceTime"** pane.
-- `intelligence` (Boolean) **"Apple Intelligence"** pane.
+- `imessage_and_facetime` (Boolean) **"iMessage and FaceTime"** pane.
+- `intelligence` (Boolean) **"Intelligence"** pane.
 - `keyboard` (Boolean) **"Keyboard"** pane.
+- `liquid_glass` (Boolean) **"Liquid Glass"** pane.
 - `location` (Boolean) **"Location Services"** pane.
 - `multitasking` (Boolean) **"Multitasking"** pane.
-- `onboarding` (Boolean) **"Onboarding"** pane.
+- `new_feature_highlights` (Boolean) **"New Feature Highlights"** pane. Replaces `onboarding`; set one or the other.
+- `onboarding` (Boolean, Deprecated) ~> Deprecated: use `new_feature_highlights` instead, the same pane under the name the admin UI shows. The provider will not remove `onboarding` before 2027-02-03.
+
+**"New Feature Highlights"** pane.
+- `one_home_screen_for_every_apple_tv` (Boolean) **"One Home Screen for Every Apple TV"** pane. Replaces `tv_home_screen_sync`; set one or the other.
 - `os_showcase` (Boolean) **"OS Showcase"** pane.
-- `passcode` (Boolean) **"Passcode"** pane.
+- `passcode` (Boolean) **"Passcode Lock"** pane.
 - `payment` (Boolean) **"Apple Pay"** pane.
-- `preferred_language` (Boolean) **"Preferred Language"** pane.
+- `preferred_language` (Boolean) **"Preferred Language Order"** pane.
 - `privacy` (Boolean) **"Privacy"** pane.
-- `restore` (Boolean) **"Restore from backup"** pane.
+- `restore` (Boolean, Deprecated) ~> Deprecated: use `apps_and_data` instead, the same pane under the name the admin UI shows. The provider will not remove `restore` before 2027-02-03.
+
+**"Apps & Data"** pane.
 - `restore_completed` (Boolean) **"Restore Completed"** pane.
-- `safety` (Boolean) **"Safety"** pane.
+- `safety` (Boolean, Deprecated) ~> Deprecated: use `emergency_sos` instead, the same pane under the name the admin UI shows. The provider will not remove `safety` before 2027-02-03.
+
+**"Emergency SOS"** pane.
 - `safety_and_handling` (Boolean) **"Safety and Handling"** pane.
-- `screen_saver` (Boolean) **"Screen Saver"** pane.
+- `screen_saver` (Boolean, Deprecated) ~> Deprecated: use `see_the_world_screensaver` instead, the same pane under the name the admin UI shows. The provider will not remove `screen_saver` before 2027-02-03.
+
+**"See the World Screensaver"** pane.
 - `screen_time` (Boolean) **"Screen Time"** pane.
-- `sim_setup` (Boolean) **"SIM Setup"** pane.
+- `see_the_world_screensaver` (Boolean) **"See the World Screensaver"** pane. Replaces `screen_saver`; set one or the other.
+- `set_up_your_apple_tv` (Boolean) **"Set Up Your Apple TV"** pane. Replaces `tap_to_setup`; set one or the other.
+- `sim_setup` (Boolean, Deprecated) ~> Deprecated: use `add_cellular_plan` instead, the same pane under the name the admin UI shows. The provider will not remove `sim_setup` before 2027-02-03.
+
+**"Add Cellular Plan"** pane.
 - `siri` (Boolean) **"Siri"** pane.
 - `software_update` (Boolean) **"Software Update"** pane.
-- `spoken_language` (Boolean) **"Spoken Language"** pane.
-- `tap_to_setup` (Boolean) **"Tap to Setup"** pane.
+- `software_update_completed` (Boolean) **"Software Update Completed"** pane. Replaces `update_completed`; set one or the other.
+- `spoken_language` (Boolean, Deprecated) ~> Deprecated: use `dictation` instead, the same pane under the name the admin UI shows. The provider will not remove `spoken_language` before 2027-02-03.
+
+**"Dictation"** pane.
+- `tap_to_setup` (Boolean, Deprecated) ~> Deprecated: use `set_up_your_apple_tv` instead, the same pane under the name the admin UI shows. The provider will not remove `tap_to_setup` before 2027-02-03.
+
+**"Set Up Your Apple TV"** pane.
+- `terms_and_conditions` (Boolean) **"Terms and Conditions"** pane. Replaces `tos`; set one or the other.
 - `terms_of_address` (Boolean) **"Terms of Address"** pane.
-- `tos` (Boolean) **"Terms of Service"** pane.
+- `tos` (Boolean, Deprecated) ~> Deprecated: use `terms_and_conditions` instead, the same pane under the name the admin UI shows. The provider will not remove `tos` before 2027-02-03.
+
+**"Terms and Conditions"** pane.
 - `transfer_data` (Boolean) **"Transfer Data"** pane.
-- `tv_home_screen_sync` (Boolean) **"TV Home Screen Sync"** pane.
-- `tv_provider_sign_in` (Boolean) **"TV Provider Sign In"** pane.
-- `tv_room` (Boolean) **"TV Room"** pane.
-- `update_completed` (Boolean) **"Update Completed"** pane.
+- `true_tone_display` (Boolean) **"True Tone Display"** pane. Replaces `display_tone`; set one or the other.
+- `tv_home_screen_sync` (Boolean, Deprecated) ~> Deprecated: use `one_home_screen_for_every_apple_tv` instead, the same pane under the name the admin UI shows. The provider will not remove `tv_home_screen_sync` before 2027-02-03.
+
+**"One Home Screen for Every Apple TV"** pane.
+- `tv_provider_sign_in` (Boolean) **"Sign In to Your TV Provider"** pane.
+- `tv_room` (Boolean, Deprecated) ~> Deprecated: use `where_is_this_apple_tv` instead, the same pane under the name the admin UI shows. The provider will not remove `tv_room` before 2027-02-03.
+
+**"Where is this Apple TV?"** pane.
+- `update_completed` (Boolean, Deprecated) ~> Deprecated: use `software_update_completed` instead, the same pane under the name the admin UI shows. The provider will not remove `update_completed` before 2027-02-03.
+
+**"Software Update Completed"** pane.
 - `voice_selection` (Boolean) **"Voice Selection"** pane.
-- `watch_migration` (Boolean) **"Watch Migration"** pane.
-- `welcome` (Boolean) **"Welcome"** pane.
-- `zoom` (Boolean) **"Zoom"** pane.
+- `watch_migration` (Boolean, Deprecated) ~> Deprecated: use `apple_watch` instead, the same pane under the name the admin UI shows. The provider will not remove `watch_migration` before 2027-02-03.
+
+**"Apple Watch"** pane.
+- `welcome` (Boolean, Deprecated) ~> Deprecated: use `get_started` instead, the same pane under the name the admin UI shows. The provider will not remove `welcome` before 2027-02-03.
+
+**"Get Started"** pane.
+- `where_is_this_apple_tv` (Boolean) **"Where is this Apple TV?"** pane. Replaces `tv_room`; set one or the other.
+- `zoom` (Boolean, Deprecated) ~> Deprecated: use `display_zoom` instead, the same pane under the name the admin UI shows. The provider will not remove `zoom` before 2027-02-03.
+
+**"Display Zoom"** pane.
 
 
 <a id="nestedatt--timeouts"></a>

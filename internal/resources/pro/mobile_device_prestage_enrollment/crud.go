@@ -47,6 +47,8 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/prestagealias"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/prestageskip"
 )
 
 // ModifyPlan marks the "server-arbitrated" fields Unknown when their planned
@@ -69,6 +71,8 @@ func (r *MobileDevicePrestageEnrollmentResource) ModifyPlan(ctx context.Context,
 		return
 	}
 	r.reportNameCollision(ctx, req, resp)
+	prestageskip.ReconcilePlan(ctx, req, resp, skipAliases())
+	prestagealias.ReconcilePlan(ctx, req, resp, renamePairs())
 	var plan MobileDevicePrestageEnrollmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -132,27 +136,31 @@ func restoreServerArbitrated(plan *MobileDevicePrestageEnrollmentResourceModel, 
 // device PreStage per tenant and will not reassign it; the current holder has to
 // give it up first. Wire-probed 2026-08-07 against Jamf Pro 11.30:
 //
-//	create default_prestage = true, no current holder   → accepted
-//	create default_prestage = true, another holds it    → 400 ALREADY_DEFAULT, nothing created
-//	update default_prestage = true, no current holder   → accepted
-//	update default_prestage = true, this one holds it   → accepted (no-op)
-//	update default_prestage = true, another holds it    → 400 ALREADY_DEFAULT, nothing written
-//	update default_prestage = false (release)           → accepted, tenant left with no default
+//	create automatically_assign_new_devices = true, no current holder   → accepted
+//	create automatically_assign_new_devices = true, another holds it    → 400 ALREADY_DEFAULT, nothing created
+//	update automatically_assign_new_devices = true, no current holder   → accepted
+//	update automatically_assign_new_devices = true, this one holds it   → accepted (no-op)
+//	update automatically_assign_new_devices = true, another holds it    → 400 ALREADY_DEFAULT, nothing written
+//	update automatically_assign_new_devices = false (release)           → accepted, tenant left with no default
 //
 // Returns true when it recognised and reported the error.
 func diagnoseAlreadyDefault(diags *diag.Diagnostics, cfg MobileDevicePrestageEnrollmentResourceModel, err error) bool {
 	if err == nil || !strings.Contains(err.Error(), "ALREADY_DEFAULT") {
 		return false
 	}
+	attribute := "automatically_assign_new_devices"
+	if !cfg.DefaultPrestage.IsNull() {
+		attribute = "default_prestage"
+	}
 	detail := "Jamf Pro allows only one default mobile device PreStage per tenant and will not move the default automatically: " +
-		"another PreStage already holds it, so this write was rejected and nothing changed. Set default_prestage = false on the " +
+		"another PreStage already holds it, so this write was rejected and nothing changed. Set " + attribute + " = false on the " +
 		"PreStage that currently holds it, then apply again."
-	if isKnownTrue(cfg.DefaultPrestage) {
+	if isKnownTrue(cfg.DefaultPrestage) || isKnownTrue(cfg.AutomaticallyAssignNewDevices) {
 		detail += " When both PreStages are managed by Terraform, the release has to land before the claim — Terraform does not " +
 			"order the two updates on its own, so either apply the release on its own first, or add a depends_on from this " +
 			"resource to the one giving up the default."
 	}
-	diags.AddAttributeError(path.Root("default_prestage"), "another PreStage is already the tenant default", detail)
+	diags.AddAttributeError(path.Root(attribute), "another PreStage is already the tenant default", detail)
 	return true
 }
 
@@ -407,6 +415,7 @@ func (r *MobileDevicePrestageEnrollmentResource) Update(ctx context.Context, req
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	put.SkipSetupItems = buildSkipSetupItemsMapOver(plan.SkipSetupItems, preGet.SkipSetupItems)
 	injectVersionLocks(put, preGet)
 
 	_, putErr := r.client.UpdateMobileDevicePrestageV3(updateCtx, id, put)

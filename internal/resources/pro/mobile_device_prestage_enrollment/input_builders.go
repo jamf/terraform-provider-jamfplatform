@@ -21,28 +21,29 @@ import (
 // storageQuotaSizeMegabytes >= 1024 even when useStorageQuotaSize is false.
 func buildPostInput(ctx context.Context, plan, cfg MobileDevicePrestageEnrollmentResourceModel) (*pro.MobileDevicePrestageV3, diag.Diagnostics) {
 	var diags diag.Diagnostics
+	resolveRenames(&plan)
 
 	post := &pro.MobileDevicePrestageV3{
 		DisplayName:                       plan.DisplayName.ValueString(),
 		DeviceEnrollmentProgramInstanceID: plan.DeviceEnrollmentProgramInstanceID.ValueString(),
 
-		Mandatory:                           plan.Mandatory.ValueBool(),
-		MDMRemovable:                        plan.MdmRemovable.ValueBool(),
-		RequireAuthentication:               plan.RequireAuthentication.ValueBool(),
-		Supervised:                          plan.Supervised.ValueBool(),
+		Mandatory:                           plan.MakeMdmProfileMandatory.ValueBool(),
+		MDMRemovable:                        mdmRemovableWire(plan.PreventUnenrollment),
+		RequireAuthentication:               plan.RequireCredentialsForEnrollment.ValueBool(),
+		Supervised:                          plan.SuperviseDevicesWithIos12OrEarlier.ValueBool(),
 		AllowPairing:                        plan.AllowPairing.ValueBool(),
-		AutoAdvanceSetup:                    plan.AutoAdvanceSetup.ValueBool(),
-		ConfigureDeviceBeforeSetupAssistant: plan.ConfigureDeviceBeforeSetupAssistant.ValueBool(),
-		DefaultPrestage:                     plan.DefaultPrestage.ValueBool(),
-		SendTimezone:                        plan.SendTimezone.ValueBool(),
+		AutoAdvanceSetup:                    plan.AutomaticallyAdvanceThroughSetupAssistant.ValueBool(),
+		ConfigureDeviceBeforeSetupAssistant: plan.InstallConfigurationProfilesBeforeSetupAssistant.ValueBool(),
+		DefaultPrestage:                     plan.AutomaticallyAssignNewDevices.ValueBool(),
+		SendTimezone:                        plan.SetTimeZone.ValueBool(),
 		PreventActivationLock:               plan.PreventActivationLock.ValueBool(),
 		EnableDeviceBasedActivationLock:     plan.EnableDeviceBasedActivationLock.ValueBool(),
-		KeepExistingSiteMembership:          plan.KeepExistingSiteMembership.ValueBool(),
-		KeepExistingLocationInformation:     plan.KeepExistingLocationInformation.ValueBool(),
-		MultiUser:                           plan.MultiUser.ValueBool(),
+		KeepExistingSiteMembership:          plan.UseExistingSiteMembership.ValueBool(),
+		KeepExistingLocationInformation:     plan.UseExistingLocationInformation.ValueBool(),
+		MultiUser:                           plan.EnableSharedIPad.ValueBool(),
 		UseStorageQuotaSize:                 plan.UseStorageQuotaSize.ValueBool(),
 
-		AuthenticationPrompt: plan.AuthenticationPrompt.ValueString(),
+		AuthenticationPrompt: plan.AuthenticationMessage.ValueString(),
 		SupportPhoneNumber:   plan.SupportPhoneNumber.ValueString(),
 		SupportEmailAddress:  plan.SupportEmailAddress.ValueString(),
 		Department:           plan.Department.ValueString(),
@@ -67,13 +68,13 @@ func buildPostInput(ctx context.Context, plan, cfg MobileDevicePrestageEnrollmen
 		PrestageMinimumOsTargetVersionTypeIos:  helpers.OptionalStringPointer(plan.PrestageMinimumOsTargetVersionTypeIos),
 		PrestageMinimumOsTargetVersionTypeIpad: helpers.OptionalStringPointer(plan.PrestageMinimumOsTargetVersionTypeIpad),
 
-		RtsEnabled:                     helpers.OptionalBoolPointer(plan.RtsEnabled),
+		RtsEnabled:                     helpers.OptionalBoolPointer(plan.AllowReturnToService),
 		TemporarySessionOnly:           helpers.OptionalBoolPointer(plan.TemporarySessionOnly),
 		EnforceTemporarySessionTimeout: helpers.OptionalBoolPointer(plan.EnforceTemporarySessionTimeout),
 		EnforceUserSessionTimeout:      helpers.OptionalBoolPointer(plan.EnforceUserSessionTimeout),
 		PreserveManagedApps:            helpers.OptionalBoolPointer(plan.PreserveManagedApps),
 		DoNotUseProfileFromBackup:      helpers.OptionalBoolPointer(plan.DoNotUseProfileFromBackup),
-		InstallAppsDuringEnrollment:    helpers.OptionalBoolPointer(plan.InstallAppsDuringEnrollment),
+		InstallAppsDuringEnrollment:    helpers.OptionalBoolPointer(plan.InstallManagedAppsBeforeSetupAssistant),
 
 		TemporarySessionTimeout: helpers.OptionalInt64Pointer(plan.TemporarySessionTimeout),
 		UserSessionTimeout:      helpers.OptionalInt64Pointer(plan.UserSessionTimeout),
@@ -100,28 +101,29 @@ func buildPostInput(ctx context.Context, plan, cfg MobileDevicePrestageEnrollmen
 // full-replace, so every managed field is emitted (§F6).
 func buildPutInput(ctx context.Context, plan, cfg MobileDevicePrestageEnrollmentResourceModel) (*pro.PutMobileDevicePrestageV3, diag.Diagnostics) {
 	var diags diag.Diagnostics
+	resolveRenames(&plan)
 
 	put := &pro.PutMobileDevicePrestageV3{
 		DisplayName:                       plan.DisplayName.ValueString(),
 		DeviceEnrollmentProgramInstanceID: plan.DeviceEnrollmentProgramInstanceID.ValueString(),
 
-		Mandatory:                           plan.Mandatory.ValueBool(),
-		MDMRemovable:                        plan.MdmRemovable.ValueBool(),
-		RequireAuthentication:               plan.RequireAuthentication.ValueBool(),
-		Supervised:                          plan.Supervised.ValueBool(),
+		Mandatory:                           plan.MakeMdmProfileMandatory.ValueBool(),
+		MDMRemovable:                        mdmRemovableWire(plan.PreventUnenrollment),
+		RequireAuthentication:               plan.RequireCredentialsForEnrollment.ValueBool(),
+		Supervised:                          plan.SuperviseDevicesWithIos12OrEarlier.ValueBool(),
 		AllowPairing:                        plan.AllowPairing.ValueBool(),
-		AutoAdvanceSetup:                    plan.AutoAdvanceSetup.ValueBool(),
-		ConfigureDeviceBeforeSetupAssistant: plan.ConfigureDeviceBeforeSetupAssistant.ValueBool(),
-		DefaultPrestage:                     plan.DefaultPrestage.ValueBool(),
-		SendTimezone:                        plan.SendTimezone.ValueBool(),
+		AutoAdvanceSetup:                    plan.AutomaticallyAdvanceThroughSetupAssistant.ValueBool(),
+		ConfigureDeviceBeforeSetupAssistant: plan.InstallConfigurationProfilesBeforeSetupAssistant.ValueBool(),
+		DefaultPrestage:                     plan.AutomaticallyAssignNewDevices.ValueBool(),
+		SendTimezone:                        plan.SetTimeZone.ValueBool(),
 		PreventActivationLock:               plan.PreventActivationLock.ValueBool(),
 		EnableDeviceBasedActivationLock:     plan.EnableDeviceBasedActivationLock.ValueBool(),
-		KeepExistingSiteMembership:          plan.KeepExistingSiteMembership.ValueBool(),
-		KeepExistingLocationInformation:     plan.KeepExistingLocationInformation.ValueBool(),
-		MultiUser:                           plan.MultiUser.ValueBool(),
+		KeepExistingSiteMembership:          plan.UseExistingSiteMembership.ValueBool(),
+		KeepExistingLocationInformation:     plan.UseExistingLocationInformation.ValueBool(),
+		MultiUser:                           plan.EnableSharedIPad.ValueBool(),
 		UseStorageQuotaSize:                 plan.UseStorageQuotaSize.ValueBool(),
 
-		AuthenticationPrompt: plan.AuthenticationPrompt.ValueString(),
+		AuthenticationPrompt: plan.AuthenticationMessage.ValueString(),
 		SupportPhoneNumber:   plan.SupportPhoneNumber.ValueString(),
 		SupportEmailAddress:  plan.SupportEmailAddress.ValueString(),
 		Department:           plan.Department.ValueString(),
@@ -149,13 +151,13 @@ func buildPutInput(ctx context.Context, plan, cfg MobileDevicePrestageEnrollment
 		PrestageMinimumOsTargetVersionTypeIos:  helpers.OptionalStringPointer(plan.PrestageMinimumOsTargetVersionTypeIos),
 		PrestageMinimumOsTargetVersionTypeIpad: helpers.OptionalStringPointer(plan.PrestageMinimumOsTargetVersionTypeIpad),
 
-		RtsEnabled:                     helpers.OptionalBoolPointer(plan.RtsEnabled),
+		RtsEnabled:                     helpers.OptionalBoolPointer(plan.AllowReturnToService),
 		TemporarySessionOnly:           helpers.OptionalBoolPointer(plan.TemporarySessionOnly),
 		EnforceTemporarySessionTimeout: helpers.OptionalBoolPointer(plan.EnforceTemporarySessionTimeout),
 		EnforceUserSessionTimeout:      helpers.OptionalBoolPointer(plan.EnforceUserSessionTimeout),
 		PreserveManagedApps:            helpers.OptionalBoolPointer(plan.PreserveManagedApps),
 		DoNotUseProfileFromBackup:      helpers.OptionalBoolPointer(plan.DoNotUseProfileFromBackup),
-		InstallAppsDuringEnrollment:    helpers.OptionalBoolPointer(plan.InstallAppsDuringEnrollment),
+		InstallAppsDuringEnrollment:    helpers.OptionalBoolPointer(plan.InstallManagedAppsBeforeSetupAssistant),
 
 		TemporarySessionTimeout: helpers.OptionalInt64Pointer(plan.TemporarySessionTimeout),
 		UserSessionTimeout:      helpers.OptionalInt64Pointer(plan.UserSessionTimeout),
@@ -305,63 +307,6 @@ func buildPurchasingInformation(m *PurchasingInformationModel, nestedID string, 
 	return out
 }
 
-// buildSkipSetupItemsMap builds the wire map from the model. Sends all 45 keys
-// (the server echoes the full set, §F12); a null/unknown model bool serialises
-// as false. Returns nil when the user omitted the block.
-func buildSkipSetupItemsMap(m *SkipSetupItemsModel) *map[string]bool {
-	if m == nil {
-		return nil
-	}
-	out := map[string]bool{
-		"ActionButton":          m.ActionButton.ValueBool(),
-		"Android":               m.Android.ValueBool(),
-		"Appearance":            m.Appearance.ValueBool(),
-		"AppleID":               m.AppleID.ValueBool(),
-		"Biometric":             m.Biometric.ValueBool(),
-		"CameraButton":          m.CameraButton.ValueBool(),
-		"CloudStorage":          m.CloudStorage.ValueBool(),
-		"Diagnostics":           m.Diagnostics.ValueBool(),
-		"DisplayTone":           m.DisplayTone.ValueBool(),
-		"EnableLockdownMode":    m.EnableLockdownMode.ValueBool(),
-		"ExpressLanguage":       m.ExpressLanguage.ValueBool(),
-		"HomeButtonSensitivity": m.HomeButtonSensitivity.ValueBool(),
-		"Intelligence":          m.Intelligence.ValueBool(),
-		"Keyboard":              m.Keyboard.ValueBool(),
-		"Location":              m.Location.ValueBool(),
-		"Multitasking":          m.Multitasking.ValueBool(),
-		"OSShowcase":            m.OSShowcase.ValueBool(),
-		"OnBoarding":            m.OnBoarding.ValueBool(),
-		"Passcode":              m.Passcode.ValueBool(),
-		"Payment":               m.Payment.ValueBool(),
-		"PreferredLanguage":     m.PreferredLanguage.ValueBool(),
-		"Privacy":               m.Privacy.ValueBool(),
-		"Restore":               m.Restore.ValueBool(),
-		"RestoreCompleted":      m.RestoreCompleted.ValueBool(),
-		"SIMSetup":              m.SIMSetup.ValueBool(),
-		"Safety":                m.Safety.ValueBool(),
-		"SafetyAndHandling":     m.SafetyAndHandling.ValueBool(),
-		"ScreenSaver":           m.ScreenSaver.ValueBool(),
-		"ScreenTime":            m.ScreenTime.ValueBool(),
-		"Siri":                  m.Siri.ValueBool(),
-		"SoftwareUpdate":        m.SoftwareUpdate.ValueBool(),
-		"SpokenLanguage":        m.SpokenLanguage.ValueBool(),
-		"TOS":                   m.TOS.ValueBool(),
-		"TVHomeScreenSync":      m.TVHomeScreenSync.ValueBool(),
-		"TVProviderSignIn":      m.TVProviderSignIn.ValueBool(),
-		"TVRoom":                m.TVRoom.ValueBool(),
-		"TapToSetup":            m.TapToSetup.ValueBool(),
-		"TermsOfAddress":        m.TermsOfAddress.ValueBool(),
-		"TransferData":          m.TransferData.ValueBool(),
-		"UpdateCompleted":       m.UpdateCompleted.ValueBool(),
-		"VoiceSelection":        m.VoiceSelection.ValueBool(),
-		"WatchMigration":        m.WatchMigration.ValueBool(),
-		"Welcome":               m.Welcome.ValueBool(),
-		"Zoom":                  m.Zoom.ValueBool(),
-		"iMessageAndFaceTime":   m.IMessageAndFaceTime.ValueBool(),
-	}
-	return &out
-}
-
 // stringSetToSlice extracts a TF Set<String> into a Go []string.
 // Returns nil when the set is null/unknown.
 func stringSetToSlice(ctx context.Context, s types.Set) ([]string, diag.Diagnostics) {
@@ -466,4 +411,14 @@ func boolPtrOrFalse(v types.Bool) *bool {
 		b = v.ValueBool()
 	}
 	return &b
+}
+
+// mdmRemovableWire converts Prevent Unenrollment to the wire's mdmRemovable, which holds the
+// opposite value. An attribute that is unset, or still unknown at create, sends false, as the
+// attribute always did before the rename.
+func mdmRemovableWire(preventUnenrollment types.Bool) bool {
+	if preventUnenrollment.IsNull() || preventUnenrollment.IsUnknown() {
+		return false
+	}
+	return !preventUnenrollment.ValueBool()
 }

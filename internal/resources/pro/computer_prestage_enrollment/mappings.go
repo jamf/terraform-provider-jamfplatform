@@ -5,12 +5,11 @@ package computer_prestage_enrollment
 
 import "github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
-// skipSetupItems wire-key ⇔ snake_case mapping is hand-encoded inside
-// buildSkipSetupItemsMap (input_builders.go) and flattenSkipSetupItems
-// (state_builders.go). The 25-row table lives there rather than as a map
-// indirection so the SDK's typed map signature is preserved without a
-// runtime lookup, and so static analysis catches a missing key at compile
-// time when a field is renamed.
+// The skipSetupItems attribute ⇔ wire-key mapping is the skipItems table in skip_items.go,
+// which drives the schema, buildSkipSetupItemsMap, flattenSkipSetupItems and
+// diffSkipSetupItems, so a pane is added or renamed in one row. The wire keys are the
+// mixed-case identifiers Jamf Pro echoes back in the `skipSetupItems` map, taken from live
+// GETs on 2026-11-05; TestSkipItems_CoverTheLiveWireKeys pins them.
 
 // Enum value sets, taken from the SDK's generated helpers where they exist so
 // the schema validators cannot drift from the API. Kept in one place so the

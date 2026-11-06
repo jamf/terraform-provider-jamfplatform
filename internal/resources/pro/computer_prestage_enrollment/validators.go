@@ -273,3 +273,38 @@ func (prefillTypeCustomRequiresFullAndUserNamesValidator) ValidateString(ctx con
 	checkSibling("prefill_account_full_name")
 	checkSibling("prefill_account_user_name")
 }
+
+// installProfilesFalseWithProfiles rejects install_profiles_during_setup = false while a profile
+// set is configured. Jamf Pro refuses profile IDs unless that flag is true, so the combination
+// can only fail at apply.
+func installProfilesFalseWithProfiles() validator.Bool {
+	return installProfilesFalseWithProfilesValidator{}
+}
+
+type installProfilesFalseWithProfilesValidator struct{}
+
+func (installProfilesFalseWithProfilesValidator) Description(_ context.Context) string {
+	return "install_profiles_during_setup cannot be false while configuration_profile_ids or prestage_installed_profile_ids lists a profile."
+}
+
+func (v installProfilesFalseWithProfilesValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (installProfilesFalseWithProfilesValidator) ValidateBool(ctx context.Context, req validator.BoolRequest, resp *validator.BoolResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() || req.ConfigValue.ValueBool() {
+		return
+	}
+	for _, name := range []string{"configuration_profile_ids", "prestage_installed_profile_ids"} {
+		var ids types.Set
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(name), &ids)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		if !ids.IsNull() && !ids.IsUnknown() && len(ids.Elements()) > 0 {
+			resp.Diagnostics.AddAttributeError(req.Path, "install_profiles_during_setup contradicts the profile list",
+				"`install_profiles_during_setup = false` contradicts `"+name+"`, which lists a profile. Jamf Pro refuses profile IDs while the flag is false. Remove `install_profiles_during_setup`: the provider derives it from the profile set.")
+			return
+		}
+	}
+}
