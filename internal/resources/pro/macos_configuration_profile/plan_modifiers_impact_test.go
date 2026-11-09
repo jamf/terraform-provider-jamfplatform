@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -202,5 +203,63 @@ func TestModifyPlanImpactAlertOnCreateAndDestroy(t *testing.T) {
 	}
 	if resp := runImpactModifyPlan(t, &model, nil); !hasImpactAlert(resp) {
 		t.Fatal("no impact alert on destroy")
+	}
+}
+
+// An imported profile that was never in Self Service holds a null
+// self_service_display_name while its self_service block exists. A payload edit
+// writes the block and Jamf Pro defaults the name, so the plan must say
+// "known after apply" (issue 560). With no write the plan stays empty.
+func TestModifyPlanSelfServiceDisplayNameUnknownOnRealWrite(t *testing.T) {
+	ctx := context.Background()
+	withSS := func(payload string) ResourceModel {
+		m := impactTestModel(payload)
+		m.SelfService = &SelfServiceModel{
+			SelfServiceDisplayName:     types.StringNull(),
+			InstallButtonText:          types.StringValue("Install"),
+			SelfServiceDescription:     types.StringNull(),
+			EnsureUsersViewDescription: types.BoolNull(),
+			FeatureOnMainPage:          types.BoolNull(),
+			DisplayNotifications:       types.BoolNull(),
+			NotificationLocation:       types.StringValue("Self Service"),
+			NotificationSubject:        types.StringNull(),
+			NotificationMessage:        types.StringNull(),
+			RemovalDisallowed:          types.StringValue("Never"),
+		}
+		return m
+	}
+	run := func(t *testing.T, payload string) types.String {
+		t.Helper()
+		var sresp resource.SchemaResponse
+		NewResource().Schema(ctx, resource.SchemaRequest{}, &sresp)
+		stateModel, planModel := withSS(impactPayloadA), withSS(payload)
+		state := tfsdk.State{Schema: sresp.Schema}
+		plan := tfsdk.Plan{Schema: sresp.Schema}
+		config := tfsdk.Config{Schema: sresp.Schema}
+		if d := state.Set(ctx, &stateModel); d.HasError() {
+			t.Fatal(d)
+		}
+		if d := plan.Set(ctx, &planModel); d.HasError() {
+			t.Fatal(d)
+		}
+		config.Raw = plan.Raw
+		r := &Resource{impact: impact.NewCache(impactTestSource{})}
+		resp := &resource.ModifyPlanResponse{Plan: plan}
+		r.ModifyPlan(ctx, resource.ModifyPlanRequest{Config: config, Plan: plan, State: state}, resp)
+		if resp.Diagnostics.HasError() {
+			t.Fatal(resp.Diagnostics)
+		}
+		var got types.String
+		if d := resp.Plan.GetAttribute(ctx, path.Root("self_service").AtName("self_service_display_name"), &got); d.HasError() {
+			t.Fatal(d)
+		}
+		return got
+	}
+
+	if got := run(t, impactPayloadChanged); !got.IsUnknown() {
+		t.Fatalf("real write: self_service_display_name = %v, want unknown", got)
+	}
+	if got := run(t, impactPayloadB); !got.IsNull() {
+		t.Fatalf("self-healed no-op: self_service_display_name = %v, want null", got)
 	}
 }

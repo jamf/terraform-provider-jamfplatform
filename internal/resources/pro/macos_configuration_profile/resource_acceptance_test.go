@@ -2463,3 +2463,92 @@ resource "jamfplatform_pro_macos_configuration_profile" "test" {
 		},
 	})
 }
+
+func configSelfServiceNoDisplayName(name, payload string) string {
+	return configSelfServiceLeaves(name, payload, `
+    install_button_text   = "Install"
+    notification_location = "Self Service"
+    removal_disallowed    = "Never"
+`)
+}
+
+func configSelfServiceLeaves(name, payload, leaves string) string {
+	return fmt.Sprintf(`
+resource "jamfplatform_pro_macos_configuration_profile" "test" {
+  general = {
+    name = %q
+    payloads = <<EOF
+%sEOF
+  }
+  self_service = {%s  }
+}
+`, name, payload, leaves)
+}
+
+// TestAccResource_MacOSConfigurationProfile_ImportedSelfServiceDisplayNameDefault
+// reproduces issue 560. A profile that was never in Self Service is imported
+// under a config declaring a self_service block without a display name. Jamf
+// Pro returns no name for it, so state holds null while the block exists. The
+// first payload edit PUTs the block and Jamf Pro defaults the name to the
+// profile name; the plan must show the name as unknown rather than null or the
+// apply fails with "Provider produced inconsistent result after apply".
+func TestAccResource_MacOSConfigurationProfile_ImportedSelfServiceDisplayNameDefault(t *testing.T) {
+	importedSelfServiceDefaults(t, configSelfServiceNoDisplayName)
+}
+
+func TestAccResource_MacOSConfigurationProfile_ImportedSelfServiceOmittedLeaves(t *testing.T) {
+	importedSelfServiceDefaults(t, func(name, payload string) string {
+		return configSelfServiceLeaves(name, payload, `install_button_text = "Install"`)
+	})
+}
+
+func importedSelfServiceDefaults(t *testing.T, cfg func(name, payload string) string) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-mcp-ss-import-" + suffix
+	const addr = "jamfplatform_pro_macos_configuration_profile.test"
+	fixture := readFixture(t, "1Password__managed_login_items_profile.mobileconfig")
+	tampered := strings.Replace(fixture,
+		"<string>Allow 1Password Launch Item</string>",
+		"<string>tampered comment</string>",
+		1,
+	)
+	if tampered == fixture {
+		t.Skip("expected to be able to tamper with Rules[0].Comment but pattern not found")
+	}
+
+	profileID, serverPayload := createOOBProfile(t, name, fixture)
+	tamperedServer := strings.Replace(serverPayload,
+		"<string>Allow 1Password Launch Item</string>",
+		"<string>tampered comment</string>",
+		1,
+	)
+	if tamperedServer == serverPayload {
+		t.Skip("server payload does not carry the tamper target")
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             checkDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:             cfg(name, serverPayload),
+				ResourceName:       addr,
+				ImportState:        true,
+				ImportStatePersist: true,
+				ImportStateIdFunc:  func(*terraform.State) (string, error) { return profileID, nil },
+			},
+			{
+				Config: cfg(name, tamperedServer),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectNonEmptyPlan()},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(addr,
+						tfjsonpath.New("self_service").AtMapKey("self_service_display_name"),
+						knownvalue.StringExact(name)),
+				},
+			},
+		},
+	})
+}

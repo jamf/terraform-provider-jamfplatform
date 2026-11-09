@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -274,7 +275,46 @@ func (r *Resource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReques
 	if resp.Plan.Raw.Equal(req.State.Raw) {
 		return
 	}
+	planSelfServiceDisplayNameUnknown(ctx, req.Config, req.State, &resp.Plan, &resp.Diagnostics)
 	r.reportScopeImpact(ctx, req, resp)
+}
+
+// planSelfServiceDisplayNameUnknown plans self_service.self_service_display_name
+// as Unknown when the apply will write a self_service block whose stored name
+// is null and whose configuration omits it.
+//
+// Jamf Pro returns no display name for a profile that was never in Self
+// Service, so an imported profile holds null there while its block exists in
+// state. UseStateForUnknownInExistingBlock carries that null into the plan, the
+// PUT sends the block, Jamf Pro defaults the name to the profile name, and
+// Terraform fails with "Provider produced inconsistent result after apply"
+// (issue 560). The modifier cannot tell a real write from a plan that
+// ModifyPlan is about to collapse to a no-op, and an Unknown left in a
+// collapsed plan is a permanent diff (STYLE_GUIDE rule 1a), so the decision
+// lives here, after the collapse, and runs only when the final plan differs
+// from state. A read failure leaves the plan untouched.
+func planSelfServiceDisplayNameUnknown(ctx context.Context, config tfsdk.Config, state tfsdk.State, plan *tfsdk.Plan, diags *diag.Diagnostics) {
+	if config.Schema == nil {
+		return
+	}
+	block := path.Root("self_service")
+	leaf := block.AtName("self_service_display_name")
+
+	var planBlock types.Object
+	var cfgName, planName, stateName types.String
+	if config.GetAttribute(ctx, leaf, &cfgName).HasError() ||
+		state.GetAttribute(ctx, leaf, &stateName).HasError() ||
+		plan.GetAttribute(ctx, leaf, &planName).HasError() ||
+		plan.GetAttribute(ctx, block, &planBlock).HasError() {
+		return
+	}
+	if planBlock.IsNull() || planBlock.IsUnknown() {
+		return
+	}
+	if !cfgName.IsNull() || !stateName.IsNull() || !planName.IsNull() {
+		return
+	}
+	diags.Append(plan.SetAttribute(ctx, leaf, types.StringUnknown())...)
 }
 
 // healPayloadPlan runs the payload-diff decision for an update plan. When
