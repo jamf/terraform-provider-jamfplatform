@@ -11,7 +11,7 @@ require (
 	github.com/hashicorp/terraform-plugin-testing v1.16.0
 	github.com/jamf/jamfplatform-go-sdk v1.11.0
 	golang.org/x/oauth2 v0.38.0
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 	golang.org/x/text v0.43.0
 	howett.net/plist v1.0.1
 )
