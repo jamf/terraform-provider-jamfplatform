@@ -161,7 +161,10 @@ whole of the change.
   `lost_mode_footnote` are now `message`, `phone_number` and `footnote`.
 
 Every other restored action keeps its name and attributes, except
-`jamfplatform_pro_set_auto_admin_password`, which now requires both `guid` and `password`.
+`jamfplatform_pro_set_auto_admin_password`. It now takes the lists `management_ids` and
+`serial_numbers` in place of `management_id` and `serial_number`, and needs either `username` or
+`guid` along with `password`. With `username` the action looks up the account's GUID on each
+computer, so you can pass the `members` of a computer group. It refuses a mobile device.
 `jamfplatform_pro_clear_passcode` now fails with a named error when Jamf Pro holds no unlock
 token for the device and you supplied none, because Jamf Pro refuses the command without one.
 

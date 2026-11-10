@@ -158,8 +158,7 @@ func batchActions() map[string]action.Action {
 // payload carries a value specific to that device.
 func singleActions() map[string]action.Action {
 	return map[string]action.Action{
-		"clear_passcode":          NewClearPasscodeAction(),
-		"set_auto_admin_password": NewSetAutoAdminPasswordAction(),
+		"clear_passcode": NewClearPasscodeAction(),
 	}
 }
 

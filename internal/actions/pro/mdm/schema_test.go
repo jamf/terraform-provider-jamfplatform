@@ -443,8 +443,36 @@ func TestSecretAttributes_SayTheyAppearInPlanOutput(t *testing.T) {
 	}
 }
 
-func TestSetAutoAdminPasswordAction_RequiresBothFields(t *testing.T) {
-	assertRequired(t, NewSetAutoAdminPasswordAction().(*SetAutoAdminPasswordAction).Schema, []string{"guid", "password"})
+func TestSetAutoAdminPasswordAction_Schema(t *testing.T) {
+	schema := schemaOf(t, NewSetAutoAdminPasswordAction())
+	assertRequired(t, NewSetAutoAdminPasswordAction().(*SetAutoAdminPasswordAction).Schema, []string{"password"})
+	assertAttrsPresent(t, NewSetAutoAdminPasswordAction().(*SetAutoAdminPasswordAction).Schema, []string{"management_ids", "serial_numbers", "username", "guid"})
+	wantType := types.ListType{ElemType: types.StringType}
+	for _, name := range []string{"management_ids", "serial_numbers"} {
+		if !schema.Attributes[name].GetType().Equal(wantType) {
+			t.Errorf("%s must be a list of strings", name)
+		}
+	}
+	for _, gone := range []string{"management_id", "serial_number"} {
+		if _, ok := schema.Attributes[gone]; ok {
+			t.Errorf("singular %q must be gone", gone)
+		}
+	}
+	for _, phrase := range []string{"**same** password", "one command per computer"} {
+		if !strings.Contains(schema.MarkdownDescription, phrase) {
+			t.Errorf("description does not say %q", phrase)
+		}
+	}
+	if !strings.Contains(schema.Attributes["guid"].GetMarkdownDescription(), "single target only") {
+		t.Error("guid must say it works with a single target only")
+	}
+}
+
+func TestUniqueInOrder(t *testing.T) {
+	got := uniqueInOrder([]string{"b", "a", "b", "c", "a"})
+	if strings.Join(got, ",") != "b,a,c" {
+		t.Errorf("got %v", got)
+	}
 }
 
 func TestSetRecoveryLockAction_RequiresAPassword(t *testing.T) {
