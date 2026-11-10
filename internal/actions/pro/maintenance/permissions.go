@@ -7,6 +7,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/computertarget"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
@@ -39,4 +40,4 @@ var redeployManagementFrameworkSDKMethods = []string{
 // redeployManagementFrameworkPrivileges is the rendered "Required Jamf
 // privileges" Markdown section for the redeploy_management_framework action,
 // appended to its MarkdownDescription.
-var redeployManagementFrameworkPrivileges = permissions.Section(pro.Privileges, redeployManagementFrameworkSDKMethods...)
+var redeployManagementFrameworkPrivileges = permissions.SectionWith(pro.Privileges, redeployManagementFrameworkSDKMethods, computertarget.Permissions)

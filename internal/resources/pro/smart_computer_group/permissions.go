@@ -7,6 +7,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
@@ -53,7 +54,7 @@ var resourceSDKMethods = []string{
 
 // resourcePrivileges is the rendered "Required Jamf permissions" section for the
 // resource.
-var resourcePrivileges = permissions.Section(privilegeRegistry, resourceSDKMethods...)
+var resourcePrivileges = permissions.SectionWith(privilegeRegistry, resourceSDKMethods, ldapgroups.Permissions)
 
 // dataSourceSDKMethods lists the SDK methods the singular data source reaches.
 // The name lookup runs through the smart-group search, and ListGroupsV2 fills

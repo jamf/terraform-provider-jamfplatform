@@ -10,7 +10,8 @@ import (
 )
 
 // resourceSDKMethods lists the SDK methods the blueprint resource's CRUD path
-// calls. It mirrors the client.<Method> calls in crud.go and drives the
+// calls. It mirrors the client.<Method> calls in crud.go and helpers.go
+// (reconcileBlueprintDeployment makes the deploy and undeploy calls) and drives the
 // "Required Jamf permissions" table appended to the resource
 // MarkdownDescription. permissions_test.go asserts this list stays in sync with
 // the actual client.<Method> calls in crud.go and with the SDK privilege
@@ -21,6 +22,8 @@ var resourceSDKMethods = []string{
 	"UpdateBlueprint",
 	"DeleteBlueprint",
 	"ListBlueprints",
+	"DeployBlueprint",
+	"UndeployBlueprint",
 }
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown

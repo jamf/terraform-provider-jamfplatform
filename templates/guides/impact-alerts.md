@@ -161,6 +161,18 @@ The summary's trailing `via N policies` adds a number after the figure. Anchor t
 
 The `Searched` count is always the number of policies actually read. If any could not be read, the sentence continues instead of being reworded: `Searched 294 policies of 295 (1 could not be read, so this answer may be incomplete).` Gate on the phrase without the full stop. A partial sweep changes two other things. The figure takes the `or more` form, so match the second pattern above as well as the first, and a summary reporting no usage says the search was incomplete instead of denying it outright.
 
+## Permissions
+
+Impact alerts read tenant data with the credential that runs the plan. No resource's **Required Jamf permissions** table lists these reads. A missing permission never fails the plan; the alert falls back to a single "impact alert unavailable" notice. For full figures, grant the integration Read on each of these in Jamf Account:
+
+| Category | Permission | Needed for |
+|---|---|---|
+| Deployment | Policies | Policy dependency alerts (the tenant-wide policy sweep) and policy scope |
+| Inventory | Device groups | Group and class membership |
+| Inventory | Devices | Computer and mobile device counts |
+| Organizational context | Buildings | Building-scoped targets |
+| Organizational context | Departments | Department-scoped targets |
+
 ## Cost
 
 Reads are cached for the lifetime of the plan, so two resources naming the same group read it once. A plan that changes nothing reads nothing.

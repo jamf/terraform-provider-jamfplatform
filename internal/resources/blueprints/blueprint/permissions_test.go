@@ -82,7 +82,7 @@ func TestResourceSDKMethods_KnownToSDK(t *testing.T) {
 // TestResourceSDKMethods_MatchCRUDCalls fails if crud.go calls an SDK method
 // not declared in resourceSDKMethods, or declares one it does not call.
 func TestResourceSDKMethods_MatchCRUDCalls(t *testing.T) {
-	assertMatch(t, "crud.go", resourceSDKMethods, "collision.go")
+	assertMatch(t, "crud.go", resourceSDKMethods, "collision.go", "helpers.go")
 }
 
 // TestResourcePrivileges_Rendered guards that the table actually rendered into

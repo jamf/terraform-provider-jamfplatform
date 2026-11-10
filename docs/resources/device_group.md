@@ -9,6 +9,11 @@ description: |-
   | Category | Permission | Actions | API capability |
   |---|---|---|---|
   | Inventory | Device groups | Create, Read, Update, Delete | `device-groups` |
+  Conditional permissions
+  Also grant these when the configuration names a directory (LDAP or cloud identity provider) group:
+  | Category | Permission | Actions | API capability |
+  |---|---|---|---|
+  | Admin identity and access | LDAP / cloud IdP | Read | `ldap-servers` |
 ---
 
 # jamfplatform_device_group (Resource)
@@ -22,6 +27,14 @@ Jamf lists this under **Platform environment** scope. You choose an integration'
 | Category | Permission | Actions | API capability |
 |---|---|---|---|
 | Inventory | Device groups | Create, Read, Update, Delete | `device-groups` |
+
+**Conditional permissions**
+
+Also grant these when the configuration names a directory (LDAP or cloud identity provider) group:
+
+| Category | Permission | Actions | API capability |
+|---|---|---|---|
+| Admin identity and access | LDAP / cloud IdP | Read | `ldap-servers` |
 
 ## Example Usage
 

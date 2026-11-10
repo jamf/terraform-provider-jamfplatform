@@ -6,6 +6,7 @@ package device_group
 import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/devicegroups"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
@@ -26,7 +27,7 @@ var resourceSDKMethods = []string{
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown
 // section for the device_group resource, appended to its MarkdownDescription.
-var resourcePrivileges = permissions.Section(devicegroups.Privileges, resourceSDKMethods...)
+var resourcePrivileges = permissions.SectionWith(devicegroups.Privileges, resourceSDKMethods, ldapgroups.Permissions)
 
 // dataSourceSDKMethods lists the SDK methods the device_group data source's
 // Read path calls. A data source documents only the privileges it needs, not

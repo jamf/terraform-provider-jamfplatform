@@ -10,6 +10,11 @@ description: |-
   |---|---|---|---|
   | Device actions | Device actions | Execute | `device-actions` |
   | Global settings | Device check-in configuration | Read | `computer-check-in` |
+  Conditional permissions
+  Also grant these when the action targets a computer by management_id:
+  | Category | Permission | Actions | API capability |
+  |---|---|---|---|
+  | Inventory | Devices | Read | `devices` |
 ---
 
 # jamfplatform_pro_redeploy_management_framework (Action)
@@ -24,6 +29,14 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 |---|---|---|---|
 | Device actions | Device actions | Execute | `device-actions` |
 | Global settings | Device check-in configuration | Read | `computer-check-in` |
+
+**Conditional permissions**
+
+Also grant these when the action targets a computer by `management_id`:
+
+| Category | Permission | Actions | API capability |
+|---|---|---|---|
+| Inventory | Devices | Read | `devices` |
 
 ## Example Usage
 

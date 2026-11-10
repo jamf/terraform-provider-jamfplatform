@@ -8,6 +8,7 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
@@ -31,7 +32,7 @@ var collisionSDKMethods = []string{
 	"ListEbooks",
 }
 
-var resourcePrivileges = permissions.Section(proclassic.Privileges, slices.Concat(resourceSDKMethods, collisionSDKMethods)...)
+var resourcePrivileges = permissions.SectionWith(proclassic.Privileges, slices.Concat(resourceSDKMethods, collisionSDKMethods), ldapgroups.Permissions)
 
 // dataSourceSDKMethods lists the SDK methods the ebook data source calls (a
 // by-ID or by-name lookup). It documents only the privileges the data source

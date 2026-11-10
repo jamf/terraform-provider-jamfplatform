@@ -6,6 +6,7 @@ package jamfprotectactions
 import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/computertarget"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
@@ -42,4 +43,4 @@ var retryDeploymentSDKMethods = []string{
 // retryDeploymentPrivileges is the rendered "Required Jamf permissions" Markdown
 // section for the Jamf Protect deployment retry action, appended to its
 // MarkdownDescription.
-var retryDeploymentPrivileges = permissions.Section(pro.Privileges, retryDeploymentSDKMethods...)
+var retryDeploymentPrivileges = permissions.SectionWith(pro.Privileges, retryDeploymentSDKMethods, computertarget.Permissions)

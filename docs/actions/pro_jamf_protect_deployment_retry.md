@@ -9,6 +9,11 @@ description: |-
   | Category | Permission | Actions | API capability |
   |---|---|---|---|
   | Deployment | Jamf Protect deployment | Read, Deploy | `jamf-protect-deployments` |
+  Conditional permissions
+  Also grant these when the action targets a computer by management_id:
+  | Category | Permission | Actions | API capability |
+  |---|---|---|---|
+  | Inventory | Devices | Read | `devices` |
 ---
 
 # jamfplatform_pro_jamf_protect_deployment_retry (Action)
@@ -22,6 +27,14 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 | Category | Permission | Actions | API capability |
 |---|---|---|---|
 | Deployment | Jamf Protect deployment | Read, Deploy | `jamf-protect-deployments` |
+
+**Conditional permissions**
+
+Also grant these when the action targets a computer by `management_id`:
+
+| Category | Permission | Actions | API capability |
+|---|---|---|---|
+| Inventory | Devices | Read | `devices` |
 
 ## Example Usage
 
