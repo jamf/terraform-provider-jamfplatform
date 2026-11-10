@@ -19,6 +19,11 @@ description: |-
   | Category | Permission | Actions | API capability |
   |---|---|---|---|
   | Deployment | Configuration profiles | Create, Read, Update, Delete | `configuration-profiles` |
+  Conditional permissions
+  Also grant these when the configuration names a directory (LDAP or cloud identity provider) group:
+  | Category | Permission | Actions | API capability |
+  |---|---|---|---|
+  | Admin identity and access | LDAP / cloud IdP | Read | `ldap-servers` |
 ---
 
 # jamfplatform_pro_macos_configuration_profile (Resource)
@@ -53,6 +58,14 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 | Category | Permission | Actions | API capability |
 |---|---|---|---|
 | Deployment | Configuration profiles | Create, Read, Update, Delete | `configuration-profiles` |
+
+**Conditional permissions**
+
+Also grant these when the configuration names a directory (LDAP or cloud identity provider) group:
+
+| Category | Permission | Actions | API capability |
+|---|---|---|---|
+| Admin identity and access | LDAP / cloud IdP | Read | `ldap-servers` |
 
 ## Example Usage
 

@@ -7,6 +7,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
@@ -57,7 +58,7 @@ var resourceSDKMethods = []string{
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown
 // section for the resource.
-var resourcePrivileges = permissions.Section(privilegeRegistry, resourceSDKMethods...)
+var resourcePrivileges = permissions.SectionWith(privilegeRegistry, resourceSDKMethods, ldapgroups.Permissions)
 
 // dataSourceSDKMethods lists the registry-backed SDK methods the singular data
 // source's Read path calls. The name lookup also calls

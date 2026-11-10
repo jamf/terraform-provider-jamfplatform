@@ -6,6 +6,7 @@ package mac_app_store_app
 import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
@@ -26,7 +27,7 @@ var resourceSDKMethods = []string{
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown
 // section for the Mac App Store app resource, appended to its
 // MarkdownDescription.
-var resourcePrivileges = permissions.Section(proclassic.Privileges, resourceSDKMethods...)
+var resourcePrivileges = permissions.SectionWith(proclassic.Privileges, resourceSDKMethods, ldapgroups.Permissions)
 
 // dataSourceSDKMethods lists the SDK methods the data source's Read path calls
 // (ID or name lookup). It documents only the privileges the data source needs,

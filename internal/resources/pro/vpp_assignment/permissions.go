@@ -6,6 +6,7 @@ package vpp_assignment
 import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
@@ -25,7 +26,7 @@ var resourceSDKMethods = []string{
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown
 // section for the VPP assignment resource, appended to its MarkdownDescription.
-var resourcePrivileges = permissions.Section(proclassic.Privileges, resourceSDKMethods...)
+var resourcePrivileges = permissions.SectionWith(proclassic.Privileges, resourceSDKMethods, ldapgroups.Permissions)
 
 // dataSourceSDKMethods lists the SDK methods the VPP assignment data source's
 // Read path calls (name resolution via list, then a get-by-id).

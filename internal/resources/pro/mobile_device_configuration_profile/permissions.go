@@ -6,6 +6,7 @@ package mobile_device_configuration_profile
 import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
@@ -36,7 +37,7 @@ var listResourceSDKMethods = []string{
 
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown
 // section for the resource, appended to its MarkdownDescription.
-var resourcePrivileges = permissions.Section(proclassic.Privileges, resourceSDKMethods...)
+var resourcePrivileges = permissions.SectionWith(proclassic.Privileges, resourceSDKMethods, ldapgroups.Permissions)
 
 // dataSourcePrivileges is the rendered "Required Jamf permissions" Markdown
 // section for the data source, appended to its MarkdownDescription.

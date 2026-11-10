@@ -6,6 +6,7 @@ package user_initiated_enrollment_settings
 import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
@@ -32,7 +33,7 @@ var resourceSDKMethods = []string{
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown
 // section for the user-initiated enrollment settings resource, appended to its
 // MarkdownDescription.
-var resourcePrivileges = permissions.Section(pro.Privileges, resourceSDKMethods...)
+var resourcePrivileges = permissions.SectionWith(pro.Privileges, resourceSDKMethods, ldapgroups.Permissions)
 
 // dataSourceSDKMethods lists the SDK methods the data source's Read path calls.
 // A data source documents only the privileges IT needs, not the resource's full

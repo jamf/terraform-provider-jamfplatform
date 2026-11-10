@@ -6,6 +6,7 @@ package mobile_device_app
 import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/permissions"
 )
 
@@ -26,7 +27,7 @@ var resourceSDKMethods = []string{
 // resourcePrivileges is the rendered "Required Jamf permissions" Markdown
 // section for the mobile device app resource, appended to its
 // MarkdownDescription.
-var resourcePrivileges = permissions.Section(proclassic.Privileges, resourceSDKMethods...)
+var resourcePrivileges = permissions.SectionWith(proclassic.Privileges, resourceSDKMethods, ldapgroups.Permissions)
 
 // dataSourceSDKMethods lists the ProClassic SDK methods the mobile device app
 // data source calls (lookup by ID or by exact name).

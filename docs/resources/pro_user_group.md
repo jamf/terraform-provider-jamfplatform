@@ -9,6 +9,11 @@ description: |-
   | Category | Permission | Actions | API capability |
   |---|---|---|---|
   | Inventory | User groups | Create, Read, Update, Delete | `user-groups` |
+  Conditional permissions
+  Also grant these when the configuration names a directory (LDAP or cloud identity provider) group:
+  | Category | Permission | Actions | API capability |
+  |---|---|---|---|
+  | Admin identity and access | LDAP / cloud IdP | Read | `ldap-servers` |
 ---
 
 # jamfplatform_pro_user_group (Resource)
@@ -22,6 +27,14 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 | Category | Permission | Actions | API capability |
 |---|---|---|---|
 | Inventory | User groups | Create, Read, Update, Delete | `user-groups` |
+
+**Conditional permissions**
+
+Also grant these when the configuration names a directory (LDAP or cloud identity provider) group:
+
+| Category | Permission | Actions | API capability |
+|---|---|---|---|
+| Admin identity and access | LDAP / cloud IdP | Read | `ldap-servers` |
 
 ## Example Usage
 

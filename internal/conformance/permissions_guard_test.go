@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -198,4 +199,82 @@ func stringLiteral(expr ast.Expr) (string, bool) {
 // packageDir returns the package directory of a file, relative to internal/.
 func packageDir(path string) string {
 	return relPath(filepath.Dir(path))
+}
+
+// helperPackages are the shared helper packages whose SDK calls fail the
+// calling construct outright, mapped to the Go identifier each exports. A
+// construct importing one must pass it to permissions.SectionWith from its
+// permissions.go, or its "Required Jamf permissions" table omits a privilege
+// the construct really needs (ldap-servers:read for a directory group,
+// devices:read for a management_id target).
+//
+// Not listed on purpose: criteria, whose group-name lookups swallow every error
+// and degrade to the wire value; and impact, which is advisory and opt-in and
+// is documented in the impact-alerts guide instead.
+var helperPackages = map[string]string{
+	"ldapgroups":     "ldapgroups.Permissions",
+	"computertarget": "computertarget.Permissions",
+}
+
+// TestHelperPermissions_EveryImporterDeclaresThem fails when a construct
+// package imports a helper in helperPackages but its permissions.go never
+// references the helper's Permissions, which is how blueprints deploy and the
+// directory-group search went undocumented.
+func TestHelperPermissions_EveryImporterDeclaresThem(t *testing.T) {
+	const modPrefix = "github.com/jamf/terraform-provider-jamfplatform/internal/common/"
+	root := filepath.Join("..")
+	var failures []string
+	checked := 0
+
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
+			return err
+		}
+		rel := filepath.ToSlash(path)
+		if strings.Contains(rel, "/common/") || strings.Contains(rel, "/testhelpers") {
+			return nil
+		}
+		raw, readErr := os.ReadFile(filepath.Join(path, "permissions.go"))
+		if readErr != nil {
+			return nil
+		}
+		permSrc := string(raw)
+		files, _ := filepath.Glob(filepath.Join(path, "*.go"))
+		imported := map[string]bool{}
+		for _, f := range files {
+			if strings.HasSuffix(f, "_test.go") {
+				continue
+			}
+			af, parseErr := parser.ParseFile(token.NewFileSet(), f, nil, parser.ImportsOnly)
+			if parseErr != nil {
+				continue
+			}
+			for _, im := range af.Imports {
+				p, _ := strconv.Unquote(im.Path.Value)
+				if name, ok := strings.CutPrefix(p, modPrefix); ok {
+					imported[name] = true
+				}
+			}
+		}
+		for pkg, ident := range helperPackages {
+			if !imported[pkg] {
+				continue
+			}
+			checked++
+			if !strings.Contains(permSrc, ident) {
+				failures = append(failures, rel+" imports "+pkg+" but permissions.go never references "+ident)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checked < 10 {
+		t.Fatalf("only %d importer/helper pairs found; the walk is not reaching the construct packages", checked)
+	}
+	sort.Strings(failures)
+	for _, f := range failures {
+		t.Error(f)
+	}
 }
