@@ -170,9 +170,12 @@ func (r *MobileDevicePrestageEnrollmentResource) Schema(ctx context.Context, req
 			"user_session_timeout": optInt64("**\"User Session Timeout\"** (minutes)."),
 
 			// storage_quota_size_megabytes is READ-ONLY (Computed). The Jamf Pro
-			// REST API recalculates it to a device-capacity floor on every PUT,
-			// ignoring any submitted value (spike §F8), so a settable attribute
-			// would perpetually diff. Set it in the Jamf Pro admin UI (which
+			// REST API recalculates it on every PUT, ignoring any submitted
+			// value (spike §F8), so a settable attribute would perpetually
+			// diff. The API minimum is 1024 MB, but the admin UI stores 0
+			// while Shared iPad / Use Storage Quota Size are off, so an imported
+			// UI-created record reads 0 and its first write rewrites it to 1024;
+			// ModifyPlan renders that as Unknown (storageQuotaWillBeRepaired). Set it in the Jamf Pro admin UI (which
 			// uses a separate legacy endpoint). The provider sends the §F3 POST
 			// floor on create and otherwise reflects the server value.
 			"storage_quota_size_megabytes": schema.Int64Attribute{

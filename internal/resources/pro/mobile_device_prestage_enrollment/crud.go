@@ -107,9 +107,26 @@ func (r *MobileDevicePrestageEnrollmentResource) ModifyPlan(ctx context.Context,
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("use_storage_quota_size"), types.BoolUnknown())...)
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("temporary_session_only"), types.BoolUnknown())...)
 	}
+	// storage_quota_size_megabytes: the admin UI stores 0 while Shared iPad /
+	// Use Storage Quota Size are off, but the REST API enforces a 1024 MB minimum
+	// and a PUT rewrites such a record to that floor. UseStateForUnknown would
+	// plan the imported 0 and the apply would report 1024: "inconsistent result
+	// after apply". So when an update is planned against a sub-floor state, render
+	// it Unknown. A plan with no change is left alone, since Unknown would show as
+	// a perpetual diff.
+	if storageQuotaWillBeRepaired(state.StorageQuotaSizeMegabytes, !req.State.Raw.IsNull() && !req.Plan.Raw.Equal(req.State.Raw)) {
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("storage_quota_size_megabytes"), types.Int64Unknown())...)
+	}
 	// timezone validity is enforced by the shared validators.IANATimeZone() on
 	// the schema attribute (Go's embedded IANA database) — no plan-time API
 	// call needed.
+}
+
+// storageQuotaWillBeRepaired reports whether a write planned against prior
+// state will move storage_quota_size_megabytes: the state holds a known value
+// below the server minimum and the plan changes something.
+func storageQuotaWillBeRepaired(state types.Int64, planChanges bool) bool {
+	return planChanges && !state.IsNull() && !state.IsUnknown() && state.ValueInt64() < minStorageQuotaMegabytes
 }
 
 // isKnownTrue reports whether a Bool is a concrete true (not null/unknown).

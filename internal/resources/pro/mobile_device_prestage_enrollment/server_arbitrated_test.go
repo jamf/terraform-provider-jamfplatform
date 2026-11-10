@@ -163,3 +163,28 @@ func TestDiagnoseAlreadyDefault(t *testing.T) {
 		}
 	})
 }
+
+func TestStorageQuotaWillBeRepaired(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		state   types.Int64
+		changes bool
+		want    bool
+	}{
+		{"UI-created zero, update planned", types.Int64Value(0), true, true},
+		{"UI-created zero, no change planned", types.Int64Value(0), false, false},
+		{"at floor, update planned", types.Int64Value(1024), true, false},
+		{"above floor, update planned", types.Int64Value(2048), true, false},
+		{"null state (create)", types.Int64Null(), true, false},
+		{"unknown state", types.Int64Unknown(), true, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if got := storageQuotaWillBeRepaired(c.state, c.changes); got != c.want {
+				t.Fatalf("got %v, want %v", got, c.want)
+			}
+		})
+	}
+}
