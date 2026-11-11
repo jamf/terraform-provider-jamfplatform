@@ -634,3 +634,51 @@ func TestLegacyPayloadValidator_SkipsUnknownSettings(t *testing.T) {
 		}
 	})
 }
+
+// energySaverSettings is the settings body of the blueprint in issue #565: one converted from a
+// classic Energy Saver profile, carrying the three Energy Saver dictionaries that profile set.
+const energySaverSettings = `{
+  "com.apple.EnergySaver.desktop.ACPower": {"Display Sleep Timer": 10, "Disk Sleep Timer": 10, "System Sleep Timer": 30, "Wake on LAN": 1},
+  "com.apple.EnergySaver.portable.ACPower": {"Display Sleep Timer": 10, "System Sleep Timer": 30},
+  "com.apple.EnergySaver.portable.BatteryPower": {"Display Sleep Timer": 5, "System Sleep Timer": 15}
+}`
+
+// TestLegacyPayloadValidator_MCXVariantPayloadTypes pins issue #565. Apple files the Energy Saver,
+// Accounts, Mobility, Time Server, Wi-Fi and FileVault payloads as com.apple.MCX(<Variant>).yaml,
+// each declaring the bare payload type com.apple.MCX, while Jamf's blueprints service keys them on
+// the variant: com.apple.MCX.EnergySaver stores, and the bare type is refused with 400. SDK v1.12.0
+// regenerated the table to key each file by its variant. Before that, config generated from a
+// blueprint the platform already held failed `terraform validate` with "Unrecognised legacy payload
+// type", leaving an imported blueprint unplannable. The bare type is now refused at plan, matching
+// what the platform does at apply.
+func TestLegacyPayloadValidator_MCXVariantPayloadTypes(t *testing.T) {
+	t.Parallel()
+
+	t.Run("the issue's Energy Saver payload validates", func(t *testing.T) {
+		t.Parallel()
+
+		list := legacyPayloadListValue(t, [2]string{"com.apple.MCX.EnergySaver", energySaverSettings})
+		if diags := validateBlockLegacyPayloads(t, list); len(diags) != 0 {
+			t.Errorf("com.apple.MCX.EnergySaver produced diagnostics: %v", diags)
+		}
+	})
+
+	t.Run("every variant is a declared payload type", func(t *testing.T) {
+		t.Parallel()
+
+		for _, variant := range []string{"Accounts", "EnergySaver", "FileVault2", "Mobility", "TimeMachine", "TimeServer", "WiFi"} {
+			if _, ok := appleprofiles.Lookup("com.apple.MCX." + variant); !ok {
+				t.Errorf("Apple's schema table declares no payload type com.apple.MCX.%s", variant)
+			}
+		}
+	})
+
+	t.Run("the bare type is refused", func(t *testing.T) {
+		t.Parallel()
+
+		diags := validateBlockLegacyPayloads(t, legacyPayloadListValue(t, [2]string{"com.apple.MCX", energySaverSettings}))
+		if len(diags.Errors()) != 1 || diags.Errors()[0].Summary() != "Unrecognised legacy payload type" {
+			t.Errorf("bare com.apple.MCX: want one %q error, got %v", "Unrecognised legacy payload type", diags)
+		}
+	})
+}

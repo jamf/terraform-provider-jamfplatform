@@ -397,7 +397,7 @@ Jamf offers three scopes when an API integration is created, and the provider mi
 
 ## Tooling
 
-- Go >= 1.26, Terraform >= 1.13.0.
+- Go >= 1.27.4, Terraform >= 1.13.0.
 - `GNUmakefile` is the canonical entrypoint. Default target: `fmt lint install generate`.
 - Releases built with goreleaser (`goreleaser.yml`).
 - `make generate` → `tools/tools.go`: copyright headers (`hashicorp/copywrite`), `terraform fmt -recursive ../examples/`, provider docs (`hashicorp/terraform-plugin-docs`).
