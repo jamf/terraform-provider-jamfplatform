@@ -807,8 +807,10 @@ func NormalizedFilterString(value types.String) (string, bool) {
 // does: `categories = [{ id = "64" }]` reported success and stored nothing on
 // every one of the six. Defaulting to true is what the attribute means — a
 // category is listed because the practitioner wants the object displayed in it,
-// which is exactly the admin UI's "Display in" tick — and it leaves
-// display_in = false available as the explicit way to remove one.
+// which is exactly the admin UI's "Display in" tick. An explicit
+// display_in = false never reaches this function on the four resources that
+// wire validators.SelfServiceCategories: Jamf Pro drops such an entry, so the
+// plan could never match, and the validator rejects it at plan time.
 //
 // `feature_in` keeps OptionalBoolPointer. It is a genuine per-resource
 // capability rather than a gate: the four macOS and ebook resources store and

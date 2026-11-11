@@ -188,7 +188,7 @@ Optional:
 
 Optional:
 
-- `categories` (Attributes Set) Set of Self Service categories the ebook appears under (macOS and iOS app only). Each item identifies the category by `id`; `name` is returned by Jamf Pro. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--self_service--categories))
+- `categories` (Attributes Set) Set of Self Service categories the ebook appears under (macOS and iOS app only). Each item identifies the category by `id`; `name` is returned by Jamf Pro. Omit to leave any existing entries untouched; they are not cleared on update. List each category once, and leave `display_in` unset or `true`: Jamf Pro merges repeated entries and drops a category that is not displayed, so both are rejected at plan time. (see [below for nested schema](#nestedatt--self_service--categories))
 - `display_name` (String) Self Service display name (UI "Self Service Display Name", in-house ebooks). Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `feature_on_main_page` (Boolean) Feature the ebook on the Self Service main page. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `force_users_to_view_description` (Boolean) Force users to view the description before installing (macOS only). Omit to leave the current value untouched; set `true`/`false` to change it.

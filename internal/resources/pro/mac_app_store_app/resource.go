@@ -193,8 +193,9 @@ func (r *MacAppResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						},
 					},
 					"self_service_categories": schema.SetNestedAttribute{
-						MarkdownDescription: "Set of Self Service categories the app appears under. Each item identifies the category by `id`; `name` is returned by Jamf Pro.",
+						MarkdownDescription: "Set of Self Service categories the app appears under. Each item identifies the category by `id`; `name` is returned by Jamf Pro. List each category once, and leave `display_in` unset or `true`: Jamf Pro merges repeated entries and drops a category that is not displayed, so both are rejected at plan time.",
 						Optional:            true,
+						Validators:          selfServiceCategoryValidators(),
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":         schema.StringAttribute{MarkdownDescription: "Category ID.", Required: true},

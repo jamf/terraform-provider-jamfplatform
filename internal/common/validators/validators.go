@@ -28,7 +28,33 @@ func UniqueStringFieldList(fieldName string) validator.List {
 // path. Note the Set type alone cannot catch these: elements differing in any
 // other attribute are distinct set members even when the named field collides.
 func UniqueStringFieldSet(fieldName string) validator.Set {
-	return uniqueStringFieldSetValidator{uniqueStringField{fieldName: fieldName}}
+	return uniqueStringFieldSetValidator{fieldName: fieldName}
+}
+
+// UniqueFieldRule configures UniqueStringFieldSetRule: which string attribute
+// keys a set element, how two values are compared, and the diagnostic that
+// says what Jamf Pro does with a repeated key and how to write it instead.
+type UniqueFieldRule struct {
+	// Field is the string attribute that keys each element.
+	Field string
+	// Key maps a value to its comparison key, for a server that matches
+	// values loosely (email addresses without regard to case, numeric ids
+	// written with leading zeros). Nil compares the values exactly.
+	Key func(string) string
+	// Summary is the diagnostic summary.
+	Summary string
+	// Detail is the diagnostic detail: a format string whose one %s verb is
+	// the repeated value as written in the configuration.
+	Detail string
+}
+
+// UniqueStringFieldSetRule is UniqueStringFieldSet with a comparison key and
+// a diagnostic of the caller's choosing. It exists for sets that Jamf Pro
+// stores keyed by one attribute: two elements differing anywhere else are
+// distinct set members, so Terraform keeps both, while Jamf Pro merges them,
+// keeps one, or refuses the write. Each repeated key is reported once.
+func UniqueStringFieldSetRule(rule UniqueFieldRule) validator.Set {
+	return uniqueStringFieldSetValidator{fieldName: rule.Field, rule: &rule}
 }
 
 // uniqueStringField holds the shared extraction and description logic. Per
@@ -105,6 +131,7 @@ func (v uniqueStringFieldListValidator) ValidateList(ctx context.Context, req va
 
 type uniqueStringFieldSetValidator struct {
 	uniqueStringField
+	rule *UniqueFieldRule
 }
 
 var _ validator.Set = uniqueStringFieldSetValidator{}
@@ -124,20 +151,28 @@ func (v uniqueStringFieldSetValidator) ValidateSet(ctx context.Context, req vali
 	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
 		return
 	}
-	seen := make(map[string]bool)
+	seen := make(map[string]int)
 	for _, elem := range req.ConfigValue.Elements() {
 		value, ok := v.fieldValue(elem)
 		if !ok {
 			continue
 		}
-		if seen[value] {
-			resp.Diagnostics.AddAttributeError(
-				req.Path,
-				fmt.Sprintf("Duplicate %s within set", v.fieldName),
-				fmt.Sprintf("%s %q appears more than once. Each element must have a unique %s.", v.fieldName, value, v.fieldName),
-			)
+		key := value
+		if v.rule != nil && v.rule.Key != nil {
+			key = v.rule.Key(value)
+		}
+		seen[key]++
+		if seen[key] != 2 {
 			continue
 		}
-		seen[value] = true
+		if v.rule != nil {
+			resp.Diagnostics.AddAttributeError(req.Path, v.rule.Summary, fmt.Sprintf(v.rule.Detail, value))
+			continue
+		}
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			fmt.Sprintf("Duplicate %s within set", v.fieldName),
+			fmt.Sprintf("%s %q appears more than once. Each element must have a unique %s.", v.fieldName, value, v.fieldName),
+		)
 	}
 }
