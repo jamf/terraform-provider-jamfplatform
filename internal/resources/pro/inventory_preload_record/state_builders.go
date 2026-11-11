@@ -19,8 +19,11 @@ import (
 // create response. Every Optional+Computed scalar uses ReconcileOptionalStringPointer
 // so an explicit empty string the user set is preserved across refreshes (the wire
 // echoes explicit null for unset fields and "" verbatim — no normalisation needed).
-// extension_attributes always flattens to a known set: the wire echoes
+// extension_attributes always flattens to a known list: the wire echoes
 // `extensionAttributes: []` for a record with no entries (wire-probed 2026-06-10).
+// The list is positional and copies the server's order verbatim, with no alignment
+// to the prior list, because Jamf Pro stores the entries in the order written and
+// keeps repeats (see flattenExtensionAttributes).
 func assignInventoryPreloadRecordResourceModel(ctx context.Context, state *InventoryPreloadRecordResourceModel, rec *pro.InventoryPreloadRecordV2) diag.Diagnostics {
 	var diags diag.Diagnostics
 
@@ -51,9 +54,9 @@ func assignInventoryPreloadRecordResourceModel(ctx context.Context, state *Inven
 	state.AssetTag = helpers.ReconcileOptionalStringPointer(rec.AssetTag, state.AssetTag)
 	state.Vendor = helpers.ReconcileOptionalStringPointer(rec.Vendor, state.Vendor)
 
-	eaSet, eaDiags := flattenExtensionAttributesSet(ctx, rec.ExtensionAttributes)
+	eaList, eaDiags := flattenExtensionAttributes(ctx, rec.ExtensionAttributes)
 	diags.Append(eaDiags...)
-	state.ExtensionAttributes = eaSet
+	state.ExtensionAttributes = eaList
 
 	return diags
 }
@@ -93,7 +96,7 @@ func assignInventoryPreloadRecordDataSourceModel(ctx context.Context, state *Inv
 	state.AssetTag = types.StringPointerValue(rec.AssetTag)
 	state.Vendor = types.StringPointerValue(rec.Vendor)
 
-	eaList, eaDiags := flattenExtensionAttributesList(ctx, rec.ExtensionAttributes)
+	eaList, eaDiags := flattenExtensionAttributes(ctx, rec.ExtensionAttributes)
 	diags.Append(eaDiags...)
 	state.ExtensionAttributes = eaList
 
@@ -121,15 +124,21 @@ func expandExtensionAttributeModels(eas *[]pro.InventoryPreloadExtensionAttribut
 	return models
 }
 
-// flattenExtensionAttributesSet flattens SDK extension attributes into the resource
-// model's types.Set. Always returns a known (possibly empty) set so the Computed
-// attribute resolves from Unknown at apply.
-func flattenExtensionAttributesSet(ctx context.Context, eas *[]pro.InventoryPreloadExtensionAttribute) (types.Set, diag.Diagnostics) {
-	return types.SetValueFrom(ctx, extensionAttributeObjectType, expandExtensionAttributeModels(eas))
-}
-
-// flattenExtensionAttributesList flattens SDK extension attributes into the data
-// source model's types.List.
-func flattenExtensionAttributesList(ctx context.Context, eas *[]pro.InventoryPreloadExtensionAttribute) (types.List, diag.Diagnostics) {
+// flattenExtensionAttributes flattens SDK extension attributes into a types.List, for
+// both the resource and the data source. Always returns a known (possibly empty) list
+// so the Computed attribute resolves from Unknown at apply.
+//
+// The list is positional: element i of state is element i of the response. Wire-probed
+// on the EU sandbox, 2026-11-11, through the SDK's Create/Update/Get (the provider's own
+// write and read path): Jamf Pro returns the entries exactly as written, on POST and on
+// PUT alike. `Z, A, M, A=a, A=a2, N, N, E=""` read back unchanged; a PUT of the same
+// eight entries in a different order read back in the new order, and the PUT echo
+// matched the GET; two identical `B=1` entries were both kept; the same name with two
+// different values was kept twice; an entry with no value and one with `""` were each
+// kept as sent. Nothing is merged, deduplicated or re-sorted, so there is no server
+// order to align a plan to, and a reorder made in the admin UI or the API surfaces as
+// drift. A PUT that omits `extensionAttributes` clears the list, as does `[]` (the
+// endpoint is full-replace), which is why the plan always carries the list forward.
+func flattenExtensionAttributes(ctx context.Context, eas *[]pro.InventoryPreloadExtensionAttribute) (types.List, diag.Diagnostics) {
 	return types.ListValueFrom(ctx, extensionAttributeObjectType, expandExtensionAttributeModels(eas))
 }

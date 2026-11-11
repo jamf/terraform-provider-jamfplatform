@@ -266,7 +266,7 @@ func TestAccResource_ProInventoryPreloadRecord_SplitOwnership(t *testing.T) {
 }
 
 // TestAccResource_ProInventoryPreloadRecord_ExtensionAttributes exercises the
-// extension_attributes set: declare two entries, replace/modify them, then clear with
+// extension_attributes list: declare two entries, replace/modify them, then clear with
 // []. No extension-attribute fixture is needed — Jamf Pro stores names unvalidated
 // (non-matching names sit inert on the record).
 func TestAccResource_ProInventoryPreloadRecord_ExtensionAttributes(t *testing.T) {

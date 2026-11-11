@@ -16,14 +16,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/identityschema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
-	"github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -103,8 +102,19 @@ func fullReplaceStringAttribute(desc string) schema.StringAttribute {
 }
 
 // Schema returns the Terraform schema for the inventory preload record resource.
+//
+// extension_attributes is a list with no uniqueness validator (issue #568). It was a
+// set with a unique-`name` validator, on the reasoning that the admin UI's CSV holds
+// one column per extension attribute. But Jamf Pro stores repeats written through the
+// API, identical ones and same-name ones alike, and a set cannot hold two equal
+// elements, so reading such a record failed with `Duplicate Set Element` and one
+// record failed a whole `terraform query`. The provider now represents what Jamf Pro
+// stores rather than rejecting it. Which of two same-name values inventory collection
+// applies is not established here: observing it needs a device to report inventory
+// against the record. Schema version 1 marks the change; see UpgradeState.
 func (r *InventoryPreloadRecordResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: 1,
 		MarkdownDescription: "Manages a single Jamf Pro Inventory Preload record. " +
 			"The Jamf Pro admin UI (**Settings > Global > Inventory Preload**) manages these records by CSV upload; " +
 			"this resource manages them one at a time instead. " +
@@ -164,22 +174,18 @@ func (r *InventoryPreloadRecordResource) Schema(ctx context.Context, req resourc
 				"the API does not enforce this."),
 			"asset_tag": fullReplaceStringAttribute("Asset tag for the device."),
 			"vendor":    fullReplaceStringAttribute("Vendor the device was purchased from."),
-			"extension_attributes": schema.SetNestedAttribute{
+			"extension_attributes": schema.ListNestedAttribute{
 				MarkdownDescription: "Extension attribute values applied to the device's inventory record. " +
 					"Each entry's `name` is matched against existing extension attribute display names at inventory-collection time; " +
 					"Jamf Pro does not validate the names when the record is written, so entries with non-matching names are stored on the record but have no effect. " +
+					"Jamf Pro keeps the entries in the order written and allows repeats, including two entries with the same `name`, so the list may name an extension attribute more than once. " +
+					"Jamf Pro does not document which value inventory collection applies when a name repeats. " +
+					"Changing only the order is an update. " +
 					"Omit to leave any existing entries untouched (they are not cleared on update); set to `[]` to clear them.",
 				Optional: true,
 				Computed: true,
-				PlanModifiers: []planmodifier.Set{
-					setplanmodifier.UseStateForUnknown(),
-				},
-				// Jamf Pro accepts duplicate names on the wire (both entries are
-				// stored against the same extension attribute), but the UI/CSV
-				// reality is one value per attribute, and the Set type alone only
-				// dedupes identical name+value pairs.
-				Validators: []validator.Set{
-					validators.UniqueStringFieldSet("name"),
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
 				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{

@@ -11,21 +11,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// knownEASet builds a known extension_attributes set value from element models.
-func knownEASet(t *testing.T, models []extensionAttributeModel) types.Set {
+// knownEAList builds a known extension_attributes list value from element models.
+func knownEAList(t *testing.T, models []extensionAttributeModel) types.List {
 	t.Helper()
-	set, diags := types.SetValueFrom(context.Background(), extensionAttributeObjectType, models)
+	list, diags := types.ListValueFrom(context.Background(), extensionAttributeObjectType, models)
 	if diags.HasError() {
-		t.Fatalf("building test set: %v", diags)
+		t.Fatalf("building test list: %v", diags)
 	}
-	return set
+	return list
 }
 
 func TestBuildInventoryPreloadRecordInput_MinimalNullsBecomeNilPointers(t *testing.T) {
 	plan := InventoryPreloadRecordResourceModel{
 		SerialNumber:        types.StringValue("ZTFACC0001"),
 		DeviceType:          types.StringValue("Computer"),
-		ExtensionAttributes: types.SetNull(extensionAttributeObjectType),
+		ExtensionAttributes: types.ListNull(extensionAttributeObjectType),
 	}
 
 	got, diags := buildInventoryPreloadRecordInput(context.Background(), plan)
@@ -54,7 +54,7 @@ func TestBuildInventoryPreloadRecordInput_MinimalNullsBecomeNilPointers(t *testi
 		}
 	}
 	if got.ExtensionAttributes != nil {
-		t.Errorf("expected ExtensionAttributes nil (omitted) for null set, got %v", got.ExtensionAttributes)
+		t.Errorf("expected ExtensionAttributes nil (omitted) for null list, got %v", got.ExtensionAttributes)
 	}
 }
 
@@ -65,7 +65,7 @@ func TestBuildInventoryPreloadRecordInput_UnknownsBecomeNilPointers(t *testing.T
 		Username:            types.StringUnknown(),
 		AssetTag:            types.StringUnknown(),
 		Vendor:              types.StringUnknown(),
-		ExtensionAttributes: types.SetUnknown(extensionAttributeObjectType),
+		ExtensionAttributes: types.ListUnknown(extensionAttributeObjectType),
 	}
 
 	got, diags := buildInventoryPreloadRecordInput(context.Background(), plan)
@@ -77,7 +77,7 @@ func TestBuildInventoryPreloadRecordInput_UnknownsBecomeNilPointers(t *testing.T
 		t.Errorf("expected nil pointers for Unknown scalars, got Username=%v AssetTag=%v Vendor=%v", got.Username, got.AssetTag, got.Vendor)
 	}
 	if got.ExtensionAttributes != nil {
-		t.Errorf("expected ExtensionAttributes nil (omitted) for unknown set, got %v", got.ExtensionAttributes)
+		t.Errorf("expected ExtensionAttributes nil (omitted) for unknown list, got %v", got.ExtensionAttributes)
 	}
 }
 
@@ -106,7 +106,7 @@ func TestBuildInventoryPreloadRecordInput_AllScalarsPopulated(t *testing.T) {
 		BarCode2:            types.StringValue("BC2"),
 		AssetTag:            types.StringValue("ASSET-1"),
 		Vendor:              types.StringValue("Vendor Inc"),
-		ExtensionAttributes: types.SetNull(extensionAttributeObjectType),
+		ExtensionAttributes: types.ListNull(extensionAttributeObjectType),
 	}
 
 	got, diags := buildInventoryPreloadRecordInput(context.Background(), plan)
@@ -157,7 +157,7 @@ func TestBuildInventoryPreloadRecordInput_EmptyStringScalarSentVerbatim(t *testi
 		SerialNumber:        types.StringValue("ZTFACC0004"),
 		DeviceType:          types.StringValue("Computer"),
 		AssetTag:            types.StringValue(""),
-		ExtensionAttributes: types.SetNull(extensionAttributeObjectType),
+		ExtensionAttributes: types.ListNull(extensionAttributeObjectType),
 	}
 
 	got, diags := buildInventoryPreloadRecordInput(context.Background(), plan)
@@ -173,11 +173,11 @@ func TestBuildInventoryPreloadRecordInput_EmptyStringScalarSentVerbatim(t *testi
 	}
 }
 
-func TestBuildInventoryPreloadRecordInput_EmptyEASetEmitsEmptySlice(t *testing.T) {
+func TestBuildInventoryPreloadRecordInput_EmptyEAListEmitsEmptySlice(t *testing.T) {
 	plan := InventoryPreloadRecordResourceModel{
 		SerialNumber:        types.StringValue("ZTFACC0005"),
 		DeviceType:          types.StringValue("Computer"),
-		ExtensionAttributes: knownEASet(t, []extensionAttributeModel{}),
+		ExtensionAttributes: knownEAList(t, []extensionAttributeModel{}),
 	}
 
 	got, diags := buildInventoryPreloadRecordInput(context.Background(), plan)
@@ -197,7 +197,7 @@ func TestBuildInventoryPreloadRecordInput_EAValueNullVsEmptyDistinct(t *testing.
 	plan := InventoryPreloadRecordResourceModel{
 		SerialNumber: types.StringValue("ZTFACC0006"),
 		DeviceType:   types.StringValue("Computer"),
-		ExtensionAttributes: knownEASet(t, []extensionAttributeModel{
+		ExtensionAttributes: knownEAList(t, []extensionAttributeModel{
 			{Name: types.StringValue("NullVal"), Value: types.StringNull()},
 			{Name: types.StringValue("EmptyVal"), Value: types.StringValue("")},
 			{Name: types.StringValue("SetVal"), Value: types.StringValue("populated")},
@@ -230,9 +230,12 @@ func TestBuildInventoryPreloadRecordInput_EAValueNullVsEmptyDistinct(t *testing.
 	}
 }
 
-// assertSetType guards against the model field regressing from types.Set — the
-// Computed nested collection rule (a Go typed slice cannot carry Unknown).
-func TestInventoryPreloadRecordResourceModel_ExtensionAttributesIsTypesSet(t *testing.T) {
+// TestInventoryPreloadRecordResourceModel_ExtensionAttributesIsTypesList guards the
+// model field against regressing to a Go typed slice (the Computed nested collection
+// rule: a slice cannot carry Unknown) or back to types.Set, which cannot hold the
+// repeats Jamf Pro stores (issue #568).
+func TestInventoryPreloadRecordResourceModel_ExtensionAttributesIsTypesList(t *testing.T) {
 	var model InventoryPreloadRecordResourceModel
 	var _ attr.Value = model.ExtensionAttributes
+	func(types.List) {}(model.ExtensionAttributes)
 }

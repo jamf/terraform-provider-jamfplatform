@@ -89,15 +89,21 @@ func TestInventoryPreloadRecordResource_Schema(t *testing.T) {
 	if !ea.IsOptional() || !ea.IsComputed() {
 		t.Errorf("extension_attributes must be Optional+Computed, got optional=%v computed=%v", ea.IsOptional(), ea.IsComputed())
 	}
-	eaAttr, ok := ea.(schema.SetNestedAttribute)
+	eaAttr, ok := ea.(schema.ListNestedAttribute)
 	if !ok {
-		t.Fatalf("extension_attributes must be a SetNestedAttribute")
+		t.Fatalf("extension_attributes must be a ListNestedAttribute: Jamf Pro stores repeated entries in the order written, and a set cannot hold a repeat (issue #568)")
 	}
-	if len(eaAttr.PlanModifiers) == 0 {
-		t.Errorf("extension_attributes must carry the UseStateForUnknown plan modifier")
+	if len(eaAttr.PlanModifiers) != 1 {
+		t.Errorf("extension_attributes must carry exactly the UseStateForUnknown plan modifier, got %d", len(eaAttr.PlanModifiers))
 	}
-	if len(eaAttr.Validators) == 0 {
-		t.Errorf("extension_attributes must carry the unique-name validator")
+	if len(eaAttr.Validators) != 0 {
+		t.Errorf("extension_attributes must carry no validator: repeats, including a repeated name, are what Jamf Pro stores (issue #568)")
+	}
+	if eaAttr.CustomType != nil {
+		t.Errorf("extension_attributes must be a plain list: the server keeps written order, so there is nothing to compare semantically")
+	}
+	if resp.Schema.Version != 1 {
+		t.Errorf("schema version: got %d, want 1 (v0 held extension_attributes as a set)", resp.Schema.Version)
 	}
 	if !eaAttr.NestedObject.Attributes["name"].IsRequired() {
 		t.Errorf("extension_attributes.name must be required")
