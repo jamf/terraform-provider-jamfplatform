@@ -1,6 +1,6 @@
 module github.com/jamf/terraform-provider-jamfplatform
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
@@ -9,7 +9,7 @@ require (
 	github.com/hashicorp/terraform-plugin-go v0.31.0
 	github.com/hashicorp/terraform-plugin-log v0.11.0
 	github.com/hashicorp/terraform-plugin-testing v1.16.0
-	github.com/jamf/jamfplatform-go-sdk v1.12.0
+	github.com/jamf/jamfplatform-go-sdk v1.12.1
 	golang.org/x/oauth2 v0.38.0
 	golang.org/x/sync v0.25.0
 	golang.org/x/text v0.43.0

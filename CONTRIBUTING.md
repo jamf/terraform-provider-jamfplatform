@@ -4,7 +4,7 @@ Thank you for your interest in contributing to the Terraform Provider for Jamf P
 
 ## Prerequisites
 
-- **Go** >= 1.26 (see `go.mod` for the exact version)
+- **Go** >= 1.27.4 (see `go.mod` for the exact version)
 - **Terraform** >= 1.13.0 (or **OpenTofu** >= 1.6.0)
 - **golangci-lint** for linting
 - A Jamf Platform tenant with API credentials (for acceptance tests only)
@@ -49,7 +49,7 @@ To drive your locally-built provider against a real Jamf tenant — i.e. write o
 This requires the Go toolchain and Terraform (or OpenTofu) from [Prerequisites](#prerequisites) to be installed and on your `PATH`. Confirm before starting:
 
 ```bash
-go version          # >= 1.26
+go version          # >= 1.27.4
 terraform version   # >= 1.13.0  (or: tofu version, >= 1.6.0)
 ```
 
