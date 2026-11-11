@@ -162,6 +162,18 @@ func (r *BlueprintResource) UpgradeState(ctx context.Context) map[int64]resource
 				setUpgradedState(ctx, resp, old)
 			},
 		},
+		5: {
+			PriorSchema: blueprintSchemaV5(ctx),
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var old BlueprintResourceModel
+				resp.Diagnostics.Append(req.State.Get(ctx, &old)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				resp.Diagnostics.Append(resp.State.Set(ctx, &old)...)
+			},
+		},
 	}
 }
 
@@ -657,8 +669,9 @@ func blueprintSchemaV0() *schema.Schema {
 	}
 }
 
-// blueprintSchemaV1 returns the v1 schema where legacy_payloads was a JSON string attribute.
-func blueprintSchemaV1() *schema.Schema {
+// blueprintSchemaV1Transcribed returns the v1 schema where legacy_payloads was a JSON string attribute,
+// with the component collections in their live shape; blueprintSchemaV1 restores their set shape.
+func blueprintSchemaV1Transcribed() *schema.Schema {
 	return &schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id":               schema.StringAttribute{Computed: true},
@@ -732,8 +745,9 @@ func blueprintSchemaV1() *schema.Schema {
 	}
 }
 
-// blueprintSchemaV2 returns the v2 schema where deferral fields were strings.
-func blueprintSchemaV2() *schema.Schema {
+// blueprintSchemaV2Transcribed returns the v2 schema where deferral fields were strings, with the
+// component collections in their live shape; blueprintSchemaV2 restores their set shape.
+func blueprintSchemaV2Transcribed() *schema.Schema {
 	return &schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id":               schema.StringAttribute{Computed: true},
@@ -979,7 +993,7 @@ func (m blueprintResourceModelV3) upgrade() *blueprintResourceModelV4 {
 // changed and a hand-copied component block would duplicate every other. The prior
 // schemas above already share the live components.*ComponentSchema() functions for the same reason.
 func blueprintSchemaV3(ctx context.Context) *schema.Schema {
-	blockAttributes := componentBlockAttributes()
+	blockAttributes := componentBlockAttributesV5()
 	blockAttributes["apple_declarations"] = schema.SingleNestedAttribute{
 		Optional: true,
 		Attributes: map[string]schema.Attribute{
@@ -1171,15 +1185,121 @@ func blockLegacyPayloadsFromDynamic(prior types.Dynamic) ([]BlockLegacyPayloadMo
 	return payloads, nil
 }
 
-// blueprintSchemaV4 returns the v4 schema: the current one plus the top-level component attributes
+// blueprintSchemaV4 returns the v4 schema: the v5 one plus the top-level component attributes
 // and activation_conditions that v5 removed. It is derived from the live attribute set for the
 // reason blueprintSchemaV3 gives, and the removed attributes reuse the live component schemas, so
 // a future change to a component cannot leave the prior schema decoding state it never held.
 func blueprintSchemaV4(ctx context.Context) *schema.Schema {
-	attributes := blueprintSchemaAttributes(ctx)
-	maps.Copy(attributes, sharedComponentAttributes())
+	attributes := blueprintSchemaV5(ctx).Attributes
+	shared := sharedComponentAttributes()
+	restoreV5Sets(shared)
+	maps.Copy(attributes, shared)
 	attributes["activation_conditions"] = schema.StringAttribute{Optional: true}
 	attributes["legacy_payloads"] = schema.DynamicAttribute{Optional: true}
 
 	return &schema.Schema{Version: 4, Attributes: attributes}
+}
+
+// blueprintSchemaV5 returns the v5 schema: the current one with the collections that v6 made
+// ordered lists still in the set shape they had then.
+//
+// v5 → v6: custom_declarations.declaration, safari_bookmarks.managed_bookmarks and
+// its nested bookmarks and folder, safari_extensions' allowed_domains and denied_domains,
+// service_background_tasks.background_tasks and its nested launchd_configurations,
+// service_configuration_files.service_config_files and software_update_settings.beta_offer_programs
+// became lists, because the blueprints service stores each as written, repeats and order included,
+// and a set can hold neither (issue #568; the probes are recorded on each component). The element
+// types are unchanged, so the upgrade carries every element across in the order state holds it.
+// That is the set's own order, not the order configured, so the first plan after upgrading may
+// propose one in-place update that writes the configured order. That update is a real change on the
+// service, not a no-op: the v5 provider wrote each collection in the set's order, so the service, and
+// Safari's bookmark order with it, held that order until now. Like any write it leaves the blueprint
+// OUT_OF_DATE, so a blueprint with deployed = true is redeployed by the same apply. Wire-verified
+// with a v5 build and this one on the EU gateway 2026-11-11: one update, then an empty plan with and
+// without refresh, and the v5 build refuses the upgraded state. The bump exists so that a provider
+// still on v5 refuses v6 state, which can hold a repeat its sets cannot decode, rather than
+// failing to read it.
+func blueprintSchemaV5(ctx context.Context) *schema.Schema {
+	attributes := blueprintSchemaAttributes(ctx)
+	attributes["component_blocks"] = schema.ListNestedAttribute{
+		Optional:     true,
+		NestedObject: schema.NestedAttributeObject{Attributes: componentBlockAttributesV5()},
+	}
+
+	return &schema.Schema{Version: 5, Attributes: attributes}
+}
+
+// componentBlockAttributesV5 returns one component block's attributes as v5 declared them.
+func componentBlockAttributesV5() map[string]schema.Attribute {
+	attributes := componentBlockAttributes()
+	restoreV5Sets(attributes)
+	return attributes
+}
+
+// restoreV5Sets rewrites, in place, every collection that v6 turned from a set into a list back
+// into its v5 set shape. attributes holds the shared component attributes, either a component
+// block's or the top-level ones v4 carried. The live schema functions build fresh maps on every
+// call, so rewriting them cannot reach the current schema.
+func restoreV5Sets(attributes map[string]schema.Attribute) {
+	withNested(attributes, "custom_declarations", func(component map[string]schema.Attribute) {
+		component["declaration"] = listAsSet(component["declaration"])
+	})
+	withNested(attributes, "safari_bookmarks", func(component map[string]schema.Attribute) {
+		groups := component["managed_bookmarks"].(schema.ListNestedAttribute)
+		bookmarks := groups.NestedObject.Attributes["bookmarks"].(schema.ListNestedAttribute)
+		bookmarks.NestedObject.Attributes["folder"] = listAsSet(bookmarks.NestedObject.Attributes["folder"])
+		groups.NestedObject.Attributes["bookmarks"] = listAsSet(bookmarks)
+		component["managed_bookmarks"] = listAsSet(groups)
+	})
+	withNested(attributes, "safari_extensions", func(component map[string]schema.Attribute) {
+		extension := component["managed_extensions"].(schema.SetNestedAttribute).NestedObject.Attributes
+		extension["allowed_domains"] = listAsSet(extension["allowed_domains"])
+		extension["denied_domains"] = listAsSet(extension["denied_domains"])
+	})
+	withNested(attributes, "service_background_tasks", func(component map[string]schema.Attribute) {
+		tasks := component["background_tasks"].(schema.ListNestedAttribute)
+		tasks.NestedObject.Attributes["launchd_configurations"] = listAsSet(tasks.NestedObject.Attributes["launchd_configurations"])
+		component["background_tasks"] = listAsSet(tasks)
+	})
+	withNested(attributes, "service_configuration_files", func(component map[string]schema.Attribute) {
+		component["service_config_files"] = listAsSet(component["service_config_files"])
+	})
+	withNested(attributes, "software_update_settings", func(component map[string]schema.Attribute) {
+		component["beta_offer_programs"] = listAsSet(component["beta_offer_programs"])
+	})
+}
+
+// blueprintSchemaV1 returns the v1 schema with every component collection in its set shape.
+func blueprintSchemaV1() *schema.Schema {
+	s := blueprintSchemaV1Transcribed()
+	restoreV5Sets(s.Attributes)
+	return s
+}
+
+// blueprintSchemaV2 returns the v2 schema with every component collection in its set shape.
+func blueprintSchemaV2() *schema.Schema {
+	s := blueprintSchemaV2Transcribed()
+	restoreV5Sets(s.Attributes)
+	return s
+}
+
+// withNested applies rewrite to the attributes of the single nested attribute called name.
+func withNested(attributes map[string]schema.Attribute, name string, rewrite func(map[string]schema.Attribute)) {
+	rewrite(attributes[name].(schema.SingleNestedAttribute).Attributes)
+}
+
+// listAsSet returns the set-nested attribute a v6 list-nested attribute was in v5: the same
+// element type and the same optionality. Validators are dropped, as a prior schema only decodes.
+// An attribute a prior schema transcribes as a set already is returned unchanged.
+func listAsSet(attribute schema.Attribute) schema.Attribute {
+	list, ok := attribute.(schema.ListNestedAttribute)
+	if !ok {
+		return attribute
+	}
+	return schema.SetNestedAttribute{
+		NestedObject: list.NestedObject,
+		Optional:     list.Optional,
+		Required:     list.Required,
+		Computed:     list.Computed,
+	}
 }

@@ -138,16 +138,16 @@ func TestUncheckedPayloadWarnings(t *testing.T) {
 			t.Fatalf("type at %s: %v", at, diags)
 		}
 		elem := elementType(t, at.AtName("declaration"))
-		set, diags := types.SetValue(elem, []attr.Value{objectOf(t, elem, map[string]attr.Value{
+		list, diags := types.ListValue(elem, []attr.Value{objectOf(t, elem, map[string]attr.Value{
 			"channel": types.StringValue("SYSTEM"),
 			"kind":    types.StringValue("CONFIGURATION"),
 			"type":    types.StringValue("com.apple.configuration.siri.settings"),
 			"payload": payload,
 		})})
 		if diags.HasError() {
-			t.Fatalf("building declaration set: %v", diags)
+			t.Fatalf("building declaration list: %v", diags)
 		}
-		return objectOf(t, componentType, map[string]attr.Value{"declaration": set})
+		return objectOf(t, componentType, map[string]attr.Value{"declaration": list})
 	}
 
 	cases := []struct {
@@ -209,7 +209,7 @@ func TestUncheckedPayloadWarnings(t *testing.T) {
 					"custom_declarations": custom(t, blockCustom, types.StringUnknown()),
 				})}
 			},
-			want:    []path.Path{blockCustom.AtName("declaration")},
+			want:    []path.Path{blockCustom.AtName("declaration").AtListIndex(0)},
 			summary: uncheckedDeclarationSummary,
 		},
 		{

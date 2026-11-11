@@ -567,7 +567,7 @@ Optional:
 
 Optional:
 
-- `declaration` (Attributes Set) Custom DDM declaration. (see [below for nested schema](#nestedatt--component_blocks--custom_declarations--declaration))
+- `declaration` (Attributes List) Custom DDM declarations, in order. A payload may reference another declaration in this list with `$PAYLOAD_n`, where `n` is the referenced declaration's 1-based position, so moving a declaration changes which one a reference names. (see [below for nested schema](#nestedatt--component_blocks--custom_declarations--declaration))
 
 <a id="nestedatt--component_blocks--custom_declarations--declaration"></a>
 ### Nested Schema for `component_blocks.custom_declarations.declaration`
@@ -655,14 +655,14 @@ Optional:
 
 Optional:
 
-- `managed_bookmarks` (Attributes Set) Set of managed bookmark groups. (see [below for nested schema](#nestedatt--component_blocks--safari_bookmarks--managed_bookmarks))
+- `managed_bookmarks` (Attributes List) Managed bookmark groups, in the order Safari shows them. A group may be listed more than once. (see [below for nested schema](#nestedatt--component_blocks--safari_bookmarks--managed_bookmarks))
 
 <a id="nestedatt--component_blocks--safari_bookmarks--managed_bookmarks"></a>
 ### Nested Schema for `component_blocks.safari_bookmarks.managed_bookmarks`
 
 Required:
 
-- `bookmarks` (Attributes Set) Set of bookmarks in this group. (see [below for nested schema](#nestedatt--component_blocks--safari_bookmarks--managed_bookmarks--bookmarks))
+- `bookmarks` (Attributes List) Bookmarks in this group, in the order Safari shows them. A bookmark may be listed more than once. (see [below for nested schema](#nestedatt--component_blocks--safari_bookmarks--managed_bookmarks--bookmarks))
 - `group_identifier` (String) Unique identifier for this group of managed bookmarks.
 - `title` (String) The name of the bookmarks folder.
 
@@ -675,7 +675,7 @@ Required:
 
 Optional:
 
-- `folder` (Attributes Set) Bookmarks within this folder. (see [below for nested schema](#nestedatt--component_blocks--safari_bookmarks--managed_bookmarks--bookmarks--folder))
+- `folder` (Attributes List) Bookmarks within this folder, in the order Safari shows them. (see [below for nested schema](#nestedatt--component_blocks--safari_bookmarks--managed_bookmarks--bookmarks--folder))
 - `type` (String) Type of bookmark. Valid values are `bookmark` (URL bookmark) or `folder` (bookmark folder).
 - `url` (String) The URL for a direct bookmark. Folders do not take one.
 
@@ -696,7 +696,7 @@ Required:
 
 Optional:
 
-- `managed_extensions` (Attributes Set) Set of managed Safari extensions. (see [below for nested schema](#nestedatt--component_blocks--safari_extensions--managed_extensions))
+- `managed_extensions` (Attributes Set) Set of managed Safari extensions. Each `extension_id` may appear only once. (see [below for nested schema](#nestedatt--component_blocks--safari_extensions--managed_extensions))
 
 <a id="nestedatt--component_blocks--safari_extensions--managed_extensions"></a>
 ### Nested Schema for `component_blocks.safari_extensions.managed_extensions`
@@ -707,8 +707,8 @@ Required:
 
 Optional:
 
-- `allowed_domains` (Attributes Set) Set of allowed domains for this extension. (see [below for nested schema](#nestedatt--component_blocks--safari_extensions--managed_extensions--allowed_domains))
-- `denied_domains` (Attributes Set) Set of denied domains for this extension. (see [below for nested schema](#nestedatt--component_blocks--safari_extensions--managed_extensions--denied_domains))
+- `allowed_domains` (Attributes List) Allowed domains for this extension, kept in the order listed. (see [below for nested schema](#nestedatt--component_blocks--safari_extensions--managed_extensions--allowed_domains))
+- `denied_domains` (Attributes List) Denied domains for this extension, kept in the order listed. (see [below for nested schema](#nestedatt--component_blocks--safari_extensions--managed_extensions--denied_domains))
 - `private_browsing` (String) Private browsing state. Valid values are `Allowed`, `AlwaysOn`, `AlwaysOff`.
 - `state` (String) Extension state. Valid values are `Allowed`, `AlwaysOn`, `AlwaysOff`.
 
@@ -752,7 +752,7 @@ Optional:
 
 Optional:
 
-- `background_tasks` (Attributes Set) Set of background tasks. (see [below for nested schema](#nestedatt--component_blocks--service_background_tasks--background_tasks))
+- `background_tasks` (Attributes List) Background tasks, kept in the order listed. A task may be listed more than once. (see [below for nested schema](#nestedatt--component_blocks--service_background_tasks--background_tasks))
 
 <a id="nestedatt--component_blocks--service_background_tasks--background_tasks"></a>
 ### Nested Schema for `component_blocks.service_background_tasks.background_tasks`
@@ -764,7 +764,7 @@ Required:
 Optional:
 
 - `executable_asset_reference` (Attributes) Reference to the executable asset. (see [below for nested schema](#nestedatt--component_blocks--service_background_tasks--background_tasks--executable_asset_reference))
-- `launchd_configurations` (Attributes Set) Launchd configuration items. (see [below for nested schema](#nestedatt--component_blocks--service_background_tasks--background_tasks--launchd_configurations))
+- `launchd_configurations` (Attributes List) Launchd configuration items, kept in the order listed. (see [below for nested schema](#nestedatt--component_blocks--service_background_tasks--background_tasks--launchd_configurations))
 - `task_description` (String) Task description.
 
 <a id="nestedatt--component_blocks--service_background_tasks--background_tasks--executable_asset_reference"></a>
@@ -812,7 +812,7 @@ Optional:
 
 Optional:
 
-- `service_config_files` (Attributes Set) Set of service configuration files. (see [below for nested schema](#nestedatt--component_blocks--service_configuration_files--service_config_files))
+- `service_config_files` (Attributes List) Service configuration files, kept in the order listed. A service type may be listed more than once. (see [below for nested schema](#nestedatt--component_blocks--service_configuration_files--service_config_files))
 
 <a id="nestedatt--component_blocks--service_configuration_files--service_config_files"></a>
 ### Nested Schema for `component_blocks.service_configuration_files.service_config_files`
@@ -869,7 +869,7 @@ Optional:
 - `automatic_download` (String) Automatic download behavior for updates. Valid values: `Allowed`, `AlwaysOn`, `AlwaysOff`.
 - `automatic_install_os_updates` (String) Automatic installation behavior for OS updates. Valid values: `Allowed`, `AlwaysOn`, `AlwaysOff`.
 - `automatic_install_security_updates` (String) Automatic installation behavior for security updates. Valid values: `Allowed`, `AlwaysOn`, `AlwaysOff`.
-- `beta_offer_programs` (Attributes Set) Beta programs to offer (max 100). Each program must have a token and description (1–1000 characters each). (see [below for nested schema](#nestedatt--component_blocks--software_update_settings--beta_offer_programs))
+- `beta_offer_programs` (Attributes List) Beta programs to offer (max 100), kept in the order listed. Each program must have a token and description (1–1000 characters each). (see [below for nested schema](#nestedatt--component_blocks--software_update_settings--beta_offer_programs))
 - `beta_program_enrollment` (String) Beta program enrollment setting. Valid values: `Allowed`, `AlwaysOn`, `AlwaysOff`.
 - `beta_require_program_description` (String) Required beta program description (1–1000 characters). Must be specified with `beta_require_program_token`.
 - `beta_require_program_token` (String) Required beta program token (1–1000 characters). Must be specified with `beta_require_program_description`.

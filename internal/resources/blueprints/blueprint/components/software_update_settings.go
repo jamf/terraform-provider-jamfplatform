@@ -36,6 +36,11 @@ type SoftwareUpdateSettingsComponent struct {
 }
 
 // BetaProgramModel represents a beta program configuration.
+//
+// beta_offer_programs is a list of these rather than a set, because the blueprints service stores
+// the programs as written. Wire-probed on the EU gateway 2026-11-11 (issue #568), on POST and on
+// merge-patch: insertion order was kept, a reorder was honoured, identical programs were kept, and
+// programs sharing a token with different descriptions were kept.
 type BetaProgramModel struct {
 	Token       types.String `tfsdk:"token"`
 	Description types.String `tfsdk:"description"`
@@ -113,8 +118,8 @@ func SoftwareUpdateSettingsComponentSchema() map[string]schema.Attribute {
 			MarkdownDescription: "Required beta program description (1–1000 characters). Must be specified with `beta_require_program_token`.",
 			Optional:            true,
 		},
-		"beta_offer_programs": schema.SetNestedAttribute{
-			MarkdownDescription: "Beta programs to offer (max 100). Each program must have a token and description (1–1000 characters each).",
+		"beta_offer_programs": schema.ListNestedAttribute{
+			MarkdownDescription: "Beta programs to offer (max 100), kept in the order listed. Each program must have a token and description (1–1000 characters each).",
 			Optional:            true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{

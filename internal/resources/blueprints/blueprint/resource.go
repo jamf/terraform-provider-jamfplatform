@@ -68,7 +68,7 @@ func (r *BlueprintResource) Metadata(ctx context.Context, req resource.MetadataR
 // Schema returns the Terraform schema for the blueprint resource.
 func (r *BlueprintResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version:             5,
+		Version:             6,
 		MarkdownDescription: "Manages a Jamf blueprint. Requires **Blueprints API** access." + resourcePrivileges,
 		Attributes:          blueprintSchemaAttributes(ctx),
 	}
@@ -156,6 +156,15 @@ func activationConditionsDescription(appliesTo string) string {
 // component block offers, all of which the framework allows inside a collection. legacy_payloads is
 // not included: its settings are JSON strings inside a block, so componentBlockAttributes defines
 // it. ai_governance and apple_declarations are likewise block-only and defined there.
+//
+// raw_component stays a set although issue #568 turned the component collections into lists,
+// because the blueprints service does not keep its order. Wire-probed on the EU gateway 2026-11-11:
+// components with distinct identifiers kept their order through a POST and a merge-patch reorder,
+// and three components sharing one identifier were all kept, but across four runs those three came
+// back in a different order from the one written (sent true, true, false; read true, false, true on
+// a POST), so a list would fail with an inconsistent result after apply. The cost of the set is that
+// two raw components with one identifier and identical configuration, which only an edit made
+// outside Terraform can store, still fail to read with `Duplicate Set Element`.
 func sharedComponentAttributes() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"raw_component": schema.SetNestedAttribute{

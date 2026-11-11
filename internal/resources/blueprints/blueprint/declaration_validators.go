@@ -37,9 +37,10 @@ import (
 // unchecked would only relocate the silent failure.
 //
 // They differ in shape, not in rules, and the shape decides which method runs. apple_declarations
-// is a list of declarations, so ValidateList addresses a finding to the exact element and can
-// range-check a $PAYLOAD_n reference. custom_declarations is an object wrapping a set, which has no
-// stable index, so ValidateObject lands a finding on the collection and names the declaration type.
+// is a list of declarations, so ValidateList runs on it; custom_declarations is an object wrapping a
+// list, so ValidateObject runs on the object. Both address a finding to the exact element and
+// range-check a $PAYLOAD_n reference, because both derive each payload key from the declaration's
+// 1-based position.
 type declarationSchemaValidator struct{}
 
 // appleDeclarationsSchemaValidator validates the apple_declarations list.
@@ -65,8 +66,8 @@ func (v declarationSchemaValidator) MarkdownDescription(context.Context) string 
 }
 
 // ValidateList checks every declaration in the apple_declarations list, addressing each finding to
-// the element it came from. Only this surface checks $PAYLOAD_n references, because only a list has
-// the positions they name.
+// the element it came from, and range-checks each $PAYLOAD_n reference against the positions the list
+// holds.
 //
 // An element Terraform has yet to compute cannot be read into the model, and that is not an error —
 // the wire decides it, which is why the elements are read with unhandled unknowns allowed. An
@@ -120,10 +121,13 @@ func (v declarationSchemaValidator) ValidateObject(ctx context.Context, req vali
 	}
 
 	base := req.Path.AtName("declaration")
-	for _, declaration := range component.Declarations {
+	for i, declaration := range component.Declarations {
+		at := base.AtListIndex(i).AtName("payload")
 		resp.Diagnostics.Append(validateDeclarationPayload(
-			declaration.Kind, declaration.Type, declaration.Payload,
-			base, declaration.Type.ValueString(),
+			declaration.Kind, declaration.Type, declaration.Payload, at, "",
+		)...)
+		resp.Diagnostics.Append(validatePayloadReferences(
+			declaration.Payload, len(component.Declarations), at,
 		)...)
 	}
 }

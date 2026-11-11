@@ -403,8 +403,8 @@ func TestBlueprintSchemaV3MatchesTheStateItDecodes(t *testing.T) {
 	if _, ok := current.NestedObject.Attributes["apple_declarations"].(schema.ListNestedAttribute); !ok {
 		t.Error("the live apple_declarations is no longer a ListNestedAttribute")
 	}
-	if resp.Schema.Version != 5 {
-		t.Errorf("current Version = %d, want 5", resp.Schema.Version)
+	if resp.Schema.Version != 6 {
+		t.Errorf("current Version = %d, want 6", resp.Schema.Version)
 	}
 }
 

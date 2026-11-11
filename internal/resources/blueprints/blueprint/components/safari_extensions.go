@@ -15,6 +15,12 @@ import (
 )
 
 // SafariExtensionsComponent represents a strongly-typed Safari extensions component.
+//
+// managed_extensions stays a set: on the wire it is a JSON object keyed by extension identifier, so
+// the service has no order to keep and cannot hold one identifier twice. Each extension's
+// allowed_domains and denied_domains are lists, because they are arrays the service stores as
+// written: wire-probed on the EU gateway 2026-11-11 (issue #568), on POST and on merge-patch,
+// insertion order was kept, a reorder was honoured and an identical domain listed twice was kept.
 type SafariExtensionsComponent struct {
 	ManagedExtensions []ManagedExtensionModel `tfsdk:"managed_extensions"`
 }
@@ -42,7 +48,7 @@ func (c *SafariExtensionsComponent) GetIdentifier() string {
 func SafariExtensionsComponentSchema() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"managed_extensions": schema.SetNestedAttribute{
-			MarkdownDescription: "Set of managed Safari extensions.",
+			MarkdownDescription: "Set of managed Safari extensions. Each `extension_id` may appear only once.",
 			Optional:            true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
@@ -60,8 +66,8 @@ func SafariExtensionsComponentSchema() map[string]schema.Attribute {
 						Optional:            true,
 						Validators:          []validator.String{stringvalidator.OneOf(blueprints.AutomaticActionValueValues()...)},
 					},
-					"allowed_domains": schema.SetNestedAttribute{
-						MarkdownDescription: "Set of allowed domains for this extension.",
+					"allowed_domains": schema.ListNestedAttribute{
+						MarkdownDescription: "Allowed domains for this extension, kept in the order listed.",
 						Optional:            true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
@@ -72,8 +78,8 @@ func SafariExtensionsComponentSchema() map[string]schema.Attribute {
 							},
 						},
 					},
-					"denied_domains": schema.SetNestedAttribute{
-						MarkdownDescription: "Set of denied domains for this extension.",
+					"denied_domains": schema.ListNestedAttribute{
+						MarkdownDescription: "Denied domains for this extension, kept in the order listed.",
 						Optional:            true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{

@@ -79,8 +79,8 @@ func TestBlueprintResource_FlatComponentAttrsRemoved(t *testing.T) {
 		}
 	}
 
-	if resp.Schema.Version != 5 {
-		t.Errorf("expected schema version 5, got %d", resp.Schema.Version)
+	if resp.Schema.Version != 6 {
+		t.Errorf("expected schema version 6, got %d", resp.Schema.Version)
 	}
 
 	for name, attr := range resp.Schema.Attributes {
