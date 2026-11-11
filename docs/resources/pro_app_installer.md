@@ -128,7 +128,7 @@ Optional:
 
 Optional:
 
-- `categories` (Attributes Set) Self Service categories the deployment appears under, keyed by `category_id`. List each category once: Jamf Pro keeps one entry per category, so a repeated `category_id` is rejected at plan time. (see [below for nested schema](#nestedatt--self_service_settings--categories))
+- `categories` (Attributes Set) Self Service categories the deployment appears under, keyed by `category_id`. List each category once: Jamf Pro keeps one entry per category, so a repeated `category_id` is rejected at plan time. A repeated `category_id` that refers to a category created in the same apply is caught only by a later plan. (see [below for nested schema](#nestedatt--self_service_settings--categories))
 - `description` (String) Description shown in Self Service. Omit to leave it unset.
 - `force_view_description` (Boolean) Force users to view the description before installing.
 - `include_in_compliance_category` (Boolean) Include the deployment in the Self Service compliance category.

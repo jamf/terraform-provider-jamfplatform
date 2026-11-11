@@ -244,7 +244,7 @@ Optional:
 
 Optional:
 
-- `categories` (Attributes List) Categories under which the profile appears in Self Service. Each entry pairs a category ID with `display_in` / `feature_in` toggles matching the Self Service "Display in" / "Feature in" columns of the admin UI. Declaring one or more entries replaces the stored list. An empty list reads as an omission. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--self_service--categories))
+- `categories` (Attributes List) Categories under which the profile appears in Self Service. Each entry pairs a category ID with `display_in` / `feature_in` toggles matching the Self Service "Display in" / "Feature in" columns of the admin UI. Declaring one or more entries replaces the stored list. An empty list reads as an omission. Omit to leave any existing entries untouched; they are not cleared on update. List each category once, and leave `display_in` unset or `true`: Jamf Pro merges repeated entries and drops a category that is not displayed, so both are rejected at plan time. A repeated id that refers to a category created in the same apply is caught only by a later plan. (see [below for nested schema](#nestedatt--self_service--categories))
 - `display_notifications` (Boolean) Whether Self Service surfaces a notification when the profile becomes available. See `notification_location` for the one pairing Jamf Pro cannot store. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `ensure_users_view_description` (Boolean) Force users to view the description before installing. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `feature_on_main_page` (Boolean) Feature the profile on the Self Service main page. Omit to leave the current value untouched; set `true`/`false` to change it.
@@ -267,7 +267,7 @@ Required:
 
 Optional:
 
-- `display_in` (Boolean) Display the profile in this category. Defaults to `true`, which is what listing the category means, matching the tick under the admin UI's "Display in". Setting `false` removes the category rather than storing it undisplayed, because Jamf Pro keeps no such state.
+- `display_in` (Boolean) Display the profile in this category. Defaults to `true`, which is what listing the category means, matching the tick under the admin UI's "Display in". Jamf Pro keeps no undisplayed state, so `false` is rejected at plan time; remove the entry instead.
 - `feature_in` (Boolean) Feature the profile in this category, matching the admin UI's "Feature in" column. Has no effect unless `display_in` is `true`.
 
 Read-Only:

@@ -194,7 +194,7 @@ func (r *EbookResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 						Computed:            true,
 					},
 					"categories": schema.SetNestedAttribute{
-						MarkdownDescription: "Set of Self Service categories the ebook appears under (macOS and iOS app only). Each item identifies the category by `id`; `name` is returned by Jamf Pro. Omit to leave any existing entries untouched; they are not cleared on update. List each category once, and leave `display_in` unset or `true`: Jamf Pro merges repeated entries and drops a category that is not displayed, so both are rejected at plan time.",
+						MarkdownDescription: "Set of Self Service categories the ebook appears under (macOS and iOS app only). Each item identifies the category by `id`; `name` is returned by Jamf Pro. Omit to leave any existing entries untouched; they are not cleared on update. List each category once, and leave `display_in` unset or `true`: Jamf Pro merges repeated entries and drops a category that is not displayed, so both are rejected at plan time. A repeated id that refers to a category created in the same apply is caught only by a later plan.",
 						Optional:            true,
 						Validators:          selfServiceCategoryValidators(),
 						NestedObject: schema.NestedAttributeObject{

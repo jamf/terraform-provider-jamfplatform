@@ -70,6 +70,27 @@ func TestUniqueStringFieldSetRule_ExactWithoutKey(t *testing.T) {
 	}
 }
 
+func TestUniqueStringFieldListRule_KeyDetailAndIndex(t *testing.T) {
+	req := validator.ListRequest{Path: path.Root("test_list"), ConfigValue: listOf(t,
+		element(t, types.StringValue("a@example.com"), types.StringValue("A")),
+		element(t, types.StringValue("b@example.com"), types.StringValue("B")),
+		element(t, types.StringValue("A@example.com"), types.StringValue("A")),
+		element(t, types.StringUnknown(), types.StringValue("A")),
+	)}
+	var resp validator.ListResponse
+	UniqueStringFieldListRule(foldRule).ValidateList(context.Background(), req, &resp)
+	if got := resp.Diagnostics.ErrorsCount(); got != 1 {
+		t.Fatalf("want 1 error, got %d: %v", got, resp.Diagnostics)
+	}
+	d := resp.Diagnostics[0]
+	if d.Summary() != foldRule.Summary || !strings.Contains(d.Detail(), "A@example.com is listed more than once") {
+		t.Errorf("diagnostic = %q / %q", d.Summary(), d.Detail())
+	}
+	if withPath, ok := d.(interface{ Path() path.Path }); !ok || !withPath.Path().Equal(path.Root("test_list").AtListIndex(2).AtName("name")) {
+		t.Errorf("want the repeat's own index path, got %v", d)
+	}
+}
+
 func TestUniqueStringFieldSetRule_DefersOnUnknowns(t *testing.T) {
 	cases := map[string]types.Set{
 		"null set":    types.SetNull(testElementType),

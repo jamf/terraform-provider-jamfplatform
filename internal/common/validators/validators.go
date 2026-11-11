@@ -19,7 +19,7 @@ import (
 // Duplicates are reported at the offending element's field path, citing the
 // index of the first occurrence.
 func UniqueStringFieldList(fieldName string) validator.List {
-	return uniqueStringFieldListValidator{uniqueStringField{fieldName: fieldName}}
+	return uniqueStringFieldListValidator{fieldName: fieldName}
 }
 
 // UniqueStringFieldSet returns a validator.Set enforcing that the named
@@ -89,8 +89,17 @@ func (v uniqueStringField) fieldValue(elem attr.Value) (string, bool) {
 	return str.ValueString(), true
 }
 
+// UniqueStringFieldListRule is UniqueStringFieldList with a comparison key and
+// a diagnostic of the caller's choosing, for a list Jamf Pro stores keyed by
+// one attribute. A list keeps identical elements, so it catches those too.
+// Every repeat is reported at its own index.
+func UniqueStringFieldListRule(rule UniqueFieldRule) validator.List {
+	return uniqueStringFieldListValidator{fieldName: rule.Field, rule: &rule}
+}
+
 type uniqueStringFieldListValidator struct {
 	uniqueStringField
+	rule *UniqueFieldRule
 }
 
 var _ validator.List = uniqueStringFieldListValidator{}
@@ -117,7 +126,15 @@ func (v uniqueStringFieldListValidator) ValidateList(ctx context.Context, req va
 		if !ok {
 			continue
 		}
-		if first, dup := seen[value]; dup {
+		key := value
+		if v.rule != nil && v.rule.Key != nil {
+			key = v.rule.Key(value)
+		}
+		if first, dup := seen[key]; dup {
+			if v.rule != nil {
+				resp.Diagnostics.AddAttributeError(req.Path.AtListIndex(i).AtName(v.fieldName), v.rule.Summary, fmt.Sprintf(v.rule.Detail, value))
+				continue
+			}
 			resp.Diagnostics.AddAttributeError(
 				req.Path.AtListIndex(i).AtName(v.fieldName),
 				fmt.Sprintf("Duplicate %s within list", v.fieldName),
@@ -125,7 +142,7 @@ func (v uniqueStringFieldListValidator) ValidateList(ctx context.Context, req va
 			)
 			continue
 		}
-		seen[value] = i
+		seen[key] = i
 	}
 }
 
