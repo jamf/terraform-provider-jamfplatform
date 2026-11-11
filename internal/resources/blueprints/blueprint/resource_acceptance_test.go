@@ -1096,6 +1096,81 @@ func TestAccResource_Blueprint_LegacyPayloads_MCXPassthrough(t *testing.T) {
 	})
 }
 
+// TestAccResource_Blueprint_LegacyPayloads_MCXEnergySaver pins issue #565 end to end: a
+// com.apple.MCX.EnergySaver payload, carrying the three Energy Saver dictionaries from the issue,
+// plans, applies, settles and imports. Jamf's blueprints service keys Apple's
+// com.apple.MCX(<Variant>).yaml payloads by variant, and the schema table did not until SDK v1.12.0,
+// so config generated from a blueprint the platform already held failed `terraform validate`. The
+// import step is the issue's own path: the state an import reads back must agree with what was
+// applied, so config generated from it describes the same blueprint.
+func TestAccResource_Blueprint_LegacyPayloads_MCXEnergySaver(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-legacy-energy-" + suffix
+	addr := "jamfplatform_blueprints_blueprint.test_legacy_energy"
+
+	config := testBlueprintConfig(smartGroupHCL("legacyenergy"), fmt.Sprintf(`
+		resource "jamfplatform_blueprints_blueprint" "test_legacy_energy" {
+			name          = %q
+			description   = "Acceptance test — safe to delete"
+			deployed      = false
+			device_groups = [jamfplatform_device_group.scope.id]
+
+			component_blocks = [
+				{
+					name = "Energy"
+					legacy_payloads = [
+						{
+							payload_type = "com.apple.MCX.EnergySaver"
+							settings = jsonencode({
+								"com.apple.EnergySaver.desktop.ACPower" = {
+									"Display Sleep Timer" = 10
+									"Disk Sleep Timer"    = 10
+									"System Sleep Timer"  = 30
+									"Wake on LAN"         = 1
+								}
+								"com.apple.EnergySaver.portable.ACPower" = {
+									"Display Sleep Timer" = 10
+									"System Sleep Timer"  = 30
+								}
+								"com.apple.EnergySaver.portable.BatteryPower" = {
+									"Display Sleep Timer" = 5
+									"System Sleep Timer"  = 15
+								}
+							})
+						}
+					]
+				},
+			]
+		}
+	`, name))
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBlueprintResourcesDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet(addr, "id"),
+					resource.TestCheckResourceAttr(addr, "component_blocks.0.legacy_payloads.0.payload_type", "com.apple.MCX.EnergySaver"),
+				),
+			},
+			{
+				Config: config,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+			{
+				ResourceName:      addr,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
 // TestAccResource_Blueprint_LegacyPayloads_RedactedCredentials pins the round trip for a payload
 // carrying credentials. Jamf returns a Wi-Fi Password, and EAPClientConfiguration's UserName and
 // UserPassword, as a run of asterisks rather than the value written, so without restoring the
