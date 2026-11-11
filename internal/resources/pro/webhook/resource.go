@@ -28,6 +28,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -179,8 +180,9 @@ func (r *WebhookResource) Schema(ctx context.Context, req resource.SchemaRequest
 				// No plan modifier: smart_group_id is meaningful only for the
 				// SmartGroup* events, so it must fall to null (not pin a stale
 				// value) whenever `event` changes to a non-smart event.
-				MarkdownDescription: "Jamf Pro smart group ID for the SmartGroup membership-change events. Only valid when `event` is `SmartGroupComputerMembershipChange`, `SmartGroupMobileDeviceMembershipChange`, or `SmartGroupUserMembershipChange`. Interpolate a Jamf Pro smart group ID (e.g. `jamfplatform_device_group.<x>.jamf_pro_id`). Omit for \"any\" group.",
+				MarkdownDescription: "Jamf Pro smart group ID for the SmartGroup membership-change events. Only valid when `event` is `SmartGroupComputerMembershipChange`, `SmartGroupMobileDeviceMembershipChange`, or `SmartGroupUserMembershipChange`. Interpolate a Jamf Pro smart group ID (e.g. `jamfplatform_device_group.<x>.jamf_pro_id`). Omit for \"any\" group: there is no sentinel to configure, and `-1` and `0` are refused at plan time. Removing the attribute clears a group set earlier.",
 				Optional:            true,
+				Validators:          []validator.Int64{commonvalidators.PositiveReferenceIDInt64("smart group", "Remove the attribute to match any group.")},
 			},
 			"enable_display_fields_for_group_object": schema.BoolAttribute{
 				MarkdownDescription: "**\"Include Display Fields for the Group Object\"** in the Jamf Pro admin UI. Whether to include the smart group's display fields in the payload. Defaults to `false`. Omit to leave the current value untouched; set `true`/`false` to change it. The display field list itself cannot be set here; see `display_fields`.",

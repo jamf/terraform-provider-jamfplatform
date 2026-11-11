@@ -67,6 +67,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
@@ -197,9 +198,10 @@ func (r *SmartComputerGroupResource) Schema(ctx context.Context, req resource.Sc
 				},
 			},
 			"site_id": schema.StringAttribute{
-				MarkdownDescription: "Jamf Pro site the group belongs to. `" + progroups.NoSiteID + "` means no site, which is the default. A smart group in a site only ever contains computers assigned to that same site.",
+				MarkdownDescription: "Jamf Pro site the group belongs to. `" + progroups.NoSiteID + "` means no site, which is the default. A smart group in a site only ever contains computers assigned to that same site. An empty value and `0` are refused at plan time.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("site")},
 				Default:             stringdefault.StaticString(progroups.NoSiteID),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),

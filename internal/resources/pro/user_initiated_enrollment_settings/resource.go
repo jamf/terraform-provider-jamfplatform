@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -347,9 +348,10 @@ func (r *UserInitiatedEnrollmentSettingsResource) Schema(ctx context.Context, re
 							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 						},
 						"site_id": schema.StringAttribute{
-							MarkdownDescription: "Site assigned to devices enrolled through this group. Omit to leave the current value untouched; there is no blank-clear, so set `-1` to remove the site.",
+							MarkdownDescription: "Site assigned to devices enrolled through this group. Set `-1` to remove the site; Jamf Pro reports `0` for a group with no site and the provider reads that back as `-1`. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site. An empty value and `0` are refused at plan time.",
 							Optional:            true,
 							Computed:            true,
+							Validators:          []validator.String{commonvalidators.ClearableReferenceID("site")},
 							PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 						},
 						"enterprise_enrollment_enabled": schema.BoolAttribute{

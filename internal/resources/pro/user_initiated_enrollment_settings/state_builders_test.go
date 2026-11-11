@@ -113,3 +113,37 @@ func TestAssignSettingsResourceModel_ManagementUsernameEmptyString(t *testing.T)
 		})
 	}
 }
+
+// TestSiteIDValue_CollapsesNoSiteEchoes proves Jamf Pro's "0" for an access
+// group with no site reads back as the single user-facing "-1".
+func TestSiteIDValue_CollapsesNoSiteEchoes(t *testing.T) {
+	cases := []struct {
+		name string
+		in   *string
+		want types.String
+	}{
+		{"nil stays null", nil, types.StringNull()},
+		{"zero collapses", new("0"), types.StringValue("-1")},
+		{"minus one stays", new("-1"), types.StringValue("-1")},
+		{"real site stays", new("42"), types.StringValue("42")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := siteIDValue(tc.in); !got.Equal(tc.want) {
+				t.Fatalf("siteIDValue = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestSiteDiffers_TreatsZeroAsNoSite proves a configured "-1" does not plan an
+// update against a group Jamf Pro reports with "0".
+func TestSiteDiffers_TreatsZeroAsNoSite(t *testing.T) {
+	cur := pro.EnrollmentAccessGroupPreview{SiteID: new("0")}
+	if siteDiffers(accessGroupModel{SiteID: types.StringValue("-1")}, cur) {
+		t.Fatal("-1 against a stored 0 must not differ")
+	}
+	if !siteDiffers(accessGroupModel{SiteID: types.StringValue("5")}, cur) {
+		t.Fatal("a real site against a stored 0 must differ")
+	}
+}

@@ -153,7 +153,7 @@ func siteDiffers(p accessGroupModel, c pro.EnrollmentAccessGroupPreview) bool {
 	if p.SiteID.IsNull() || p.SiteID.IsUnknown() {
 		return false
 	}
-	return p.SiteID.ValueString() != pointerString(c.SiteID)
+	return p.SiteID.ValueString() != siteIDValue(c.SiteID).ValueString()
 }
 
 // boolDiffers compares a planned Bool to a current *bool, treating an unset

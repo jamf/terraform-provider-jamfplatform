@@ -29,6 +29,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -143,9 +144,10 @@ func (r *FileShareDistributionPointResource) Schema(ctx context.Context, req res
 				},
 			},
 			"backup_distribution_point_id": schema.StringAttribute{
-				MarkdownDescription: "Failover distribution point (the **Failover distribution point** option). Set it to `-2` for the Jamf Cloud distribution point, or to the ID of another file share distribution point, which you can reference with `jamfplatform_pro_file_share_distribution_point.other.id`. If the referenced distribution point is deleted, this resets to `-1`. Omit to leave the current value untouched; set `-1` to clear the failover.",
+				MarkdownDescription: "Failover distribution point (the **Failover distribution point** option). Set it to `-2` for the Jamf Cloud distribution point, or to the ID of another file share distribution point, which you can reference with `jamfplatform_pro_file_share_distribution_point.other.id`. If the referenced distribution point is deleted, this resets to `-1`. Omit to leave the current value untouched; set `-1` to clear the failover. An empty value and `0` are refused at plan time.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceIDWith("distribution point", "-2")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},

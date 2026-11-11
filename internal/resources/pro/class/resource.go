@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
@@ -102,9 +103,10 @@ func (r *ClassResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 			},
 			"site_id": schema.StringAttribute{
-				MarkdownDescription: "**\"Site\"** in the Jamf Pro admin UI. Site ID scoping the class. Use `-1` for \"None\", the default.",
+				MarkdownDescription: "**\"Site\"** in the Jamf Pro admin UI. Site ID scoping the class. Use `-1` for \"None\", the default. An empty value and `0` are refused at plan time.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("site")},
 				Default:             stringdefault.StaticString(noSiteID),
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 			},

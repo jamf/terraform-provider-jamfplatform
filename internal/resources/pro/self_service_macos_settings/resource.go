@@ -260,11 +260,13 @@ func (r *SelfServiceMacosSettingsResource) Schema(ctx context.Context, req resou
 					"\"Category\"). `-1` means All Items. Reference a category with `jamfplatform_pro_category`. " +
 					"Only applies under `BROWSE`: with any other landing page Jamf Pro silently resets the value to `-1`, " +
 					"so a value other than `-1` requires `default_landing_page = \"BROWSE\"` to be declared alongside it. " +
+					"`0` is refused at plan time: Jamf Pro stores it as a literal category 0, which is not a clear. " +
 					"Omit to leave the current value untouched.",
 				Optional: true,
 				Computed: true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(-4),
+					int64validator.NoneOf(0),
 				},
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),

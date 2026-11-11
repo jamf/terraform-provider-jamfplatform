@@ -30,6 +30,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -149,10 +150,11 @@ func (r *VolumePurchasingNotificationResource) Schema(ctx context.Context, req r
 				},
 			},
 			"site_id": schema.StringAttribute{
-				MarkdownDescription: "**\"Site\"** in the Jamf Pro admin UI. Jamf Pro site ID scoping the notification. Omit to leave the current value untouched; there is no blank-clear, so set `-1` to remove the site.",
+				MarkdownDescription: "**\"Site\"** in the Jamf Pro admin UI. Jamf Pro site ID scoping the notification. Jamf Pro ignores the site on an update, so it can be set only on create and changing it forces replacement. Use `-1` for no site; an empty value and `0` are refused at plan time. Omit to leave the current value untouched.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("site")},
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()},
 			},
 			"timeouts": timeouts.Attributes(ctx, timeouts.Opts{
 				Create: true,

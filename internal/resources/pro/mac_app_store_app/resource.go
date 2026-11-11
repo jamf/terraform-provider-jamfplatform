@@ -189,7 +189,7 @@ func (r *MacAppResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						MarkdownDescription: "Self Service icon. Set `id` to reference an already-uploaded icon; `uri` is returned by Jamf Pro. Uploading icon bytes inline is not supported, because Jamf Pro re-encodes PNGs and the result would diff forever. Open an issue if you need it.",
 						Optional:            true,
 						Attributes: map[string]schema.Attribute{
-							"id":  optComputedString("Icon ID assigned by Jamf Pro."),
+							"id":  optComputedString("Icon ID assigned by Jamf Pro. Jamf Pro cannot remove an icon once set, so the icon can be replaced but not cleared: omit the attribute to leave the current icon untouched, and `\"\"`, `-1` and `0` are refused at plan time.", commonvalidators.PositiveReferenceID("icon", "Jamf Pro cannot remove an icon once set; omit the attribute to leave it untouched.")),
 							"uri": iconMirrorString("Icon URI. Jamf Pro sets it from the icon `id`."),
 						},
 					},
