@@ -870,7 +870,7 @@ func TestAccPolicyResource_PackageConfigurationPackages(t *testing.T) {
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
 						tfjsonpath.New("packages").AtMapKey("packages"),
-						knownvalue.SetSizeExact(1),
+						knownvalue.ListSizeExact(1),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
@@ -1060,7 +1060,7 @@ resource "jamfplatform_pro_policy" "test" {
 // references its ID from policy.scripts.scripts. The policy's wire form for
 // `priority` is `Before`/`After`/`At Reboot`, distinct from the fixture's
 // enum. Step 2 swaps priority and
-// parameter_4 to exercise the Update path on the scripts set without
+// parameter_4 to exercise the Update path on the scripts list without
 // recreating the fixture.
 func TestAccPolicyResource_ScriptsFullCoverage(t *testing.T) {
 	testhelpers.AccPreCheck(t)
@@ -1078,7 +1078,7 @@ func TestAccPolicyResource_ScriptsFullCoverage(t *testing.T) {
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
 						tfjsonpath.New("script_assignments"),
-						knownvalue.SetSizeExact(1),
+						knownvalue.ListSizeExact(1),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
@@ -1246,7 +1246,7 @@ func TestAccPolicyResource_PrintersFullCoverage(t *testing.T) {
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
 						tfjsonpath.New("printer_assignments"),
-						knownvalue.SetSizeExact(1),
+						knownvalue.ListSizeExact(1),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
@@ -1320,7 +1320,7 @@ func TestAccPolicyResource_DockItemsFullCoverage(t *testing.T) {
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
 						tfjsonpath.New("dock_item_assignments"),
-						knownvalue.SetSizeExact(1),
+						knownvalue.ListSizeExact(1),
 					),
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
@@ -2498,7 +2498,7 @@ func TestAccPolicyResource_AccountMaintenanceDirectoryBindingsFullCoverage(t *te
 					statecheck.ExpectKnownValue(
 						"jamfplatform_pro_policy.test",
 						tfjsonpath.New("directory_bindings"),
-						knownvalue.SetSizeExact(1),
+						knownvalue.ListSizeExact(1),
 					),
 				},
 			},

@@ -15,6 +15,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -101,7 +102,7 @@ func (r *PolicyResource) IdentitySchema(ctx context.Context, req resource.Identi
 // element names are noted in attribute descriptions where they differ.
 func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version:             2,
+		Version:             3,
 		MarkdownDescription: "Manages a Jamf Pro policy. Top-level blocks mirror the admin UI's tabs and Options sidebar: `general`, `scope`, `self_service`, `user_interaction`, and the Options payloads `packages`, `scripts`, `printers`, `disk_encryption`, `dock_items`, `local_accounts`, `management_account`, `directory_bindings`, `efi_password`, `restart_options`, `maintenance`, `files_and_processes`. Scope targets are flat sets of Jamf Pro IDs; interpolate `jamfplatform_device_group.x.jamf_pro_id` to bridge from Platform Services. The four account-maintenance payloads (`local_accounts`, `management_account`, `directory_bindings`, `efi_password`) are flattened peers of the UI sections; internally Jamf Pro stores them as a single `account_maintenance` object. The legacy Software Update and Conditional Access policy sections are **intentionally not modelled**. Both are obsolete in Jamf Pro, superseded by MDM-driven app installs, OS update scheduling and the patch-management surface. To drive OS or app updates from Terraform, reach for the patch / DDM resources instead.\n\nUpdates are merged rather than replaced. Removing a whole optional block (`scope`, `self_service`, `packages`, `scripts`, `printers`, `dock_items`, `local_accounts`, `management_account`, `directory_bindings`, `efi_password`, `restart_options`, `maintenance`, `files_and_processes`, `user_interaction` or `disk_encryption`) from your configuration does not clear it: Jamf Pro keeps the values you set previously. To clear a block, null its individual fields instead of deleting the block." + resourcePrivileges,
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -280,8 +281,8 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 							stringplanmodifier.UseNonNullStateForUnknown(),
 						},
 					},
-					"packages": schema.SetNestedAttribute{
-						MarkdownDescription: "Set of package assignments. Each item identifies the package by ID; `name` is returned by Jamf Pro. `action` is one of " + markdownValueList(packageActions) + ". Omit to leave any existing entries untouched; they are not cleared on update.",
+					"packages": schema.ListNestedAttribute{
+						MarkdownDescription: "Package assignments. Each item identifies the package by ID; `name` is returned by Jamf Pro. `action` is one of " + markdownValueList(packageActions) + ". " + packagesOrderNote + " Omit to leave any existing entries untouched; they are not cleared on update.",
 						Optional:            true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
@@ -301,8 +302,8 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				DeprecationMessage:  scriptsDeprecation,
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
-					"scripts": schema.SetNestedAttribute{
-						MarkdownDescription: "Set of script assignments. `priority` is one of " + markdownValueList(proclassic.PolicyScriptsScriptItemPriorityValues()) + ". Omit to leave any existing entries untouched; they are not cleared on update.",
+					"scripts": schema.ListNestedAttribute{
+						MarkdownDescription: "Script assignments. `priority` is one of " + markdownValueList(proclassic.PolicyScriptsScriptItemPriorityValues()) + ". " + scriptsOrderNote + " Omit to leave any existing entries untouched; they are not cleared on update.",
 						Optional:            true,
 						NestedObject:        schema.NestedAttributeObject{Attributes: scriptItemAttributes()},
 					},
@@ -316,8 +317,8 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				DeprecationMessage:  printersDeprecation,
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
-					"printers": schema.SetNestedAttribute{
-						MarkdownDescription: "Set of printer assignments. Omit to leave any existing entries untouched; they are not cleared on update.",
+					"printers": schema.ListNestedAttribute{
+						MarkdownDescription: "Printer assignments. " + insertionOrderNote("printer") + " Omit to leave any existing entries untouched; they are not cleared on update.",
 						Optional:            true,
 						NestedObject:        schema.NestedAttributeObject{Attributes: printerItemAttributes()},
 					},
@@ -331,8 +332,8 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				DeprecationMessage:  dockItemsDeprecation,
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
-					"dock_items": schema.SetNestedAttribute{
-						MarkdownDescription: "Set of dock item assignments. Omit to leave any existing entries untouched; they are not cleared on update.",
+					"dock_items": schema.ListNestedAttribute{
+						MarkdownDescription: "Dock item assignments. " + insertionOrderNote("dock item") + " Omit to leave any existing entries untouched; they are not cleared on update.",
 						Optional:            true,
 						NestedObject:        schema.NestedAttributeObject{Attributes: dockItemAttributes()},
 					},
@@ -341,28 +342,28 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					objectvalidator.ConflictsWith(path.MatchRoot("dock_item_assignments")),
 				},
 			},
-			"script_assignments": schema.SetNestedAttribute{
-				MarkdownDescription: "Scripts to run as part of the policy (admin UI: Options ▸ Scripts). Each item identifies the script by ID; `name` is returned by Jamf Pro. `priority` is one of " + markdownValueList(proclassic.PolicyScriptsScriptItemPriorityValues()) + ". Replaces `scripts.scripts`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update.",
+			"script_assignments": schema.ListNestedAttribute{
+				MarkdownDescription: "Scripts to run as part of the policy (admin UI: Options ▸ Scripts). Each item identifies the script by ID; `name` is returned by Jamf Pro. `priority` is one of " + markdownValueList(proclassic.PolicyScriptsScriptItemPriorityValues()) + ". " + scriptsOrderNote + " Replaces `scripts.scripts`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update.",
 				Optional:            true,
 				NestedObject:        schema.NestedAttributeObject{Attributes: scriptItemAttributes()},
-				Validators: []validator.Set{
-					setvalidator.SizeAtLeast(1),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
 				},
 			},
-			"printer_assignments": schema.SetNestedAttribute{
-				MarkdownDescription: "Printers to install or remove (admin UI: Options ▸ Printers). Replaces `printers.printers`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update.",
+			"printer_assignments": schema.ListNestedAttribute{
+				MarkdownDescription: "Printers to install or remove (admin UI: Options ▸ Printers). " + insertionOrderNote("printer") + " Replaces `printers.printers`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update.",
 				Optional:            true,
 				NestedObject:        schema.NestedAttributeObject{Attributes: printerItemAttributes()},
-				Validators: []validator.Set{
-					setvalidator.SizeAtLeast(1),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
 				},
 			},
-			"dock_item_assignments": schema.SetNestedAttribute{
-				MarkdownDescription: "Dock items to add or remove (admin UI: Options ▸ Dock). Replaces `dock_items.dock_items`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update.",
+			"dock_item_assignments": schema.ListNestedAttribute{
+				MarkdownDescription: "Dock items to add or remove (admin UI: Options ▸ Dock). " + insertionOrderNote("dock item") + " Replaces `dock_items.dock_items`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update.",
 				Optional:            true,
 				NestedObject:        schema.NestedAttributeObject{Attributes: dockItemAttributes()},
-				Validators: []validator.Set{
-					setvalidator.SizeAtLeast(1),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
 				},
 			},
 			// account_maintenance is flattened into four UI-aligned peer blocks
@@ -429,8 +430,8 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					},
 				},
 			},
-			"directory_bindings": schema.SetNestedAttribute{
-				MarkdownDescription: "Directory binding assignments (admin UI: Options ▸ Directory Bindings). Omit to leave any existing entries untouched; they are not cleared on update.",
+			"directory_bindings": schema.ListNestedAttribute{
+				MarkdownDescription: "Directory binding assignments (admin UI: Options ▸ Directory Bindings). " + insertionOrderNote("directory binding") + " Omit to leave any existing entries untouched; they are not cleared on update.",
 				Optional:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -832,11 +833,12 @@ func requiredEnum(desc string, values []string) schema.StringAttribute {
 }
 
 // optComputedStringKeyed is optComputedString for an attribute of an id-keyed
-// set element (packages, scripts, printers, dock items, self-service
-// categories). The framework pairs a planned set element with prior state by
+// list or set element (packages, scripts, printers, dock items, self-service
+// categories). The framework pairs a planned element with prior state by
 // position, so the stock modifier lends a re-keyed or reordered element
 // another element's values; this one carries only from the prior element with
-// the same id. See planmodifiers.UseKeyedStateForUnknownString and issue #464.
+// the same id, and carries nothing when that id is listed more than once. See
+// planmodifiers.UseKeyedStateForUnknownString and issue #464.
 func optComputedStringKeyed(desc string) schema.StringAttribute {
 	return optComputedStringKeyedBy(keyedElementID, desc)
 }
@@ -964,6 +966,35 @@ func dateTimeLimitationsAttributes() map[string]schema.Attribute {
 	out := serverSideLimitationsAttributes()
 	maps.Copy(out, clientSideLimitationsAttributes())
 	return out
+}
+
+// scriptsOrderNote and packagesOrderNote describe the two policy lists Jamf Pro
+// re-sorts. Wire-probed 2026-11-11 against the EU sandbox through PUT
+// /policies/id/{id} and a full GET after each write (issue #568): scripts are
+// stored sorted by script id, then by priority with After ahead of Before, and
+// entries sharing both keep the order sent, parameters included; packages are
+// stored sorted by package name, and entries for one package keep the order
+// sent. Every repeat is kept. Writing the same entries in three further orders
+// (groups reversed, interleaved, Before first), with repeated scripts carrying
+// parameters and one package listed twice with different settings, left the
+// full GET byte-identical to the first write, so a reorder across those groups
+// changes nothing Jamf Pro stores. The state builders keep the configured order
+// (helpers.AlignToPrior), which is why such a reorder plans exactly once.
+const (
+	scriptsOrderNote = "The same script may be listed more than once, for example with different parameters. " +
+		"Jamf Pro stores the list sorted by script ID and then by `priority`, `After` before `Before`; entries with the same script ID and priority keep the order written. " +
+		"Writing the list in another order does not change what Jamf Pro stores. The provider keeps the order you wrote, so moving an entry past one with a different script ID or priority plans one update that changes nothing in Jamf Pro, and the next plan is empty."
+	packagesOrderNote = "The same package may be listed more than once. " +
+		"Jamf Pro stores the list sorted by package name; entries for the same package keep the order written. " +
+		"Writing the list in another order does not change what Jamf Pro stores. The provider keeps the order you wrote, so moving an entry past a different package plans one update that changes nothing in Jamf Pro, and the next plan is empty."
+)
+
+// insertionOrderNote describes a policy list Jamf Pro stores in the order
+// sent, repeats included: printers, dock items and directory bindings, each
+// wire-probed 2026-11-11 by writing ids 0,1 and then 1,0,1 through PUT
+// /policies/id/{id} and reading them back in that order (issue #568).
+func insertionOrderNote(item string) string {
+	return "The same " + item + " may be listed more than once. Jamf Pro keeps the order written, so reordering the list plans an update."
 }
 
 // scriptItemAttributes is the attribute set of one script assignment, shared by the flat

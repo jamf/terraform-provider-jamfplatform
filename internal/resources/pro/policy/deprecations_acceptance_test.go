@@ -139,9 +139,9 @@ func TestAccPolicyResource_DeprecatedWrappersMigrateToFlatAttributes(t *testing.
 			{
 				Config: policyConfigDeprecatedWrappers(suffix),
 				ConfigStateChecks: []statecheck.StateCheck{
-					statecheck.ExpectKnownValue(addr, tfjsonpath.New("scripts").AtMapKey("scripts"), knownvalue.SetSizeExact(1)),
-					statecheck.ExpectKnownValue(addr, tfjsonpath.New("printers").AtMapKey("printers"), knownvalue.SetSizeExact(1)),
-					statecheck.ExpectKnownValue(addr, tfjsonpath.New("dock_items").AtMapKey("dock_items"), knownvalue.SetSizeExact(1)),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("scripts").AtMapKey("scripts"), knownvalue.ListSizeExact(1)),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("printers").AtMapKey("printers"), knownvalue.ListSizeExact(1)),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("dock_items").AtMapKey("dock_items"), knownvalue.ListSizeExact(1)),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("general").AtMapKey("date_time_limitations").AtMapKey("activation_date"), knownvalue.StringExact("2026-02-03 04:05:06")),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("script_assignments"), knownvalue.Null()),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("printer_assignments"), knownvalue.Null()),
@@ -162,10 +162,10 @@ func TestAccPolicyResource_DeprecatedWrappersMigrateToFlatAttributes(t *testing.
 					},
 				},
 				ConfigStateChecks: []statecheck.StateCheck{
-					statecheck.ExpectKnownValue(addr, tfjsonpath.New("script_assignments"), knownvalue.SetSizeExact(1)),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("script_assignments"), knownvalue.ListSizeExact(1)),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("script_assignments").AtSliceIndex(0).AtMapKey("parameter_4"), knownvalue.StringExact("tf-acc-p4")),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("printer_assignments").AtSliceIndex(0).AtMapKey("action"), knownvalue.StringExact("Map")),
-					statecheck.ExpectKnownValue(addr, tfjsonpath.New("dock_item_assignments"), knownvalue.SetSizeExact(1)),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("dock_item_assignments"), knownvalue.ListSizeExact(1)),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("server_side_limitations").AtMapKey("expiration_date"), knownvalue.StringExact("2027-02-03 04:05:06")),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("client_side_limitations").AtMapKey("no_execute_on"), knownvalue.SetSizeExact(2)),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("scripts"), knownvalue.Null()),

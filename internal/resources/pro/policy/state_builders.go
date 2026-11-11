@@ -5,6 +5,7 @@ package policy
 
 import (
 	"context"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -587,6 +588,16 @@ func flattenPolicySelfService(ss *proclassic.PolicySelfService, state *PolicySel
 	}
 }
 
+// flattenPolicyPackageConfiguration maps the wire <package_configuration>
+// block onto the model.
+//
+// Jamf Pro returns the packages sorted by package name whatever order they were
+// written in, keeps every repeat, and keeps the written order among entries for
+// one package (wire-probed 2026-11-11, issue #568). The wire list is therefore
+// aligned to the prior list (the plan on Create/Update, prior state on Read) by
+// package id, so a configuration written in any order reads back in that order.
+// Order across packages carries no meaning on the server: rewriting the same
+// entries in another order left the policy byte-identical.
 func flattenPolicyPackageConfiguration(pc *proclassic.PolicyPackageConfiguration, state *PolicyPackagesModel) {
 	state.DistributionPoint = helpers.ReconcileOptionalStringPointerTrimmed(pc.DistributionPoint, state.DistributionPoint)
 
@@ -595,8 +606,10 @@ func flattenPolicyPackageConfiguration(pc *proclassic.PolicyPackageConfiguration
 		return
 	}
 	items := *pc.Packages.Package
+	order, _ := helpers.AlignToPriorFunc(items, state.Packages, wirePackageKey, priorPackageKey, packageFitsPrior)
 	out := make([]PolicyPackageItemModel, 0, len(items))
-	for _, p := range items {
+	for _, n := range order {
+		p := items[n]
 		out = append(out, PolicyPackageItemModel{
 			ID:            helpers.StringValueFromIntPtr(p.ID),
 			Name:          helpers.StringPointerValueOrNull(p.Name),
@@ -609,31 +622,61 @@ func flattenPolicyPackageConfiguration(pc *proclassic.PolicyPackageConfiguration
 	state.Packages = out
 }
 
+// wirePackageKey is the alignment key of a wire package: its id, the only
+// thing that ties two entries on the server's name sort.
+func wirePackageKey(p proclassic.PolicyPackageConfigurationPackagesPackageItem) string {
+	return helpers.StringValueFromIntPtr(p.ID).ValueString()
+}
+
+// priorPackageKey is wirePackageKey for a prior element; an unknown id has no
+// key yet.
+func priorPackageKey(p PolicyPackageItemModel) (string, bool) {
+	if !helpers.IsConfiguredValue(p.ID) {
+		return "", false
+	}
+	return p.ID.ValueString(), true
+}
+
+// packageFitsPrior reports whether a wire package can be the prior element
+// whose id is not yet known: every setting the prior element already knows
+// must agree.
+func packageFitsPrior(w proclassic.PolicyPackageConfigurationPackagesPackageItem, p PolicyPackageItemModel) bool {
+	return knownIDAgrees(p.ID, w.ID) &&
+		knownStringAgrees(p.Action, w.Action) &&
+		knownBoolAgrees(p.Fut, w.Fut) &&
+		knownBoolAgrees(p.Feu, w.Feu) &&
+		knownBoolAgrees(p.UpdateAutorun, w.UpdateAutorun)
+}
+
 // flattenPolicyScripts maps the wire <scripts> block onto the model.
 //
+// Jamf Pro returns the scripts sorted by script id and then by priority, After
+// ahead of Before, keeps every repeat, and keeps the written order among
+// entries sharing both, parameters included (wire-probed 2026-11-11, issue
+// #568: C A C A A is stored A A A C C). The wire list is aligned to the prior
+// list (the plan on Create/Update, prior state on Read) on that id and
+// priority, so a configuration written in any order reads back in that order,
+// and each wire entry is paired with the prior element it was written as.
+// Order across those groups carries no meaning on the server: rewriting the
+// same entries in three other orders left the policy byte-identical.
+//
 // Jamf Pro echoes an unset parameter and one written as "" identically, as an
-// empty element, so each parameter is reconciled against the prior element for
-// the same script: an authored "" survives the read rather than collapsing to
-// null, which the post-apply consistency check rejects. Prior elements are
-// paired by script id in order, since one script may be assigned more than
-// once.
+// empty element, so each parameter is reconciled against the paired prior
+// element: an authored "" survives the read rather than collapsing to null,
+// which the post-apply consistency check rejects.
 func flattenPolicyScripts(sc *proclassic.PolicyScripts, prior []PolicyScriptItemModel) []PolicyScriptItemModel {
 	if sc.Script == nil {
 		return nil
 	}
-	priorByID := make(map[string][]PolicyScriptItemModel, len(prior))
-	for _, prev := range prior {
-		if helpers.IsConfiguredValue(prev.ID) {
-			priorByID[prev.ID.ValueString()] = append(priorByID[prev.ID.ValueString()], prev)
-		}
-	}
 	items := *sc.Script
+	order, priorIdx := helpers.AlignToPriorFunc(items, prior, wireScriptKey, priorScriptKey, scriptFitsPrior)
 	out := make([]PolicyScriptItemModel, 0, len(items))
-	for _, s := range items {
+	for n, i := range order {
+		s := items[i]
 		id := helpers.StringValueFromIntPtr(s.ID)
 		var prev PolicyScriptItemModel
-		if queue := priorByID[id.ValueString()]; len(queue) > 0 {
-			prev, priorByID[id.ValueString()] = queue[0], queue[1:]
+		if j := priorIdx[n]; j >= 0 {
+			prev = prior[j]
 		}
 		out = append(out, PolicyScriptItemModel{
 			ID:          id,
@@ -652,6 +695,67 @@ func flattenPolicyScripts(sc *proclassic.PolicyScripts, prior []PolicyScriptItem
 	return out
 }
 
+// scriptKey joins a script id and priority into the alignment key: the two
+// fields Jamf Pro sorts a policy's scripts on. Jamf Pro echoes priority in the
+// case it was sent (wire-probed 2026-11-11), so the plan's value and the wire's
+// compare exactly.
+func scriptKey(id, priority string) string {
+	return id + "\x00" + priority
+}
+
+// wireScriptKey is scriptKey for a wire script.
+func wireScriptKey(s proclassic.PolicyScriptsScriptItem) string {
+	return scriptKey(helpers.StringValueFromIntPtr(s.ID).ValueString(), helpers.DerefString(s.Priority))
+}
+
+// priorScriptKey is scriptKey for a prior element; an unknown id or priority
+// has no key yet.
+func priorScriptKey(s PolicyScriptItemModel) (string, bool) {
+	if !helpers.IsConfiguredValue(s.ID) || !helpers.IsConfiguredValue(s.Priority) {
+		return "", false
+	}
+	return scriptKey(s.ID.ValueString(), s.Priority.ValueString()), true
+}
+
+// scriptFitsPrior reports whether a wire script can be the prior element whose
+// key is not yet known: the id, priority and every parameter the prior element
+// already knows must agree, so two new scripts that differ only in their
+// parameters are not handed each other's values.
+func scriptFitsPrior(w proclassic.PolicyScriptsScriptItem, p PolicyScriptItemModel) bool {
+	return knownIDAgrees(p.ID, w.ID) &&
+		knownStringAgrees(p.Priority, w.Priority) &&
+		knownTrimmedStringAgrees(p.Parameter4, w.Parameter4) &&
+		knownTrimmedStringAgrees(p.Parameter5, w.Parameter5) &&
+		knownTrimmedStringAgrees(p.Parameter6, w.Parameter6) &&
+		knownTrimmedStringAgrees(p.Parameter7, w.Parameter7) &&
+		knownTrimmedStringAgrees(p.Parameter8, w.Parameter8) &&
+		knownTrimmedStringAgrees(p.Parameter9, w.Parameter9) &&
+		knownTrimmedStringAgrees(p.Parameter10, w.Parameter10) &&
+		knownTrimmedStringAgrees(p.Parameter11, w.Parameter11)
+}
+
+// knownStringAgrees reports whether a wire string matches a prior value,
+// treating a null or unknown prior as matching anything.
+func knownStringAgrees(prior types.String, wire *string) bool {
+	return !helpers.IsConfiguredValue(prior) || prior.ValueString() == helpers.DerefString(wire)
+}
+
+// knownTrimmedStringAgrees is knownStringAgrees for a field Jamf Pro stores
+// trimmed.
+func knownTrimmedStringAgrees(prior types.String, wire *string) bool {
+	return !helpers.IsConfiguredValue(prior) || strings.TrimSpace(prior.ValueString()) == strings.TrimSpace(helpers.DerefString(wire))
+}
+
+// knownIDAgrees is knownStringAgrees for a numeric wire id.
+func knownIDAgrees(prior types.String, wire *int) bool {
+	return !helpers.IsConfiguredValue(prior) || prior.ValueString() == helpers.StringValueFromIntPtr(wire).ValueString()
+}
+
+// knownBoolAgrees is knownStringAgrees for a bool.
+func knownBoolAgrees(prior types.Bool, wire *bool) bool {
+	return !helpers.IsConfiguredValue(prior) || (wire != nil && *wire == prior.ValueBool())
+}
+
 // flattenPolicyPrinters maps the wire <printers> block onto the model.
 //
 // The wire's <leave_existing_default> is not modelled. It is a dead element:
@@ -662,6 +766,10 @@ func flattenPolicyScripts(sc *proclassic.PolicyScripts, prior []PolicyScriptItem
 // persists is per printer, as printers[].make_default, which does round-trip.
 // The attribute was removed in schema v2; see UpgradeState. Wire-probed against
 // 11.31.1 on 2026-09-07; see issue #387.
+//
+// Printers are mapped in wire order. Jamf Pro stores them in the order written,
+// repeats included (wire-probed 2026-11-11, issue #568), so a reorder made in
+// the admin UI surfaces as drift rather than being aligned away.
 func flattenPolicyPrinters(pr *proclassic.PolicyPrinters) []PolicyPrinterItemModel {
 	if pr.Printer == nil {
 		return nil
@@ -698,6 +806,11 @@ func printerActionFromWire(action *string) types.String {
 	}
 }
 
+// flattenPolicyDockItems maps the wire <dock_items> block onto the model in
+// wire order. Jamf Pro stores dock items in the order written, repeats
+// included (wire-probed 2026-11-11, issue #568), so the order is meaningful
+// and is not aligned to the prior list: a reorder made in the admin UI
+// surfaces as drift.
 func flattenPolicyDockItems(d *proclassic.PolicyDockItems) []PolicyDockItemModel {
 	if d.DockItem == nil {
 		return nil
@@ -727,6 +840,9 @@ func flattenPolicyDockItems(d *proclassic.PolicyDockItems) []PolicyDockItemModel
 // authored "" survives the read. Collapsing it to null tripped the post-apply
 // consistency check, which Terraform reports against the whole local_accounts
 // list as a sensitive attribute because each element carries a password (#445).
+//
+// Directory bindings are mapped in wire order: Jamf Pro stores them in the
+// order written, repeats included (wire-probed 2026-11-11, issue #568).
 func flattenPolicyAccountMaintenance(am *proclassic.PolicyAccountMaintenance, state *PolicyResourceModel, includeUnmanaged bool) {
 	if includeUnmanaged {
 		if state.LocalAccounts == nil && am.Accounts != nil && am.Accounts.Account != nil {

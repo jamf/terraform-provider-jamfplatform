@@ -9,6 +9,7 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers/listhydration"
 )
 
@@ -28,6 +29,23 @@ func TestListHydration_PolicyResourceModel(t *testing.T) {
 	if got := listhydration.NilBlocks(state, deprecatedBlocksLeftNullByConfigGeneration...); len(got) != 0 {
 		t.Errorf("list path left blocks null: %v", got)
 	}
+}
+
+// TestListHydration_RepeatedEntriesSetCleanly is the exact path issue #568
+// broke: config generation hydrates a policy that lists the same script,
+// package, printer, dock item and directory binding more than once, and the
+// hydrated model must set into the resource schema without a "Duplicate Set
+// Element" diagnostic, keeping every repeat.
+func TestListHydration_RepeatedEntriesSetCleanly(t *testing.T) {
+	state := &PolicyResourceModel{Timeouts: helpers.NewResourceTimeoutsNullValue(policyTimeoutAttributeTypes)}
+	if diags := assignPolicyResourceModel(context.Background(), state, repeatedEntriesPolicy(), true); diags.HasError() {
+		t.Fatalf("assign: %v", diags)
+	}
+	if state.Scripts != nil || state.Printers != nil || state.DockItems != nil {
+		t.Error("config generation must populate the flat attributes, not the deprecated wrappers")
+	}
+	assertEveryRepeatKept(t, state.ScriptAssignments, state.Packages.Packages, state.PrinterAssignments, state.DockItemAssignments, state.DirectoryBindings)
+	setPolicyState(t, state)
 }
 
 var deprecatedBlocksLeftNullByConfigGeneration = []string{

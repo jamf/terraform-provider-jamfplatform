@@ -105,10 +105,19 @@ func TestPolicyResource_FlatAssignmentsShareItemSchemaWithWrapper(t *testing.T) 
 	}
 	for _, p := range pairs {
 		wrapper := s.Attributes[p.wrapper].(rschema.SingleNestedAttribute)
-		oldSet := wrapper.Attributes[p.inner].(rschema.SetNestedAttribute)
-		newSet := s.Attributes[p.flat].(rschema.SetNestedAttribute)
-		if !reflect.DeepEqual(attrNames(oldSet.NestedObject.Attributes), attrNames(newSet.NestedObject.Attributes)) {
+		oldList, ok := wrapper.Attributes[p.inner].(rschema.ListNestedAttribute)
+		if !ok {
+			t.Fatalf("%s.%s must be a list, like %s (issue #568), got %T", p.wrapper, p.inner, p.flat, wrapper.Attributes[p.inner])
+		}
+		newList, ok := s.Attributes[p.flat].(rschema.ListNestedAttribute)
+		if !ok {
+			t.Fatalf("%s must be a list (issue #568), got %T", p.flat, s.Attributes[p.flat])
+		}
+		if !reflect.DeepEqual(attrNames(oldList.NestedObject.Attributes), attrNames(newList.NestedObject.Attributes)) {
 			t.Errorf("%s and %s must expose the same item attributes", p.wrapper, p.flat)
+		}
+		if !oldList.NestedObject.Type().Equal(newList.NestedObject.Type()) {
+			t.Errorf("%s and %s must share one element type", p.wrapper, p.flat)
 		}
 	}
 	general := s.Attributes["general"].(rschema.SingleNestedAttribute)
