@@ -11,8 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
-// ReferenceIDClearValue is the value that clears a Jamf Pro category or site
-// reference on every endpoint ClearableReferenceID guards.
+// ReferenceIDClearValue is the value that clears a Jamf Pro category, site or
+// smart group reference on every endpoint ClearableReferenceID guards.
 const ReferenceIDClearValue = "-1"
 
 // clearableReferenceIDValidator accepts a positive Jamf Pro object ID or the
@@ -21,18 +21,18 @@ type clearableReferenceIDValidator struct {
 	noun string
 }
 
-// ClearableReferenceID returns a validator.String for a Jamf Pro category or
-// site reference whose clear value is "-1". noun names the referenced object
-// in the diagnostic ("category", "site").
+// ClearableReferenceID returns a validator.String for a Jamf Pro category, site
+// or smart group reference whose clear value is "-1". noun names the
+// referenced object in the diagnostic ("category", "site", "smart group").
 //
 // "-1" is the only value that clears the reference on every endpoint the
-// validator is wired onto, wire-probed for issue #567. The other candidates
+// validator is wired onto, wire-probed for issue #567 on 2026-11-11. The other candidates
 // fail at apply time, each differently: "" draws a 500 from /pro/v1/scripts
 // and a 400 INVALID_ID from /pro/v1/app-installers/deployments and
 // /pro/v1/packages, and on the classic resources the input builders drop it,
 // so the old value is kept and the apply ends in "Provider produced
-// inconsistent result after apply". "0" draws a 400 or a 409 ("No match found
-// for category 0", "Problem with site ID"), except on /pro/v1/scripts, which
+// inconsistent result after apply". "0" draws a 400 INVALID_ID or a 409 ("No
+// match found for category 0", "Problem with site ID"), except on /pro/v1/scripts, which
 // stores the literal "0". So everything but a positive decimal integer and
 // "-1" is refused at plan time, with a diagnostic naming "-1".
 //

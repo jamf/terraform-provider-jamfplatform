@@ -201,9 +201,10 @@ func (r *AppInstallerResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"smart_group_id": schema.StringAttribute{
-				MarkdownDescription: "Smart computer group ID scoping the deployment. Omit to leave the current value untouched; set `-1` to clear it.",
+				MarkdownDescription: "Smart computer group ID scoping the deployment. Set `-1` to clear the smart group; Jamf Pro accepts that only while `enabled` is `false`. Removing the attribute from the configuration leaves the current value untouched; it does not clear the smart group.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("smart group")},
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"install_predefined_config_profiles": schema.BoolAttribute{

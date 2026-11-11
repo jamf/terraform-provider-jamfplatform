@@ -175,7 +175,7 @@ Optional:
 - `category_id` (String) Jamf Pro category ID. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.
 - `deployment_type` (String) Install method. One of `Make Available in Self Service` or `Install Automatically/Prompt Users to Install`. Server-defaults to `Make Available in Self Service` on create. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `is_free` (Boolean) Whether the app is free. Server-defaults to false on create. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `site_id` (String) Jamf Pro site ID scoping the app. Use `-1` for "No site". Omit to leave the current value untouched.
+- `site_id` (String) Jamf Pro site ID scoping the app. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.
 
 Read-Only:
 

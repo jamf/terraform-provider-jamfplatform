@@ -162,7 +162,7 @@ func (r *EbookResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 						MarkdownDescription: "Category display name. Returned by Jamf Pro; not user-settable.",
 						Computed:            true,
 					},
-					"site_id": optComputedString("Jamf Pro site ID scoping the ebook. Omit to leave the current value untouched; set `-1` to clear the site."),
+					"site_id": optComputedString("Jamf Pro site ID scoping the ebook. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.", commonvalidators.ClearableReferenceID("site")),
 					"site_name": schema.StringAttribute{
 						// No UseStateForUnknown: site_name is derived from site_id.
 						MarkdownDescription: "Site display name. Returned by Jamf Pro; not user-settable.",

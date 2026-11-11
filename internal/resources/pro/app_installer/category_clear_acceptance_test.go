@@ -102,3 +102,77 @@ func TestAccResource_ProAppInstaller_CategoryAndSiteClear(t *testing.T) {
 		},
 	})
 }
+
+// TestAccResource_ProAppInstaller_SmartGroupClear proves "-1" is the clear
+// value for smart_group_id (#567): "" and "0" are refused at plan time, "-1"
+// clears the smart group on the server, and the cleared state plans empty.
+// Jamf Pro answers "" and "0" with 400 INVALID_ID, and refuses "-1" while the
+// deployment is enabled, so the deployment is disabled in the same apply that
+// clears the group. It has no site, because a site-scoped deployment can only
+// reference a smart group in that site.
+func TestAccResource_ProAppInstaller_SmartGroupClear(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	suffix := testhelpers.RunSuffix()
+	name := "tf-acc-app-installer-sgclear-" + suffix
+	c := pro.New(testhelpers.NewAcceptanceClient(t))
+
+	config := func(enabled bool, smartGroupID string) string {
+		return groupFixtures(suffix) + fmt.Sprintf(`
+			resource "jamfplatform_pro_app_installer" "test" {
+				name            = %[1]q
+				enabled         = %[2]t
+				app_title_name  = %[3]s
+				deployment_type = "SELF_SERVICE"
+				update_behavior = "AUTOMATIC"
+				smart_group_id  = %[4]s
+			}
+		`, name, enabled, titleNameRef, smartGroupID)
+	}
+	live := func(want string) resource.TestCheckFunc {
+		return testhelpers.CheckLiveObject(resourceAddr,
+			func(ctx context.Context, id string) (*pro.AppTitleDeploymentRead, error) {
+				return c.GetAppInstallerDeploymentV1(ctx, id)
+			},
+			func(d *pro.AppTitleDeploymentRead) error {
+				return testhelpers.RequireEqual("smartGroupId", want, d.SmartGroupID)
+			})
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAppInstallerDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config:      config(false, `""`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Invalid smart group ID`),
+			},
+			{
+				Config:      config(false, `"0"`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Invalid smart group ID`),
+			},
+			{
+				Config: config(true, "jamfplatform_device_group.grp.jamf_pro_id"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPair(resourceAddr, "smart_group_id", "jamfplatform_device_group.grp", "jamf_pro_id"),
+					resource.TestCheckResourceAttr(resourceAddr, "enabled", "true"),
+				),
+			},
+			{
+				Config: config(false, `"-1"`),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceAddr, "smart_group_id", "-1"),
+					resource.TestCheckResourceAttr(resourceAddr, "enabled", "false"),
+					live("-1"),
+				),
+			},
+			{
+				Config: config(false, `"-1"`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+		},
+	})
+}

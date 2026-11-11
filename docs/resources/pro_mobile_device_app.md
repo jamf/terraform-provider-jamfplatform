@@ -206,7 +206,7 @@ Optional:
 - `prevent_backup_of_app_data` (Boolean) Prevent the app's data from being backed up to iCloud / iTunes. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `remove_app_when_mdm_profile_is_removed` (Boolean) Remove the app from a device when its MDM profile is removed. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `require_network_tethered` (Boolean) Require a network-tethered connection to install. Relevant for automatically-deployed apps. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `site_id` (String) Jamf Pro site ID scoping the app. Use `-1` for "No site". Omit to leave the current value untouched.
+- `site_id` (String) Jamf Pro site ID scoping the app. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.
 - `take_over_management` (Boolean) Take over management of the app if it is already installed unmanaged. Omit to leave the current value untouched; set `true`/`false` to change it.
 
 Read-Only:

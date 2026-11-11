@@ -155,7 +155,7 @@ func (r *MacAppResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						MarkdownDescription: "Category display name. Returned by Jamf Pro; not user-settable.",
 						Computed:            true,
 					},
-					"site_id": optComputedString("Jamf Pro site ID scoping the app. Use `-1` for \"No site\". Omit to leave the current value untouched."),
+					"site_id": optComputedString("Jamf Pro site ID scoping the app. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.", commonvalidators.ClearableReferenceID("site")),
 					"site_name": schema.StringAttribute{
 						// No UseStateForUnknown: site_name is derived from site_id
 						// (same rationale as category_name above).

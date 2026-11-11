@@ -7,6 +7,7 @@ package mac_app_store_app_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"testing"
@@ -18,22 +19,26 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers"
 )
 
-// TestAccResource_ProMacApp_CategoryClear proves "-1" is the clear value for
-// general.category_id (#567): "" is refused at plan time, "-1" clears the
-// category on the server, and the cleared state plans empty. Before the
-// plan-time refusal, "" was dropped from the request, Jamf Pro kept the old
-// category, and the apply failed the post-apply consistency check.
-func TestAccResource_ProMacApp_CategoryClear(t *testing.T) {
+// TestAccResource_ProMacApp_CategoryAndSiteClear proves "-1" is the clear
+// value for general.category_id and general.site_id (#567): "" and "0" are
+// refused at plan time, "-1" clears both on the server, and the cleared state
+// plans empty. The input builder drops "", and Jamf Pro keeps the old value
+// when the element is omitted, so before the plan-time refusal "" failed the
+// post-apply consistency check; "0" draws a 409.
+func TestAccResource_ProMacApp_CategoryAndSiteClear(t *testing.T) {
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-pro-macapp-catclear-" + suffix
 	c := proclassic.New(testhelpers.NewAcceptanceClient(t))
 
-	config := func(categoryID string) string {
+	config := func(categoryID, siteID string) string {
 		return fmt.Sprintf(`
 			resource "jamfplatform_pro_category" "clear" {
 				name     = "tf-acc-macapp-catclear-%[1]s"
 				priority = 9
+			}
+			resource "jamfplatform_pro_site" "clear" {
+				name = "tf-acc-macapp-siteclear-%[1]s"
 			}
 			resource "jamfplatform_pro_mac_app_store_app" "test" {
 				general = {
@@ -42,20 +47,25 @@ func TestAccResource_ProMacApp_CategoryClear(t *testing.T) {
 					bundle_id   = "com.example.tfacc.macapp.catclear"
 					url         = "https://apps.apple.com/app/id000000001"
 					category_id = %[3]s
+					site_id     = %[4]s
 				}
 			}
-		`, suffix, name, categoryID)
+		`, suffix, name, categoryID, siteID)
 	}
-	liveCategory := func(want int) resource.TestCheckFunc {
+	live := func(wantCategory, wantSite int) resource.TestCheckFunc {
 		return testhelpers.CheckLiveObject(macAppResourceAddr,
 			func(ctx context.Context, id string) (*proclassic.MacApplication, error) {
 				return c.GetMacApplicationByID(ctx, id)
 			},
 			func(a *proclassic.MacApplication) error {
-				if a.General == nil || a.General.Category == nil {
-					return fmt.Errorf("general.category: absent")
+				g := a.General
+				if g == nil || g.Category == nil || g.Site == nil {
+					return fmt.Errorf("general.category or general.site: absent")
 				}
-				return testhelpers.RequireEqual("general.category.id", want, testhelpers.Deref(a.General.Category.ID))
+				return errors.Join(
+					testhelpers.RequireEqual("general.category.id", wantCategory, testhelpers.Deref(g.Category.ID)),
+					testhelpers.RequireEqual("general.site.id", wantSite, testhelpers.Deref(g.Site.ID)),
+				)
 			})
 	}
 
@@ -64,25 +74,38 @@ func TestAccResource_ProMacApp_CategoryClear(t *testing.T) {
 		CheckDestroy:             testAccCheckMacAppDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config:      config(`""`),
+				Config:      config(`""`, `"-1"`),
 				PlanOnly:    true,
 				ExpectError: regexp.MustCompile(`Invalid category ID`),
 			},
 			{
-				Config: config("jamfplatform_pro_category.clear.id"),
+				Config:      config(`"-1"`, `""`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Invalid site ID`),
+			},
+			{
+				Config:      config(`"-1"`, `"0"`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Invalid site ID`),
+			},
+			{
+				Config: config("jamfplatform_pro_category.clear.id", "jamfplatform_pro_site.clear.id"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrPair(macAppResourceAddr, "general.category_id", "jamfplatform_pro_category.clear", "id"),
+					resource.TestCheckResourceAttrPair(macAppResourceAddr, "general.site_id", "jamfplatform_pro_site.clear", "id"),
 				),
 			},
 			{
-				Config: config(`"-1"`),
+				Config: config(`"-1"`, `"-1"`),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(macAppResourceAddr, "general.category_id", "-1"),
-					liveCategory(-1),
+					resource.TestCheckResourceAttr(macAppResourceAddr, "general.site_id", "-1"),
+					resource.TestCheckNoResourceAttr(macAppResourceAddr, "general.site_name"),
+					live(-1, -1),
 				),
 			},
 			{
-				Config: config(`"-1"`),
+				Config: config(`"-1"`, `"-1"`),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
 				},
