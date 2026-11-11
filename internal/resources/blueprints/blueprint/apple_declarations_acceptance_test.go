@@ -387,8 +387,8 @@ func TestAccResource_Blueprint_AppleDeclarations_SchemaValidation(t *testing.T) 
 // the older component. It delivers identical declarations to the same devices with the same absence
 // of server-side validation, so leaving it unchecked would only move the silent failure.
 //
-// The diagnostic names the declaration type rather than an element index: custom_declarations backs
-// its declarations with a set, which has no stable position to address.
+// The diagnostic addresses the element, `declaration[n].payload`, as it does for apple_declarations:
+// custom_declarations backs its declarations with a list since issue #568.
 func TestAccResource_Blueprint_CustomDeclarations_SchemaValidation(t *testing.T) {
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
@@ -429,9 +429,10 @@ func TestAccResource_Blueprint_CustomDeclarations_SchemaValidation(t *testing.T)
 				PlanOnly:    true,
 			},
 			{
-				// The finding must identify which declaration it came from, since the path cannot.
+				// The finding is attributed through its path, to the payload line of the declaration it
+				// came from, so the message carries no declaration name.
 				Config:      config(`jsonencode({ Enabled = "yes" })`),
-				ExpectError: regexp.MustCompile(`In declaration com\.apple\.configuration`),
+				ExpectError: regexp.MustCompile(`(?s)payload = jsonencode\(\{ Enabled = "yes" \}\).*Apple declares this as a\s+boolean`),
 				PlanOnly:    true,
 			},
 			{
