@@ -111,7 +111,7 @@ Required:
 Optional:
 
 - `author` (String) Ebook author. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
-- `category_id` (String) Jamf Pro category ID. Omit to leave the current value untouched; set `-1` to clear the category.
+- `category_id` (String) Jamf Pro category ID. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.
 - `deploy_as_managed` (Boolean) Make the ebook managed when possible (UI "Make eBook managed when possible"). Omit to leave the current value untouched; set `true`/`false` to change it.
 - `deployment_type` (String) Distribution Method. One of `Make Available in Self Service` or `Install Automatically/Prompt Users to Install`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `file_type` (String) File Type. Set it for an in-house ebook: `PDF`, `EPUB` or `IBOOKS`, in any letter case. Jamf Pro reports an iBooks file as `IBOOK` but saves a configured `IBOOK` as `Unknown`, so set `IBOOKS`. For an App Store ebook, leave it unset: Jamf Pro resolves it from the Apple Books URL and returns it. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.

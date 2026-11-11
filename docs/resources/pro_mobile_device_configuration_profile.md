@@ -156,13 +156,13 @@ Required:
 
 Optional:
 
-- `category_id` (String) Jamf Pro category ID. Use `-1` (default) for "no category". Omit to leave the current value untouched.
+- `category_id` (String) Jamf Pro category ID. Defaults to `-1` (no category) on create. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.
 - `description` (String) Free-text description of the profile. It doubles as the Self Service description, because Jamf Pro stores one for both. To set those separately, use the profile's Options and Self Service tabs and leave this attribute unset. Omit to leave the current value untouched.
 - `distribution_method` (String) How the profile reaches devices. `Install Automatically` pushes via MDM; `Make Available in Self Service` lists the profile in Self Service so users install it manually. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `level` (String) Profile delivery level. Mirrors the admin UI dropdown: `Device Level` (default) or `User Level`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `redeploy_days_before_certificate_expires` (Number) Number of days before a certificate in the profile expires that should trigger redeployment. `0` disables certificate-expiry redeployment. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
 - `redeploy_on_update` (String) Redeployment behaviour when the profile changes. Valid values: `Newly Assigned` (push to newly-scoped devices only) or `All` (push to every scoped device on the next update). Jamf Pro does not echo this value back after it is set, so the provider treats it as write-only: once you set it, later refreshes will not snap it back to a default. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
-- `site_id` (String) Jamf Pro site ID. Use `-1` (default) for "no site". Omit to leave the current value untouched.
+- `site_id` (String) Jamf Pro site ID. Defaults to `-1` (no site) on create. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.
 
 Read-Only:
 

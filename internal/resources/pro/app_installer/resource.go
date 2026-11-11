@@ -26,6 +26,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -186,15 +187,17 @@ func (r *AppInstallerResource) Schema(ctx context.Context, req resource.SchemaRe
 				Computed:            true,
 			},
 			"category_id": schema.StringAttribute{
-				MarkdownDescription: "Jamf Pro category ID for the deployment. Omit to leave the current value untouched; set `-1` to clear it.",
+				MarkdownDescription: "Jamf Pro category ID for the deployment. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("category")},
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"site_id": schema.StringAttribute{
-				MarkdownDescription: "Jamf Pro site ID scoping the deployment. Omit to leave the current value untouched; set `-1` to clear it.",
+				MarkdownDescription: "Jamf Pro site ID scoping the deployment. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("site")},
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"smart_group_id": schema.StringAttribute{

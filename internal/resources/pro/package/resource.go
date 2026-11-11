@@ -23,6 +23,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -109,9 +110,10 @@ func (r *PackageResource) Schema(ctx context.Context, req resource.SchemaRequest
 				},
 			},
 			"category_id": schema.StringAttribute{
-				MarkdownDescription: "**\"Category\"** in the Jamf Pro admin UI. Defaults to `\"-1\"` (None).",
+				MarkdownDescription: "**\"Category\"** in the Jamf Pro admin UI. Defaults to `-1` (no category) on create. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("category")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},

@@ -66,7 +66,7 @@ resource "jamfplatform_pro_script" "cleanup_temp" {
 
 ### Optional
 
-- `category_id` (String) ID of the Jamf Pro category this script belongs to. Look it up via the `jamfplatform_pro_category` data source. Jamf Pro reports `-1` when the script has no category. Omit to leave the current value untouched; there is no blank-clear, so set a concrete value to change it.
+- `category_id` (String) ID of the Jamf Pro category this script belongs to. Look it up via the `jamfplatform_pro_category` data source. Jamf Pro reports `-1` when the script has no category. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.
 - `info` (String) Informational text shown to end users (e.g. in Self Service) describing the script. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `notes` (String) Administrator-only notes about the script. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `os_requirements` (String) Comma-separated macOS versions the script supports (e.g. `13.0.x,14.0.x`). Empty allows all. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.

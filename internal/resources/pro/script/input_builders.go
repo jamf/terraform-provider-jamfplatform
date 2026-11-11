@@ -23,7 +23,9 @@ import (
 // survives. TestAccResource_ProScript_SplitOwnership asserts that contract. Null
 // reaches the builder only on Create, where there is no prior value to preserve.
 // An explicit "" is a known value, so it arrives as a pointer to the empty
-// string and clears the field — except on `categoryId`, which rejects it.
+// string and clears the field — except on `categoryId`, which answers "" with a
+// 500 and clears only on "-1". commonvalidators.ClearableReferenceID refuses ""
+// at plan time, so it never reaches this builder (#567).
 func buildScriptInput(plan ScriptResourceModel) *pro.Script {
 	return &pro.Script{
 		Name:           plan.Name.ValueString(),

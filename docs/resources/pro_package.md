@@ -139,7 +139,7 @@ resource "jamfplatform_pro_package" "meta_only" {
 ### Optional
 
 - `available_in_software_update` (Boolean) **"Install only if available in Software Update"** in the Jamf Pro admin UI. Defaults to `false`. This is not the separate OS-installer flag, which this resource does not expose.
-- `category_id` (String) **"Category"** in the Jamf Pro admin UI. Defaults to `"-1"` (None).
+- `category_id` (String) **"Category"** in the Jamf Pro admin UI. Defaults to `-1` (no category) on create. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.
 - `fill_existing_users` (Boolean) **"Fill existing user home directories (FEU)"** in the Jamf Pro admin UI. Defaults to `false`.
 - `fill_user_template` (Boolean) **"Fill user templates (FUT)"** in the Jamf Pro admin UI. Defaults to `false`.
 - `hash_type` (String) Hash algorithm for the package. One of `MD5`, `SHA_256`, `SHA_512`, `SHA3_512`. A record that has never had a file uploaded reads back `SHA_512`. Cannot be combined with `package_file_source` (a cloud distribution point upload sets this to `SHA3_512`).

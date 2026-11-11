@@ -190,7 +190,7 @@ Required:
 Optional:
 
 - `allow_user_to_delete` (Boolean) Allow the user to delete the managed app. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `category_id` (String) Jamf Pro category ID. Use `-1` for "No category". Omit to leave the current value untouched.
+- `category_id` (String) Jamf Pro category ID. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.
 - `deploy_as_managed_app` (Boolean) Deploy as a managed app (enables managed-app capabilities such as app configuration). Omit to leave the current value untouched; set `true`/`false` to change it.
 - `deploy_automatically` (Boolean) Automatically push the app to in-scope devices. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `external_url` (String) External / in-house hosting URL. Independent of the App Store URL; setting it flips `host_externally` to true server-side. Omit to leave the current value untouched.
