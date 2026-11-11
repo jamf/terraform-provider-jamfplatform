@@ -89,13 +89,13 @@ resource "jamfplatform_pro_app_installer" "self_service" {
 
 ### Optional
 
-- `category_id` (String) Jamf Pro category ID for the deployment. Omit to leave the current value untouched; set `-1` to clear it.
+- `category_id` (String) Jamf Pro category ID for the deployment. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.
 - `enabled` (Boolean) Whether the deployment is enabled. A deployment can only be enabled when `smart_group_id` is set to a real smart group (not `-1`). Omit to leave the current value untouched; set `true`/`false` to change it.
 - `install_predefined_config_profiles` (Boolean) Whether Jamf Pro installs the title's predefined configuration profiles alongside the app. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `notification_settings` (Attributes) End-user notification presentation (the "End user experience" tab). Supply the block to manage notifications; omit it to leave the Jamf Pro defaults in place. Each field is independent: omit a field to keep its Jamf Pro default. Message fields must not be blank, and the interval and delay values must be positive, when set. (see [below for nested schema](#nestedatt--notification_settings))
 - `self_service_settings` (Attributes) Self Service presentation. Supply the block to manage how the deployment appears in Self Service; omit it to leave the Jamf Pro defaults in place. Terraform replaces every field on each apply, so set all the fields you care about. Jamf Pro accepts a Self Service block even for an `INSTALL_AUTOMATICALLY` deployment. (see [below for nested schema](#nestedatt--self_service_settings))
-- `site_id` (String) Jamf Pro site ID scoping the deployment. Omit to leave the current value untouched; set `-1` to clear it.
-- `smart_group_id` (String) Smart computer group ID scoping the deployment. Omit to leave the current value untouched; set `-1` to clear it.
+- `site_id` (String) Jamf Pro site ID scoping the deployment. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.
+- `smart_group_id` (String) Smart computer group ID scoping the deployment. Set `-1` to clear the smart group; Jamf Pro accepts that only while `enabled` is `false`. Removing the attribute from the configuration leaves the current value untouched; it does not clear the smart group.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 - `trigger_admin_notifications` (Boolean) Whether Jamf Pro logs event notifications for this app (raising administrator notifications). Defaults to off on create. Omit to leave the current value untouched; set `true`/`false` to change it.
 

@@ -32,6 +32,7 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -154,9 +155,9 @@ func (r *MobileAppResource) Schema(ctx context.Context, req resource.SchemaReque
 					"itunes_store_url":                       optComputedString("Canonical App Store (iTunes) URL. Setting it also populates the deprecated `url` mirror server-side. Omit to leave the current value untouched."),
 					"itunes_country_region":                  optComputedString("Two-letter App Store country/region code used to resolve store metadata. Omit to leave the current value untouched."),
 					"itunes_sync_time":                       optComputedInt64("App Store sync time as a Unix epoch. Maintained by Jamf Pro."),
-					"category_id":                            optComputedString("Jamf Pro category ID. Use `-1` for \"No category\". Omit to leave the current value untouched."),
+					"category_id":                            optComputedString("Jamf Pro category ID. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.", commonvalidators.ClearableReferenceID("category")),
 					"category_name":                          mirrorString("Category display name. Returned by Jamf Pro; not user-settable.", planmodifiers.StringSource(path.MatchRoot("general").AtName("category_id"))),
-					"site_id":                                optComputedString("Jamf Pro site ID scoping the app. Use `-1` for \"No site\". Omit to leave the current value untouched."),
+					"site_id":                                optComputedString("Jamf Pro site ID scoping the app. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.", commonvalidators.ClearableReferenceID("site")),
 					"site_name":                              mirrorString("Site display name. Returned by Jamf Pro; not user-settable.", planmodifiers.StringSource(path.MatchRoot("general").AtName("site_id"))),
 					"make_available_after_install":           optComputedBool("Make the app available in Self Service after it is installed automatically. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"keep_description_and_icon_up_to_date":   optComputedBool("Keep the app description and icon in sync with the App Store listing. Omit to leave the current value untouched; set `true`/`false` to change it."),
@@ -323,12 +324,13 @@ func (r *MobileAppResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 // CRLF-only change to a no-op and restores nothing else, so
 // `plan -refresh=false` was never empty. This modifier carries a null prior
 // while the block exists and leaves it Unknown only when the block is new.
-func optComputedString(desc string) schema.StringAttribute {
+func optComputedString(desc string, v ...validator.String) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
 		PlanModifiers:       []planmodifier.String{planmodifiers.UseStateForUnknownInExistingBlockString()},
+		Validators:          v,
 	}
 }
 

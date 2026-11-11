@@ -318,13 +318,13 @@ func TestAccResource_ProAppInstaller_AutomaticInstallManual(t *testing.T) {
 	})
 }
 
-// NOTE: site_id is intentionally not acceptance-tested. It is plumbed and
-// round-trips (Optional+Computed, server default "-1"), but exercising it
-// requires a site-scoped deployment, and (a) a site-scoped deployment can only
+// site_id is covered only by TestAccResource_ProAppInstaller_CategoryAndSiteClear,
+// which keeps the deployment disabled (so it needs no smart group) and sets
+// site_id back to "-1" before destroy. A site-scoped deployment can only
 // reference a smart group belonging to that site (Full-JSS fixture groups are
-// rejected as "not existing smart group"), and (b) the acceptance API client
-// lacks site-based privileges to delete site-scoped deployments (observed 403),
-// so such a test could not reliably clean up. Covered manually instead.
+// rejected as "not existing smart group"), and an acceptance API client without
+// site-based privileges has been refused (403) deleting a site-scoped
+// deployment, so no test destroys one while it is still site-scoped.
 
 // TestAccResource_ProAppInstaller_BadTitleName asserts the plan-time
 // app_title_name preflight surfaces an unknown title before apply.

@@ -33,6 +33,7 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -153,7 +154,7 @@ func (r *EbookResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 						"File Type. Set it for an in-house ebook: `PDF`, `EPUB` or `IBOOKS`, in any letter case. Jamf Pro reports an iBooks file as `IBOOK` but saves a configured `IBOOK` as `Unknown`, so set `IBOOKS`. For an App Store ebook, leave it unset: Jamf Pro resolves it from the Apple Books URL and returns it. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it.",
 					), stringvalidator.OneOfCaseInsensitive(ebookFileTypes...)),
 					"version":     optComputedString("Ebook version. User-set for an in-house ebook; returned by Jamf Pro for an App Store ebook. Omit to leave any existing value untouched (it is not cleared on update); set to `\"\"` to clear it."),
-					"category_id": optComputedString("Jamf Pro category ID. Omit to leave the current value untouched; set `-1` to clear the category."),
+					"category_id": optComputedString("Jamf Pro category ID. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.", commonvalidators.ClearableReferenceID("category")),
 					"category_name": schema.StringAttribute{
 						// No UseStateForUnknown: category_name is derived from
 						// category_id, so it must go Unknown (not pin the stale
@@ -161,7 +162,7 @@ func (r *EbookResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 						MarkdownDescription: "Category display name. Returned by Jamf Pro; not user-settable.",
 						Computed:            true,
 					},
-					"site_id": optComputedString("Jamf Pro site ID scoping the ebook. Omit to leave the current value untouched; set `-1` to clear the site."),
+					"site_id": optComputedString("Jamf Pro site ID scoping the ebook. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.", commonvalidators.ClearableReferenceID("site")),
 					"site_name": schema.StringAttribute{
 						// No UseStateForUnknown: site_name is derived from site_id.
 						MarkdownDescription: "Site display name. Returned by Jamf Pro; not user-settable.",
@@ -395,12 +396,13 @@ func (r *EbookResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanR
 // at top level and inside SetNested list elements — UseNonNullStateForUnknown
 // (not UseStateForUnknown) is required for nested-list growth (see
 // feedback_writeonly_nested_attrs).
-func optComputedString(desc string) schema.StringAttribute {
+func optComputedString(desc string, v ...validator.String) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
 		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+		Validators:          v,
 	}
 }
 

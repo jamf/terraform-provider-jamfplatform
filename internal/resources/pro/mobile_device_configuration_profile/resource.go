@@ -161,9 +161,10 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 						Validators:          []validator.String{validators.PlistDocument()},
 					},
 					"category_id": schema.StringAttribute{
-						MarkdownDescription: "Jamf Pro category ID. Use `-1` (default) for \"no category\". Omit to leave the current value untouched.",
+						MarkdownDescription: "Jamf Pro category ID. Defaults to `-1` (no category) on create. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.",
 						Optional:            true,
 						Computed:            true,
+						Validators:          []validator.String{validators.ClearableReferenceID("category")},
 						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 					},
 					"category_name": schema.StringAttribute{
@@ -173,9 +174,10 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 						Computed:            true,
 					},
 					"site_id": schema.StringAttribute{
-						MarkdownDescription: "Jamf Pro site ID. Use `-1` (default) for \"no site\". Omit to leave the current value untouched.",
+						MarkdownDescription: "Jamf Pro site ID. Defaults to `-1` (no site) on create. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.",
 						Optional:            true,
 						Computed:            true,
+						Validators:          []validator.String{validators.ClearableReferenceID("site")},
 						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 					},
 					"site_name": schema.StringAttribute{

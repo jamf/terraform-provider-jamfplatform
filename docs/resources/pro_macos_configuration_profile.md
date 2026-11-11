@@ -170,12 +170,12 @@ Required:
 
 Optional:
 
-- `category_id` (String) Jamf Pro category ID. Use `-1` (default) for "no category". Omit to leave the current value untouched.
+- `category_id` (String) Jamf Pro category ID. Defaults to `-1` (no category) on create. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.
 - `description` (String) Free-text description shown in the Jamf Pro admin UI. Omit to leave the current value untouched.
 - `distribution_method` (String) How the profile reaches devices. `Install Automatically` pushes via MDM; `Make Available in Self Service` lists the profile under the Self Service tab so users install it manually. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `level` (String) Profile delivery level. Mirrors the admin UI dropdown: `Computer Level` (default) or `User Level`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `redeploy_on_update` (String) Redeployment behaviour when the profile changes. Valid values: `Newly Assigned` (push to newly-scoped devices only) or `All` (push to every scoped device on the next update). Jamf Pro does not echo this value back after it is set, so the provider treats it as write-only: once you set it, later refreshes will not snap it back to a default. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
-- `site_id` (String) Jamf Pro site ID. Use `-1` (default) for "no site". Omit to leave the current value untouched.
+- `site_id` (String) Jamf Pro site ID. Defaults to `-1` (no site) on create. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.
 - `user_removable` (Boolean) Whether end users can remove the profile from System Settings. Defaults to `false`. Independent of the Self Service `removal_disallowed` setting; the two interact only for Self Service profiles. Omit to leave the current value untouched; set `true`/`false` to change it.
 
 Read-Only:

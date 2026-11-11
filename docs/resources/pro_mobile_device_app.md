@@ -190,7 +190,7 @@ Required:
 Optional:
 
 - `allow_user_to_delete` (Boolean) Allow the user to delete the managed app. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `category_id` (String) Jamf Pro category ID. Use `-1` for "No category". Omit to leave the current value untouched.
+- `category_id` (String) Jamf Pro category ID. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.
 - `deploy_as_managed_app` (Boolean) Deploy as a managed app (enables managed-app capabilities such as app configuration). Omit to leave the current value untouched; set `true`/`false` to change it.
 - `deploy_automatically` (Boolean) Automatically push the app to in-scope devices. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `external_url` (String) External / in-house hosting URL. Independent of the App Store URL; setting it flips `host_externally` to true server-side. Omit to leave the current value untouched.
@@ -206,7 +206,7 @@ Optional:
 - `prevent_backup_of_app_data` (Boolean) Prevent the app's data from being backed up to iCloud / iTunes. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `remove_app_when_mdm_profile_is_removed` (Boolean) Remove the app from a device when its MDM profile is removed. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `require_network_tethered` (Boolean) Require a network-tethered connection to install. Relevant for automatically-deployed apps. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `site_id` (String) Jamf Pro site ID scoping the app. Use `-1` for "No site". Omit to leave the current value untouched.
+- `site_id` (String) Jamf Pro site ID scoping the app. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.
 - `take_over_management` (Boolean) Take over management of the app if it is already installed unmanaged. Omit to leave the current value untouched; set `true`/`false` to change it.
 
 Read-Only:

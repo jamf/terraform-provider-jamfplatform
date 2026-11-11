@@ -23,6 +23,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -101,9 +102,10 @@ func (r *ScriptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				},
 			},
 			"category_id": schema.StringAttribute{
-				MarkdownDescription: "ID of the Jamf Pro category this script belongs to. Look it up via the `jamfplatform_pro_category` data source. Jamf Pro reports `-1` when the script has no category. Omit to leave the current value untouched; there is no blank-clear, so set a concrete value to change it.",
+				MarkdownDescription: "ID of the Jamf Pro category this script belongs to. Look it up via the `jamfplatform_pro_category` data source. Jamf Pro reports `-1` when the script has no category. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("category")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},

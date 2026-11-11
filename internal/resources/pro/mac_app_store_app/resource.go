@@ -31,6 +31,7 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/ldapgroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/planmodifiers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -145,7 +146,7 @@ func (r *MacAppResource) Schema(ctx context.Context, req resource.SchemaRequest,
 							stringvalidator.OneOf(deploymentTypeSelfService, deploymentTypeAutomatic),
 						},
 					},
-					"category_id": optComputedString("Jamf Pro category ID. Use `-1` for \"No category\". Omit to leave the current value untouched."),
+					"category_id": optComputedString("Jamf Pro category ID. Set `-1` to clear the category. Removing the attribute from the configuration leaves the current value untouched; it does not clear the category.", commonvalidators.ClearableReferenceID("category")),
 					"category_name": schema.StringAttribute{
 						// No UseStateForUnknown: category_name is derived from
 						// category_id, so it must go Unknown (not pin the stale
@@ -154,7 +155,7 @@ func (r *MacAppResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						MarkdownDescription: "Category display name. Returned by Jamf Pro; not user-settable.",
 						Computed:            true,
 					},
-					"site_id": optComputedString("Jamf Pro site ID scoping the app. Use `-1` for \"No site\". Omit to leave the current value untouched."),
+					"site_id": optComputedString("Jamf Pro site ID scoping the app. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site.", commonvalidators.ClearableReferenceID("site")),
 					"site_name": schema.StringAttribute{
 						// No UseStateForUnknown: site_name is derived from site_id
 						// (same rationale as category_name above).
@@ -330,12 +331,13 @@ func iconMirrorString(desc string) schema.StringAttribute {
 // Leaving a null prior Unknown is safe only while nothing in the resource can
 // collapse a configured change back to prior state, which
 // TestMacAppResource_NothingCollapsesAPlan enforces (STYLE_GUIDE rule 1a).
-func optComputedString(desc string) schema.StringAttribute {
+func optComputedString(desc string, v ...validator.String) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
 		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+		Validators:          v,
 	}
 }
 
