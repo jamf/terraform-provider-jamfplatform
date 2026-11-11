@@ -41,6 +41,7 @@ const (
 	envComputerSerial  = "JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL"
 	envComputerSerial2 = "JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL_2"
 	envMobileSerial    = "JAMFPLATFORM_ACC_PRO_MOBILE_SERIAL"
+	envLAPSUsername    = "JAMFPLATFORM_ACC_PRO_LAPS_USERNAME"
 )
 
 // fireConfig wraps an action block with a terraform_data trigger that invokes it
@@ -624,9 +625,9 @@ func TestAccAction_ProSetAutoAdminPassword_Invoke(t *testing.T) {
 	config := fireConfig(fmt.Sprintf(`
 action "jamfplatform_pro_set_auto_admin_password" "admin" {
   config {
-    serial_number = %q
-    guid          = "00000000-0000-0000-0000-000000000000"
-    password      = "tf-acc-Admin-1"
+    serial_numbers = [%q]
+    guid           = "00000000-0000-0000-0000-000000000000"
+    password       = "tf-acc-Admin-1"
   }
 }`, serial), "action.jamfplatform_pro_set_auto_admin_password.admin")
 
@@ -636,14 +637,106 @@ action "jamfplatform_pro_set_auto_admin_password" "admin" {
 	})
 }
 
-func TestAccAction_ProSetAutoAdminPassword_NeedsAGUID(t *testing.T) {
+func TestAccAction_ProSetAutoAdminPassword_InvokeByUsername(t *testing.T) {
+	serial := accComputerSerial(t)
+	username := testhelpers.AccEnv(envLAPSUsername)
+	if username == "" {
+		t.Skipf("%s not set; skipping username resolution acceptance test", envLAPSUsername)
+	}
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_auto_admin_password" "admin" {
+  config {
+    serial_numbers = [%q]
+    username       = %q
+    password       = "tf-acc-Admin-1"
+  }
+}`, serial, username), "action.jamfplatform_pro_set_auto_admin_password.admin")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+// TestAccAction_ProSetAutoAdminPassword_InvokeForTwoComputers resolves the same
+// username to a different GUID on each computer.
+func TestAccAction_ProSetAutoAdminPassword_InvokeForTwoComputers(t *testing.T) {
+	serial := accComputerSerial(t)
+	serial2 := testhelpers.AccEnv(envComputerSerial2)
+	username := testhelpers.AccEnv(envLAPSUsername)
+	if serial2 == "" || username == "" {
+		t.Skipf("%s and %s not both set; skipping the two-computer acceptance test", envComputerSerial2, envLAPSUsername)
+	}
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_auto_admin_password" "admin" {
+  config {
+    serial_numbers = [%q, %q]
+    username       = %q
+    password       = "tf-acc-Admin-1"
+  }
+}`, serial, serial2, username), "action.jamfplatform_pro_set_auto_admin_password.admin")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps:                    []resource.TestStep{{Config: config}},
+	})
+}
+
+func TestAccAction_ProSetAutoAdminPassword_UnknownUsernameFails(t *testing.T) {
+	serial := accComputerSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_auto_admin_password" "admin" {
+  config {
+    serial_numbers = [%q]
+    username       = "tf-acc-no-such-account"
+    password       = "tf-acc-Admin-1"
+  }
+}`, serial), "action.jamfplatform_pro_set_auto_admin_password.admin")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Account Not Resolved.*nothing was sent.*no managed local administrator`),
+		}},
+	})
+}
+
+// TestAccAction_ProSetAutoAdminPassword_RefusesAMobileDevice sends the serial of
+// a mobile device. Jamf Pro would queue the command for it and answer 201, so the
+// refusal has to come from the action.
+func TestAccAction_ProSetAutoAdminPassword_RefusesAMobileDevice(t *testing.T) {
+	serial := accMobileSerial(t)
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_auto_admin_password" "admin" {
+  config {
+    serial_numbers = [%q]
+    username       = "madmin"
+    password       = "tf-acc-Admin-1"
+  }
+}`, serial), "action.jamfplatform_pro_set_auto_admin_password.admin")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)Not A Computer.*not computers`),
+		}},
+	})
+}
+
+func TestAccAction_ProSetAutoAdminPassword_NeedsUsernameOrGUID(t *testing.T) {
 	testhelpers.AccPreCheck(t)
 
 	config := fireConfig(`
 action "jamfplatform_pro_set_auto_admin_password" "admin" {
   config {
-    serial_number = "NOSUCHSERIAL0001"
-    password      = "tf-acc-Admin-1"
+    serial_numbers = ["NOSUCHSERIAL0001"]
+    password       = "tf-acc-Admin-1"
   }
 }`, "action.jamfplatform_pro_set_auto_admin_password.admin")
 
@@ -651,7 +744,32 @@ action "jamfplatform_pro_set_auto_admin_password" "admin" {
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config:      config,
-			ExpectError: regexp.MustCompile(`(?s)Missing required argument.*guid`),
+			ExpectError: regexp.MustCompile(`(?s)Exactly one of these attributes must be configured.*username.*guid`),
+		}},
+	})
+}
+
+func TestAccAction_ProSetAutoAdminPassword_GUIDRefusesTwoComputers(t *testing.T) {
+	serial := accComputerSerial(t)
+	serial2 := testhelpers.AccEnv(envComputerSerial2)
+	if serial2 == "" {
+		t.Skipf("%s not set; skipping the guid-with-two-computers acceptance test", envComputerSerial2)
+	}
+
+	config := fireConfig(fmt.Sprintf(`
+action "jamfplatform_pro_set_auto_admin_password" "admin" {
+  config {
+    serial_numbers = [%q, %q]
+    guid           = "00000000-0000-0000-0000-000000000000"
+    password       = "tf-acc-Admin-1"
+  }
+}`, serial, serial2), "action.jamfplatform_pro_set_auto_admin_password.admin")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{{
+			Config:      config,
+			ExpectError: regexp.MustCompile(`(?s)GUID Needs A Single Computer`),
 		}},
 	})
 }

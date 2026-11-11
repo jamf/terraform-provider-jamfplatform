@@ -3,21 +3,26 @@
 page_title: "jamfplatform_pro_set_auto_admin_password Action - terraform-provider-jamfplatform"
 subcategory: ""
 description: |-
-  Sets the automatic administrator password on a Mac. If the computer already has this command waiting, Jamf Pro keeps that command and queues no other, so a password you change in the meantime does not reach the computer.
-  This action targets one device. Use for_each to cover several devices.
+  Sets the automatic administrator password on one or more Macs. The action sends one command per computer. If a computer already has this command waiting, Jamf Pro keeps the waiting command and queues no other, so a password you change in the meantime never reaches that computer.
+  Every computer you target gets the same password. Use that for a one-off baseline or a recovery. Anyone who learns the password has admin on every Mac in the list, so leave routine rotation to Jamf Pro's LAPS, which gives each computer its own.
   Required Jamf permissions
   Jamf lists this under Platform environment scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
   |---|---|---|---|
   | Device secrets | Local Admin Passwords (LAPS) | Execute | `local-admin-passwords` |
   | Inventory | Devices | Read | `devices` |
+  Conditional permissions
+  Also grant these when the configuration sets username, which the action resolves to a GUID:
+  | Category | Permission | Actions | API capability |
+  |---|---|---|---|
+  | Device secrets | Local Admin Passwords (LAPS) | Read | `local-admin-passwords` |
 ---
 
 # jamfplatform_pro_set_auto_admin_password (Action)
 
-Sets the automatic administrator password on a Mac. If the computer already has this command waiting, Jamf Pro keeps that command and queues no other, so a password you change in the meantime does not reach the computer.
+Sets the automatic administrator password on one or more Macs. The action sends one command per computer. If a computer already has this command waiting, Jamf Pro keeps the waiting command and queues no other, so a password you change in the meantime never reaches that computer.
 
-This action targets one device. Use `for_each` to cover several devices.
+Every computer you target gets the **same** password. Use that for a one-off baseline or a recovery. Anyone who learns the password has admin on every Mac in the list, so leave routine rotation to Jamf Pro's LAPS, which gives each computer its own.
 
 **Required Jamf permissions**
 
@@ -28,6 +33,14 @@ Jamf lists this under **Platform environment** scope. You choose an integration'
 | Device secrets | Local Admin Passwords (LAPS) | Execute | `local-admin-passwords` |
 | Inventory | Devices | Read | `devices` |
 
+**Conditional permissions**
+
+Also grant these when the configuration sets username, which the action resolves to a GUID:
+
+| Category | Permission | Actions | API capability |
+|---|---|---|---|
+| Device secrets | Local Admin Passwords (LAPS) | Read | `local-admin-passwords` |
+
 ## Example Usage
 
 ```terraform
@@ -36,11 +49,36 @@ variable "admin_password" {
   sensitive = true
 }
 
+# Set the password on one computer. The action looks up the GUID of the account
+# on that Mac. Only accounts that Jamf Pro manages through LAPS resolve.
 action "jamfplatform_pro_set_auto_admin_password" "admin" {
   config {
-    serial_number = "C02XXXXXXXXX"
-    guid          = "00000000-0000-0000-0000-000000000000"
-    password      = var.admin_password
+    serial_numbers = ["C02XXXXXXXXX"]
+    username       = "mdmadmin"
+    password       = var.admin_password
+  }
+}
+
+# Set the same password on every member of a computer group. Each computer gets
+# its own GUID lookup. A mobile device group is refused.
+data "jamfplatform_device_group" "kiosks" {
+  id = "7f4cb2da-c7c4-44bd-a76b-147dd24eb613"
+}
+
+action "jamfplatform_pro_set_auto_admin_password" "kiosks" {
+  config {
+    management_ids = data.jamfplatform_device_group.kiosks.members
+    username       = "mdmadmin"
+    password       = var.admin_password
+  }
+}
+
+# Any other local administrator account: pass its GUID, for one computer only.
+action "jamfplatform_pro_set_auto_admin_password" "by_guid" {
+  config {
+    serial_numbers = ["C02XXXXXXXXX"]
+    guid           = "00000000-0000-0000-0000-000000000000"
+    password       = var.admin_password
   }
 }
 ```
@@ -50,14 +88,15 @@ action "jamfplatform_pro_set_auto_admin_password" "admin" {
 
 ### Required
 
-- `guid` (String) GUID of the local administrator account whose password you are setting.
-- `password` (String) The new password. Jamf Pro never returns it. This value appears in Terraform plan output, so supply it from a variable or secret store rather than committing it.
+- `password` (String) The new password. Every targeted computer gets this value. Jamf Pro never returns it. This value appears in Terraform plan output, so supply it from a variable or secret store rather than committing it.
 
 ### Optional
 
-- `management_id` (String) Jamf Pro Management ID of the computer. This is the `id` reported by the `jamfplatform_devices`/`jamfplatform_device` data sources. Set exactly one of this or `serial_number`.
-- `serial_number` (String) Serial number of the computer (case-sensitive). Set exactly one of this or `management_id`.
+- `guid` (String) GUID of the local administrator account to set the password on. A GUID identifies one account on one computer, so this works with a single target only. Jamf Pro does not check it and queues the command for any value, so a wrong GUID fails silently on the Mac. Prefer `username`. To find a GUID, run `dscl . -read /Users/<name> GeneratedUID` on the Mac. Set exactly one of `username` or `guid`.
+- `management_ids` (List of String) Jamf Pro Management IDs of the computers to target. Use the `id` from the `jamfplatform_devices` or `jamfplatform_device` data sources, or the `members` of a `jamfplatform_device_group` of computers. Every ID must belong to a computer. The action refuses a mobile device before it sends anything. Set this, `serial_numbers`, or both.
+- `serial_numbers` (List of String) Serial numbers of the computers to target (case-sensitive). The action looks up each Management ID first, so `management_ids` saves that step. Set this, `management_ids`, or both.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
+- `username` (String) Short name of the local administrator account to set the password on. The action looks up the account's GUID on each computer, because the same account has a different GUID on every Mac. Only accounts that Jamf Pro manages through LAPS resolve. For any other account, set `guid`. Set exactly one of `username` or `guid`.
 
 <a id="nestedatt--timeouts"></a>
 ### Nested Schema for `timeouts`

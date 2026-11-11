@@ -16,6 +16,8 @@ func allMdmActions() map[string]action.Action {
 	all := map[string]action.Action{
 		"flush_mdm_commands": NewFlushMdmCommandsAction(),
 		"renew_mdm_profile":  NewRenewMdmProfileAction(),
+
+		"set_auto_admin_password": NewSetAutoAdminPasswordAction(),
 	}
 	maps.Copy(all, batchActions())
 	maps.Copy(all, singleActions())

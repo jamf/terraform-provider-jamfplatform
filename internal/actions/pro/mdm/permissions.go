@@ -100,8 +100,20 @@ var localAdminPasswordRegistry = permissions.Narrow(resolveSerialMerged, "SendMd
 var setAutoAdminPasswordSDKMethods = []string{
 	"SendMdmCommandV2",
 	"ListDevices",
+	"ListComputersInventoryV4",
 }
-var setAutoAdminPasswordPrivileges = permissions.Section(localAdminPasswordRegistry, setAutoAdminPasswordSDKMethods...)
+
+// lapsAccountLookupMethods are the SDK calls laps_account.go makes, only when
+// username is set, so they render as a conditional table rather than required.
+var lapsAccountLookupMethods = []string{
+	"ListLocalAdminPasswordAccountsV2",
+}
+var lapsAccountLookup = permissions.Helper{
+	When:     "the configuration sets username, which the action resolves to a GUID",
+	Registry: pro.Privileges,
+	Methods:  lapsAccountLookupMethods,
+}
+var setAutoAdminPasswordPrivileges = permissions.SectionWith(localAdminPasswordRegistry, setAutoAdminPasswordSDKMethods, lapsAccountLookup)
 
 // DEVICE_LOCK and DELETE_USER are the destructive-device-actions commands
 // POST /v2/mdm/commands authorises (with ERASE_DEVICE, which the Platform erase

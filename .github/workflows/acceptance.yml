@@ -496,6 +496,7 @@ jobs:
           # --- Jamf Pro: existing estate objects the suite references -------
           JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL: ${{ secrets.JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL }}
           JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL_2: ${{ secrets.JAMFPLATFORM_ACC_PRO_COMPUTER_SERIAL_2 }}
+          JAMFPLATFORM_ACC_PRO_LAPS_USERNAME: ${{ secrets.JAMFPLATFORM_ACC_PRO_LAPS_USERNAME }}
           JAMFPLATFORM_ACC_PRO_MDPP_UUID_LOOKUP: ${{ secrets.JAMFPLATFORM_ACC_PRO_MDPP_UUID_LOOKUP }}
           # An AD CS OUTBOUND job needs a pre-existing Jamf Pro API client, and
           # the provider can no longer create one: the API-client and API-role

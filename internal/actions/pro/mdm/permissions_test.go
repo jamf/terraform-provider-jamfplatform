@@ -89,6 +89,7 @@ var helperSDKMethods = map[string][]string{
 	"sendCommand":                    {"SendMdmCommandV2"},
 	"resolveManagementID":            {"ListDevices"},
 	"resolveUnlockToken":             {"ListMobileDevicesDetailV2", "GetMobileDeviceDetailV2"},
+	"requireComputers":               {"ListComputersInventoryV4"},
 }
 
 // directSDKAliases maps SDK methods callable directly in an action file to their
@@ -209,6 +210,32 @@ func TestTranche3SDKMethods_MatchFile(t *testing.T) {
 	assertMatch(t, "set_auto_admin_password.go", setAutoAdminPasswordSDKMethods)
 	assertMatch(t, "lock_device.go", destructiveCommandSDKMethods)
 	assertMatch(t, "delete_user.go", destructiveCommandSDKMethods)
+}
+
+func TestLAPSAccountLookupMethods_MatchFile(t *testing.T) {
+	src, err := os.ReadFile("laps_account.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, m := range regexp.MustCompile(`\ba\.(?:client|devices|classic)\.([A-Za-z0-9]+)\(`).FindAllStringSubmatch(string(src), -1) {
+		got[m[1]] = true
+	}
+	for _, m := range lapsAccountLookupMethods {
+		if !got[m] {
+			t.Errorf("declared %s is not called in laps_account.go", m)
+		}
+		delete(got, m)
+	}
+	if len(got) > 0 {
+		t.Errorf("laps_account.go calls undeclared methods: %v", got)
+	}
+	if !permissions.Renders(setAutoAdminPasswordPrivileges, "local-admin-passwords:read") {
+		t.Errorf("username lookup privilege not rendered:\n%s", setAutoAdminPasswordPrivileges)
+	}
+	if !strings.Contains(setAutoAdminPasswordPrivileges, "Conditional permissions") {
+		t.Errorf("lookup privilege must be conditional:\n%s", setAutoAdminPasswordPrivileges)
+	}
 }
 
 func TestSimpleCommandActions_MatchFile(t *testing.T) {
