@@ -17,10 +17,12 @@ import (
 // so the body is built entirely from the plan: omitted Optional+Computed scalars have
 // already been carried forward from prior state by UseStateForUnknown, and
 // helpers.OptionalStringPointer nils both Null and Unknown so genuinely-unset fields
-// are dropped from the body. The extension_attributes set is omitted (nil pointer)
-// when null or unknown; when known it is always emitted — an empty plan set becomes a
+// are dropped from the body. The extension_attributes list is omitted (nil pointer)
+// when null or unknown; when known it is always emitted — an empty plan list becomes a
 // non-nil empty slice so `[]` clears the collection server-side. Element values
-// preserve the null-vs-empty-string distinction (both round-trip on the wire).
+// preserve the null-vs-empty-string distinction (both round-trip on the wire), and
+// the entries go out in plan order, repeats included, which is the order Jamf Pro
+// stores (see flattenExtensionAttributes).
 func buildInventoryPreloadRecordInput(ctx context.Context, plan InventoryPreloadRecordResourceModel) (*pro.InventoryPreloadRecordV2, diag.Diagnostics) {
 	var diags diag.Diagnostics
 

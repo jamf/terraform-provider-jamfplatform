@@ -13,9 +13,10 @@ import (
 )
 
 // InventoryPreloadRecordResourceModel represents the Terraform resource model for a
-// Jamf Pro Inventory Preload record. ExtensionAttributes is types.Set (not a Go typed
+// Jamf Pro Inventory Preload record. ExtensionAttributes is types.List (not a Go typed
 // slice) because the attribute is Optional+Computed — a Computed nested collection is
-// Unknown at plan time and only types.Set can carry Unknown.
+// Unknown at plan time and only types.List can carry Unknown. It is a list, not a set,
+// because Jamf Pro stores repeated entries in the order written (issue #568).
 type InventoryPreloadRecordResourceModel struct {
 	ID                  types.String           `tfsdk:"id"`
 	SerialNumber        types.String           `tfsdk:"serial_number"`
@@ -41,7 +42,7 @@ type InventoryPreloadRecordResourceModel struct {
 	BarCode2            types.String           `tfsdk:"bar_code_2"`
 	AssetTag            types.String           `tfsdk:"asset_tag"`
 	Vendor              types.String           `tfsdk:"vendor"`
-	ExtensionAttributes types.Set              `tfsdk:"extension_attributes"`
+	ExtensionAttributes types.List             `tfsdk:"extension_attributes"`
 	Timeouts            resourceTimeouts.Value `tfsdk:"timeouts"`
 }
 

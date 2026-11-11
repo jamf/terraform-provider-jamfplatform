@@ -11,11 +11,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/list"
 	listschema "github.com/hashicorp/terraform-plugin-framework/list/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listskip"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -57,6 +59,13 @@ var inventoryPreloadRecordFilterSelectors = []string{
 // `timeouts.list` is unset.
 const defaultListTimeout = 90 * time.Second
 
+// skippedRecordsKind is the plural noun the trailing skip warning uses.
+const skippedRecordsKind = "Jamf Pro inventory preload records"
+
+// skippedRecordsHint closes the trailing skip warning.
+const skippedRecordsHint = "The other records are unaffected. " +
+	"If a record named here still exists, please report it to the provider developers with the diagnostics above."
+
 var _ list.ListResource = &InventoryPreloadRecordListResource{}
 var _ list.ListResourceWithConfigure = &InventoryPreloadRecordListResource{}
 
@@ -68,6 +77,11 @@ func NewInventoryPreloadRecordListResource() list.ListResource {
 
 // InventoryPreloadRecordListResource implements Terraform query list support for
 // Jamf Pro inventory preload records.
+//
+// A record that cannot be hydrated is left out and named in one trailing warning
+// (internal/common/listskip) rather than failing the whole query: one record whose
+// extension attributes repeated used to fail every record in the tenant with
+// `Duplicate Set Element` (issue #568).
 type InventoryPreloadRecordListResource struct {
 	client *pro.Client
 }
@@ -146,6 +160,7 @@ func (r *InventoryPreloadRecordListResource) List(ctx context.Context, req list.
 	}
 
 	results := make([]list.ListResult, 0, maxResults)
+	var skipped listskip.Recorder
 
 	for i := range items {
 		if int64(len(results)) >= maxResults {
@@ -164,22 +179,15 @@ func (r *InventoryPreloadRecordListResource) List(ctx context.Context, req list.
 		}
 
 		if req.IncludeResource {
-			state := InventoryPreloadRecordResourceModel{
-				Timeouts: helpers.NewResourceTimeoutsNullValue(inventoryPreloadRecordTimeoutAttributeTypes),
+			hydrate := hydrateListResult(ctx, &result, rec, id)
+			if hydrate.HasError() {
+				tflog.Warn(ctx, "Skipping Jamf Pro inventory preload record from generated config after hydration failure", map[string]any{
+					"id": id.ValueString(),
+				})
+				skipped.Add(listskip.Item{ID: id.ValueString(), Name: rec.SerialNumber, Diags: hydrate})
+				continue
 			}
-			result.Diagnostics.Append(assignInventoryPreloadRecordResourceModel(ctx, &state, rec)...)
-			if result.Diagnostics.HasError() {
-				stream.Results = list.ListResultsStreamDiagnostics(result.Diagnostics)
-				return
-			}
-			if state.ID.IsNull() || state.ID.IsUnknown() {
-				state.ID = id
-			}
-			result.Diagnostics.Append(result.Resource.Set(ctx, &state)...)
-			if result.Diagnostics.HasError() {
-				stream.Results = list.ListResultsStreamDiagnostics(result.Diagnostics)
-				return
-			}
+			result.Diagnostics.Append(hydrate...)
 		}
 
 		results = append(results, result)
@@ -189,18 +197,28 @@ func (r *InventoryPreloadRecordListResource) List(ctx context.Context, req list.
 		"filter":   filterExpression,
 		"limit":    req.Limit,
 		"returned": len(results),
+		"skipped":  skipped.Len(),
 	})
 
-	if len(results) == 0 {
-		stream.Results = list.NoListResults
-		return
-	}
+	stream.Results = listskip.Stream(results, &skipped, skippedRecordsKind, skippedRecordsHint)
+}
 
-	stream.Results = func(push func(list.ListResult) bool) {
-		for _, result := range results {
-			if !push(result) {
-				return
-			}
-		}
+// hydrateListResult fills result.Resource from one listed record and returns the
+// diagnostics, leaving result.Diagnostics to the caller so that a record which fails
+// can be skipped rather than failing the stream. The list endpoint returns full
+// records, so no per-item read is needed.
+func hydrateListResult(ctx context.Context, result *list.ListResult, rec *pro.InventoryPreloadRecordV2, id types.String) diag.Diagnostics {
+	var diags diag.Diagnostics
+	state := InventoryPreloadRecordResourceModel{
+		Timeouts: helpers.NewResourceTimeoutsNullValue(inventoryPreloadRecordTimeoutAttributeTypes),
 	}
+	diags.Append(assignInventoryPreloadRecordResourceModel(ctx, &state, rec)...)
+	if diags.HasError() {
+		return diags
+	}
+	if state.ID.IsNull() || state.ID.IsUnknown() {
+		state.ID = id
+	}
+	diags.Append(result.Resource.Set(ctx, &state)...)
+	return diags
 }

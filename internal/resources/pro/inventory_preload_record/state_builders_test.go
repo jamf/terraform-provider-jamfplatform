@@ -161,44 +161,44 @@ func TestAssignInventoryPreloadRecordResourceModel_ConfiguredEmptyStringPreserve
 	}
 }
 
-func TestFlattenExtensionAttributesSet_NilBecomesKnownEmptySet(t *testing.T) {
-	set, diags := flattenExtensionAttributesSet(context.Background(), nil)
+func TestFlattenExtensionAttributes_NilBecomesKnownEmptyList(t *testing.T) {
+	set, diags := flattenExtensionAttributes(context.Background(), nil)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	if set.IsNull() || set.IsUnknown() {
-		t.Fatalf("expected known set, got null=%v unknown=%v", set.IsNull(), set.IsUnknown())
+		t.Fatalf("expected known list, got null=%v unknown=%v", set.IsNull(), set.IsUnknown())
 	}
 	if len(set.Elements()) != 0 {
-		t.Errorf("expected empty set, got %d elements", len(set.Elements()))
+		t.Errorf("expected empty list, got %d elements", len(set.Elements()))
 	}
 }
 
-func TestFlattenExtensionAttributesSet_EmptySliceBecomesKnownEmptySet(t *testing.T) {
+func TestFlattenExtensionAttributes_EmptySliceBecomesKnownEmptyList(t *testing.T) {
 	eas := []pro.InventoryPreloadExtensionAttribute{}
-	set, diags := flattenExtensionAttributesSet(context.Background(), &eas)
+	set, diags := flattenExtensionAttributes(context.Background(), &eas)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	if set.IsNull() || set.IsUnknown() || len(set.Elements()) != 0 {
-		t.Errorf("expected known empty set, got null=%v unknown=%v len=%d", set.IsNull(), set.IsUnknown(), len(set.Elements()))
+		t.Errorf("expected known empty list, got null=%v unknown=%v len=%d", set.IsNull(), set.IsUnknown(), len(set.Elements()))
 	}
 }
 
-func TestFlattenExtensionAttributesSet_NullVsEmptyValueDistinct(t *testing.T) {
+func TestFlattenExtensionAttributes_NullVsEmptyValueDistinct(t *testing.T) {
 	eas := []pro.InventoryPreloadExtensionAttribute{
 		{Name: "NullVal", Value: nil},
 		{Name: "EmptyVal", Value: new("")},
 		{Name: "SetVal", Value: new("populated")},
 	}
-	set, diags := flattenExtensionAttributesSet(context.Background(), &eas)
+	set, diags := flattenExtensionAttributes(context.Background(), &eas)
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 
 	var models []extensionAttributeModel
 	if d := set.ElementsAs(context.Background(), &models, false); d.HasError() {
-		t.Fatalf("decoding set: %v", d)
+		t.Fatalf("decoding list: %v", d)
 	}
 	byName := map[string]types.String{}
 	for _, m := range models {
