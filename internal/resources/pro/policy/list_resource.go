@@ -16,6 +16,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filters"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listskip"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -30,6 +31,13 @@ const defaultListTimeout = 120 * time.Second
 // exhaust a shared deadline. An item whose read fails or times out is dropped
 // from the generated config rather than aborting the whole type.
 const defaultItemReadTimeout = 30 * time.Second
+
+// skippedPoliciesKind is the plural noun the trailing skip warning uses.
+const skippedPoliciesKind = "Jamf Pro policies"
+
+// skippedPoliciesHint closes the trailing skip warning.
+const skippedPoliciesHint = "The other policies are unaffected. A policy deleted between the list and its read reports the same way. " +
+	"If a policy that still exists is named here, please report it to the provider developers with the diagnostics above."
 
 var _ list.ListResource = &PolicyListResource{}
 var _ list.ListResourceWithConfigure = &PolicyListResource{}
@@ -47,6 +55,11 @@ func NewPolicyListResource() list.ListResource {
 // shared Read state-builder with includeUnmanaged=true, populating every
 // wire-present section (general, scope, self_service, scripts, packages, …)
 // so the generated config is complete rather than general-only.
+//
+// A policy that cannot be hydrated is left out and named in one trailing
+// warning (internal/common/listskip) rather than failing the whole query: one
+// policy whose data the state builders rejected used to fail every policy in
+// the tenant (issue #568).
 type PolicyListResource struct {
 	client *proclassic.Client
 }
@@ -134,6 +147,7 @@ func (r *PolicyListResource) List(ctx context.Context, req list.ListRequest, str
 	}
 
 	results := make([]list.ListResult, 0, maxResults)
+	var skipped listskip.Recorder
 
 	for _, p := range items {
 		if int64(len(results)) >= maxResults {
@@ -159,18 +173,28 @@ func (r *PolicyListResource) List(ctx context.Context, req list.ListRequest, str
 					"id":    id.ValueString(),
 					"error": err.Error(),
 				})
+				skipped.Add(listskip.Item{ID: id.ValueString(), Name: result.DisplayName, Diags: diag.Diagnostics{
+					diag.NewErrorDiagnostic("Unable to read Jamf Pro policy", helpers.APIErrorDetail(err)),
+				}})
 				continue
 			}
 			state := PolicyResourceModel{
 				ID:       id,
 				Timeouts: helpers.NewResourceTimeoutsNullValue(policyTimeoutAttributeTypes),
 			}
-			result.Diagnostics.Append(assignPolicyResourceModel(ctx, &state, got, true)...)
-			result.Diagnostics.Append(result.Resource.Set(ctx, &state)...)
-			if result.Diagnostics.HasError() {
-				stream.Results = list.ListResultsStreamDiagnostics(result.Diagnostics)
-				return
+			var hydrate diag.Diagnostics
+			hydrate.Append(assignPolicyResourceModel(ctx, &state, got, true)...)
+			if !hydrate.HasError() {
+				hydrate.Append(result.Resource.Set(ctx, &state)...)
 			}
+			if hydrate.HasError() {
+				tflog.Warn(ctx, "Skipping Jamf Pro policy from generated config after hydration failure", map[string]any{
+					"id": id.ValueString(),
+				})
+				skipped.Add(listskip.Item{ID: id.ValueString(), Name: result.DisplayName, Diags: hydrate})
+				continue
+			}
+			result.Diagnostics.Append(hydrate...)
 		}
 
 		results = append(results, result)
@@ -180,20 +204,10 @@ func (r *PolicyListResource) List(ctx context.Context, req list.ListRequest, str
 		"name_substring": filter.NameSubstring.ValueString(),
 		"limit":          req.Limit,
 		"returned":       len(results),
+		"skipped":        skipped.Len(),
 	})
 
-	if len(results) == 0 {
-		stream.Results = list.NoListResults
-		return
-	}
-
-	stream.Results = func(push func(list.ListResult) bool) {
-		for _, result := range results {
-			if !push(result) {
-				return
-			}
-		}
-	}
+	stream.Results = listskip.Stream(results, &skipped, skippedPoliciesKind, skippedPoliciesHint)
 }
 
 // policyListItemName is the name accessor passed to filters.ApplyClassicFilter.

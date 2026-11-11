@@ -49,6 +49,8 @@ The scope is unchanged; these computers will receive the updated policy.
 
 Creating an object reports what will start receiving it; deleting one reports what stops.
 
+Reordering a policy's scripts or packages also counts as a change. Jamf Pro sorts those lists itself, so the update changes nothing it stores, but the provider still saves the policy and the alert still fires once. The first plan after upgrading to the provider version that made these attributes lists can show such an update, with one alert, for each policy that has more than one script, package, printer, Dock item or directory binding. For printers, Dock items and directory bindings that update writes the order in your configuration, which earlier versions never sent.
+
 ## Policy dependency changes
 
 A script, package, printer, Dock item, directory binding or disk encryption configuration has no scope of its own. But every policy referencing it delivers it to that policy's audience. Jamf Pro shows no alert for that. The provider does:

@@ -373,3 +373,40 @@ func TestPolicyResource_NothingCollapsesAPlan(t *testing.T) {
 	NewPolicyResource().Schema(context.Background(), resource.SchemaRequest{}, &resp)
 	nullprior.AssertNoPlanCollapse(t, resp.Schema, ".")
 }
+
+// TestPolicyResource_RepeatableCollectionsAreLists pins issue #568: Jamf Pro
+// keeps a repeated script, package, printer, dock item or directory binding,
+// and a set cannot hold one, so each of these is a list. The list carries no
+// plan modifier and no custom type, since anything that planned the prior
+// order in place of the configured one would collapse a plan (see
+// TestPolicyResource_NothingCollapsesAPlan), and semantic equality never runs
+// at plan time. Self Service categories stay a set: Jamf Pro merges a repeated
+// category into one entry.
+func TestPolicyResource_RepeatableCollectionsAreLists(t *testing.T) {
+	t.Parallel()
+	for _, p := range [][]string{
+		{"script_assignments"},
+		{"printer_assignments"},
+		{"dock_item_assignments"},
+		{"directory_bindings"},
+		{"packages", "packages"},
+		{"scripts", "scripts"},
+		{"printers", "printers"},
+		{"dock_items", "dock_items"},
+	} {
+		a, ok := policyResourceAttribute(t, p...).(rschema.ListNestedAttribute)
+		if !ok {
+			t.Errorf("%v must be a ListNestedAttribute", p)
+			continue
+		}
+		if len(a.PlanModifiers) != 0 {
+			t.Errorf("%v must carry no list-level plan modifier", p)
+		}
+		if a.CustomType != nil {
+			t.Errorf("%v must use the plain list type, with no semantic equality", p)
+		}
+	}
+	if _, ok := policyResourceAttribute(t, "self_service", "categories").(rschema.SetNestedAttribute); !ok {
+		t.Error("self_service.categories must stay a set")
+	}
+}

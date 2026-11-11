@@ -13,16 +13,16 @@ package policy
 // tfplugindocs does not render it, so each notice also prefixes the attribute's
 // documentation with a callout built from the same text.
 
-// PRO-DEPRECATED remove-after=2027-02-15 replaced-by=script_assignments — the single-child wrapper scripts.scripts collapses into a flat set; an object cannot become a set under its own name.
-const scriptsDeprecation = "Deprecated: use `script_assignments` instead, the same set without the wrapping block. " +
+// PRO-DEPRECATED remove-after=2027-02-15 replaced-by=script_assignments — the single-child wrapper scripts.scripts collapses into a flat list; an object cannot become a list under its own name.
+const scriptsDeprecation = "Deprecated: use `script_assignments` instead, the same list without the wrapping block. " +
 	"The provider will not remove `scripts` before 2027-02-15."
 
-// PRO-DEPRECATED remove-after=2027-02-15 replaced-by=printer_assignments — the single-child wrapper printers.printers collapses into a flat set; an object cannot become a set under its own name.
-const printersDeprecation = "Deprecated: use `printer_assignments` instead, the same set without the wrapping block. " +
+// PRO-DEPRECATED remove-after=2027-02-15 replaced-by=printer_assignments — the single-child wrapper printers.printers collapses into a flat list; an object cannot become a list under its own name.
+const printersDeprecation = "Deprecated: use `printer_assignments` instead, the same list without the wrapping block. " +
 	"The provider will not remove `printers` before 2027-02-15."
 
-// PRO-DEPRECATED remove-after=2027-02-15 replaced-by=dock_item_assignments — the single-child wrapper dock_items.dock_items collapses into a flat set; an object cannot become a set under its own name.
-const dockItemsDeprecation = "Deprecated: use `dock_item_assignments` instead, the same set without the wrapping block. " +
+// PRO-DEPRECATED remove-after=2027-02-15 replaced-by=dock_item_assignments — the single-child wrapper dock_items.dock_items collapses into a flat list; an object cannot become a list under its own name.
+const dockItemsDeprecation = "Deprecated: use `dock_item_assignments` instead, the same list without the wrapping block. " +
 	"The provider will not remove `dock_items` before 2027-02-15."
 
 // PRO-DEPRECATED remove-after=2027-02-15 replaced-by=server_side_limitations — general.date_time_limitations splits into the two blocks the admin UI shows on separate tabs and moves out of general.

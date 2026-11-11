@@ -196,10 +196,10 @@ resource "jamfplatform_pro_policy" "options" {
 ### Optional
 
 - `client_side_limitations` (Attributes) Times and days on which the policy must not run (admin UI: Options ▸ General ▸ Client-Side Limitations). Each computer enforces them from its own settings. Replaces `no_execute_on`, `no_execute_start` and `no_execute_end` under `general.date_time_limitations`; set one or the other. (see [below for nested schema](#nestedatt--client_side_limitations))
-- `directory_bindings` (Attributes Set) Directory binding assignments (admin UI: Options ▸ Directory Bindings). Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--directory_bindings))
+- `directory_bindings` (Attributes List) Directory binding assignments (admin UI: Options ▸ Directory Bindings). The same directory binding may be listed more than once. Jamf Pro keeps the order written, so reordering the list plans an update. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--directory_bindings))
 - `disk_encryption` (Attributes) Disk encryption configuration to apply. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--disk_encryption))
-- `dock_item_assignments` (Attributes Set) Dock items to add or remove (admin UI: Options ▸ Dock). Replaces `dock_items.dock_items`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--dock_item_assignments))
-- `dock_items` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: use `dock_item_assignments` instead, the same set without the wrapping block. The provider will not remove `dock_items` before 2027-02-15.
+- `dock_item_assignments` (Attributes List) Dock items to add or remove (admin UI: Options ▸ Dock). The same dock item may be listed more than once. Jamf Pro keeps the order written, so reordering the list plans an update. Replaces `dock_items.dock_items`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--dock_item_assignments))
+- `dock_items` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: use `dock_item_assignments` instead, the same list without the wrapping block. The provider will not remove `dock_items` before 2027-02-15.
 
 Dock items to add or remove. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--dock_items))
 - `efi_password` (Attributes) Open Firmware / EFI password configuration (admin UI: Options ▸ EFI Password). Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--efi_password))
@@ -208,14 +208,14 @@ Dock items to add or remove. Omit the block to leave any existing values untouch
 - `maintenance` (Attributes) Maintenance tasks to run as part of the policy. Attribute names mirror the Jamf Pro admin UI checkbox labels. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--maintenance))
 - `management_account` (Attributes) Management account configuration (admin UI: Options ▸ Management Accounts). Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--management_account))
 - `packages` (Attributes) Packages to install / cache / remove. Mirrors the admin UI's Options ▸ Packages section. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--packages))
-- `printer_assignments` (Attributes Set) Printers to install or remove (admin UI: Options ▸ Printers). Replaces `printers.printers`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--printer_assignments))
-- `printers` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: use `printer_assignments` instead, the same set without the wrapping block. The provider will not remove `printers` before 2027-02-15.
+- `printer_assignments` (Attributes List) Printers to install or remove (admin UI: Options ▸ Printers). The same printer may be listed more than once. Jamf Pro keeps the order written, so reordering the list plans an update. Replaces `printers.printers`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--printer_assignments))
+- `printers` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: use `printer_assignments` instead, the same list without the wrapping block. The provider will not remove `printers` before 2027-02-15.
 
 Printers to install or remove. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--printers))
 - `restart_options` (Attributes) Reboot configuration after the policy completes. Mirrors the admin UI's Options ▸ Restart Options section. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--restart_options))
 - `scope` (Attributes) Policy scope. Each category is independently owned: declare it (including `[]`, which clears it) and Terraform manages its members; omit it and it is left as configured outside Terraform, with updates preserving it. Targets are flat sets of Jamf Pro IDs; interpolate `jamfplatform_device_group.<x>.jamf_pro_id` to bridge from Platform Services UUIDs. Setting `all_computers = true` forbids `computer_ids`, `computer_group_ids`, `building_ids`, `department_ids`. Setting `all_jss_users = true` forbids `user_ids` and `user_group_ids`. `user_ids` / `user_group_ids` map to the admin UI's "Users" / "User Groups" lists. (see [below for nested schema](#nestedatt--scope))
-- `script_assignments` (Attributes Set) Scripts to run as part of the policy (admin UI: Options ▸ Scripts). Each item identifies the script by ID; `name` is returned by Jamf Pro. `priority` is one of `Before`, `After`. Replaces `scripts.scripts`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--script_assignments))
-- `scripts` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: use `script_assignments` instead, the same set without the wrapping block. The provider will not remove `scripts` before 2027-02-15.
+- `script_assignments` (Attributes List) Scripts to run as part of the policy (admin UI: Options ▸ Scripts). Each item identifies the script by ID; `name` is returned by Jamf Pro. `priority` is one of `Before`, `After`. The same script may be listed more than once, for example with different parameters. Jamf Pro stores the list sorted by script ID and then by `priority`, `After` before `Before`; entries with the same script ID and priority keep the order written. Writing the list in another order does not change what Jamf Pro stores. The provider keeps the order you wrote, so moving an entry past one with a different script ID or priority plans one update that changes nothing in Jamf Pro, and the next plan is empty. Replaces `scripts.scripts`; set one or the other. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--script_assignments))
+- `scripts` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: use `script_assignments` instead, the same list without the wrapping block. The provider will not remove `scripts` before 2027-02-15.
 
 Scripts to run as part of the policy. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--scripts))
 - `self_service` (Attributes) Self Service integration. Pair `display_notifications` with `notification_location` to control whether and where Self Service surfaces a notification when the policy becomes available. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--self_service))
@@ -356,7 +356,7 @@ Read-Only:
 
 Optional:
 
-- `dock_items` (Attributes Set) Set of dock item assignments. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--dock_items--dock_items))
+- `dock_items` (Attributes List) Dock item assignments. The same dock item may be listed more than once. Jamf Pro keeps the order written, so reordering the list plans an update. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--dock_items--dock_items))
 
 <a id="nestedatt--dock_items--dock_items"></a>
 ### Nested Schema for `dock_items.dock_items`
@@ -451,7 +451,7 @@ Optional:
 Optional:
 
 - `distribution_point` (String) Name of the file share distribution point the policy uses. On create Jamf Pro falls back to the tenant default. Omit to leave the current value untouched.
-- `packages` (Attributes Set) Set of package assignments. Each item identifies the package by ID; `name` is returned by Jamf Pro. `action` is one of `Install`, `Cache`, `Install Cached`, `Uninstall`. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--packages--packages))
+- `packages` (Attributes List) Package assignments. Each item identifies the package by ID; `name` is returned by Jamf Pro. `action` is one of `Install`, `Cache`, `Install Cached`, `Uninstall`. The same package may be listed more than once. Jamf Pro stores the list sorted by package name; entries for the same package keep the order written. Writing the list in another order does not change what Jamf Pro stores. The provider keeps the order you wrote, so moving an entry past a different package plans one update that changes nothing in Jamf Pro, and the next plan is empty. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--packages--packages))
 
 <a id="nestedatt--packages--packages"></a>
 ### Nested Schema for `packages.packages`
@@ -495,7 +495,7 @@ Read-Only:
 
 Optional:
 
-- `printers` (Attributes Set) Set of printer assignments. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--printers--printers))
+- `printers` (Attributes List) Printer assignments. The same printer may be listed more than once. Jamf Pro keeps the order written, so reordering the list plans an update. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--printers--printers))
 
 <a id="nestedatt--printers--printers"></a>
 ### Nested Schema for `printers.printers`
@@ -612,7 +612,7 @@ Read-Only:
 
 Optional:
 
-- `scripts` (Attributes Set) Set of script assignments. `priority` is one of `Before`, `After`. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--scripts--scripts))
+- `scripts` (Attributes List) Script assignments. `priority` is one of `Before`, `After`. The same script may be listed more than once, for example with different parameters. Jamf Pro stores the list sorted by script ID and then by `priority`, `After` before `Before`; entries with the same script ID and priority keep the order written. Writing the list in another order does not change what Jamf Pro stores. The provider keeps the order you wrote, so moving an entry past one with a different script ID or priority plans one update that changes nothing in Jamf Pro, and the next plan is empty. Omit to leave any existing entries untouched; they are not cleared on update. (see [below for nested schema](#nestedatt--scripts--scripts))
 
 <a id="nestedatt--scripts--scripts"></a>
 ### Nested Schema for `scripts.scripts`

@@ -39,9 +39,23 @@ var _ resource.ResourceWithUpgradeState = &PolicyResource{}
 // as readily as 16), and with no action for a generated-password length to
 // apply to, the enum being rotate or doNotChange.
 //
-// The v0 upgrader applies both rewrites, because state written against v0 has
-// never been through the v1 → v2 step either. Terraform runs exactly one
-// upgrader — the one matching the stored version — rather than chaining them.
+// v2 → v3: script_assignments, printer_assignments, dock_item_assignments,
+// directory_bindings, packages.packages and the deprecated wrappers'
+// scripts.scripts, printers.printers and dock_items.dock_items became lists,
+// because Jamf Pro stores a repeated entry and a set cannot hold one (issue
+// #568). The element types are unchanged and a set and a list both serialise
+// as a JSON array, so the upgrader rewrites nothing: the stored order is kept
+// verbatim, and the first refresh realigns it. The bump exists for two reasons.
+// It records that v3 state is decoded as lists, from a version known to have
+// written the same elements as sets. And it stops a provider still on v2 from
+// reading v3 state, which can hold a repeated entry its sets cannot decode:
+// Terraform refuses state written by a newer schema version rather than
+// letting the older provider fail on it.
+//
+// The v0 and v1 upgraders apply every later rewrite too, because state written
+// against them has never been through the later steps. Terraform runs exactly
+// one upgrader — the one matching the stored version — rather than chaining
+// them.
 func (r *PolicyResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
 	return map[int64]resource.StateUpgrader{
 		0: {
@@ -58,6 +72,11 @@ func (r *PolicyResource) UpgradeState(ctx context.Context) map[int64]resource.St
 		1: {
 			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
 				r.upgradeRawState(ctx, req, resp, "v1", dropRemovedV2Attributes)
+			},
+		},
+		2: {
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				r.upgradeRawState(ctx, req, resp, "v2", keepRawState)
 			},
 		},
 	}
@@ -107,6 +126,12 @@ func (r *PolicyResource) upgradeRawState(
 	}
 
 	resp.DynamicValue = &dynamicValue
+}
+
+// keepRawState is the v2 → v3 rewrite, which changes nothing; see
+// UpgradeState.
+func keepRawState(rawJSON []byte) ([]byte, error) {
+	return rawJSON, nil
 }
 
 // dropRemovedV2Attributes removes the two attributes v2 deleted from
