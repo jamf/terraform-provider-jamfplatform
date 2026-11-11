@@ -84,7 +84,7 @@ resource "jamfplatform_pro_user_group" "managed_apple_ids_vpp_associated" {
 - `criteria` (Attributes List) Ordered list of criteria evaluated by Jamf Pro to determine smart-group membership. Required when `group_type = "smart"`. Forbidden when `group_type = "static"`. Order is significant: Jamf Pro evaluates the criteria left to right with the supplied `and_or` joins. (see [below for nested schema](#nestedatt--criteria))
 - `members` (Set of String) User IDs (as strings) to assign as members of a static user group. Forbidden when `group_type = "smart"`: Jamf Pro resolves smart-group membership from `criteria`. Omit to leave any existing entries untouched (they are not cleared on update); set to `[]` to clear them.
 - `notify_on_membership_change` (Boolean) Whether Jamf Pro emits a notification when group membership changes. Defaults to `false`.
-- `site_id` (String) Optional Jamf Pro site ID to scope the user group. Omit to leave unscoped (server sets the `NONE` site, id `-1`).
+- `site_id` (String) Optional Jamf Pro site ID to scope the user group. Omit, or set `-1`, to leave unscoped (Jamf Pro reports the `NONE` site, id `-1`). An empty value and `0` are refused at plan time.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only

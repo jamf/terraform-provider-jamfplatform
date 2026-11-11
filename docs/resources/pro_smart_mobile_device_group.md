@@ -130,7 +130,7 @@ output "supervised_ipads_platform_id" {
 
 - `criteria` (Attributes List) Criteria that decide who is in the group. Order is significant: Jamf Pro reads the list from first entry to last, each entry joining the one before it, and `has_opening_parenthesis` / `has_closing_parenthesis` bracket them. Leave the list out to store a group with no criteria. (see [below for nested schema](#nestedatt--criteria))
 - `description` (String) Free-text note stored with the group.
-- `site_id` (String) Jamf Pro site the group belongs to. `-1` means no site, and is the default.
+- `site_id` (String) Jamf Pro site the group belongs to. `-1` means no site, and is the default. An empty value and `0` are refused at plan time.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only

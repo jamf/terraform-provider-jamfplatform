@@ -93,7 +93,7 @@ resource "jamfplatform_pro_advanced_computer_search" "all_in_site" {
 
 - `criteria` (Attributes List) Ordered list of criteria Jamf Pro evaluates to populate the search. Order matters: Jamf Pro reads left to right, applying the supplied `and_or` joins and parentheses. Omit the attribute, or supply an empty list, for a search with no criteria. (see [below for nested schema](#nestedatt--criteria))
 - `display_fields` (Set of String) Set of inventory column names shown in the search results, for example `Computer Name`, `Serial Number`, `Username`. Order is not significant, because Jamf Pro returns the columns in its own canonical order. Omit for no display columns.
-- `site_id` (String) Optional Jamf Pro site ID to scope the search. Omit to leave unscoped (server sets the `NONE` site, id `-1`).
+- `site_id` (String) Optional Jamf Pro site ID to scope the search. Omit, or set `-1`, to leave unscoped (Jamf Pro reports the `NONE` site, id `-1`). An empty value and `0` are refused at plan time.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only

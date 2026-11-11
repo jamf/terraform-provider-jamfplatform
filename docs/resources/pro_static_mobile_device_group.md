@@ -74,7 +74,7 @@ output "loaners_platform_id" {
 
 - `assigned_mobile_device_ids` (Set of String) Jamf Pro identifiers of the mobile devices in the group, as strings. Omit the attribute and Terraform leaves membership alone, so devices assigned in Jamf Pro stay where they are. Set it to `[]` to empty the group. A populated set is the whole membership, and a device you remove from it leaves the group.
 - `description` (String) Note Jamf Pro keeps with the group.
-- `site_id` (String) Jamf Pro site the group belongs to. `-1` means no site, and is the default. A group in a site holds only mobile devices assigned to that same site.
+- `site_id` (String) Jamf Pro site the group belongs to. `-1` means no site, and is the default. A group in a site holds only mobile devices assigned to that same site. An empty value and `0` are refused at plan time.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only

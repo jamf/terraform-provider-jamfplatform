@@ -225,7 +225,7 @@ Optional:
 - `install_button_text` (String) Text on the Self Service install button (UI "Button Name", under "Display in Self Service"). Defaults to `Update`. Omit to leave the current value untouched.
 - `notifications` (Attributes) Notifications shown to the user before the deadline. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--user_interaction--notifications))
 - `self_service_description` (String) Description shown in Self Service (UI "Description"). Omit to leave the current value untouched.
-- `self_service_icon_id` (String) Jamf Pro icon ID shown in Self Service (UI "Icon"). Omit to leave the current value untouched.
+- `self_service_icon_id` (String) Jamf Pro icon ID shown in Self Service (UI "Icon"). Omit to leave the current value untouched. Jamf Pro cannot remove an icon once set, so the icon can be replaced but not cleared: `""`, `-1` and `0` are refused at plan time.
 
 <a id="nestedatt--user_interaction--deadlines"></a>
 ### Nested Schema for `user_interaction.deadlines`
