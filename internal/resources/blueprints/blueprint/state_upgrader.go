@@ -1214,7 +1214,11 @@ func blueprintSchemaV4(ctx context.Context) *schema.Schema {
 // propose one in-place update that writes the configured order. That update is a real change on the
 // service, not a no-op: the v5 provider wrote each collection in the set's order, so the service, and
 // Safari's bookmark order with it, held that order until now. Like any write it leaves the blueprint
-// OUT_OF_DATE, so a blueprint with deployed = true is redeployed by the same apply. Wire-verified
+// OUT_OF_DATE, so a blueprint with deployed = true is redeployed by the same apply:
+// reconcileBlueprintDeployment sees OUT_OF_DATE and calls deploy. Wire-verified 2026-11-11 on a
+// deployed blueprint scoped to 38 computers: the update sent PATCH (204), GET (OUT_OF_DATE), POST
+// /deploy (202), and a new deployment job started and reached SUCCEEDED, with every device in scope
+// pending again; payloadKey moved from the set's order to the configured one. Wire-verified
 // with a v5 build and this one on the EU gateway 2026-11-11: one update, then an empty plan with and
 // without refresh, and the v5 build refuses the upgraded state. The bump exists so that a provider
 // still on v5 refuses v6 state, which can hold a repeat its sets cannot decode, rather than

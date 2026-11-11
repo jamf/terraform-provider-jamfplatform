@@ -4,6 +4,7 @@
 package components
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -12,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 )
 
 // SafariExtensionsComponent represents a strongly-typed Safari extensions component.
@@ -44,12 +46,56 @@ func (c *SafariExtensionsComponent) GetIdentifier() string {
 	return blueprints.SafariExtensionsComponentIdentifierComJamfDdmSafariExtensions
 }
 
+// uniqueExtensionIDs rejects two managed_extensions entries naming one extension_id during plan.
+//
+// The wire shape is a JSON object keyed by extension identifier, so two entries for one identifier
+// cannot both be stored: ToRawConfiguration writes a Go map, and whichever entry the set yields last
+// overwrites the other. The service behaves the same way on its own, wire-probed on the EU gateway
+// 2026-11-11: a body repeating one identifier key was stored with the last occurrence only, in
+// both send orders, on POST and on merge-patch. Unchecked, the dropped entry surfaces as
+// "Provider produced inconsistent result after apply" (reproduced 2026-11-11, the AlwaysOff entry
+// kept and the Allowed one lost), after the blueprint has already been written. It wraps the
+// shared UniqueStringFieldSet so the unknown handling stays in one place, and rewords the finding
+// to say what to do about it.
+func uniqueExtensionIDs() validator.Set {
+	return uniqueExtensionIDsValidator{inner: commonvalidators.UniqueStringFieldSet("extension_id")}
+}
+
+// uniqueExtensionIDsValidator is the validator uniqueExtensionIDs returns.
+type uniqueExtensionIDsValidator struct {
+	inner validator.Set
+}
+
+// Description returns the shared validator's description.
+func (v uniqueExtensionIDsValidator) Description(ctx context.Context) string {
+	return v.inner.Description(ctx)
+}
+
+// MarkdownDescription returns the shared validator's markdown description.
+func (v uniqueExtensionIDsValidator) MarkdownDescription(ctx context.Context) string {
+	return v.inner.MarkdownDescription(ctx)
+}
+
+// ValidateSet reports each repeated extension_id the shared validator finds, at the set's path.
+func (v uniqueExtensionIDsValidator) ValidateSet(ctx context.Context, req validator.SetRequest, resp *validator.SetResponse) {
+	var inner validator.SetResponse
+	v.inner.ValidateSet(ctx, req, &inner)
+	for _, finding := range inner.Diagnostics.Errors() {
+		resp.Diagnostics.AddAttributeError(req.Path,
+			"Safari extension configured more than once",
+			finding.Detail()+" Jamf Pro keeps one setting per extension and silently drops the others, "+
+				"so merge these entries into one.",
+		)
+	}
+}
+
 // SafariExtensionsComponentSchema returns the Terraform schema for Safari extensions component.
 func SafariExtensionsComponentSchema() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"managed_extensions": schema.SetNestedAttribute{
 			MarkdownDescription: "Set of managed Safari extensions. Each `extension_id` may appear only once.",
 			Optional:            true,
+			Validators:          []validator.Set{uniqueExtensionIDs()},
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
 					"extension_id": schema.StringAttribute{
