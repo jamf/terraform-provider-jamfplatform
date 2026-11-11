@@ -396,14 +396,22 @@ func flattenSelfService(ss *proclassic.MobileDeviceConfigurationProfileSelfServi
 // returning an empty (non-nil) slice when the server carries none so a managed
 // attribute can converge on a declared `[]`.
 //
-// The items come back in the order of order, matched by category id, with any
-// id order does not name appended in wire order, exactly as the macOS profile
-// does. Jamf Pro stores the list sorted by id whatever order it was written in
+// The items come back in the order of order, aligned by category id through
+// helpers.AlignToPrior, with any id order does not name appended in wire
+// order, exactly as the macOS profile does. Jamf Pro stores the list sorted by id whatever order it was written in
 // (wire-probed 2026-11-11, on create and update), and adopting the wire order
 // failed every apply that listed categories in descending id order with
 // "Provider produced inconsistent result after apply". order is the planned
 // list on create and update and the prior state on read; with none (import,
 // config generation) the state takes the wire order.
+//
+// An element of order whose id is unknown or null takes the first wire
+// category no other element claimed, at its own position; a sort by key would
+// push it to the end and swap it with its neighbour (issue #568). Terraform
+// re-plans before Create, so an id interpolated from a category created in the
+// same apply is already known here (verified by acceptance, 2026-11-11); the
+// keyless path is a guard, not a live route. name is rebuilt from the wire for
+// every element, so the category in each position carries its own name.
 func flattenSelfServiceCategories(c *proclassic.MobileDeviceConfigurationProfileSelfServiceSelfServiceCategories, order []SelfServiceCategoryItem) []SelfServiceCategoryItem {
 	if c == nil || c.Category == nil {
 		return []SelfServiceCategoryItem{}
@@ -416,7 +424,24 @@ func flattenSelfServiceCategories(c *proclassic.MobileDeviceConfigurationProfile
 			Name: helpers.StringPointerValueOrNull(cat.Name),
 		})
 	}
-	return helpers.OrderByKey(items, order, func(it SelfServiceCategoryItem) string { return it.ID.ValueString() })
+	idx, _ := helpers.AlignToPrior(items, order, selfServiceCategoryKey, selfServiceCategoryPriorKey)
+	out := make([]SelfServiceCategoryItem, 0, len(idx))
+	for _, i := range idx {
+		out = append(out, items[i])
+	}
+	return out
+}
+
+func selfServiceCategoryKey(it SelfServiceCategoryItem) string { return it.ID.ValueString() }
+
+// selfServiceCategoryPriorKey reports no key for an id that is unknown or
+// null, so helpers.AlignToPrior places the element by position instead of
+// matching it against nothing.
+func selfServiceCategoryPriorKey(it SelfServiceCategoryItem) (string, bool) {
+	if it.ID.IsUnknown() || it.ID.IsNull() {
+		return "", false
+	}
+	return it.ID.ValueString(), true
 }
 
 func idPointerToString(id *int) types.String {
