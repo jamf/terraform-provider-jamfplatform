@@ -824,6 +824,29 @@ func TestAccResource_Blueprint_SafariExtensions(t *testing.T) {
 				Config: testBlueprintConfig(smartGroupHCL("extensions"), fmt.Sprintf(`
 					resource "jamfplatform_blueprints_blueprint" "test_extensions" {
 						name          = %q
+						deployed      = false
+						device_groups = [jamfplatform_device_group.scope.id]
+
+						component_blocks = [
+							{
+								name = "Safari Extensions"
+								safari_extensions = {
+									managed_extensions = [
+										{ extension_id = "com.example.test.extension (ABC1234567)", state = "Allowed" },
+										{ extension_id = "com.example.test.extension (ABC1234567)", state = "AlwaysOff" },
+									]
+								}
+							},
+						]
+					}
+				`, name)),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Safari extension configured more than once`),
+			},
+			{
+				Config: testBlueprintConfig(smartGroupHCL("extensions"), fmt.Sprintf(`
+					resource "jamfplatform_blueprints_blueprint" "test_extensions" {
+						name          = %q
 						description   = "Acceptance test — safe to delete"
 						deployed      = false
 						device_groups = [jamfplatform_device_group.scope.id]

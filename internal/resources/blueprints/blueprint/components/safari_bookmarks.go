@@ -15,6 +15,14 @@ import (
 )
 
 // SafariBookmarksComponent represents a strongly-typed Safari bookmarks component.
+//
+// managed_bookmarks, each group's bookmarks and each folder's contents are lists rather than sets,
+// because the blueprints service stores them as written and Safari shows them in that order. Wire
+// probed on the EU gateway 2026-11-11 (issue #568), on POST and on merge-patch: insertion order was
+// kept, a reorder at every level was honoured, identical bookmarks within a group, identical
+// entries within a folder and two groups with identical content and group_identifier were all kept,
+// and bookmarks differing only in url were kept. A set could hold none of the repeats, and failed
+// to read a blueprint holding one with `Duplicate Set Element`.
 type SafariBookmarksComponent struct {
 	ManagedBookmarks []BookmarkGroupModel `tfsdk:"managed_bookmarks"`
 }
@@ -48,8 +56,8 @@ func (c *SafariBookmarksComponent) GetIdentifier() string {
 // SafariBookmarksComponentSchema returns the Terraform schema for Safari bookmarks component.
 func SafariBookmarksComponentSchema() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
-		"managed_bookmarks": schema.SetNestedAttribute{
-			MarkdownDescription: "Set of managed bookmark groups.",
+		"managed_bookmarks": schema.ListNestedAttribute{
+			MarkdownDescription: "Managed bookmark groups, in the order Safari shows them. A group may be listed more than once.",
 			Optional:            true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
@@ -61,8 +69,8 @@ func SafariBookmarksComponentSchema() map[string]schema.Attribute {
 						MarkdownDescription: "The name of the bookmarks folder.",
 						Required:            true,
 					},
-					"bookmarks": schema.SetNestedAttribute{
-						MarkdownDescription: "Set of bookmarks in this group.",
+					"bookmarks": schema.ListNestedAttribute{
+						MarkdownDescription: "Bookmarks in this group, in the order Safari shows them. A bookmark may be listed more than once.",
 						Required:            true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
@@ -79,8 +87,8 @@ func SafariBookmarksComponentSchema() map[string]schema.Attribute {
 									MarkdownDescription: "The URL for a direct bookmark. Folders do not take one.",
 									Optional:            true,
 								},
-								"folder": schema.SetNestedAttribute{
-									MarkdownDescription: "Bookmarks within this folder.",
+								"folder": schema.ListNestedAttribute{
+									MarkdownDescription: "Bookmarks within this folder, in the order Safari shows them.",
 									Optional:            true,
 									NestedObject: schema.NestedAttributeObject{
 										Attributes: map[string]schema.Attribute{

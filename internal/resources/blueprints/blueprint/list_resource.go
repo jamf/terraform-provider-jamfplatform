@@ -17,6 +17,7 @@ import (
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/blueprints"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listskip"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/listtimeouts"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -28,8 +29,16 @@ const defaultListTimeout = 5 * time.Minute
 // defaultItemReadTimeout bounds each per-item hydration GET issued when
 // IncludeResource is set (config generation), giving every item its own
 // deadline independent of the list-fetch budget so one slow item cannot
-// exhaust a shared deadline.
+// exhaust a shared deadline. An item whose read or hydration fails is left out
+// and named in the trailing skip warning.
 const defaultItemReadTimeout = 30 * time.Second
+
+// skippedBlueprintsKind is the plural noun the trailing skip warning uses.
+const skippedBlueprintsKind = "blueprints"
+
+// skippedBlueprintsHint closes the trailing skip warning.
+const skippedBlueprintsHint = "The other blueprints are unaffected. A blueprint deleted between the list and its read reports the same way. " +
+	"If a blueprint that still exists is named here, please report it to the provider developers with the diagnostics above."
 
 var _ list.ListResource = &BlueprintListResource{}
 var _ list.ListResourceWithConfigure = &BlueprintListResource{}
@@ -40,6 +49,10 @@ func NewBlueprintListResource() list.ListResource {
 }
 
 // BlueprintListResource implements terraform query list support for blueprints.
+//
+// A blueprint that cannot be hydrated for config generation is left out and named in one trailing
+// warning (internal/common/listskip) rather than failing the whole query, the shape issue #568
+// settled on for policies.
 type BlueprintListResource struct {
 	client *blueprints.Client
 }
@@ -133,6 +146,7 @@ func (r *BlueprintListResource) List(ctx context.Context, req list.ListRequest, 
 
 	results := make([]list.ListResult, 0, maxResults)
 	var emitted int64
+	var skipped listskip.Recorder
 
 	for _, bp := range blueprints {
 		if hasSearch {
@@ -160,18 +174,30 @@ func (r *BlueprintListResource) List(ctx context.Context, req list.ListRequest, 
 			detail, err := r.client.GetBlueprint(itemCtx, bp.ID)
 			cancelItem()
 			if err != nil {
-				stream.Results = list.ListResultsStreamDiagnostics(diag.Diagnostics{
-					diag.NewErrorDiagnostic(
-						"Unable to read blueprint",
-						helpers.APIErrorDetail(err),
-					),
+				tflog.Warn(ctx, "Skipping blueprint from generated config after per-item read failure", map[string]any{
+					"id":    bp.ID,
+					"error": err.Error(),
 				})
-				return
+				skipped.Add(listskip.Item{ID: bp.ID, Name: bp.Name, Diags: diag.Diagnostics{
+					diag.NewErrorDiagnostic("Unable to read blueprint", helpers.APIErrorDetail(err)),
+				}})
+				continue
 			}
 
 			var state BlueprintResourceModel
-			result.Diagnostics.Append(updateModelFromAPIResponse(ctx, &state, detail)...)
-			result.Diagnostics.Append(result.Resource.Set(ctx, &state)...)
+			var hydrate diag.Diagnostics
+			hydrate.Append(updateModelFromAPIResponse(ctx, &state, detail)...)
+			if !hydrate.HasError() {
+				hydrate.Append(result.Resource.Set(ctx, &state)...)
+			}
+			if hydrate.HasError() {
+				tflog.Warn(ctx, "Skipping blueprint from generated config after hydration failure", map[string]any{
+					"id": bp.ID,
+				})
+				skipped.Add(listskip.Item{ID: bp.ID, Name: bp.Name, Diags: hydrate})
+				continue
+			}
+			result.Diagnostics.Append(hydrate...)
 		}
 
 		results = append(results, result)
@@ -182,18 +208,8 @@ func (r *BlueprintListResource) List(ctx context.Context, req list.ListRequest, 
 		"search":   searchTerm,
 		"limit":    req.Limit,
 		"returned": len(results),
+		"skipped":  skipped.Len(),
 	})
 
-	if len(results) == 0 {
-		stream.Results = list.NoListResults
-		return
-	}
-
-	stream.Results = func(push func(list.ListResult) bool) {
-		for _, result := range results {
-			if !push(result) {
-				return
-			}
-		}
-	}
+	stream.Results = listskip.Stream(results, &skipped, skippedBlueprintsKind, skippedBlueprintsHint)
 }

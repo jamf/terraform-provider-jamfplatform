@@ -36,8 +36,8 @@ func TestBlueprintResource_Schema(t *testing.T) {
 	}
 
 	s := resp.Schema
-	if s.Version != 5 {
-		t.Errorf("expected schema version 5, got %d", s.Version)
+	if s.Version != 6 {
+		t.Errorf("expected schema version 6, got %d", s.Version)
 	}
 
 	requiredAttrs := []string{"name", "deployed", "device_groups"}

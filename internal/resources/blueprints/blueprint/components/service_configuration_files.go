@@ -13,6 +13,11 @@ import (
 )
 
 // ServiceConfigurationFilesComponent represents a strongly-typed service configuration files component.
+//
+// service_config_files is a list rather than a set, because the blueprints service stores it as
+// written. Wire-probed on the EU gateway 2026-11-11 (issue #568), on POST and on merge-patch:
+// insertion order was kept, a reorder was honoured, identical entries were kept, and entries
+// sharing a service_type with different data URLs were kept.
 type ServiceConfigurationFilesComponent struct {
 	ServiceConfigFiles []ServiceConfigFileModel `tfsdk:"service_config_files"`
 }
@@ -33,8 +38,8 @@ type ServiceConfigFileModel struct {
 // ServiceConfigurationFilesComponentSchema returns the Terraform schema for service configuration files component.
 func ServiceConfigurationFilesComponentSchema() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
-		"service_config_files": schema.SetNestedAttribute{
-			MarkdownDescription: "Set of service configuration files.",
+		"service_config_files": schema.ListNestedAttribute{
+			MarkdownDescription: "Service configuration files, kept in the order listed. A service type may be listed more than once.",
 			Optional:            true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{

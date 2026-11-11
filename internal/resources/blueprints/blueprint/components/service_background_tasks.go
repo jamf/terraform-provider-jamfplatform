@@ -15,6 +15,12 @@ import (
 )
 
 // ServiceBackgroundTasksComponent represents a strongly-typed service background tasks component.
+//
+// background_tasks and each task's launchd_configurations are lists rather than sets, because the
+// blueprints service stores both as written. Wire-probed on the EU gateway 2026-11-11 (issue #568),
+// on POST and on merge-patch: insertion order was kept and a reorder honoured at both levels,
+// identical tasks and identical launchd configurations within one task were kept, and entries
+// differing only in task_description, or only in context, were kept.
 type ServiceBackgroundTasksComponent struct {
 	BackgroundTasks []ServiceBackgroundTaskModel `tfsdk:"background_tasks"`
 }
@@ -43,8 +49,8 @@ type LaunchdItemModel struct {
 // ServiceBackgroundTasksComponentSchema returns the Terraform schema for service background tasks component.
 func ServiceBackgroundTasksComponentSchema() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
-		"background_tasks": schema.SetNestedAttribute{
-			MarkdownDescription: "Set of background tasks.",
+		"background_tasks": schema.ListNestedAttribute{
+			MarkdownDescription: "Background tasks, kept in the order listed. A task may be listed more than once.",
 			Optional:            true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
@@ -74,8 +80,8 @@ func ServiceBackgroundTasksComponentSchema() map[string]schema.Attribute {
 							},
 						},
 					},
-					"launchd_configurations": schema.SetNestedAttribute{
-						MarkdownDescription: "Launchd configuration items.",
+					"launchd_configurations": schema.ListNestedAttribute{
+						MarkdownDescription: "Launchd configuration items, kept in the order listed.",
 						Optional:            true,
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{

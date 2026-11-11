@@ -524,3 +524,72 @@ func TestAppleDeclarationsValidateListToleratesAnUnknownElement(t *testing.T) {
 		t.Errorf("an unknown element produced errors: %v", diags.Errors())
 	}
 }
+
+// customDeclarationsValue builds a custom_declarations object holding one declaration per
+// {type, payload} pair, in order.
+func customDeclarationsValue(t *testing.T, declarations ...[2]string) types.Object {
+	t.Helper()
+
+	elementType := types.ObjectType{AttrTypes: map[string]attr.Type{
+		"channel": types.StringType,
+		"kind":    types.StringType,
+		"payload": types.StringType,
+		"type":    types.StringType,
+	}}
+	elements := make([]attr.Value, 0, len(declarations))
+	for _, declaration := range declarations {
+		element, diags := types.ObjectValue(elementType.AttrTypes, map[string]attr.Value{
+			"channel": types.StringValue("SYSTEM"),
+			"kind":    types.StringValue("CONFIGURATION"),
+			"payload": types.StringValue(declaration[1]),
+			"type":    types.StringValue(declaration[0]),
+		})
+		if diags.HasError() {
+			t.Fatalf("building a declaration element: %v", diags)
+		}
+		elements = append(elements, element)
+	}
+	list, diags := types.ListValue(elementType, elements)
+	if diags.HasError() {
+		t.Fatalf("building the declaration list: %v", diags)
+	}
+	object, diags := types.ObjectValue(map[string]attr.Type{"declaration": types.ListType{ElemType: elementType}}, map[string]attr.Value{"declaration": list})
+	if diags.HasError() {
+		t.Fatalf("building the component: %v", diags)
+	}
+	return object
+}
+
+// TestCustomDeclarationsValidateObjectAddressesTheElement pins that, with declaration a list, a
+// custom_declarations finding lands on `declaration[n].payload` and a `$PAYLOAD_n` reference is
+// range-checked against the list, as it is for apple_declarations.
+func TestCustomDeclarationsValidateObjectAddressesTheElement(t *testing.T) {
+	at := path.Root("component_blocks").AtListIndex(0).AtName("custom_declarations")
+	validate := func(value types.Object) diag.Diagnostics {
+		var resp validator.ObjectResponse
+		customDeclarationsSchemaValidator().ValidateObject(context.Background(), validator.ObjectRequest{Path: at, ConfigValue: value}, &resp)
+		return resp.Diagnostics
+	}
+
+	diags := validate(customDeclarationsValue(t,
+		[2]string{"com.apple.configuration.siri.settings", `{"Enabled":true}`},
+		[2]string{"com.apple.configuration.siri.settings", `{"ZzNotAKey":true}`},
+	))
+	if !diags.HasError() {
+		t.Fatal("an undeclared key in the second declaration produced no error")
+	}
+	want := at.AtName("declaration").AtListIndex(1).AtName("payload")
+	for _, reported := range diags.Errors() {
+		withPath, ok := reported.(diag.DiagnosticWithPath)
+		if !ok || !withPath.Path().Equal(want) {
+			t.Errorf("finding %v is not on %s", reported, want)
+		}
+	}
+
+	pastTheEnd := validate(customDeclarationsValue(t,
+		[2]string{"com.apple.configuration.services.configuration-files", `{"ServiceType":"com.apple.sudo","DataAssetReference":"$PAYLOAD_2"}`},
+	))
+	if !pastTheEnd.HasError() {
+		t.Fatal("a reference past the end of the list produced no error")
+	}
+}

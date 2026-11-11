@@ -35,9 +35,11 @@ type CustomDeclarationModel struct {
 // CustomDeclarationsComponentSchema returns the Terraform schema for custom declarations component.
 func CustomDeclarationsComponentSchema() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
-		"declaration": schema.SetNestedAttribute{
-			MarkdownDescription: "Custom DDM declaration.",
-			Optional:            true,
+		"declaration": schema.ListNestedAttribute{
+			MarkdownDescription: "Custom DDM declarations, in order. A payload may reference another declaration in " +
+				"this list with `$PAYLOAD_n`, where `n` is the referenced declaration's 1-based position, so moving a " +
+				"declaration changes which one a reference names.",
+			Optional: true,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
 					"channel": schema.StringAttribute{
@@ -70,6 +72,20 @@ func CustomDeclarationsComponentSchema() map[string]schema.Attribute {
 // Empty Declarations marshals to `{}` to preserve the canonical no-op shape;
 // otherwise builds blueprints.CustomDeclarationsConfiguration so the on-wire
 // payload is driven by the SDK schema rather than ad-hoc maps.
+//
+// Each declaration's payloadKey is its 1-based position in the configuration, the same rule
+// apple_declarations follows, so a `$PAYLOAD_n` reference names the n-th declaration listed. The
+// service requires the key (a declaration without one is refused with `400 VALIDATION_FAILURE`) and
+// otherwise stores it verbatim without interpreting it: wire-probed on the EU gateway 2026-11-11, it
+// kept keys sent out of order (2, 1) in the order the declarations were sent rather than sorting
+// by key, and accepted a repeated key (1, 1), gaps (9, 5), 0 and -1 alike, each echoed back as sent.
+// So the key follows the configuration order and nothing else: reordering the list re-keys the
+// declarations that move, and a `$PAYLOAD_n` reference written against the old position then names
+// whichever declaration took it. The service stored a reference to a key it holds without resolving
+// or checking it on write, so that is not caught on its side either. While the
+// attribute was a set the key followed the set's own element order instead, which is why the first
+// apply after upgrading may re-key declarations once. Whether a device treats a re-keyed declaration
+// as removed and re-added is not observable through the API and was not verified on a device.
 func (c *CustomDeclarationsComponent) ToRawConfiguration() (json.RawMessage, error) {
 	if len(c.Declarations) == 0 {
 		return json.RawMessage(`{}`), nil

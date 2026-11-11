@@ -104,8 +104,8 @@ func appendUncheckedElements(diags *diag.Diagnostics, collection attr.Value, at 
 }
 
 // appendUncheckedCustomDeclarations warns about each custom declaration whose type or payload is
-// unknown. The declarations are a set, which has no stable index, so a warning lands on the set and
-// names the declaration type when it is known, as declarationSchemaValidator.ValidateObject does.
+// unknown. The declarations are a list inside the component object, so once the object is known a
+// warning lands on the declaration's own index, as it does for apple_declarations.
 func appendUncheckedCustomDeclarations(diags *diag.Diagnostics, component attr.Value, at path.Path) {
 	object, ok := component.(types.Object)
 	if !ok || object.IsNull() {
@@ -119,30 +119,7 @@ func appendUncheckedCustomDeclarations(diags *diag.Diagnostics, component attr.V
 		return
 	}
 
-	set, ok := object.Attributes()["declaration"].(types.Set)
-	if !ok || set.IsNull() {
-		return
-	}
-	if set.IsUnknown() {
-		diags.AddAttributeWarning(at, uncheckedDeclarationSummary,
-			"Terraform will not know these custom declarations until apply, so the provider cannot check "+
-				"them against Apple's schemas during plan. "+uncheckedConsequence)
-		return
-	}
-	for _, element := range set.Elements() {
-		if !elementUnchecked(element, "type", "payload") {
-			continue
-		}
-		attribution := ""
-		if object, ok := element.(types.Object); ok {
-			if declarationType, ok := object.Attributes()["type"].(types.String); ok && !declarationType.IsUnknown() {
-				attribution = declarationType.ValueString()
-			}
-		}
-		diags.AddAttributeWarning(at, uncheckedDeclarationSummary,
-			attributionPrefix(attribution)+"Terraform will not know this payload until apply, so the "+
-				"provider cannot check it against Apple's schemas during plan. "+uncheckedConsequence)
-	}
+	appendUncheckedElements(diags, object.Attributes()["declaration"], at, "type", "payload", true)
 }
 
 // elementUnchecked reports whether a payload or declaration element is unknown, or carries an unknown
