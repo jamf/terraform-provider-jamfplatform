@@ -292,12 +292,17 @@ func optComputedBool(desc string) schema.BoolAttribute {
 	}
 }
 
+// optComputedStringInList is the name of a self_service.categories element. It
+// carries prior state only from the element with the same id, as the macOS
+// profile's categoryName does. The positional carry it used to have planned
+// the previous occupant's name on an element a reorder had moved, and the
+// apply failed with "Provider produced inconsistent result after apply".
 func optComputedStringInList(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseKeyedStateForUnknownString("id")},
 	}
 }
 
