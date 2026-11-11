@@ -26,7 +26,7 @@ import (
 func TestAccResource_MobileDeviceConfigurationProfile_SelfServiceCategoryCreatedFirst(t *testing.T) {
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
-	name := "tf-align-mdcp-newfirst-" + suffix
+	name := "tf-acc-mdcp-newfirst-" + suffix
 	payload := readFixture(t, "profile_50.mobileconfig")
 	if !strings.HasSuffix(payload, "\n") {
 		payload += "\n"
@@ -38,13 +38,13 @@ func TestAccResource_MobileDeviceConfigurationProfile_SelfServiceCategoryCreated
 
 	existing := fmt.Sprintf(`
 resource "jamfplatform_pro_category" "existing" {
-  name     = "tf-align-mdcp-existing-%[1]s"
+  name     = "tf-acc-mdcp-existing-%[1]s"
   priority = 9
 }
 `, suffix)
 	withProfile := existing + fmt.Sprintf(`
 resource "jamfplatform_pro_category" "created" {
-  name     = "tf-align-mdcp-created-%[1]s"
+  name     = "tf-acc-mdcp-created-%[1]s"
   priority = 9
 }
 

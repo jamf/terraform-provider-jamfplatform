@@ -25,18 +25,18 @@ import (
 func TestAccResource_MacOSConfigurationProfile_SelfServiceCategoryCreatedFirst(t *testing.T) {
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
-	name := "tf-align-mcp-newfirst-" + suffix
+	name := "tf-acc-mcp-newfirst-" + suffix
 	const addr = "jamfplatform_pro_macos_configuration_profile.test"
 
 	existing := fmt.Sprintf(`
 resource "jamfplatform_pro_category" "existing" {
-  name     = "tf-align-mcp-existing-%[1]s"
+  name     = "tf-acc-mcp-existing-%[1]s"
   priority = 9
 }
 `, suffix)
 	withProfile := existing + fmt.Sprintf(`
 resource "jamfplatform_pro_category" "created" {
-  name     = "tf-align-mcp-created-%[1]s"
+  name     = "tf-acc-mcp-created-%[1]s"
   priority = 9
 }
 
