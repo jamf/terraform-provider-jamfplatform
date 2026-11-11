@@ -290,8 +290,9 @@ func (r *AppInstallerResource) Schema(ctx context.Context, req resource.SchemaRe
 						PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseNonNullStateForUnknown()},
 					},
 					"categories": schema.SetNestedAttribute{
-						MarkdownDescription: "Self Service categories the deployment appears under, keyed by `category_id`.",
+						MarkdownDescription: "Self Service categories the deployment appears under, keyed by `category_id`. List each category once: Jamf Pro keeps one entry per category, so a repeated `category_id` is rejected at plan time. A repeated `category_id` that refers to a category created in the same apply is caught only by a later plan.",
 						Optional:            true,
+						Validators:          selfServiceCategoryValidators(),
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"category_id": schema.StringAttribute{

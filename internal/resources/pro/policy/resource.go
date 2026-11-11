@@ -256,8 +256,9 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						},
 					},
 					"categories": schema.SetNestedAttribute{
-						MarkdownDescription: "Self Service categories under which the policy appears. Each entry carries its own `display_in` / `feature_in` flags, mirroring the admin UI's parallel \"Display in\" / \"Feature in\" columns. A policy may appear in multiple categories. Declaring one or more entries replaces the stored list. An empty list reads as an omission. Omit to leave any existing entries untouched; they are not cleared on update.",
+						MarkdownDescription: "Self Service categories under which the policy appears. Each entry carries its own `display_in` / `feature_in` flags, mirroring the admin UI's parallel \"Display in\" / \"Feature in\" columns. A policy may appear in multiple categories. Declaring one or more entries replaces the stored list. An empty list reads as an omission. Omit to leave any existing entries untouched; they are not cleared on update. List each category once, and leave `display_in` unset or `true`: Jamf Pro merges repeated entries and drops a category that is not displayed, so both are rejected at plan time. A repeated id that refers to a category created in the same apply is caught only by a later plan.",
 						Optional:            true,
+						Validators:          selfServiceCategoryValidators(),
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":         schema.StringAttribute{MarkdownDescription: "Category ID.", Required: true},

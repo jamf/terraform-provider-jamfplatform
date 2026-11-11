@@ -4,9 +4,7 @@
 package macos_configuration_profile
 
 import (
-	"cmp"
 	"context"
-	"slices"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -436,22 +434,7 @@ func flattenSelfServiceCategories(c *proclassic.OsXConfigurationProfileSelfServi
 			FeatureIn: helpers.BoolPointerValueOrNull(cat.FeatureIn),
 		})
 	}
-	rank := make(map[string]int, len(order))
-	for i, o := range order {
-		if _, seen := rank[o.ID.ValueString()]; !seen {
-			rank[o.ID.ValueString()] = i
-		}
-	}
-	position := func(it SelfServiceCategoryItem) int {
-		if r, ok := rank[it.ID.ValueString()]; ok {
-			return r
-		}
-		return len(order)
-	}
-	slices.SortStableFunc(items, func(a, b SelfServiceCategoryItem) int {
-		return cmp.Compare(position(a), position(b))
-	})
-	return items
+	return helpers.OrderByKey(items, order, func(it SelfServiceCategoryItem) string { return it.ID.ValueString() })
 }
 
 func idPointerToString(id *int) types.String {

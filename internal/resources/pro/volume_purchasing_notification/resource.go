@@ -128,10 +128,11 @@ func (r *VolumePurchasingNotificationResource) Schema(ctx context.Context, req r
 				PlanModifiers:       []planmodifier.Set{setplanmodifier.UseStateForUnknown()},
 			},
 			"external_recipients": schema.SetNestedAttribute{
-				MarkdownDescription: "**\"External Recipients\"** in the Jamf Pro admin UI. Email addresses outside Jamf Pro that receive the daily summary. Omit to leave any existing entries untouched (they are not cleared on update); set to `[]` for no external recipients.",
+				MarkdownDescription: "**\"External Recipients\"** in the Jamf Pro admin UI. Email addresses outside Jamf Pro that receive the daily summary. Omit to leave any existing entries untouched (they are not cleared on update); set to `[]` for no external recipients. List each address once: Jamf Pro compares addresses without regard to case and refuses a repeated one, so it is rejected at plan time.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.Set{setplanmodifier.UseStateForUnknown()},
+				Validators:          externalRecipientsValidators(),
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"email": schema.StringAttribute{

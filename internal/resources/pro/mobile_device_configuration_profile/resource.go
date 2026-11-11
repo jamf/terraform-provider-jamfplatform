@@ -213,8 +213,9 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 						Sensitive:           true,
 					},
 					"categories": schema.ListNestedAttribute{
-						MarkdownDescription: "Categories under which the profile appears in Self Service. Listing a category displays the profile in it, matching the admin UI's \"Display in\" tick; Jamf Pro keeps no undisplayed state and offers no per-category \"Feature in\" control for mobile profiles, so neither is exposed here. Declaring one or more entries replaces the stored list. An empty list reads as an omission. Omit to leave any existing entries untouched; they are not cleared on update.",
+						MarkdownDescription: "Categories under which the profile appears in Self Service. Listing a category displays the profile in it, matching the admin UI's \"Display in\" tick; Jamf Pro keeps no undisplayed state and offers no per-category \"Feature in\" control for mobile profiles, so neither is exposed here. Declaring one or more entries replaces the stored list. An empty list reads as an omission. Omit to leave any existing entries untouched; they are not cleared on update. List each category once: Jamf Pro keeps one entry per category, so a repeated id is rejected at plan time. A repeated id that refers to a category created in the same apply is caught only by a later plan.",
 						Optional:            true,
+						Validators:          selfServiceCategoryValidators(),
 						NestedObject: schema.NestedAttributeObject{
 							Attributes: map[string]schema.Attribute{
 								"id":   schema.StringAttribute{MarkdownDescription: "Category ID.", Required: true},
@@ -293,12 +294,17 @@ func optComputedBool(desc string) schema.BoolAttribute {
 	}
 }
 
+// optComputedStringInList is the name of a self_service.categories element. It
+// carries prior state only from the element with the same id, as the macOS
+// profile's categoryName does. The positional carry it used to have planned
+// the previous occupant's name on an element a reorder had moved, and the
+// apply failed with "Provider produced inconsistent result after apply".
 func optComputedStringInList(desc string) schema.StringAttribute {
 	return schema.StringAttribute{
 		MarkdownDescription: desc,
 		Optional:            true,
 		Computed:            true,
-		PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
+		PlanModifiers:       []planmodifier.String{planmodifiers.UseKeyedStateForUnknownString("id")},
 	}
 }
 

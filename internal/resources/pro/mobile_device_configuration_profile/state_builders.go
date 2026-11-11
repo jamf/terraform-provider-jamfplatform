@@ -384,9 +384,9 @@ func flattenSelfService(ss *proclassic.MobileDeviceConfigurationProfileSelfServi
 	// refresh never fabricates a list the practitioner never wrote.
 	switch {
 	case state.Categories != nil:
-		state.Categories = flattenSelfServiceCategories(ss.SelfServiceCategories)
+		state.Categories = flattenSelfServiceCategories(ss.SelfServiceCategories, state.Categories)
 	case includeUnmanaged:
-		if cats := flattenSelfServiceCategories(ss.SelfServiceCategories); len(cats) > 0 {
+		if cats := flattenSelfServiceCategories(ss.SelfServiceCategories, nil); len(cats) > 0 {
 			state.Categories = cats
 		}
 	}
@@ -395,7 +395,16 @@ func flattenSelfService(ss *proclassic.MobileDeviceConfigurationProfileSelfServi
 // flattenSelfServiceCategories maps the wire category list onto the model,
 // returning an empty (non-nil) slice when the server carries none so a managed
 // attribute can converge on a declared `[]`.
-func flattenSelfServiceCategories(c *proclassic.MobileDeviceConfigurationProfileSelfServiceSelfServiceCategories) []SelfServiceCategoryItem {
+//
+// The items come back in the order of order, matched by category id, with any
+// id order does not name appended in wire order, exactly as the macOS profile
+// does. Jamf Pro stores the list sorted by id whatever order it was written in
+// (wire-probed 2026-11-11, on create and update), and adopting the wire order
+// failed every apply that listed categories in descending id order with
+// "Provider produced inconsistent result after apply". order is the planned
+// list on create and update and the prior state on read; with none (import,
+// config generation) the state takes the wire order.
+func flattenSelfServiceCategories(c *proclassic.MobileDeviceConfigurationProfileSelfServiceSelfServiceCategories, order []SelfServiceCategoryItem) []SelfServiceCategoryItem {
 	if c == nil || c.Category == nil {
 		return []SelfServiceCategoryItem{}
 	}
@@ -407,7 +416,7 @@ func flattenSelfServiceCategories(c *proclassic.MobileDeviceConfigurationProfile
 			Name: helpers.StringPointerValueOrNull(cat.Name),
 		})
 	}
-	return items
+	return helpers.OrderByKey(items, order, func(it SelfServiceCategoryItem) string { return it.ID.ValueString() })
 }
 
 func idPointerToString(id *int) types.String {
