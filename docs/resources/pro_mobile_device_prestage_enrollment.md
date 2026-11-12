@@ -140,8 +140,8 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
 - `enable_shared_ipad` (Boolean) **"Enable Shared iPad"** in the Jamf Pro admin UI. Requires `prevent_activation_lock = true` and supervision. Jamf Pro rejects Shared iPad without `prevent_activation_lock`, and turns it off without an error on a device that is not supervised. Replaces `multi_user`; set one or the other.
 - `enforce_temporary_session_timeout` (Boolean) **"Enforce Temporary Session Timeout"** in the Jamf Pro admin UI.
 - `enforce_user_session_timeout` (Boolean) **"Enforce User Session Timeout"** in the Jamf Pro admin UI.
-- `enrollment_customization_id` (String) Enrollment customization ID to apply during Setup Assistant. Sentinel `"0"` = no customization (note: `"0"`, not `"-1"`). Invalid IDs are silently coerced to `"0"`.
-- `enrollment_site_id` (String) Site ID applied to devices enrolled through this PreStage. Sentinel `"-1"` = no site.
+- `enrollment_customization_id` (String) Enrollment customization ID to apply during Setup Assistant. Set `0` for no customization. `-1` and `""` fail at plan time. Remove the attribute to keep the current customization.
+- `enrollment_site_id` (String) Site ID applied to devices enrolled through this PreStage. Set `-1` for no site. `""` and `0` fail at plan time. Remove the attribute to keep the current site.
 - `install_apps_during_enrollment` (Boolean, Deprecated) ~> Deprecated: use `install_managed_apps_before_setup_assistant` instead. The provider will not remove `install_apps_during_enrollment` before 2027-02-03.
 
 **"Install managed apps before Setup Assistant"** in the Jamf Pro admin UI.
@@ -180,7 +180,7 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
 
 **"Require Credentials for Enrollment"** in the Jamf Pro admin UI. Jamf Pro ignores it for devices with iOS 13 or later when `enrollment_customization_id` names an enrollment customization. Configure authentication in the enrollment customization instead.
 - `require_credentials_for_enrollment` (Boolean) **"Require Credentials for Enrollment"** in the Jamf Pro admin UI. Jamf Pro ignores it for devices with iOS 13 or later when `enrollment_customization_id` names an enrollment customization. Configure authentication in the enrollment customization instead. Replaces `require_authentication`; set one or the other.
-- `rts_config_profile_id` (String) Return to Service configuration profile ID. Sentinel `"-1"` = none.
+- `rts_config_profile_id` (String) Return to Service configuration profile ID. Set `-1` for none. `""` and `0` fail at plan time. Remove the attribute to keep the current profile.
 - `rts_enabled` (Boolean, Deprecated) ~> Deprecated: use `allow_return_to_service` instead. The provider will not remove `rts_enabled` before 2027-02-03.
 
 **"Allow use of the Return to Service option during device reset"** in the Jamf Pro admin UI.
@@ -216,8 +216,8 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "example" {
 
 Optional:
 
-- `building_id` (String) Building ID for the device record. Sentinel `"-1"` = no building.
-- `department_id` (String) Department ID for the device record. Sentinel `"-1"` = no department.
+- `building_id` (String) Building ID for the device record. Set `-1` for no building. `""` and `0` fail at plan time. Remove the attribute to keep the current building.
+- `department_id` (String) Department ID for the device record. Set `-1` for no department. `""` and `0` fail at plan time. Remove the attribute to keep the current department.
 - `email` (String) **"Email Address"** for the device record.
 - `phone` (String) **"Phone Number"** for the device record.
 - `position` (String) **"Position"** for the device record.
