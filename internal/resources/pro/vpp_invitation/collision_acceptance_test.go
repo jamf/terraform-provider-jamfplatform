@@ -26,7 +26,7 @@ func collisionInvitation(label, name string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_invitation" %q {
   name                        = %q
-  vpp_account_id              = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_account_id              = data.jamfplatform_pro_volume_purchasing_location.vpp.id
   distribution_method         = "Make available in Self Service only"
   auto_register_managed_users = false
 }
@@ -40,11 +40,11 @@ resource "jamfplatform_pro_vpp_invitation" %q {
 // the same config applies and the tenant holds two.
 func TestAccResource_ProVPPInvitation_StrictNameCollision(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-collide-vppi-" + suffix
 
-	first := vppLocationFixture(token, suffix) + collisionInvitation("existing", name)
+	first := vppLocationFixture(locationID, suffix) + collisionInvitation("existing", name)
 	both := first + collisionInvitation("duplicate", strings.ToUpper(name))
 
 	resource.Test(t, resource.TestCase{
@@ -72,12 +72,12 @@ func TestAccResource_ProVPPInvitation_StrictNameCollision(t *testing.T) {
 
 func TestAccResource_ProVPPInvitation_RenameIntoManagedNameOffersNoImport(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	suffix := testhelpers.RunSuffix()
 	one := "tf-acc-collide-managed-one-" + suffix
 	two := "tf-acc-collide-managed-two-" + suffix
 	pair := func(nameOne, nameTwo string) string {
-		return vppLocationFixture(token, suffix) + collisionInvitation("one", nameOne) + collisionInvitation("two", nameTwo)
+		return vppLocationFixture(locationID, suffix) + collisionInvitation("one", nameOne) + collisionInvitation("two", nameTwo)
 	}
 
 	resource.Test(t, resource.TestCase{

@@ -236,7 +236,7 @@ Required:
 
 Optional:
 
-- `category_id` (String) Jamf Pro category ID. Use `-1` to clear. Omit to leave the current value untouched.
+- `category_id` (String) Jamf Pro category ID. Set `-1` to clear the category. Removing the attribute leaves the current category in place.
 - `date_time_limitations` (Attributes, Deprecated) ~> **Deprecated.** Deprecated: use the top-level `server_side_limitations` (`activation_date`, `expiration_date`) and `client_side_limitations` (`no_execute_on`, `no_execute_start`, `no_execute_end`) instead, which mirror the admin UI's two tabs. `general.date_time_limitations` may be removed on or after 2027-02-15.
 
 Schedule limitations for when the policy may run. Only the user-authored date/time inputs are surfaced. The derived epoch and UTC siblings Jamf Pro also stores are deterministic transforms of `activation_date` / `expiration_date`, reproducible client-side with Terraform stdlib functions such as `formatdate`. (see [below for nested schema](#nestedatt--general--date_time_limitations))
@@ -254,7 +254,7 @@ Read-only view of the network conditions under which the policy may run. Jamf Pr
 Read-only view of the per-policy overrides of tenant-wide defaults, matching the admin UI's "Override Default Settings" panel. Jamf Pro derives each attribute from a setting that lives elsewhere. Declare the block as `{}` to read the derived values into state. (see [below for nested schema](#nestedatt--general--override_default_settings))
 - `retry_attempts` (Number) Maximum retry attempts, 1–10, or `-1` for none. Any value above `-1` needs a `retry_event` other than `none`. Requires `frequency = "Once per computer"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
 - `retry_event` (String) When to retry a failed run: `none`, `trigger` (the policy's own trigger), or `check-in`. Requires `frequency = "Once per computer"`. Jamf Pro clears a policy's retry configuration under any other frequency. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
-- `site_id` (String) Jamf Pro site ID scoping the policy. Use `-1` for "no site". Omit to leave the current value untouched.
+- `site_id` (String) Jamf Pro site ID scoping the policy. Set `-1` to clear the site. Removing the attribute leaves the current site in place.
 - `target_drive` (String) Drive target (e.g. `/`). Omit to leave the current value untouched.
 - `trigger_checkin` (Boolean) Fire on managed check-in. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `trigger_enrollment_complete` (Boolean) Fire when device enrollment completes. Omit to leave the current value untouched; set `true`/`false` to change it.
@@ -333,8 +333,8 @@ Optional:
 
 - `action` (String) Disk encryption action. One of `apply`, `remediate`, `none`; `none` turns the payload off. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 - `auth_restart` (Boolean) Use authenticated restart. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `disk_encryption_configuration_id` (Number) Disk encryption configuration ID to apply. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
-- `remediate_disk_encryption_configuration_id` (Number) Disk encryption configuration ID used to remediate. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.
+- `disk_encryption_configuration_id` (Number) Disk encryption configuration ID to apply. Jamf Pro keeps the ID while `action` is `apply` and drops it for any other action, so change `action` to stop applying a configuration. Omit to keep the current value. The provider rejects `-1` and `0` at plan time.
+- `remediate_disk_encryption_configuration_id` (Number) Disk encryption configuration ID used to remediate. Jamf Pro keeps the ID while `remediate_key_type` is `Institutional` or `Individual And Institutional` and drops it for `Individual`, so change `remediate_key_type` to stop remediating with a configuration. Omit to keep the current value. The provider rejects `-1` and `0` at plan time.
 - `remediate_key_type` (String) Key type for remediation. One of `Individual`, `Institutional`, `Individual And Institutional`. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.
 
 
@@ -680,7 +680,7 @@ Read-Only:
 
 Optional:
 
-- `id` (String) Icon ID assigned by Jamf Pro.
+- `id` (String) Icon ID assigned by Jamf Pro. Jamf Pro cannot remove an icon once set, so you can replace the icon but not clear it. Omit the attribute to keep the current icon. The provider rejects `""`, `-1` and `0` at plan time.
 
 Read-Only:
 

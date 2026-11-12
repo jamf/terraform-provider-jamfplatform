@@ -93,13 +93,13 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "example" {
 **"Automatically advance through Setup Assistant (macOS 11 or later only)"** in the Jamf Pro admin UI.
 - `automatically_advance_through_setup_assistant` (Boolean) **"Automatically advance through Setup Assistant (macOS 11 or later only)"** in the Jamf Pro admin UI. Automatically skips every Setup Assistant screen that can be skipped during enrollment. Replaces `auto_advance_setup`; set one or the other.
 - `configuration_profile_ids` (Set of String) **"Configuration Profiles"** pane of the Jamf Pro admin UI: the IDs of the configuration profiles to install during Setup Assistant. Replaces `prestage_installed_profile_ids`; set one or the other. Leave it empty to install none.
-- `custom_package_distribution_point_id` (String) Distribution point ID used to serve `custom_package_ids`. Sentinels: `"-1"` = none, `"-2"` = cloud distribution point, positive integer = specific DP ID.
+- `custom_package_distribution_point_id` (String) Distribution point ID used to serve `custom_package_ids`. Set `-1` for none or `-2` for the cloud distribution point. The provider rejects `""` and `0` at plan time.
 - `custom_package_ids` (Set of String) Set of custom package IDs to install during Setup Assistant. Paired with `custom_package_distribution_point_id`.
 - `default_prestage` (Boolean) When true, this PreStage becomes the tenant default. Jamf Pro enforces at most one default PreStage; setting this to `true` may cause another PreStage to be silently demoted.
 - `department` (String) **"Department"** label shown during Setup Assistant. Free-form text, *not* the department ID (`location_information.department_id`).
 - `enable_recovery_lock` (Boolean) **"Set Recovery Lock Password"** in the Jamf Pro admin UI. Turns Recovery Lock on; `recovery_lock_password_type` chooses how the password is provisioned.
-- `enrollment_customization_id` (String) Enrollment customization ID to apply during Setup Assistant. Sentinel `"0"` = no customization; it is `"0"`, not `"-1"`.
-- `enrollment_site_id` (String) Site ID applied to devices enrolled through this PreStage. Sentinel `"-1"` = no site.
+- `enrollment_customization_id` (String) Enrollment customization ID to apply during Setup Assistant. Set `0` for no customization. `-1` and `""` fail at plan time. Remove the attribute to keep the current customization.
+- `enrollment_site_id` (String) Site ID applied to devices enrolled through this PreStage. Set `-1` for no site. `""` and `0` fail at plan time. Remove the attribute to keep the current site.
 - `install_profiles_during_setup` (Boolean, Deprecated) ~> Deprecated: the provider now derives this from `configuration_profile_ids`, so remove it. The provider will not remove `install_profiles_during_setup` before 2027-02-03.
 
 The provider sends `true` whenever `configuration_profile_ids` holds a profile. Setting `false` alongside profiles is a configuration error.
@@ -124,7 +124,7 @@ The provider sends `true` whenever `configuration_profile_ids` holds a profile. 
 
 **"Configuration Profiles"** pane of the Jamf Pro admin UI: the IDs of the configuration profiles to install during Setup Assistant.
 - `prestage_minimum_os_target_version_type` (String) **"Minimum required macOS version"** in the Jamf Pro admin UI: the enforcement mode. One of `NO_ENFORCEMENT`, `MINIMUM_OS_LATEST_VERSION`, `MINIMUM_OS_LATEST_MAJOR_VERSION`, `MINIMUM_OS_LATEST_MINOR_VERSION`, `MINIMUM_OS_SPECIFIC_VERSION`. Pair `MINIMUM_OS_SPECIFIC_VERSION` with `minimum_os_specific_version`.
-- `psso_config_profile_id` (String) Configuration profile ID for attended Platform SSO. Mutually exclusive with `platform_sso_app_bundle_id`, which configures unattended Platform SSO. Incompatible with an enrollment customization, so `enrollment_customization_id` must be `"0"`. Sentinel `"-1"` means none.
+- `psso_config_profile_id` (String) Configuration profile ID for attended Platform SSO. Mutually exclusive with `platform_sso_app_bundle_id`, which configures unattended Platform SSO. Incompatible with an enrollment customization, so `enrollment_customization_id` must be `"0"`. Set `-1` for none. While `psso_enabled` is `true`, Jamf Pro requires a profile, so set `psso_enabled` to `false` before clearing it. The provider rejects `""` and `0` at plan time.
 - `psso_enabled` (Boolean) **"Enable Simplified Setup for Platform Single Sign-on (macOS 26 or later)"** in the Jamf Pro admin UI. Whether Platform SSO is enabled for this PreStage.
 - `purchasing_information` (Attributes) **"Purchasing Information"** in the Jamf Pro admin UI. Supply the block to manage this section, even empty as `purchasing_information = {}`. Omitting it produces drift on the next refresh, because Jamf Pro always returns a populated block. (see [below for nested schema](#nestedatt--purchasing_information))
 - `recovery_lock_password` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Recovery Lock plaintext password. Only meaningful when `recovery_lock_password_type = "MANUAL"` AND `enable_recovery_lock = true`. WriteOnly: the value is sent to Jamf Pro but never persisted in Terraform state. Bump `recovery_lock_password_wo_version` to force the provider to re-send the current value.
@@ -187,8 +187,8 @@ The provider sends `true` whenever the block sets any other account setting.
 
 Optional:
 
-- `building_id` (String) Building ID for the device record. Sentinel `"-1"` = no building.
-- `department_id` (String) Department ID for the device record. Sentinel `"-1"` = no department.
+- `building_id` (String) Building ID for the device record. Set `-1` for no building. `""` and `0` fail at plan time. Remove the attribute to keep the current building.
+- `department_id` (String) Department ID for the device record. Set `-1` for no department. `""` and `0` fail at plan time. Remove the attribute to keep the current department.
 - `email` (String) **"Email Address"** for the device record.
 - `phone` (String) **"Phone Number"** for the device record.
 - `position` (String) **"Position"** for the device record.

@@ -34,11 +34,11 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
 // configured, and the deprecated attribute follows the replacement once switched.
 func TestAccResource_ProMobileDevicePrestageEnrollment_SkipSetupItems_RenamedPanes(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-skip-rename-" + suffix
-	ade := adeFixtureBlock(suffix, token)
+	ade := adeFixtureBlock(adeID)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
@@ -76,7 +76,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_SkipSetupItems_RenamedPan
 // pane under both its deprecated and its current name fails at plan time.
 func TestAccResource_ProMobileDevicePrestageEnrollment_SkipSetupItems_BothNamesConflict(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-skip-conflict-" + suffix
@@ -85,7 +85,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_SkipSetupItems_BothNamesC
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:      adeFixtureBlock(suffix, token) + skipItemsConfig(name, "{ tos = true, terms_and_conditions = true }"),
+				Config:      adeFixtureBlock(adeID) + skipItemsConfig(name, "{ tos = true, terms_and_conditions = true }"),
 				ExpectError: regexp.MustCompile(`(?s)tos.*terms_and_conditions|terms_and_conditions.*tos`),
 			},
 		},
@@ -96,11 +96,11 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_SkipSetupItems_BothNamesC
 // the Jamf Pro admin UI lists and the provider did not expose before.
 func TestAccResource_ProMobileDevicePrestageEnrollment_SkipSetupItems_LiquidGlass(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-skip-liquid-" + suffix
-	ade := adeFixtureBlock(suffix, token)
+	ade := adeFixtureBlock(adeID)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,

@@ -26,7 +26,7 @@ func collisionAssignment(label, name string) string {
 	return fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_assignment" %q {
   name                 = %q
-  vpp_admin_account_id = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_admin_account_id = data.jamfplatform_pro_volume_purchasing_location.vpp.id
 }
 `, label, name)
 }
@@ -38,11 +38,11 @@ resource "jamfplatform_pro_vpp_assignment" %q {
 // the same config applies and the tenant holds two.
 func TestAccResource_ProVPPAssignment_StrictNameCollision(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-collide-vppa-" + suffix
 
-	first := vppLocationFixture(token, suffix) + collisionAssignment("existing", name)
+	first := vppLocationFixture(locationID, suffix) + collisionAssignment("existing", name)
 	both := first + collisionAssignment("duplicate", strings.ToUpper(name))
 
 	resource.Test(t, resource.TestCase{
@@ -70,8 +70,8 @@ func TestAccResource_ProVPPAssignment_StrictNameCollision(t *testing.T) {
 
 // twoAssignmentsConfig declares two assignments on one location. The second
 // depends on the first so the creates are sequential.
-func twoAssignmentsConfig(token, suffix, nameOne, nameTwo string) string {
-	return collisionProviderBlock + vppLocationFixture(token, suffix) +
+func twoAssignmentsConfig(locationID, suffix, nameOne, nameTwo string) string {
+	return collisionProviderBlock + vppLocationFixture(locationID, suffix) +
 		collisionAssignment("one", nameOne) +
 		strings.Replace(
 			collisionAssignment("two", nameTwo),
@@ -88,7 +88,7 @@ func twoAssignmentsConfig(token, suffix, nameOne, nameTwo string) string {
 // fires.
 func TestAccResource_ProVPPAssignment_RenameIntoManagedNameOffersNoImport(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	suffix := testhelpers.RunSuffix()
 	one := "tf-acc-collide-managed-one-" + suffix
 	two := "tf-acc-collide-managed-two-" + suffix
@@ -98,10 +98,10 @@ func TestAccResource_ProVPPAssignment_RenameIntoManagedNameOffersNoImport(t *tes
 		CheckDestroy:             testAccCheckVPPAssignmentDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: twoAssignmentsConfig(token, suffix, one, two),
+				Config: twoAssignmentsConfig(locationID, suffix, one, two),
 			},
 			{
-				Config:      twoAssignmentsConfig(token, suffix, one, one),
+				Config:      twoAssignmentsConfig(locationID, suffix, one, one),
 				ExpectError: regexp.MustCompile(`(?s)Name\s+already\s+in\s+use.*already\s+managed\s+by\s+another\s+resource`),
 			},
 		},

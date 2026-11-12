@@ -38,6 +38,15 @@ func PositiveReferenceID(noun, hint string) validator.String {
 	return referenceIDVariantValidator{noun: noun, hint: hint}
 }
 
+// PositiveReferenceIDOr returns a validator.String accepting a positive
+// canonical decimal ID or one of the given sentinels, and refusing "-1" unless it
+// is listed. It fits a field where "none" is a sentinel other than "-1", such as
+// "0" on an enrollment customization. hint finishes the diagnostic and may be
+// empty.
+func PositiveReferenceIDOr(noun, hint string, sentinels ...string) validator.String {
+	return referenceIDVariantValidator{noun: noun, sentinels: sentinels, hint: hint}
+}
+
 func (v referenceIDVariantValidator) quoted() string {
 	q := make([]string, len(v.sentinels))
 	for i, s := range v.sentinels {

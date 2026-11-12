@@ -91,7 +91,7 @@ output "vpp_prod_purchased_apps" {
 - `auto_register_managed_users` (Boolean) Whether Jamf Pro should auto-register managed users associated with this location. Jamf Pro decides the default on create. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `automatically_populate_purchased_content` (Boolean) Whether Jamf Pro should automatically populate purchased content from Apple after every sync. Jamf Pro decides the default on create. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `send_notification_when_no_longer_assigned` (Boolean) Whether Jamf Pro should send a notification when a previously-assigned content item is no longer assigned to the location. Jamf Pro decides the default on create. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `site_id` (String) Optional Jamf Pro site ID to associate with this VPP location. Jamf Pro reports the sentinel `"-1"` when no site is set; the provider mirrors whatever Jamf Pro reports into state and does not apply a default. Omit to leave the current value untouched; set `-1` to clear the site association.
+- `site_id` (String) Optional Jamf Pro site ID to associate with this VPP location. Jamf Pro reports the sentinel `"-1"` when no site is set; the provider mirrors whatever Jamf Pro reports into state and does not apply a default. Omit to leave the current value untouched; set `-1` to clear the site association. The provider rejects `""` and `0` at plan time.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only

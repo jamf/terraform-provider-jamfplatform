@@ -150,9 +150,9 @@ func (r *MobileDevicePrestageEnrollmentResource) Schema(ctx context.Context, req
 			"language": optString("Default Setup Assistant language (ISO-639 code, e.g. `\"en\"`). Invalid values are silently coerced to empty by Jamf Pro."),
 			"region":   optString("Default Setup Assistant region (ISO-3166 code, e.g. `\"US\"`). Invalid values are silently coerced to empty by Jamf Pro."),
 
-			"enrollment_site_id":          optString("Site ID applied to devices enrolled through this PreStage. Sentinel `\"-1\"` = no site."),
-			"enrollment_customization_id": optString("Enrollment customization ID to apply during Setup Assistant. Sentinel `\"0\"` = no customization (note: `\"0\"`, not `\"-1\"`). Invalid IDs are silently coerced to `\"0\"`."),
-			"rts_config_profile_id":       optString("Return to Service configuration profile ID. Sentinel `\"-1\"` = none."),
+			"enrollment_site_id":          optStringRef("Site ID applied to devices enrolled through this PreStage. Set `-1` for no site. `\"\"` and `0` fail at plan time. Remove the attribute to keep the current site.", "site"),
+			"enrollment_customization_id": optStringValidated("Enrollment customization ID to apply during Setup Assistant. Set `0` for no customization. `-1` and `\"\"` fail at plan time. Remove the attribute to keep the current customization.", validators.PositiveReferenceIDOr("enrollment customization", "Set \"0\" for no customization.", "0")),
+			"rts_config_profile_id":       optStringRef("Return to Service configuration profile ID. Set `-1` for none. `\"\"` and `0` fail at plan time. Remove the attribute to keep the current profile.", "configuration profile"),
 
 			"maximum_shared_accounts": optInt64("**\"Number of users\"** for Shared iPad."),
 			"temporary_session_timeout": schema.Int64Attribute{
@@ -323,6 +323,21 @@ func optString(md string) schema.Attribute {
 	}
 }
 
+// optStringRef is optString for a reference ID whose clear value is "-1"
+// (wire-probed 2026-11-12, issue #573).
+// optStringValidated is optString with validators.
+func optStringValidated(md string, v ...validator.String) schema.Attribute {
+	a := optString(md).(schema.StringAttribute)
+	a.Validators = v
+	return a
+}
+
+func optStringRef(md, noun string) schema.Attribute {
+	a := optString(md).(schema.StringAttribute)
+	a.Validators = []validator.String{validators.ClearableReferenceID(noun)}
+	return a
+}
+
 func optInt64(md string) schema.Attribute {
 	return schema.Int64Attribute{
 		MarkdownDescription: md,
@@ -420,8 +435,8 @@ func locationInformationSchema() schema.SingleNestedAttribute {
 			"email":         optString("**\"Email Address\"** for the device record."),
 			"room":          optString("**\"Room\"** for the device record."),
 			"position":      optString("**\"Position\"** for the device record."),
-			"building_id":   optString("Building ID for the device record. Sentinel `\"-1\"` = no building."),
-			"department_id": optString("Department ID for the device record. Sentinel `\"-1\"` = no department."),
+			"building_id":   optStringRef("Building ID for the device record. Set `-1` for no building. `\"\"` and `0` fail at plan time. Remove the attribute to keep the current building.", "building"),
+			"department_id": optStringRef("Department ID for the device record. Set `-1` for no department. `\"\"` and `0` fail at plan time. Remove the attribute to keep the current department.", "department"),
 		},
 	}
 }

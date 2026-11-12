@@ -298,7 +298,7 @@ Optional:
 Optional:
 
 - `assign_vpp_device_based_licenses` (Boolean) Assign VPP device-based licenses. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `vpp_admin_account_id` (String) VPP admin account ID. `-1` when the app is not VPP-backed. Omit to leave the current value untouched.
+- `vpp_admin_account_id` (String) VPP admin account ID. `-1` when the app is not VPP-backed. Jamf Pro accepts `-1` only while `assign_vpp_device_based_licenses` is `false`, so set both to stop using volume purchasing. The provider rejects `""` and `0` at plan time. Omit to leave the current value untouched.
 
 Read-Only:
 

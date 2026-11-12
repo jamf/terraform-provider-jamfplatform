@@ -7,6 +7,7 @@ package location
 
 import (
 	"context"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -170,9 +171,10 @@ func (r *VolumePurchasingLocationResource) Schema(ctx context.Context, req resou
 				MarkdownDescription: "Optional Jamf Pro site ID to associate with this VPP location. Jamf Pro " +
 					"reports the sentinel `\"-1\"` when no site is set; the provider mirrors whatever Jamf Pro " +
 					"reports into state and does not apply a default. Omit to leave the current value " +
-					"untouched; set `-1` to clear the site association.",
-				Optional: true,
-				Computed: true,
+					"untouched; set `-1` to clear the site association. The provider rejects `\"\"` and `0` at plan time.",
+				Optional:   true,
+				Computed:   true,
+				Validators: []validator.String{commonvalidators.ClearableReferenceID("site")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
