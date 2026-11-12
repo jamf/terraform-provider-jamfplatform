@@ -413,13 +413,23 @@ func flattenSelfService(ss *proclassic.OsXConfigurationProfileSelfService, state
 // returning an empty (non-nil) slice when the server carries none so a managed
 // attribute can converge on a declared `[]`.
 //
-// The items come back in the order of order, matched by category id, with any
-// id order does not name appended in wire order. Jamf Pro does not keep the
-// order a list was written in: categories c then a read back as a then c
-// (wire-probed 2026-10-14), so the wire order carries no meaning, and adopting
-// it failed every apply that listed categories in another order with "Provider
-// produced inconsistent result after apply". order is the planned list on
-// create and update and the prior state on read.
+// The items come back in the order of order, aligned by category id through
+// helpers.AlignToPriorFunc, with any id order does not name appended in wire
+// order. Jamf Pro does not keep the order a list was written in: categories c
+// then a read back as a then c (wire-probed 2026-10-14), so the wire order
+// carries no meaning, and adopting it failed every apply that listed
+// categories in another order with "Provider produced inconsistent result
+// after apply". order is the planned list on create and update and the prior
+// state on read; with none (import, config generation) the state takes the
+// wire order.
+//
+// An element of order whose id is unknown or null takes the first wire
+// category no other element claimed, at its own position, among those whose
+// display_in and feature_in agree with whatever the element already knows; a
+// sort by key would push it to the end and swap it with its neighbour (issue
+// #568). Terraform re-plans before Create, so an id interpolated from a
+// category created in the same apply is already known here (verified by
+// acceptance, 2026-11-11); the keyless path is a guard, not a live route.
 func flattenSelfServiceCategories(c *proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategories, order []SelfServiceCategoryItem) []SelfServiceCategoryItem {
 	if c == nil || c.Category == nil {
 		return []SelfServiceCategoryItem{}
@@ -434,7 +444,37 @@ func flattenSelfServiceCategories(c *proclassic.OsXConfigurationProfileSelfServi
 			FeatureIn: helpers.BoolPointerValueOrNull(cat.FeatureIn),
 		})
 	}
-	return helpers.OrderByKey(items, order, func(it SelfServiceCategoryItem) string { return it.ID.ValueString() })
+	idx, _ := helpers.AlignToPriorFunc(items, order, selfServiceCategoryKey, selfServiceCategoryPriorKey, selfServiceCategoryFits)
+	out := make([]SelfServiceCategoryItem, 0, len(idx))
+	for _, i := range idx {
+		out = append(out, items[i])
+	}
+	return out
+}
+
+func selfServiceCategoryKey(it SelfServiceCategoryItem) string { return it.ID.ValueString() }
+
+// selfServiceCategoryPriorKey reports no key for an id that is unknown or
+// null, so helpers.AlignToPriorFunc places the element by position instead of
+// matching it against nothing.
+func selfServiceCategoryPriorKey(it SelfServiceCategoryItem) (string, bool) {
+	if it.ID.IsUnknown() || it.ID.IsNull() {
+		return "", false
+	}
+	return it.ID.ValueString(), true
+}
+
+// selfServiceCategoryFits rejects a wire category for a keyless element only
+// when a flag both sides know disagrees.
+func selfServiceCategoryFits(wire, prior SelfServiceCategoryItem) bool {
+	return boolsAgree(wire.DisplayIn, prior.DisplayIn) && boolsAgree(wire.FeatureIn, prior.FeatureIn)
+}
+
+func boolsAgree(a, b types.Bool) bool {
+	if a.IsNull() || a.IsUnknown() || b.IsNull() || b.IsUnknown() {
+		return true
+	}
+	return a.ValueBool() == b.ValueBool()
 }
 
 func idPointerToString(id *int) types.String {

@@ -6,6 +6,7 @@ package macos_configuration_profile
 import (
 	"context"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -652,5 +653,62 @@ func TestFlattenSelfService_WireTrimsTrailingSpace(t *testing.T) {
 	}
 	if got := state.NotificationSubject.ValueString(); got != "FileVault (managed)" {
 		t.Errorf("notification_subject: a real server edit must win, got %q", got)
+	}
+}
+
+// TestFlattenSelfServiceCategories_UnknownIDKeepsItsPosition pins issue #568:
+// a planned category whose id is unknown (created in the same apply) takes the
+// wire category no other element claimed, at its own position. Sorting by key
+// pushed it to the end, so planned [new, 5] over wire [3, 5] read back [5, 3].
+func TestFlattenSelfServiceCategories_UnknownIDKeepsItsPosition(t *testing.T) {
+	t.Parallel()
+	type wireCat struct {
+		id      int
+		feature bool
+	}
+	wireOf := func(cs ...wireCat) *proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategories {
+		items := make([]proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategoriesCategoryItem, 0, len(cs))
+		for _, c := range cs {
+			id, name, display, feature := c.id, "n"+strconv.Itoa(c.id), true, c.feature
+			items = append(items, proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategoriesCategoryItem{ID: &id, Name: &name, DisplayIn: &display, FeatureIn: &feature})
+		}
+		return &proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategories{Category: &items}
+	}
+	unknown := SelfServiceCategoryItem{ID: types.StringUnknown(), Name: types.StringUnknown(), DisplayIn: types.BoolUnknown(), FeatureIn: types.BoolUnknown()}
+	known := func(id string) SelfServiceCategoryItem {
+		return SelfServiceCategoryItem{ID: types.StringValue(id), Name: types.StringUnknown(), DisplayIn: types.BoolUnknown(), FeatureIn: types.BoolUnknown()}
+	}
+	withFeature := func(it SelfServiceCategoryItem, v bool) SelfServiceCategoryItem {
+		it.FeatureIn = types.BoolValue(v)
+		return it
+	}
+	tests := []struct {
+		name  string
+		wire  *proclassic.OsXConfigurationProfileSelfServiceSelfServiceCategories
+		order []SelfServiceCategoryItem
+		want  []string
+	}{
+		{"unknown first", wireOf(wireCat{3, false}, wireCat{5, false}), []SelfServiceCategoryItem{unknown, known("5")}, []string{"3=n3", "5=n5"}},
+		{"unknown last", wireOf(wireCat{3, false}, wireCat{5, false}), []SelfServiceCategoryItem{known("5"), unknown}, []string{"5=n5", "3=n3"}},
+		{"two unknowns take wire order", wireOf(wireCat{3, false}, wireCat{4, false}), []SelfServiceCategoryItem{unknown, unknown}, []string{"3=n3", "4=n4"}},
+		{"null id is keyless too", wireOf(wireCat{3, false}, wireCat{5, false}), []SelfServiceCategoryItem{{ID: types.StringNull()}, known("5")}, []string{"3=n3", "5=n5"}},
+		{
+			"known feature_in steers two unknowns",
+			wireOf(wireCat{3, false}, wireCat{4, true}),
+			[]SelfServiceCategoryItem{withFeature(unknown, true), withFeature(unknown, false)},
+			[]string{"4=n4", "3=n3"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var got []string
+			for _, c := range flattenSelfServiceCategories(tt.wire, tt.order) {
+				got = append(got, c.ID.ValueString()+"="+c.Name.ValueString())
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

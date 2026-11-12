@@ -230,3 +230,37 @@ func TestAlignToPrior_SameIDPackagesKeepInsertionOrder(t *testing.T) {
 		}
 	}
 }
+
+// TestAlignToPrior_IDSortedCategories covers the configuration profiles' Self
+// Service categories, which Jamf Pro returns sorted by id whatever the written
+// order. "?" stands for an id unknown at plan time, a category created in the
+// same apply: it must keep its own position rather than trail the list
+// (issue #568).
+func TestAlignToPrior_IDSortedCategories(t *testing.T) {
+	key := func(s string) string { return s }
+	priorKey := func(s string) (string, bool) { return s, s != "?" }
+	cases := map[string]struct {
+		server, prior, want []string
+	}{
+		"server sorted, planned descending":   {server: []string{"1", "2", "3"}, prior: []string{"3", "2", "1"}, want: []string{"3", "2", "1"}},
+		"no prior keeps server order":         {server: []string{"1", "3", "2"}, prior: nil, want: []string{"1", "3", "2"}},
+		"unnamed entries trail in wire order": {server: []string{"1", "4", "2", "5"}, prior: []string{"2", "1"}, want: []string{"2", "1", "4", "5"}},
+		"prior names an id the server lost":   {server: []string{"1", "2"}, prior: []string{"9", "2", "1"}, want: []string{"2", "1"}},
+		"repeated prior key pairs once":       {server: []string{"1", "2"}, prior: []string{"2", "1", "2"}, want: []string{"2", "1"}},
+		"unknown first":                       {server: []string{"3", "5"}, prior: []string{"?", "5"}, want: []string{"3", "5"}},
+		"unknown last":                        {server: []string{"3", "5"}, prior: []string{"5", "?"}, want: []string{"5", "3"}},
+		"two unknowns take server order":      {server: []string{"3", "4"}, prior: []string{"?", "?"}, want: []string{"3", "4"}},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			order, _ := AlignToPrior(tc.server, tc.prior, key, priorKey)
+			got := make([]string, 0, len(order))
+			for _, s := range order {
+				got = append(got, tc.server[s])
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("AlignToPrior(%v, %v) = %v, want %v", tc.server, tc.prior, got, tc.want)
+			}
+		})
+	}
+}

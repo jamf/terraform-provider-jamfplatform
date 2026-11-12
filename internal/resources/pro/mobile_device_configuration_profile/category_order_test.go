@@ -5,6 +5,7 @@ package mobile_device_configuration_profile
 
 import (
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -62,4 +63,45 @@ func TestFlattenSelfService_CategoriesInPlannedOrder(t *testing.T) {
 			t.Errorf("got %v, want %v", got, want)
 		}
 	})
+}
+
+// TestFlattenSelfServiceCategories_UnknownIDKeepsItsPosition pins issue #568:
+// a planned category whose id is unknown (created in the same apply) takes the
+// wire category no other element claimed, at its own position, and carries
+// that category's name. Sorting by key pushed it to the end, so planned
+// [new, 5] over wire [3, 5] read back [5, 3].
+func TestFlattenSelfServiceCategories_UnknownIDKeepsItsPosition(t *testing.T) {
+	t.Parallel()
+	wireOf := func(ids ...int) *proclassic.MobileDeviceConfigurationProfileSelfServiceSelfServiceCategories {
+		items := make([]proclassic.MobileDeviceConfigurationProfileSelfServiceSelfServiceCategoriesCategoryItem, 0, len(ids))
+		for _, id := range ids {
+			name := "n" + strconv.Itoa(id)
+			items = append(items, proclassic.MobileDeviceConfigurationProfileSelfServiceSelfServiceCategoriesCategoryItem{ID: &id, Name: &name})
+		}
+		return &proclassic.MobileDeviceConfigurationProfileSelfServiceSelfServiceCategories{Category: &items}
+	}
+	unknown := SelfServiceCategoryItem{ID: types.StringUnknown(), Name: types.StringUnknown()}
+	known := func(id string) SelfServiceCategoryItem {
+		return SelfServiceCategoryItem{ID: types.StringValue(id), Name: types.StringUnknown()}
+	}
+	tests := []struct {
+		name  string
+		wire  []int
+		order []SelfServiceCategoryItem
+		want  []string
+	}{
+		{"unknown first", []int{3, 5}, []SelfServiceCategoryItem{unknown, known("5")}, []string{"3=n3", "5=n5"}},
+		{"unknown last", []int{3, 5}, []SelfServiceCategoryItem{known("5"), unknown}, []string{"5=n5", "3=n3"}},
+		{"two unknowns take wire order", []int{3, 4}, []SelfServiceCategoryItem{unknown, unknown}, []string{"3=n3", "4=n4"}},
+		{"null id is keyless too", []int{3, 5}, []SelfServiceCategoryItem{{ID: types.StringNull()}, known("5")}, []string{"3=n3", "5=n5"}},
+		{"unclaimed wire entry trails", []int{3, 5, 7}, []SelfServiceCategoryItem{known("7"), unknown}, []string{"7=n7", "3=n3", "5=n5"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := categoryIDsAndNames(flattenSelfServiceCategories(wireOf(tt.wire...), tt.order)); !slices.Equal(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
