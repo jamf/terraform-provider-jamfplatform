@@ -224,7 +224,21 @@ func TestAccResource_ProEbook_AppStoreServerDerived(t *testing.T) {
 					resource.TestCheckResourceAttr(ebookResourceAddr, "general.name", name),
 					// file_type is server-derived (Computed) — must be known after apply.
 					resource.TestCheckResourceAttrSet(ebookResourceAddr, "general.file_type"),
+					// #583: Read must never store the reported IBOOK, which the schema rejects.
+					resource.TestCheckResourceAttrWith(ebookResourceAddr, "general.file_type", func(v string) error {
+						if strings.EqualFold(v, "IBOOK") {
+							return fmt.Errorf("file_type = %q: not a value the schema accepts", v)
+						}
+						return nil
+					}),
 				),
+			},
+			{
+				ResourceName:      ebookResourceAddr,
+				ImportState:       true,
+				ImportStateVerify: true,
+				// Import hydrates general only; scope and self_service are optional sections.
+				ImportStateVerifyIgnore: []string{"general.file_type", "timeouts", "scope", "self_service"},
 			},
 		},
 	})

@@ -4,8 +4,12 @@
 package ebook
 
 import (
+	"context"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 )
@@ -128,5 +132,26 @@ func TestFlattenEbookSelfService_NotificationDriftWhenEchoed(t *testing.T) {
 	}
 	if ss.NotificationEnabled.ValueBool() {
 		t.Error("notification_enabled: wire false must win over state true")
+	}
+}
+
+// TestFlattenEbookGeneral_IBookReadIsAcceptedBySchema pins #583: Jamf Pro
+// reports an iBooks file as IBOOK, and what Read stores must pass the same
+// validator that gates config, or generated config and imports fail validate.
+func TestFlattenEbookGeneral_IBookReadIsAcceptedBySchema(t *testing.T) {
+	t.Parallel()
+	for _, wire := range []string{"IBOOK", "ibook"} {
+		general := &EbookGeneralModel{FileType: types.StringNull()}
+		flattenEbookGeneral(&proclassic.EbookGeneral{Name: new("book"), FileType: new(wire)}, general)
+		got := general.FileType.ValueString()
+		if got != ebookFileTypeIBOOKS {
+			t.Errorf("wire %q: file_type = %q, want %q", wire, got, ebookFileTypeIBOOKS)
+		}
+		var resp validator.StringResponse
+		stringvalidator.OneOfCaseInsensitive(ebookFileTypes...).ValidateString(context.Background(),
+			validator.StringRequest{Path: path.Root("general").AtName("file_type"), ConfigValue: general.FileType}, &resp)
+		if resp.Diagnostics.HasError() {
+			t.Errorf("wire %q: stored value %q rejected by schema: %v", wire, got, resp.Diagnostics)
+		}
 	}
 }
