@@ -8,6 +8,7 @@ package automated_device_enrollment
 
 import (
 	"context"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -160,8 +161,9 @@ func (r *AutomatedDeviceEnrollmentResource) Schema(ctx context.Context, req reso
 					"reports the sentinel `\"-1\"` when no site is set. The provider mirrors whatever Jamf Pro " +
 					"reports into state and applies no default. Omit to leave the current value untouched; " +
 					"set `-1` to clear it.",
-				Optional: true,
-				Computed: true,
+				Optional:   true,
+				Computed:   true,
+				Validators: []validator.String{commonvalidators.ClearableReferenceID("site")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -171,8 +173,9 @@ func (r *AutomatedDeviceEnrollmentResource) Schema(ctx context.Context, req reso
 					"instance. Jamf Pro reports the sentinel `\"-1\"` when no supervision identity is set; the " +
 					"provider mirrors whatever Jamf Pro reports into state and does not apply a default. Omit " +
 					"to leave the current value untouched; set `-1` to clear it.",
-				Optional: true,
-				Computed: true,
+				Optional:   true,
+				Computed:   true,
+				Validators: []validator.String{commonvalidators.ClearableReferenceID("supervision identity")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},

@@ -158,14 +158,14 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 							stringvalidator.OneOf(proclassic.PolicyPostGeneralNetworkRequirementsValues()...),
 						},
 					},
-					"category_id": optComputedString("Jamf Pro category ID. Use `-1` to clear. Omit to leave the current value untouched."),
+					"category_id": optComputedStringValidated("Jamf Pro category ID. Set `-1` to clear the category. Removing the attribute leaves the current category in place.", commonvalidators.ClearableReferenceID("category")),
 					"category_name": schema.StringAttribute{
 						// No UseStateForUnknown: derived from the mutable category_id, so it
 						// must go Unknown when category_id changes. See STYLE_GUIDE §886.
 						MarkdownDescription: "Category display name. Returned by Jamf Pro; not user-settable.",
 						Computed:            true,
 					},
-					"site_id": optComputedString("Jamf Pro site ID scoping the policy. Use `-1` for \"no site\". Omit to leave the current value untouched."),
+					"site_id": optComputedStringValidated("Jamf Pro site ID scoping the policy. Set `-1` to clear the site. Removing the attribute leaves the current site in place.", commonvalidators.ClearableReferenceID("site")),
 					"site_name": schema.StringAttribute{
 						// No UseStateForUnknown: derived from the mutable site_id, so it
 						// must go Unknown when site_id changes. See STYLE_GUIDE §886.
@@ -250,7 +250,7 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						MarkdownDescription: "Self Service icon. Set `id` to the ID of an uploaded icon, such as a `jamfplatform_pro_icon`. Jamf Pro fills in `uri` and `filename` from it. The provider cannot upload icon bytes inline. Open an issue if you need that.",
 						Optional:            true,
 						Attributes: map[string]schema.Attribute{
-							"id":       optComputedString("Icon ID assigned by Jamf Pro."),
+							"id":       optComputedStringValidated("Icon ID assigned by Jamf Pro. Jamf Pro cannot remove an icon once set, so you can replace the icon but not clear it. Omit the attribute to keep the current icon. The provider rejects `\"\"`, `-1` and `0` at plan time.", commonvalidators.PositiveReferenceID("icon", "Jamf Pro cannot remove an icon once set. Omit the attribute to keep it.")),
 							"uri":      iconMirrorString("Icon URI. Jamf Pro sets it from the icon `id`."),
 							"filename": iconMirrorString("Icon filename. Jamf Pro sets it from the icon `id`."),
 						},
@@ -563,10 +563,10 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"action":                           optComputedEnum("Disk encryption action. One of "+markdownValueList(diskEncryptionActions)+"; `none` turns the payload off. Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.", diskEncryptionActions),
-					"disk_encryption_configuration_id": optComputedInt("Disk encryption configuration ID to apply. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it."),
+					"disk_encryption_configuration_id": optComputedIntValidated("Disk encryption configuration ID to apply. Jamf Pro keeps the ID while `action` is `apply` and drops it for any other action, so change `action` to stop applying a configuration. Omit to keep the current value. The provider rejects `-1` and `0` at plan time.", commonvalidators.PositiveReferenceIDInt64("disk encryption configuration", "Change `action` to stop applying a configuration.")),
 					"auth_restart":                     optComputedBool("Use authenticated restart. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"remediate_key_type":               optComputedEnum("Key type for remediation. One of "+markdownValueList(proclassic.PolicyPostDiskEncryptionRemediateKeyTypeValues())+". Omit to leave the current value untouched; an enum has no blank-clear, so set a concrete value to change it.", proclassic.PolicyPostDiskEncryptionRemediateKeyTypeValues()),
-					"remediate_disk_encryption_configuration_id": optComputedInt("Disk encryption configuration ID used to remediate. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it."),
+					"remediate_disk_encryption_configuration_id": optComputedIntValidated("Disk encryption configuration ID used to remediate. Jamf Pro keeps the ID while `remediate_key_type` is `Institutional` or `Individual And Institutional` and drops it for `Individual`, so change `remediate_key_type` to stop remediating with a configuration. Omit to keep the current value. The provider rejects `-1` and `0` at plan time.", commonvalidators.PositiveReferenceIDInt64("disk encryption configuration", "Change `remediate_key_type` to stop remediating with a configuration.")),
 				},
 			},
 			"timeouts": timeouts.Attributes(ctx, timeouts.Opts{
@@ -893,6 +893,21 @@ func optComputedIntRetryAttempts(desc string) schema.Int64Attribute {
 func optComputedIntBetween(desc string, lo, hi int64) schema.Int64Attribute {
 	a := optComputedInt(desc)
 	a.Validators = []validator.Int64{int64validator.Between(lo, hi)}
+	return a
+}
+
+// optComputedStringValidated is optComputedString with validators, for a
+// reference ID whose accepted values are wire-probed (issue #573).
+func optComputedStringValidated(desc string, v ...validator.String) schema.StringAttribute {
+	a := optComputedString(desc)
+	a.Validators = v
+	return a
+}
+
+// optComputedIntValidated is optComputedInt with validators.
+func optComputedIntValidated(desc string, v ...validator.Int64) schema.Int64Attribute {
+	a := optComputedInt(desc)
+	a.Validators = v
 	return a
 }
 

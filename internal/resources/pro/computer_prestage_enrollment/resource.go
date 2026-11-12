@@ -10,6 +10,7 @@ package computer_prestage_enrollment
 import (
 	"context"
 	"fmt"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -190,9 +191,10 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 				},
 			},
 			"enrollment_site_id": schema.StringAttribute{
-				MarkdownDescription: "Site ID applied to devices enrolled through this PreStage. Sentinel `\"-1\"` = no site.",
+				MarkdownDescription: "Site ID applied to devices enrolled through this PreStage. Set `-1` for no site. `\"\"` and `0` fail at plan time. Remove the attribute to keep the current site.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("site")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -204,9 +206,10 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 			"use_existing_site_membership":  renamedBool("**\"Use existing site membership, if applicable\"** in the Jamf Pro admin UI. Replaces `keep_existing_site_membership`; set one or the other.", "keep_existing_site_membership", true, topLevelBoolModifier),
 			"keep_existing_site_membership": deprecatedBool("**\"Use existing site membership, if applicable\"** in the Jamf Pro admin UI.", deprecationKeepExistingSiteMembership, "use_existing_site_membership", topLevelBoolModifier),
 			"enrollment_customization_id": schema.StringAttribute{
-				MarkdownDescription: "Enrollment customization ID to apply during Setup Assistant. Sentinel `\"0\"` = no customization; it is `\"0\"`, not `\"-1\"`.",
+				MarkdownDescription: "Enrollment customization ID to apply during Setup Assistant. Set `0` for no customization. `-1` and `\"\"` fail at plan time. Remove the attribute to keep the current customization.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.PositiveReferenceIDOr("enrollment customization", "Set \"0\" for no customization.", "0")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -271,9 +274,10 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 				},
 			},
 			"custom_package_distribution_point_id": schema.StringAttribute{
-				MarkdownDescription: "Distribution point ID used to serve `custom_package_ids`. Sentinels: `\"-1\"` = none, `\"-2\"` = cloud distribution point, positive integer = specific DP ID.",
+				MarkdownDescription: "Distribution point ID used to serve `custom_package_ids`. Set `-1` for none or `-2` for the cloud distribution point. The provider rejects `\"\"` and `0` at plan time.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceIDWith("distribution point", "-2")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -377,10 +381,11 @@ func (r *ComputerPrestageEnrollmentResource) Schema(ctx context.Context, req res
 				},
 			},
 			"psso_config_profile_id": schema.StringAttribute{
-				MarkdownDescription: "Configuration profile ID for attended Platform SSO. Mutually exclusive with `platform_sso_app_bundle_id`, which configures unattended Platform SSO. Incompatible with an enrollment customization, so `enrollment_customization_id` must be `\"0\"`. Sentinel `\"-1\"` means none.",
+				MarkdownDescription: "Configuration profile ID for attended Platform SSO. Mutually exclusive with `platform_sso_app_bundle_id`, which configures unattended Platform SSO. Incompatible with an enrollment customization, so `enrollment_customization_id` must be `\"0\"`. Set `-1` for none. While `psso_enabled` is `true`, Jamf Pro requires a profile, so set `psso_enabled` to `false` before clearing it. The provider rejects `\"\"` and `0` at plan time.",
 				Optional:            true,
 				Computed:            true,
 				Validators: []validator.String{
+					commonvalidators.ClearableReferenceID("configuration profile"),
 					pssoConfigProfileConflictsWithBundle(),
 					pssoAttendedConflictsWithEnrollmentCustomization(),
 				},
@@ -579,6 +584,14 @@ func optString(md string) schema.Attribute {
 	}
 }
 
+// optStringRef is optString for a reference ID whose clear value is "-1"
+// (wire-probed 2026-11-12, issue #573).
+func optStringRef(md, noun string) schema.Attribute {
+	a := optString(md).(schema.StringAttribute)
+	a.Validators = []validator.String{commonvalidators.ClearableReferenceID(noun)}
+	return a
+}
+
 func optInt64(md string) schema.Attribute {
 	return schema.Int64Attribute{
 		MarkdownDescription: md,
@@ -605,8 +618,8 @@ func locationInformationSchema() schema.SingleNestedAttribute {
 			"email":         optString("**\"Email Address\"** for the device record."),
 			"room":          optString("**\"Room\"** for the device record."),
 			"position":      optString("**\"Position\"** for the device record."),
-			"building_id":   optString("Building ID for the device record. Sentinel `\"-1\"` = no building."),
-			"department_id": optString("Department ID for the device record. Sentinel `\"-1\"` = no department."),
+			"building_id":   optStringRef("Building ID for the device record. Set `-1` for no building. `\"\"` and `0` fail at plan time. Remove the attribute to keep the current building.", "building"),
+			"department_id": optStringRef("Department ID for the device record. Set `-1` for no department. `\"\"` and `0` fail at plan time. Remove the attribute to keep the current department.", "department"),
 		},
 	}
 }
