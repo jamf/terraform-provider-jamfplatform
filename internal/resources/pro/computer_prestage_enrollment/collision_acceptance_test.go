@@ -83,7 +83,8 @@ func TestAccResource_ProComputerPrestageEnrollment_RenameIntoManagedNameOffersNo
 	two := "tf-acc-prestage-managed-two-" + suffix
 	fixture := adeFixtureBlock(suffix, token)
 	pair := func(nameOne, nameTwo string) string {
-		return fixture + collisionPrestageResource("one", nameOne) + collisionPrestageResource("two", nameTwo)
+		two := strings.Replace(collisionPrestageResource("two", nameTwo), "{\n  display_name", "{\n  depends_on = [jamfplatform_pro_computer_prestage_enrollment.one]\n  display_name", 1)
+		return fixture + collisionPrestageResource("one", nameOne) + two
 	}
 
 	resource.Test(t, resource.TestCase{
