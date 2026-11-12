@@ -5,6 +5,7 @@ package ebook
 
 import (
 	"context"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -61,6 +62,19 @@ func assignEbookResourceModel(ctx context.Context, state *EbookResourceModel, e 
 	return diags
 }
 
+// writableFileType maps the file type Jamf Pro reports onto the spelling the
+// schema accepts. Jamf Pro reports an iBooks file as IBOOK but stores a written
+// IBOOK as "Unknown", so the validator allows only IBOOKS; adopting the wire
+// value as-is would hand an import or generated config a value the schema
+// rejects (#583). Every other value passes through unchanged.
+func writableFileType(api *string) *string {
+	if api != nil && strings.EqualFold(*api, proclassic.EbookPostGeneralFileTypeIbook) {
+		v := ebookFileTypeIBOOKS
+		return &v
+	}
+	return api
+}
+
 // flattenEbookGeneral maps the wire <general> block onto the model. Two fields
 // keep a sticky read. deploy_as_managed does not persist: a PUT sending false,
 // in isolation, left the GET reading true. file_type is canonicalised by the
@@ -81,7 +95,7 @@ func flattenEbookGeneral(g *proclassic.EbookGeneral, state *EbookGeneralModel) {
 	state.DeploymentType = helpers.ReconcileOptionalStringPointerTrimmed(g.DeploymentType, state.DeploymentType)
 	state.DeployAsManaged = helpers.StickyIgnoringDriftBool(g.DeployAsManaged, state.DeployAsManaged)
 	state.Free = helpers.BoolPointerValueOrNull(g.Free)
-	state.FileType = helpers.StickyIgnoringDriftString(g.FileType, state.FileType)
+	state.FileType = helpers.StickyIgnoringDriftString(writableFileType(g.FileType), state.FileType)
 	state.Version = helpers.ReconcileOptionalStringPointerTrimmed(g.Version, state.Version)
 
 	if g.Category != nil {
