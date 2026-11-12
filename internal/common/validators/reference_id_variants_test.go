@@ -93,3 +93,32 @@ func TestInt64ReferenceIDs(t *testing.T) {
 		}
 	}
 }
+
+func TestPositiveReferenceIDOr(t *testing.T) {
+	cases := []struct {
+		value   string
+		wantErr bool
+	}{
+		{"42", false}, {"0", false},
+		{"", true}, {"-1", true}, {"-2", true}, {"007", true}, {"abc", true},
+	}
+	v := PositiveReferenceIDOr("enrollment customization", "Set \"0\" for none.", "0")
+	for _, tc := range cases {
+		t.Run(tc.value, func(t *testing.T) {
+			resp := &validator.StringResponse{}
+			v.ValidateString(context.Background(), validator.StringRequest{Path: path.Root("x"), ConfigValue: types.StringValue(tc.value)}, resp)
+			if got := resp.Diagnostics.HasError(); got != tc.wantErr {
+				t.Fatalf("error = %v, want %v: %v", got, tc.wantErr, resp.Diagnostics)
+			}
+			if tc.wantErr && !strings.Contains(resp.Diagnostics[0].Detail(), `Set "0" for none.`) {
+				t.Errorf("detail %q is missing the hint", resp.Diagnostics[0].Detail())
+			}
+		})
+	}
+	resp := &validator.StringResponse{}
+	v.ValidateString(context.Background(), validator.StringRequest{ConfigValue: types.StringNull()}, resp)
+	v.ValidateString(context.Background(), validator.StringRequest{ConfigValue: types.StringUnknown()}, resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("null and unknown must defer: %v", resp.Diagnostics)
+	}
+}
