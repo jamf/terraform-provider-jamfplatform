@@ -8,8 +8,11 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 func TestIPv4Validator_AcceptsIPv4(t *testing.T) {
@@ -65,6 +68,60 @@ func TestIPv4Validator_SkipsNullAndUnknown(t *testing.T) {
 			ipv4Address().ValidateString(context.Background(), req, &resp)
 			if resp.Diagnostics.HasError() {
 				t.Errorf("expected no diagnostics for %s, got: %v", tc.name, resp.Diagnostics)
+			}
+		})
+	}
+}
+
+func TestRequiredWhenTrue(t *testing.T) {
+	r := NewNetworkSegmentResource()
+	var sresp resource.SchemaResponse
+	r.Schema(context.Background(), resource.SchemaRequest{}, &sresp)
+	s := sresp.Schema
+
+	objType := s.Type().TerraformType(context.Background()).(tftypes.Object)
+	cfg := func(override tftypes.Value, building tftypes.Value) tfsdk.Config {
+		vals := map[string]tftypes.Value{}
+		for k, t := range objType.AttributeTypes {
+			vals[k] = tftypes.NewValue(t, nil)
+		}
+		vals["override_buildings"] = override
+		vals["building"] = building
+		return tfsdk.Config{Schema: s, Raw: tftypes.NewValue(objType, vals)}
+	}
+	str := func(v any) tftypes.Value { return tftypes.NewValue(tftypes.String, v) }
+	boolean := func(v any) tftypes.Value { return tftypes.NewValue(tftypes.Bool, v) }
+
+	cases := []struct {
+		name     string
+		override tftypes.Value
+		building tftypes.Value
+		wantErr  bool
+	}{
+		{"false without building validates", boolean(false), str(nil), false},
+		{"null without building validates", boolean(nil), str(nil), false},
+		{"true with building validates", boolean(true), str("HQ"), false},
+		{"true without building fails", boolean(true), str(nil), true},
+		{"true with unknown building defers", boolean(true), str(tftypes.UnknownValue), false},
+		{"unknown override defers", boolean(tftypes.UnknownValue), str(nil), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := cfg(tc.override, tc.building)
+			var val types.Bool
+			if diags := c.GetAttribute(context.Background(), path.Root("override_buildings"), &val); diags.HasError() {
+				t.Fatal(diags)
+			}
+			req := validator.BoolRequest{
+				Path:           path.Root("override_buildings"),
+				PathExpression: path.MatchRoot("override_buildings"),
+				Config:         c,
+				ConfigValue:    val,
+			}
+			var resp validator.BoolResponse
+			requiredWhenTrue(path.MatchRoot("building")).ValidateBool(context.Background(), req, &resp)
+			if got := resp.Diagnostics.HasError(); got != tc.wantErr {
+				t.Errorf("HasError=%v want %v: %v", got, tc.wantErr, resp.Diagnostics)
 			}
 		})
 	}

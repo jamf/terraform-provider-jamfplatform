@@ -57,8 +57,8 @@ resource "jamfplatform_pro_network_segment" "branch_with_overrides" {
 
 - `building` (String) Optional building name to associate with the network segment. Used together with `override_buildings = true` to override the building of devices that join this segment.
 - `department` (String) Optional department name to associate with the network segment. Used together with `override_departments = true` to override the department of devices that join this segment.
-- `override_buildings` (Boolean) When true, devices that join this segment have their building set to the value of `building`. Also requires `building` to be set.
-- `override_departments` (Boolean) When true, devices that join this segment have their department set to the value of `department`. Also requires `department` to be set.
+- `override_buildings` (Boolean) When true, devices that join this segment have their building set to the value of `building`. Requires `building` to be set when true.
+- `override_departments` (Boolean) When true, devices that join this segment have their department set to the value of `department`. Requires `department` to be set when true.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only

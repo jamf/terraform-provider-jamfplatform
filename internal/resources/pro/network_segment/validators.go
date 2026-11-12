@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
@@ -38,4 +40,48 @@ func (ipv4Validator) ValidateString(_ context.Context, req validator.StringReque
 			fmt.Sprintf("Expected a valid IPv4 address, got %q. Jamf Pro network segments are IPv4-only.", v),
 		)
 	}
+}
+
+// requiredWhenTrue validates that a bool attribute set to true is accompanied
+// by a non-null sibling string attribute. false and null impose nothing:
+// `terraform query -generate-config-out` writes override_buildings = false for
+// a segment with no building, and that configuration must validate.
+func requiredWhenTrue(sibling path.Expression) validator.Bool {
+	return requiredWhenTrueValidator{sibling: sibling}
+}
+
+type requiredWhenTrueValidator struct{ sibling path.Expression }
+
+func (v requiredWhenTrueValidator) Description(context.Context) string {
+	return fmt.Sprintf("when true, %s must also be set.", v.sibling)
+}
+
+func (v requiredWhenTrueValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (v requiredWhenTrueValidator) ValidateBool(ctx context.Context, req validator.BoolRequest, resp *validator.BoolResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() || !req.ConfigValue.ValueBool() {
+		return
+	}
+	paths, diags := req.Config.PathMatches(ctx, req.PathExpression.Merge(v.sibling))
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+	for _, p := range paths {
+		var val attr.Value
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, p, &val)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		if val.IsUnknown() || !val.IsNull() {
+			return
+		}
+	}
+	resp.Diagnostics.AddAttributeError(
+		req.Path,
+		"Invalid Attribute Combination",
+		fmt.Sprintf("%s must be specified when %s is true.", v.sibling, req.Path),
+	)
 }
