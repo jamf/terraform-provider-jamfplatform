@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
-	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -112,17 +111,17 @@ func (r *NetworkSegmentResource) Schema(ctx context.Context, req resource.Schema
 				Optional:            true,
 			},
 			"override_buildings": schema.BoolAttribute{
-				MarkdownDescription: "When true, devices that join this segment have their building set to the value of `building`. Also requires `building` to be set.",
+				MarkdownDescription: "When true, devices that join this segment have their building set to the value of `building`. Requires `building` to be set when true.",
 				Optional:            true,
 				Validators: []validator.Bool{
-					boolvalidator.AlsoRequires(path.MatchRoot("building")),
+					requiredWhenTrue(path.MatchRoot("building")),
 				},
 			},
 			"override_departments": schema.BoolAttribute{
-				MarkdownDescription: "When true, devices that join this segment have their department set to the value of `department`. Also requires `department` to be set.",
+				MarkdownDescription: "When true, devices that join this segment have their department set to the value of `department`. Requires `department` to be set when true.",
 				Optional:            true,
 				Validators: []validator.Bool{
-					boolvalidator.AlsoRequires(path.MatchRoot("department")),
+					requiredWhenTrue(path.MatchRoot("department")),
 				},
 			},
 			"distribution_point": schema.StringAttribute{

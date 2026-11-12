@@ -402,3 +402,37 @@ func TestAccListResource_ProNetworkSegment_HydratesBeyondTheSummaryRow(t *testin
 		},
 	})
 }
+
+// TestAccResource_ProNetworkSegment_OverrideFalseWithoutSibling pins #582: the
+// shape terraform query -generate-config-out writes for a segment with no
+// building or department must validate, apply, and settle with an empty plan.
+func TestAccResource_ProNetworkSegment_OverrideFalseWithoutSibling(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+	name := "tf-acc-pro-ns-false-" + testhelpers.RunSuffix()
+	cfg := fmt.Sprintf(`
+resource "jamfplatform_pro_network_segment" "test" {
+  name                 = %q
+  starting_address     = "10.10.14.0"
+  ending_address       = "10.10.14.255"
+  override_buildings   = false
+  override_departments = false
+}
+`, name)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckNetworkSegmentDestroy(t),
+		Steps: []resource.TestStep{
+			{
+				Config: cfg,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(networkSegmentResourceAddr, "override_buildings", "false"),
+					resource.TestCheckResourceAttr(networkSegmentResourceAddr, "override_departments", "false"),
+				),
+			},
+			{
+				Config:   cfg,
+				PlanOnly: true,
+			},
+		},
+	})
+}
