@@ -29,6 +29,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
@@ -94,9 +95,10 @@ func (r *EnrollmentProfileResource) Schema(ctx context.Context, req resource.Sch
 				Optional:            true,
 			},
 			"site_id": schema.StringAttribute{
-				MarkdownDescription: "ID of the site mobile devices enrolled with this profile are added to. Defaults to `-1` (no site). Omit to leave the current value untouched.",
+				MarkdownDescription: "ID of the site mobile devices enrolled with this profile are added to. Jamf Pro reports `-1` when there is no site. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site. An empty value and `0` are refused at plan time.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("site")},
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"site_name": schema.StringAttribute{

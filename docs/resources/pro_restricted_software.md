@@ -113,7 +113,7 @@ Optional:
 - `kill_process` (Boolean) **"Kill process"** in the Jamf Pro admin UI. Terminate the restricted process when found. Defaults to `false`. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `restrict_exact_process_name` (Boolean) **"Restrict exact process name"** in the Jamf Pro admin UI. Only restrict processes that match the exact process name. Defaults to `true`. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `send_email_notification_on_violation` (Boolean) **"Send email notification on violation"** in the Jamf Pro admin UI. When the process is found, send an email notification to Jamf Pro users with email notifications enabled (an SMTP server must be configured). Defaults to `false`. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `site_id` (String) **"Site"** in the Jamf Pro admin UI. Jamf Pro site ID scoping the record. Omit to leave the current value untouched; there is no blank-clear, so set `-1` to remove the site.
+- `site_id` (String) **"Site"** in the Jamf Pro admin UI. Jamf Pro site ID scoping the record. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site. An empty value and `0` are refused at plan time.
 
 Read-Only:
 

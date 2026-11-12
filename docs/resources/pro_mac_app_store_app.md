@@ -273,7 +273,7 @@ Read-Only:
 
 Optional:
 
-- `id` (String) Icon ID assigned by Jamf Pro.
+- `id` (String) Icon ID assigned by Jamf Pro. Jamf Pro cannot remove an icon once set, so the icon can be replaced but not cleared: omit the attribute to leave the current icon untouched, and `""`, `-1` and `0` are refused at plan time.
 
 Read-Only:
 

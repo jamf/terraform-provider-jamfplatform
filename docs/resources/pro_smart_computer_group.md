@@ -141,7 +141,7 @@ output "recent_macbooks_platform_id" {
 
 - `criteria` (Attributes List) Criteria Jamf Pro evaluates to decide who is in the group, in evaluation order. A criterion naming a directory service group takes the group name and the provider resolves it, or the stored reference value if you already have one. Omit the attribute for a group with no criteria; an empty list is refused, because Jamf Pro reports such a group with no criteria at all and a configuration asking for an empty one would never settle. (see [below for nested schema](#nestedatt--criteria))
 - `description` (String) Free-text note stored beside the group. Dropping the attribute from a configuration that once set it keeps the stored text; set it to `""` to clear it.
-- `site_id` (String) Jamf Pro site the group belongs to. `-1` means no site, which is the default. A smart group in a site only ever contains computers assigned to that same site.
+- `site_id` (String) Jamf Pro site the group belongs to. `-1` means no site, which is the default. A smart group in a site only ever contains computers assigned to that same site. An empty value and `0` are refused at plan time.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only

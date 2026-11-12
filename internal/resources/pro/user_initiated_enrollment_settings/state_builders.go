@@ -97,6 +97,20 @@ func assignAccessGroupsState(ctx context.Context, groups []pro.EnrollmentAccessG
 	return types.SetValueFrom(ctx, elemType, values)
 }
 
+// noSiteID is the single user-facing value for an access group with no site.
+const noSiteID = "-1"
+
+// siteIDValue maps the site Jamf Pro reports for an access group onto state.
+// Jamf Pro reports "0" for a group with no site (the built-in "All Directory
+// Service Users" group included) and echoes "-1" after a clear, so "0" is
+// collapsed to the single user-facing value "-1".
+func siteIDValue(s *string) types.String {
+	if s != nil && *s == "0" {
+		return types.StringValue(noSiteID)
+	}
+	return helpers.StringPointerValueOrNull(s)
+}
+
 // accessGroupObject converts an SDK preview into a Terraform object value.
 func accessGroupObject(g pro.EnrollmentAccessGroupPreview) (attr.Value, diag.Diagnostics) {
 	return types.ObjectValue(accessGroupAttrTypes, map[string]attr.Value{
@@ -104,7 +118,7 @@ func accessGroupObject(g pro.EnrollmentAccessGroupPreview) (attr.Value, diag.Dia
 		"directory_service_group_id":             helpers.StringValueOrNull(g.GroupID),
 		"ldap_server_id":                         helpers.StringValueOrNull(g.LdapServerID),
 		"name":                                   helpers.StringValueOrNull(g.Name),
-		"site_id":                                helpers.StringPointerValueOrNull(g.SiteID),
+		"site_id":                                siteIDValue(g.SiteID),
 		"enterprise_enrollment_enabled":          helpers.BoolPointerValueOrNull(g.EnterpriseEnrollmentEnabled),
 		"personal_enrollment_enabled":            helpers.BoolPointerValueOrNull(g.PersonalEnrollmentEnabled),
 		"account_driven_user_enrollment_enabled": helpers.BoolPointerValueOrNull(g.AccountDrivenUserEnrollmentEnabled),

@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/criteria"
@@ -100,9 +101,10 @@ func (r *AdvancedUserSearchResource) Schema(ctx context.Context, req resource.Sc
 				},
 			},
 			"site_id": schema.StringAttribute{
-				MarkdownDescription: "Optional Jamf Pro site ID to scope the search. Omit to leave unscoped (server sets the `NONE` site, id `-1`).",
+				MarkdownDescription: "Optional Jamf Pro site ID to scope the search. Omit, or set `-1`, to leave unscoped (Jamf Pro reports the `NONE` site, id `-1`). An empty value and `0` are refused at plan time.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("site")},
 				Default:             stringdefault.StaticString(noSiteID),
 			},
 			"site_name": schema.StringAttribute{

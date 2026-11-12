@@ -109,7 +109,7 @@ func (r *AppRequestSettingsResource) Schema(ctx context.Context, req resource.Sc
 				Required:            true,
 			},
 			"requester_user_group_id": schema.Int64Attribute{
-				MarkdownDescription: "ID of the static Jamf Pro user group whose members may request apps (see `jamfplatform_pro_user_group`). Required when `enabled` is `true`, and it must reference a static group; Jamf Pro rejects a smart group or an unknown ID. Only valid while `enabled` is `true`: when App Requests are disabled the group is cleared and may not be set. Omit it while enabled to leave the current value untouched.",
+				MarkdownDescription: "ID of the static Jamf Pro user group whose members may request apps (see `jamfplatform_pro_user_group`). Required when `enabled` is `true`, and it must reference a static group; Jamf Pro rejects a smart group or an unknown ID. Only valid while `enabled` is `true`: the provider refuses a configured group while App Requests are disabled, and a disable clears the stored group (Jamf Pro itself would keep one), so there is no way to clear the group while enabled. Omit it while enabled to leave the current value untouched.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers: []planmodifier.Int64{

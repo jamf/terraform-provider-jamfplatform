@@ -181,7 +181,7 @@ Optional:
 - `enterprise_enrollment_enabled` (Boolean) Allow institutional (enterprise) enrollment for members of this group. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `personal_enrollment_enabled` (Boolean) Allow personal-device enrollment for members of this group. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `require_eula` (Boolean) Require members of this group to accept the EULA during enrollment. Jamf Pro may override the requested value depending on the other enrollment toggles, and has been observed to force `true`. When it overrides an explicitly-set value, Terraform shows a perpetual diff for this attribute. Omit to leave the current value untouched; set `true`/`false` to change it. Where Jamf Pro enforces a value, align the configuration with it.
-- `site_id` (String) Site assigned to devices enrolled through this group. Omit to leave the current value untouched; there is no blank-clear, so set `-1` to remove the site.
+- `site_id` (String) Site assigned to devices enrolled through this group. Set `-1` to remove the site; Jamf Pro reports `0` for a group with no site and the provider reads that back as `-1`. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site. An empty value and `0` are refused at plan time.
 
 Read-Only:
 

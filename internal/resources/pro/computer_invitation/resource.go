@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
@@ -133,9 +134,10 @@ func (r *ComputerInvitationResource) Schema(ctx context.Context, req resource.Sc
 				},
 			},
 			"enroll_into_site_id": schema.StringAttribute{
-				MarkdownDescription: "**\"Site\"** in the Jamf Pro admin UI. The site the enrolled computer is assigned to, given as a Jamf Pro site ID. Use `-1` for \"None\". Changing this forces replacement.",
+				MarkdownDescription: "**\"Site\"** in the Jamf Pro admin UI. The site the enrolled computer is assigned to, given as a Jamf Pro site ID. Use `-1` for \"None\". An empty value and `0` are refused at plan time. Changing this forces replacement.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("site")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseNonNullStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),

@@ -70,7 +70,7 @@ resource "jamfplatform_pro_class" "all_year_9" {
 
 - `description` (String) **"Description"** in the Jamf Pro admin UI. Free-text description for the class. Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.
 - `mobile_device_group_ids` (Set of String) **"Mobile Device Groups"** in the Jamf Pro admin UI. Jamf Pro mobile device group IDs, as strings, assigned to the class. The full set is applied on every change. Referenced IDs must already exist.
-- `site_id` (String) **"Site"** in the Jamf Pro admin UI. Site ID scoping the class. Use `-1` for "None", the default.
+- `site_id` (String) **"Site"** in the Jamf Pro admin UI. Site ID scoping the class. Use `-1` for "None", the default. An empty value and `0` are refused at plan time.
 - `student_group_ids` (Set of String) **"Student Groups"** in the Jamf Pro admin UI. Jamf Pro user group IDs, as strings, assigned as student groups. The full set is applied on every change. Referenced IDs must already exist.
 - `students` (Set of String) **"Students"** in the Jamf Pro admin UI. Usernames of the students assigned to the class. The full set is applied on every change: removing a username removes the member, and omitting the attribute leaves the class with no students. Unrecognised usernames are created as Jamf Pro users.
 - `teacher_group_ids` (Set of String) **"Teacher Groups"** in the Jamf Pro admin UI. Jamf Pro user group IDs, as strings, assigned as teacher groups. The full set is applied on every change. Referenced IDs must already exist.

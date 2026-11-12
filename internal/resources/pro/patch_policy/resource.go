@@ -41,6 +41,7 @@ import (
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/scope"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -274,9 +275,10 @@ func (r *PatchPolicyResource) Schema(ctx context.Context, req resource.SchemaReq
 						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 					},
 					"self_service_icon_id": schema.StringAttribute{
-						MarkdownDescription: "Jamf Pro icon ID shown in Self Service (UI \"Icon\"). Omit to leave the current value untouched.",
+						MarkdownDescription: "Jamf Pro icon ID shown in Self Service (UI \"Icon\"). Omit to leave the current value untouched. Jamf Pro cannot remove an icon once set, so the icon can be replaced but not cleared: `\"\"`, `-1` and `0` are refused at plan time.",
 						Optional:            true,
 						Computed:            true,
+						Validators:          []validator.String{commonvalidators.PositiveReferenceID("icon", "Jamf Pro cannot remove an icon once set; omit the attribute to leave it untouched.")},
 						PlanModifiers:       []planmodifier.String{stringplanmodifier.UseNonNullStateForUnknown()},
 					},
 					"notifications": schema.SingleNestedAttribute{

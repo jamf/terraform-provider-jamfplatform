@@ -109,9 +109,10 @@ func (r *EnrollmentCustomizationResource) Schema(ctx context.Context, req resour
 				},
 			},
 			"site_id": schema.StringAttribute{
-				MarkdownDescription: "Optional Jamf Pro site ID to associate with this customization. Jamf Pro reports the sentinel `\"-1\"` when no site is set; the provider mirrors that value into state.",
+				MarkdownDescription: "Optional Jamf Pro site ID to associate with this customization. Jamf Pro reports `-1` when no site is set; set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site. An empty value and `0` are refused at plan time.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{validators.ClearableReferenceID("site")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},

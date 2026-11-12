@@ -74,7 +74,7 @@ output "enrollment_attachments" {
 - `description` (String) Description shown on the enrollment profile's General tab. Omit it and Jamf Pro clears the stored description.
 - `location` (Attributes) User and Location Information for devices enrolled with this profile. The fields inside it behave the other way round, so read each one before relying on it. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--location))
 - `purchasing` (Attributes) Purchasing Information for devices enrolled with this profile. The string fields inside it behave the other way round, so read each one before relying on it. Omit the block to leave any existing values untouched (they are not cleared on update). (see [below for nested schema](#nestedatt--purchasing))
-- `site_id` (String) ID of the site mobile devices enrolled with this profile are added to. Defaults to `-1` (no site). Omit to leave the current value untouched.
+- `site_id` (String) ID of the site mobile devices enrolled with this profile are added to. Jamf Pro reports `-1` when there is no site. Set `-1` to clear the site. Removing the attribute from the configuration leaves the current value untouched; it does not clear the site. An empty value and `0` are refused at plan time.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only

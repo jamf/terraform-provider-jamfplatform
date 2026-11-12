@@ -38,6 +38,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/accountprivileges"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -137,15 +138,17 @@ func (r *AccountResource) Schema(ctx context.Context, req resource.SchemaRequest
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()},
 			},
 			"ldap_server_id": schema.Int64Attribute{
-				MarkdownDescription: "ID of the backing LDAP / cloud-identity-provider server for a directory account. `-1` (the default) means a Jamf-Pro-local account. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.",
+				MarkdownDescription: "ID of the backing LDAP / cloud-identity-provider server for a directory account. `-1` (the default) means a Jamf-Pro-local account. Omit to leave the current value untouched; set `-1` to clear it. `0` is refused at plan time: Jamf Pro would store it as a second spelling of \"none\".",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.Int64{commonvalidators.ClearableReferenceIDInt64("LDAP server")},
 				PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 			"site_id": schema.Int64Attribute{
-				MarkdownDescription: "Scoped site ID. `-1` means no site. Only meaningful for `Site Access` / `Group Access`. Omit to leave the current value untouched; an integer has no blank-clear, so set a concrete value to change it.",
+				MarkdownDescription: "Scoped site ID. `-1` means no site. Only meaningful for `Site Access` / `Group Access`. Omit to leave the current value untouched; set `-1` to clear it. `0` is refused at plan time: Jamf Pro would store it as a second spelling of \"none\".",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.Int64{commonvalidators.ClearableReferenceIDInt64("site")},
 				PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 			"force_password_change": schema.BoolAttribute{

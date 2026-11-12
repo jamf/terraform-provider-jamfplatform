@@ -63,6 +63,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
@@ -162,9 +163,10 @@ func (r *StaticComputerGroupResource) Schema(ctx context.Context, req resource.S
 				},
 			},
 			"site_id": schema.StringAttribute{
-				MarkdownDescription: "Jamf Pro site the group belongs to. `-1` means no site, and is the default.",
+				MarkdownDescription: "Jamf Pro site the group belongs to. `-1` means no site, and is the default. An empty value and `0` are refused at plan time.",
 				Optional:            true,
 				Computed:            true,
+				Validators:          []validator.String{commonvalidators.ClearableReferenceID("site")},
 				Default:             stringdefault.StaticString(progroups.NoSiteID),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),

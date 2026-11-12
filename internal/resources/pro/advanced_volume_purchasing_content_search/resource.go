@@ -99,12 +99,12 @@ func (r *AdvancedVolumePurchasingContentSearchResource) Schema(ctx context.Conte
 				},
 			},
 			"site_id": schema.StringAttribute{
-				MarkdownDescription: "Optional Jamf Pro site ID to scope the search. Omit to leave unscoped (Jamf Pro reports the `NONE` site, id `-1`).",
+				MarkdownDescription: "Optional Jamf Pro site ID to scope the search. Omit, or set `-1`, to leave unscoped (Jamf Pro reports the `NONE` site, id `-1`). An empty value and `0` are refused at plan time.",
 				Optional:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString(noSiteID),
 				Validators: []validator.String{
-					commonvalidators.NotEmptyString("Jamf Pro refuses an empty site ID. Omit site_id to leave the search unscoped, or set a site ID."),
+					commonvalidators.ClearableReferenceID("site"),
 				},
 			},
 			"criteria": schema.ListNestedAttribute{
