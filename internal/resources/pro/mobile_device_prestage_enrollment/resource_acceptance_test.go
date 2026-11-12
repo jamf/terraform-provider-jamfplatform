@@ -24,11 +24,11 @@ import (
 
 const (
 	resourceName  = "jamfplatform_pro_mobile_device_prestage_enrollment.test"
-	adeFixtureRef = "jamfplatform_pro_automated_device_enrollment.fixture.id"
+	adeFixtureRef = "local.shared_ade_id"
 )
 
 // accCleanupOrphans registers a t.Cleanup that force-deletes any mobile-device
-// prestages or ADE fixtures whose display name contains the test's unique
+// prestages whose display name contains the test's unique
 // suffix. Runs unconditionally — Terraform's own `terraform destroy` step is
 // the primary teardown, but mid-step failures (or destroy itself erroring) can
 // leak fixtures on the tenant. The cleanup is idempotent: 404 / INVALID_ID are
@@ -56,38 +56,17 @@ func accCleanupOrphans(t *testing.T, suffix string) {
 			}
 		}
 
-		// ADE fixtures — list, match name by suffix, DELETE.
-		ades, err := c.ListDeviceEnrollmentsV1(ctx, nil)
-		if err != nil {
-			t.Logf("orphan cleanup: list ADE instances failed: %v", err)
-			return
-		}
-		for _, a := range ades {
-			if a.ID == nil || a.Name == "" || !strings.Contains(a.Name, suffix) {
-				continue
-			}
-			if err := c.DeleteDeviceEnrollmentV1(ctx, *a.ID); err != nil && !helpers.IsNotFoundError(err) {
-				t.Logf("orphan cleanup: delete ADE %s (%s) failed: %v", *a.ID, a.Name, err)
-			} else {
-				t.Logf("orphan cleanup: deleted ADE %s (%s)", *a.ID, a.Name)
-			}
-		}
 	})
 }
 
-// requireADETokenBlob skips the test when JAMFPLATFORM_ACC_PRO_DEP_TOKEN is not set.
-// The env var must hold the base64-encoded `.p7m` server token downloaded from
-// Apple Business Manager / Apple School Manager — the same token blob the
-// sibling jamfplatform_pro_automated_device_enrollment acc tests consume. Each
-// test creates an ADE fixture from this blob, builds a prestage that depends on
-// it, and lets TF destroy both at the end.
-func requireADETokenBlob(t *testing.T) string {
+// requireSharedADE returns the id of the one ADE instance every test in this
+// package attaches its PreStage to, creating it on first use. Each test used to
+// upload its own instance and wait about two minutes for Jamf Pro to report the
+// first Apple sync; sharing one removes that wait from every test but the first.
+// Skips when JAMFPLATFORM_ACC_PRO_DEP_TOKEN is unset. TestMain deletes it.
+func requireSharedADE(t *testing.T) string {
 	t.Helper()
-	v := testhelpers.AccEnv("JAMFPLATFORM_ACC_PRO_DEP_TOKEN")
-	if v == "" {
-		t.Skip("JAMFPLATFORM_ACC_PRO_DEP_TOKEN not set — acc tests upload a real ADE server token (.p7m base64) and create an ADE fixture before exercising the prestage.")
-	}
-	return v
+	return testhelpers.RequireSharedADEInstance(t, "mobile-prestage")
 }
 
 // requireADESerialFixture skips the test when JAMFPLATFORM_ACC_PRO_DEP_MOBILE_SERIAL is
@@ -126,17 +105,15 @@ func requireADEMultiSerialsFixture(t *testing.T, min int) []string {
 	return serials
 }
 
-// adeFixtureBlock emits a Terraform resource block that creates an ADE instance
-// from the supplied base64 token. Returned HCL is concatenated with the
-// prestage block in each test config.
-func adeFixtureBlock(suffix, tokenB64 string) string {
+// adeFixtureBlock emits the `local.shared_ade_id` that prestage configs
+// reference (see adeFixtureRef), pointing at the package's shared ADE instance.
+// Returned HCL is concatenated with the prestage block in each test config.
+func adeFixtureBlock(adeID string) string {
 	return fmt.Sprintf(`
-resource "jamfplatform_pro_automated_device_enrollment" "fixture" {
-  name                    = %q
-  server_token            = %q
-  server_token_wo_version = 1
+locals {
+  shared_ade_id = %q
 }
-`, "tf-acc-mdprestage-ade-"+suffix, tokenB64)
+`, adeID)
 }
 
 // importStateVerifyIgnore mirrors spike §13 — mobile prestages carry NO
@@ -149,7 +126,7 @@ var importStateVerifyIgnore = []string{
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_Minimal(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-mobile-prestage-minimal-" + suffix
@@ -158,7 +135,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Minimal(t *testing.T) {
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageMinimalConfig(name),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageMinimalConfig(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "display_name", name),
 					resource.TestCheckResourceAttrSet(resourceName, "id"),
@@ -172,7 +149,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Minimal(t *testing.T) {
 				ImportStateVerifyIgnore: importStateVerifyIgnore,
 			},
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageMinimalConfig(name+"-renamed"),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageMinimalConfig(name+"-renamed"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "display_name", name+"-renamed"),
 				),
@@ -185,7 +162,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Minimal(t *testing.T) {
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_Full_UpdateRoundTrip(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	// require_credentials_for_enrollment = true (config V1) needs a Directory Service on the
 	// tenant or Create returns PREREQUISITE_NOT_MET; stand up the shared Okta
 	// LDAP server fixture and depend on it.
@@ -199,7 +176,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Full_UpdateRoundTrip(t *t
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: ldapFixture + adeFixtureBlock(suffix, token) + testAccMobilePrestageFullConfigV1(name),
+				Config: ldapFixture + adeFixtureBlock(adeID) + testAccMobilePrestageFullConfigV1(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "display_name", name),
 					resource.TestCheckResourceAttr(resourceName, "support_phone_number", "+44-1-555-0100"),
@@ -211,7 +188,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Full_UpdateRoundTrip(t *t
 				),
 			},
 			{
-				Config: ldapFixture + adeFixtureBlock(suffix, token) + testAccMobilePrestageFullConfigV2(name+"-v2"),
+				Config: ldapFixture + adeFixtureBlock(adeID) + testAccMobilePrestageFullConfigV2(name+"-v2"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "display_name", name+"-v2"),
 					resource.TestCheckResourceAttr(resourceName, "support_phone_number", "+44-1-555-0200"),
@@ -232,7 +209,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Full_UpdateRoundTrip(t *t
 			// framework's implicit post-apply empty-plan check proves the
 			// removed blocks stay null on refresh rather than re-appearing.
 			{
-				Config: ldapFixture + adeFixtureBlock(suffix, token) + testAccMobilePrestageBlocksRemovedConfig(name+"-v2"),
+				Config: ldapFixture + adeFixtureBlock(adeID) + testAccMobilePrestageBlocksRemovedConfig(name+"-v2"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "display_name", name+"-v2"),
 					resource.TestCheckNoResourceAttr(resourceName, "skip_setup_items.biometric"),
@@ -249,7 +226,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Full_UpdateRoundTrip(t *t
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_SharedIpad_StorageQuota(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-mobile-prestage-storage-" + suffix
@@ -258,7 +235,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_SharedIpad_StorageQuota(t
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageStorageQuotaConfig(name, 5),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageStorageQuotaConfig(name, 5),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "enable_shared_ipad", "true"),
 					resource.TestCheckResourceAttr(resourceName, "use_storage_quota_size", "true"),
@@ -269,7 +246,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_SharedIpad_StorageQuota(t
 			// Update an unrelated shared-iPad field; storage_quota_size_megabytes
 			// stays server-authoritative (read-only) and must not perturb the plan.
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageStorageQuotaConfig(name, 10),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageStorageQuotaConfig(name, 10),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "maximum_shared_accounts", "10"),
 					resource.TestCheckResourceAttrSet(resourceName, "storage_quota_size_megabytes"),
@@ -283,7 +260,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_SharedIpad_StorageQuota(t
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_SharedIpad_TemporarySession(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-mobile-prestage-tempsession-" + suffix
@@ -292,7 +269,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_SharedIpad_TemporarySessi
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageTemporarySessionConfig(name),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageTemporarySessionConfig(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "enable_shared_ipad", "true"),
 					resource.TestCheckResourceAttr(resourceName, "temporary_session_only", "true"),
@@ -306,7 +283,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_SharedIpad_TemporarySessi
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_Names_SerialNumbers(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -314,7 +291,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Names_SerialNumbers(t *te
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccMobilePrestageNamesModeConfig("tf-acc-names-serial-"+suffix, `
   names = {
     assign_names_using = "Serial Numbers"
@@ -332,7 +309,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Names_SerialNumbers(t *te
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_Names_SingleName(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -340,7 +317,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Names_SingleName(t *testi
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccMobilePrestageNamesModeConfig("tf-acc-names-single-"+suffix, `
   names = {
     assign_names_using = "Single Name"
@@ -358,7 +335,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Names_SingleName(t *testi
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_Names_ListOfNames(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -366,7 +343,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Names_ListOfNames(t *test
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccMobilePrestageNamesModeConfig("tf-acc-names-list-"+suffix, `
   names = {
     assign_names_using = "List of Names"
@@ -387,7 +364,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Names_ListOfNames(t *test
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_Names_DefaultNames(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -395,7 +372,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Names_DefaultNames(t *tes
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccMobilePrestageNamesModeConfig("tf-acc-names-default-"+suffix, `
   names = {
     assign_names_using = "Default Names"
@@ -413,7 +390,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_Names_DefaultNames(t *tes
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_ExpectError_SingleNameRequiresName(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -421,7 +398,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_ExpectError_SingleNameReq
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccMobilePrestageNamesModeConfig("tf-acc-expect-single-"+suffix, `
   names = {
     assign_names_using = "Single Name"
@@ -437,7 +414,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_ExpectError_SingleNameReq
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_ExpectError_StorageVsTempSession(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -445,7 +422,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_ExpectError_StorageVsTemp
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-storage-temp-%s"
   device_enrollment_program_instance_id = %s
@@ -475,7 +452,7 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_ExpectError_TempSessionTimeoutBelowMin(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -483,7 +460,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_ExpectError_TempSessionTi
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-temp-timeout-%s"
   device_enrollment_program_instance_id = %s
@@ -514,7 +491,7 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_ExpectError_BadMinOsIos(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -522,7 +499,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_ExpectError_BadMinOsIos(t
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-bad-min-os-ios-%s"
   device_enrollment_program_instance_id = %s
@@ -546,7 +523,7 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_ExpectError_BadMinOsIpad(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -554,7 +531,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_ExpectError_BadMinOsIpad(
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-bad-min-os-ipad-%s"
   device_enrollment_program_instance_id = %s
@@ -580,7 +557,7 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_MinOsSpecific(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-mobile-minos-" + suffix
@@ -589,7 +566,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_MinOsSpecific(t *testing.
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
   display_name                          = %q
   device_enrollment_program_instance_id = %s
@@ -629,7 +606,7 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_AnchorCertificatesRollback(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-mobile-anchor-" + suffix
@@ -638,11 +615,11 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_AnchorCertificatesRollbac
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageMinimalConfig(name),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageMinimalConfig(name),
 				Check:  resource.TestCheckResourceAttrSet(resourceName, "id"),
 			},
 			{
-				Config:      adeFixtureBlock(suffix, token) + testAccMobilePrestageAnchorsConfig(name, `["dGVzdA=="]`),
+				Config:      adeFixtureBlock(adeID) + testAccMobilePrestageAnchorsConfig(name, `["dGVzdA=="]`),
 				ExpectError: regexp.MustCompile(`did not commit|did not round-trip|anchor_certificates`),
 			},
 		},
@@ -653,7 +630,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_AnchorCertificatesRollbac
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_ScopeAssignments(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	serial := requireADESerialFixture(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
@@ -663,20 +640,20 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_ScopeAssignments(t *testi
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageScopeConfig(name, ""),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageScopeConfig(name, ""),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "0"),
 				),
 			},
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageScopeConfig(name, serial),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageScopeConfig(name, serial),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "1"),
 					resource.TestCheckTypeSetElemAttr(resourceName, "scope_serial_numbers.*", serial),
 				),
 			},
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageScopeConfig(name, ""),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageScopeConfig(name, ""),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "0"),
 				),
@@ -692,7 +669,7 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_ScopeAssignments(t *testi
 // set membership round-trips order-independently and that a shrink reconciles.
 func TestAccResource_ProMobileDevicePrestageEnrollment_ScopeMultipleSerials(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	serials := requireADEMultiSerialsFixture(t, 2)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
@@ -718,15 +695,15 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_ScopeMultipleSerials(t *t
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageScopeListConfig(name, all),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageScopeListConfig(name, all),
 				Check:  resource.ComposeAggregateTestCheckFunc(allChecks...),
 			},
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageScopeListConfig(name, subset),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageScopeListConfig(name, subset),
 				Check:  resource.ComposeAggregateTestCheckFunc(subsetChecks...),
 			},
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageScopeListConfig(name, nil),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageScopeListConfig(name, nil),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "0"),
 				),
@@ -1150,13 +1127,13 @@ func mobilePrestageEmptyNamesSteps(prefixHCL, name, instanceRef string) []resour
 // and reading that back as null failed the post-apply consistency check.
 func TestAccResource_ProMobileDevicePrestageEnrollment_Names_EmptyStringFieldsRoundTrip(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
-		Steps:                    mobilePrestageEmptyNamesSteps(adeFixtureBlock(suffix, token), "tf-acc-names-empty-"+suffix, adeFixtureRef),
+		Steps:                    mobilePrestageEmptyNamesSteps(adeFixtureBlock(adeID), "tf-acc-names-empty-"+suffix, adeFixtureRef),
 	})
 }
 
@@ -1187,7 +1164,7 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" "test" {
 // 2026-10-14. Needs the ADE token blob the other tests here use.
 func TestAccResource_ProMobileDevicePrestageEnrollment_BlocksOmittedToDeclared(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-mobile-prestage-blocks-" + suffix
@@ -1195,9 +1172,9 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_BlocksOmittedToDeclared(t
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			{Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageBlocksConfig(name, false)},
+			{Config: adeFixtureBlock(adeID) + testAccMobilePrestageBlocksConfig(name, false)},
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccMobilePrestageBlocksConfig(name, true),
+				Config: adeFixtureBlock(adeID) + testAccMobilePrestageBlocksConfig(name, true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "location_information.username", "tf-acc-user"),
 					resource.TestCheckResourceAttrSet(resourceName, "location_information.building_id"),

@@ -48,10 +48,10 @@ resource "jamfplatform_pro_computer_prestage_enrollment" %q {
 
 func TestAccResource_ProComputerPrestageEnrollment_NameCollisionStrict(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-prestage-collide-" + suffix
-	fixture := adeFixtureBlock(suffix, token)
+	fixture := adeFixtureBlock(adeID)
 	existing := fixture + collisionPrestageResource("existing", name)
 	withDuplicate := existing + collisionPrestageResource("duplicate", strings.ToUpper(name))
 
@@ -77,11 +77,11 @@ func TestAccResource_ProComputerPrestageEnrollment_NameCollisionStrict(t *testin
 
 func TestAccResource_ProComputerPrestageEnrollment_RenameIntoManagedNameOffersNoImport(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	one := "tf-acc-prestage-managed-one-" + suffix
 	two := "tf-acc-prestage-managed-two-" + suffix
-	fixture := adeFixtureBlock(suffix, token)
+	fixture := adeFixtureBlock(adeID)
 	pair := func(nameOne, nameTwo string) string {
 		two := strings.Replace(collisionPrestageResource("two", nameTwo), "{\n  display_name", "{\n  depends_on = [jamfplatform_pro_computer_prestage_enrollment.one]\n  display_name", 1)
 		return fixture + collisionPrestageResource("one", nameOne) + two

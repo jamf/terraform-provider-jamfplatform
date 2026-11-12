@@ -41,10 +41,10 @@ resource "jamfplatform_pro_mobile_device_prestage_enrollment" %q {
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_NameCollisionStrict(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-mobile-prestage-collide-" + suffix
-	fixture := adeFixtureBlock(suffix, token)
+	fixture := adeFixtureBlock(adeID)
 	existing := fixture + collisionPrestageResource("existing", name)
 	withDuplicate := existing + collisionPrestageResource("duplicate", strings.ToUpper(name))
 
@@ -70,12 +70,12 @@ func TestAccResource_ProMobileDevicePrestageEnrollment_NameCollisionStrict(t *te
 
 func TestAccResource_ProMobileDevicePrestageEnrollment_RenameIntoManagedDisplayNameOffersNoImportStrict(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	one := "tf-acc-collide-mdprestage-one-" + suffix
 	two := "tf-acc-collide-mdprestage-two-" + suffix
-	fixture := adeFixtureBlock(suffix, token)
+	fixture := adeFixtureBlock(adeID)
 
 	pair := func(nameOne, nameTwo string) string {
 		return strictCollisionProvider + fixture +

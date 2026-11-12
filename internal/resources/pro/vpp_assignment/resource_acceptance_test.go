@@ -58,12 +58,13 @@ const resAddr = "jamfplatform_pro_vpp_assignment.test"
 // location fixture (which owns the VPP account the assignment references).
 const vppTokenEnvVar = "JAMFPLATFORM_ACC_PRO_VPP_TOKEN"
 
-func vppToken(t *testing.T) string {
-	v := testhelpers.AccEnv(vppTokenEnvVar)
-	if v == "" {
-		t.Skipf("%s not set; skipping VPP assignment acceptance test (needs a VPP location fixture)", vppTokenEnvVar)
-	}
-	return v
+// requireSharedVPP returns the id of the one synced Volume Purchasing location
+// every test in this package attaches to. Creating a location blocks on Apple's
+// first content sync, so each test used to pay that wait; sharing one removes it
+// from every test but the first. Skips when {vppTokenEnvVar} is unset.
+func requireSharedVPP(t *testing.T) string {
+	t.Helper()
+	return testhelpers.RequireSharedVPPLocation(t, "vpp-assignment", false)
 }
 
 func testAccCheckVPPAssignmentDestroy(t *testing.T) resource.TestCheckFunc {
@@ -87,17 +88,14 @@ func testAccCheckVPPAssignmentDestroy(t *testing.T) resource.TestCheckFunc {
 	}
 }
 
-// vppLocationFixture stands up a VPP location from the token; its id is the VPP
-// account the assignment distributes content from.
-func vppLocationFixture(token, suffix string) string {
+// vppLocationFixture reads the package's shared location (see requireSharedVPP);
+// its id is the VPP account the assignment uses.
+func vppLocationFixture(locationID, _ string) string {
 	return fmt.Sprintf(`
-resource "jamfplatform_pro_volume_purchasing_location" "vpp" {
-  name                                     = "tf-acc-vpp-loc-%[2]s"
-  service_token                            = %[1]q
-  service_token_wo_version                 = 1
-  automatically_populate_purchased_content = true
+data "jamfplatform_pro_volume_purchasing_location" "vpp" {
+  id = %q
 }
-`, token, suffix)
+`, locationID)
 }
 
 // lifecycleConfig builds an assignment plus the location fixture and two static
@@ -105,7 +103,7 @@ resource "jamfplatform_pro_volume_purchasing_location" "vpp" {
 // many target groups are in scope (1 or 2) to exercise add/remove; allUsers
 // toggles the all_jss_users flag (mutually exclusive with target groups, so it is
 // only used with groupCount=0).
-func lifecycleConfig(token, suffix, name string, groupCount int, allUsers bool) string {
+func lifecycleConfig(locationID, suffix, name string, groupCount int, allUsers bool) string {
 	scopeBlock := ""
 	switch {
 	case allUsers:
@@ -130,7 +128,7 @@ func lifecycleConfig(token, suffix, name string, groupCount int, allUsers bool) 
     }
   }`
 	}
-	return vppLocationFixture(token, suffix) + fmt.Sprintf(`
+	return vppLocationFixture(locationID, suffix) + fmt.Sprintf(`
 resource "jamfplatform_pro_user_group" "a" {
   name       = "%[1]s-grp-a"
   group_type = "static"
@@ -143,14 +141,14 @@ resource "jamfplatform_pro_user_group" "b" {
 
 resource "jamfplatform_pro_vpp_assignment" "test" {
   name                 = %[1]q
-  vpp_admin_account_id = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_admin_account_id = data.jamfplatform_pro_volume_purchasing_location.vpp.id
 %[2]s
 }
 `, name, scopeBlock)
 }
 
 func TestAccResource_ProVPPAssignment(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-vppa-" + suffix
@@ -161,18 +159,18 @@ func TestAccResource_ProVPPAssignment(t *testing.T) {
 		CheckDestroy:             testAccCheckVPPAssignmentDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: lifecycleConfig(token, suffix, name, 1, false),
+				Config: lifecycleConfig(locationID, suffix, name, 1, false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet(resAddr, "id"),
 					resource.TestCheckResourceAttr(resAddr, "name", name),
-					resource.TestCheckResourceAttrPair(resAddr, "vpp_admin_account_id", "jamfplatform_pro_volume_purchasing_location.vpp", "id"),
+					resource.TestCheckResourceAttrPair(resAddr, "vpp_admin_account_id", "data.jamfplatform_pro_volume_purchasing_location.vpp", "id"),
 					resource.TestCheckResourceAttrSet(resAddr, "vpp_admin_account_name"),
 					resource.TestCheckResourceAttr(resAddr, "scope.targets.jss_user_group_ids.#", "1"),
 				),
 			},
 			{
 				// Merge update: rename + add the second target group (nested-set growth).
-				Config: lifecycleConfig(token, suffix, renamed, 2, false),
+				Config: lifecycleConfig(locationID, suffix, renamed, 2, false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "name", renamed),
 					resource.TestCheckResourceAttr(resAddr, "scope.targets.jss_user_group_ids.#", "2"),
@@ -181,7 +179,7 @@ func TestAccResource_ProVPPAssignment(t *testing.T) {
 			{
 				// Shrink the target set back to one (nested-set removal — the declared
 				// category is owned, so its members full-replace).
-				Config: lifecycleConfig(token, suffix, renamed, 1, false),
+				Config: lifecycleConfig(locationID, suffix, renamed, 1, false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "scope.targets.jss_user_group_ids.#", "1"),
 				),
@@ -194,7 +192,7 @@ func TestAccResource_ProVPPAssignment(t *testing.T) {
 				// "groups cleared" invariant is enforced implicitly — no explicit
 				// count assertion (a null Set has no reliable "#" key; mirrors
 				// vpp_invitation).
-				Config: lifecycleConfig(token, suffix, renamed, 0, true),
+				Config: lifecycleConfig(locationID, suffix, renamed, 0, true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "scope.targets.all_jss_users", "true"),
 				),
@@ -218,19 +216,19 @@ func TestAccResource_ProVPPAssignment(t *testing.T) {
 // token currently owns instead of a hand-set env var. A resource
 // ARGUMENT may be unknown at plan time (unlike count/for_each), so the location
 // applies + syncs first and the adam_id resolves before the assignment applies.
-func contentConfig(token, suffix, name string, assign bool) string {
+func contentConfig(locationID, suffix, name string, assign bool) string {
 	ios := "[]"
 	if assign {
 		ios = `[
-    [for c in jamfplatform_pro_volume_purchasing_location.vpp.content :
+    [for c in data.jamfplatform_pro_volume_purchasing_location.vpp.content :
       c.adam_id if c.content_type == "IOS_APP"
     ][0],
   ]`
 	}
-	return vppLocationFixture(token, suffix) + fmt.Sprintf(`
+	return vppLocationFixture(locationID, suffix) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_assignment" "test" {
   name                 = %[1]q
-  vpp_admin_account_id = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_admin_account_id = data.jamfplatform_pro_volume_purchasing_location.vpp.id
   ios_app_adam_ids     = %[2]s
 
   scope = {
@@ -247,7 +245,7 @@ resource "jamfplatform_pro_vpp_assignment" "test" {
 // fixture's owned content, so the only gate is JAMFPLATFORM_ACC_PRO_VPP_TOKEN (a token
 // whose account owns at least one iOS app).
 func TestAccResource_ProVPPAssignment_Content(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-vppa-content-" + suffix
@@ -257,7 +255,7 @@ func TestAccResource_ProVPPAssignment_Content(t *testing.T) {
 		CheckDestroy:             testAccCheckVPPAssignmentDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: contentConfig(token, suffix, name, true),
+				Config: contentConfig(locationID, suffix, name, true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Exactly one app assigned; its value is server-owned (derived
 					// from the location catalog), so we assert the count, not a
@@ -267,7 +265,7 @@ func TestAccResource_ProVPPAssignment_Content(t *testing.T) {
 			},
 			{
 				// Clear ([]) — opt-out empty emits a clearing <ios_apps/> element.
-				Config: contentConfig(token, suffix, name, false),
+				Config: contentConfig(locationID, suffix, name, false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "ios_app_adam_ids.#", "0"),
 				),
@@ -277,7 +275,7 @@ func TestAccResource_ProVPPAssignment_Content(t *testing.T) {
 }
 
 func TestAccDataSource_ProVPPAssignment_BySelectors(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-vppa-ds-" + suffix
@@ -287,7 +285,7 @@ func TestAccDataSource_ProVPPAssignment_BySelectors(t *testing.T) {
 		CheckDestroy:             testAccCheckVPPAssignmentDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: lifecycleConfig(token, suffix, name, 1, false) + `
+				Config: lifecycleConfig(locationID, suffix, name, 1, false) + `
 data "jamfplatform_pro_vpp_assignment" "by_id" {
   id = jamfplatform_pro_vpp_assignment.test.id
 }
@@ -306,11 +304,11 @@ data "jamfplatform_pro_vpp_assignment" "by_name" {
 }
 
 func TestAccResource_ProVPPAssignment_DriftRecovery(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-vppa-drift-" + suffix
-	cfg := lifecycleConfig(token, suffix, name, 1, false)
+	cfg := lifecycleConfig(locationID, suffix, name, 1, false)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
@@ -347,7 +345,7 @@ func TestAccResource_ProVPPAssignment_DriftRecovery(t *testing.T) {
 // group in both limitations and exclusions. Requires both a VPP token (for the
 // account fixture) and a real LDAP group name.
 func TestAccResource_ProVPPAssignment_DSGroupScope(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	ldapEnv := testhelpers.RequireOktaLdapEnv(t)
 	group := testhelpers.RequireLdapGroupName(t)
 	testhelpers.AccPreCheck(t)
@@ -364,10 +362,10 @@ func TestAccResource_ProVPPAssignment_DSGroupScope(t *testing.T) {
 		CheckDestroy:             testAccCheckVPPAssignmentDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: vppLocationFixture(token, suffix) + fmt.Sprintf(`
+				Config: vppLocationFixture(locationID, suffix) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_assignment" "test" {
   name                 = %[1]q
-  vpp_admin_account_id = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_admin_account_id = data.jamfplatform_pro_volume_purchasing_location.vpp.id
 
   scope = {
     limitations = {
@@ -393,10 +391,10 @@ resource "jamfplatform_pro_vpp_assignment" "test" {
 				// the declared-clear gesture (plans as an empty set, emits an explicit
 				// empty element — omission would preserve the group); the post-step
 				// empty-plan check enforces the clear round-tripped.
-				Config: vppLocationFixture(token, suffix) + fmt.Sprintf(`
+				Config: vppLocationFixture(locationID, suffix) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_assignment" "test" {
   name                 = %[1]q
-  vpp_admin_account_id = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_admin_account_id = data.jamfplatform_pro_volume_purchasing_location.vpp.id
 
   scope = {
     limitations = {
@@ -427,27 +425,27 @@ resource "jamfplatform_pro_vpp_assignment" "test" {
 // scope->LDAP association (see TestAccResource_ProVPPAssignment_DSGroupScope).
 // The group fixtures are carried by every step so the server never sees a
 // scoped group disappear underneath the assignment.
-func vppaOmitRetainsConfig(token, suffix, name string) string {
-	return vppaOmitRetainsFixtures(token, suffix, name) + fmt.Sprintf(`
+func vppaOmitRetainsConfig(locationID, suffix, name string) string {
+	return vppaOmitRetainsFixtures(locationID, suffix, name) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_assignment" "test" {
   name                 = %[1]q
-  vpp_admin_account_id = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_admin_account_id = data.jamfplatform_pro_volume_purchasing_location.vpp.id
 
   ios_app_adam_ids = [
-    [for c in jamfplatform_pro_volume_purchasing_location.vpp.content :
+    [for c in data.jamfplatform_pro_volume_purchasing_location.vpp.content :
       c.adam_id if c.content_type == "IOS_APP"
     ][0],
   ]
   mac_app_adam_ids = slice(
-    [for c in jamfplatform_pro_volume_purchasing_location.vpp.content :
+    [for c in data.jamfplatform_pro_volume_purchasing_location.vpp.content :
       c.adam_id if c.content_type == "MAC_APP"
-    ], 0, min(1, length([for c in jamfplatform_pro_volume_purchasing_location.vpp.content :
+    ], 0, min(1, length([for c in data.jamfplatform_pro_volume_purchasing_location.vpp.content :
       c.adam_id if c.content_type == "MAC_APP"
     ])))
   ebook_adam_ids = slice(
-    [for c in jamfplatform_pro_volume_purchasing_location.vpp.content :
+    [for c in data.jamfplatform_pro_volume_purchasing_location.vpp.content :
       c.adam_id if c.content_type == "BOOK"
-    ], 0, min(1, length([for c in jamfplatform_pro_volume_purchasing_location.vpp.content :
+    ], 0, min(1, length([for c in data.jamfplatform_pro_volume_purchasing_location.vpp.content :
       c.adam_id if c.content_type == "BOOK"
     ])))
 
@@ -468,14 +466,14 @@ resource "jamfplatform_pro_vpp_assignment" "test" {
 // vppaOmitRetainsChildrenDroppedConfig keeps the scope block but drops its
 // exclusions (re-emitted from the granular merge), keeps the iOS content set
 // and drops the Mac and book sets (omitted, so retained by the merge).
-func vppaOmitRetainsChildrenDroppedConfig(token, suffix, name string) string {
-	return vppaOmitRetainsFixtures(token, suffix, name) + fmt.Sprintf(`
+func vppaOmitRetainsChildrenDroppedConfig(locationID, suffix, name string) string {
+	return vppaOmitRetainsFixtures(locationID, suffix, name) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_assignment" "test" {
   name                 = %[1]q
-  vpp_admin_account_id = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_admin_account_id = data.jamfplatform_pro_volume_purchasing_location.vpp.id
 
   ios_app_adam_ids = [
-    [for c in jamfplatform_pro_volume_purchasing_location.vpp.content :
+    [for c in data.jamfplatform_pro_volume_purchasing_location.vpp.content :
       c.adam_id if c.content_type == "IOS_APP"
     ][0],
   ]
@@ -493,11 +491,11 @@ resource "jamfplatform_pro_vpp_assignment" "test" {
 
 // vppaOmitRetainsGeneralOnlyConfig drops every optional collection and the
 // scope, so the PUT carries <general> alone.
-func vppaOmitRetainsGeneralOnlyConfig(token, suffix, name string) string {
-	return vppaOmitRetainsFixtures(token, suffix, name) + fmt.Sprintf(`
+func vppaOmitRetainsGeneralOnlyConfig(locationID, suffix, name string) string {
+	return vppaOmitRetainsFixtures(locationID, suffix, name) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_assignment" "test" {
   name                 = %[1]q
-  vpp_admin_account_id = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_admin_account_id = data.jamfplatform_pro_volume_purchasing_location.vpp.id
 
   depends_on = [jamfplatform_pro_user_group.a, jamfplatform_pro_user_group.b]
 }
@@ -514,8 +512,8 @@ resource "jamfplatform_pro_vpp_assignment" "test" {
 // longer mentions, and a group destroyed before it is refused with "The
 // following items are dependent on this Static User Group". depends_on is
 // ordering metadata only and reaches no payload.
-func vppaOmitRetainsFixtures(token, suffix, name string) string {
-	return vppLocationFixture(token, suffix) + fmt.Sprintf(`
+func vppaOmitRetainsFixtures(locationID, suffix, name string) string {
+	return vppLocationFixture(locationID, suffix) + fmt.Sprintf(`
 resource "jamfplatform_pro_user_group" "a" {
   name       = "%[1]s-grp-a"
   group_type = "static"
@@ -705,7 +703,7 @@ func ebookAdamIDs(a *proclassic.VppAssignmentEbooks) []*int {
 // longer merges and nothing that suppresses the removal plan may ship for this
 // resource. Gated on JAMFPLATFORM_ACC_PRO_VPP_TOKEN like every apply test here.
 func TestAccResource_ProVPPAssignment_OmittedBlocksRetained(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-vppa-omit-" + suffix
@@ -716,7 +714,7 @@ func TestAccResource_ProVPPAssignment_OmittedBlocksRetained(t *testing.T) {
 		CheckDestroy:             testAccCheckVPPAssignmentDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: vppaOmitRetainsConfig(token, suffix, name),
+				Config: vppaOmitRetainsConfig(locationID, suffix, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "ios_app_adam_ids.#", "1"),
 					resource.TestCheckResourceAttr(resAddr, "scope.targets.jss_user_group_ids.#", "1"),
@@ -726,7 +724,7 @@ func TestAccResource_ProVPPAssignment_OmittedBlocksRetained(t *testing.T) {
 				),
 			},
 			{
-				Config: vppaOmitRetainsChildrenDroppedConfig(token, suffix, name),
+				Config: vppaOmitRetainsChildrenDroppedConfig(locationID, suffix, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "ios_app_adam_ids.#", "1"),
 					resource.TestCheckNoResourceAttr(resAddr, "mac_app_adam_ids.#"),
@@ -737,7 +735,7 @@ func TestAccResource_ProVPPAssignment_OmittedBlocksRetained(t *testing.T) {
 				),
 			},
 			{
-				Config: vppaOmitRetainsGeneralOnlyConfig(token, suffix, name),
+				Config: vppaOmitRetainsGeneralOnlyConfig(locationID, suffix, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckNoResourceAttr(resAddr, "ios_app_adam_ids.#"),
 					resource.TestCheckNoResourceAttr(resAddr, "scope.targets.jss_user_group_ids.#"),

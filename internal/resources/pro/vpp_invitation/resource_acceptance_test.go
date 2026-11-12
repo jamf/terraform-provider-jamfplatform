@@ -56,12 +56,13 @@ const resAddr = "jamfplatform_pro_vpp_invitation.test"
 // location fixture (which owns the VPP account the invitation references).
 const vppTokenEnvVar = "JAMFPLATFORM_ACC_PRO_VPP_TOKEN"
 
-func vppToken(t *testing.T) string {
-	v := testhelpers.AccEnv(vppTokenEnvVar)
-	if v == "" {
-		t.Skipf("%s not set; skipping VPP invitation acceptance test (needs a VPP location fixture)", vppTokenEnvVar)
-	}
-	return v
+// requireSharedVPP returns the id of the one synced Volume Purchasing location
+// every test in this package attaches to. Creating a location blocks on Apple's
+// first content sync, so each test used to pay that wait; sharing one removes it
+// from every test but the first. Skips when {vppTokenEnvVar} is unset.
+func requireSharedVPP(t *testing.T) string {
+	t.Helper()
+	return testhelpers.RequireSharedVPPLocation(t, "vpp-invitation", true)
 }
 
 func testAccCheckVPPInvitationDestroy(t *testing.T) resource.TestCheckFunc {
@@ -85,32 +86,25 @@ func testAccCheckVPPInvitationDestroy(t *testing.T) resource.TestCheckFunc {
 	}
 }
 
-// vppLocationFixture stands up a VPP location from the token; its id is the VPP
-// account the invitation registers against. auto_register_managed_users is
-// enabled on the location because an invitation can only set
-// auto_register_managed_users = true when its location has it enabled (the
-// server otherwise 409s "not enabled on Vpp Location").
-func vppLocationFixture(token, suffix string) string {
+// vppLocationFixture reads the package's shared location (see requireSharedVPP);
+// its id is the VPP account the invitation uses.
+func vppLocationFixture(locationID, _ string) string {
 	return fmt.Sprintf(`
-resource "jamfplatform_pro_volume_purchasing_location" "vpp" {
-  name                                     = "tf-acc-vpp-loc-%[2]s"
-  service_token                            = %[1]q
-  service_token_wo_version                 = 1
-  automatically_populate_purchased_content = true
-  auto_register_managed_users              = true
+data "jamfplatform_pro_volume_purchasing_location" "vpp" {
+  id = %q
 }
-`, token, suffix)
+`, locationID)
 }
 
 // lifecycleConfig builds an invitation plus the location fixture and two static
 // user-group fixtures so scope targets reference real IDs. groupCount selects how
 // many target groups are in scope (1 or 2) to exercise add/remove.
-func lifecycleConfig(token, suffix, name, distMethod string, autoReg bool, groupCount int) string {
+func lifecycleConfig(locationID, suffix, name, distMethod string, autoReg bool, groupCount int) string {
 	target := "jamfplatform_pro_user_group.a.id"
 	if groupCount == 2 {
 		target = "jamfplatform_pro_user_group.a.id, jamfplatform_pro_user_group.b.id"
 	}
-	return vppLocationFixture(token, suffix) + fmt.Sprintf(`
+	return vppLocationFixture(locationID, suffix) + fmt.Sprintf(`
 resource "jamfplatform_pro_user_group" "a" {
   name       = "%[1]s-grp-a"
   group_type = "static"
@@ -123,7 +117,7 @@ resource "jamfplatform_pro_user_group" "b" {
 
 resource "jamfplatform_pro_vpp_invitation" "test" {
   name                        = %[1]q
-  vpp_account_id              = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_account_id              = data.jamfplatform_pro_volume_purchasing_location.vpp.id
   distribution_method         = %[2]q
   auto_register_managed_users = %[3]t
 
@@ -141,7 +135,7 @@ resource "jamfplatform_pro_vpp_invitation" "test" {
 }
 
 func TestAccResource_ProVPPInvitation(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-vpp-" + suffix
@@ -152,11 +146,11 @@ func TestAccResource_ProVPPInvitation(t *testing.T) {
 		CheckDestroy:             testAccCheckVPPInvitationDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: lifecycleConfig(token, suffix, name, "Make available in Self Service only", true, 1),
+				Config: lifecycleConfig(locationID, suffix, name, "Make available in Self Service only", true, 1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet(resAddr, "id"),
 					resource.TestCheckResourceAttr(resAddr, "name", name),
-					resource.TestCheckResourceAttrPair(resAddr, "vpp_account_id", "jamfplatform_pro_volume_purchasing_location.vpp", "id"),
+					resource.TestCheckResourceAttrPair(resAddr, "vpp_account_id", "data.jamfplatform_pro_volume_purchasing_location.vpp", "id"),
 					resource.TestCheckResourceAttr(resAddr, "distribution_method", "Make available in Self Service only"),
 					resource.TestCheckResourceAttr(resAddr, "auto_register_managed_users", "true"),
 					resource.TestCheckResourceAttr(resAddr, "scope.targets.jss_user_group_ids.#", "1"),
@@ -166,7 +160,7 @@ func TestAccResource_ProVPPInvitation(t *testing.T) {
 			{
 				// Merge update: rename, change distribution_method, toggle auto_register,
 				// add the second target group (nested-set growth).
-				Config: lifecycleConfig(token, suffix, renamed, "Prompt users to accept/make available in Self Service", false, 2),
+				Config: lifecycleConfig(locationID, suffix, renamed, "Prompt users to accept/make available in Self Service", false, 2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "name", renamed),
 					resource.TestCheckResourceAttr(resAddr, "distribution_method", "Prompt users to accept/make available in Self Service"),
@@ -177,7 +171,7 @@ func TestAccResource_ProVPPInvitation(t *testing.T) {
 			{
 				// Shrink the target set back to one (nested-set removal — the declared
 				// category is owned, so its members full-replace).
-				Config: lifecycleConfig(token, suffix, renamed, "Prompt users to accept/make available in Self Service", false, 1),
+				Config: lifecycleConfig(locationID, suffix, renamed, "Prompt users to accept/make available in Self Service", false, 1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "scope.targets.jss_user_group_ids.#", "1"),
 				),
@@ -199,12 +193,12 @@ func TestAccResource_ProVPPInvitation(t *testing.T) {
 // Self-Service method and drops the email fields to verify the server clears
 // them without a perpetual diff. The message may contain `%@` and literal `%`
 // (the provider form-URL-encodes it for the server's form-decode).
-func emailConfig(token, suffix, name, message string, sendEmails bool) string {
+func emailConfig(locationID, suffix, name, message string, sendEmails bool) string {
 	if !sendEmails {
-		return vppLocationFixture(token, suffix) + fmt.Sprintf(`
+		return vppLocationFixture(locationID, suffix) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_invitation" "test" {
   name                = %[1]q
-  vpp_account_id      = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_account_id      = data.jamfplatform_pro_volume_purchasing_location.vpp.id
   distribution_method = "Make available in Self Service only"
 
   scope = {
@@ -215,10 +209,10 @@ resource "jamfplatform_pro_vpp_invitation" "test" {
 }
 `, name)
 	}
-	return vppLocationFixture(token, suffix) + fmt.Sprintf(`
+	return vppLocationFixture(locationID, suffix) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_invitation" "test" {
   name                 = %[1]q
-  vpp_account_id       = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_account_id       = data.jamfplatform_pro_volume_purchasing_location.vpp.id
   distribution_method  = "Send emails"
   sender_name          = "IT Support"
   sender_email_address = "it-support@example.com"
@@ -236,7 +230,7 @@ resource "jamfplatform_pro_vpp_invitation" "test" {
 }
 
 func TestAccResource_ProVPPInvitation_EmailMode(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-vpp-email-" + suffix
@@ -250,7 +244,7 @@ func TestAccResource_ProVPPInvitation_EmailMode(t *testing.T) {
 				// newline + literal `%` — the provider form-URL-encodes it so the
 				// server's form-decode round-trips it verbatim (the field 500s on a
 				// bare `%`). State must reflect the exact original.
-				Config: emailConfig(token, suffix, name, "Click to register:\n\n%@\n\n(100% done)", true),
+				Config: emailConfig(locationID, suffix, name, "Click to register:\n\n%@\n\n(100% done)", true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "distribution_method", "Send emails"),
 					resource.TestCheckResourceAttr(resAddr, "sender_name", "IT Support"),
@@ -263,7 +257,7 @@ func TestAccResource_ProVPPInvitation_EmailMode(t *testing.T) {
 			{
 				// Mutate the email body (every non-RequiresReplace email field is
 				// updatable); keep a %@ placeholder to re-exercise the encode path.
-				Config: emailConfig(token, suffix, name, "Updated — register here: %@", true),
+				Config: emailConfig(locationID, suffix, name, "Updated — register here: %@", true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "message", "Updated — register here: %@"),
 				),
@@ -271,7 +265,7 @@ func TestAccResource_ProVPPInvitation_EmailMode(t *testing.T) {
 			{
 				// Toggle out of email mode: the server drops the email fields; state
 				// must reconcile to null with no perpetual diff.
-				Config: emailConfig(token, suffix, name, "", false),
+				Config: emailConfig(locationID, suffix, name, "", false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "distribution_method", "Make available in Self Service only"),
 					resource.TestCheckNoResourceAttr(resAddr, "sender_name"),
@@ -284,7 +278,7 @@ func TestAccResource_ProVPPInvitation_EmailMode(t *testing.T) {
 }
 
 func TestAccDataSource_ProVPPInvitation_BySelectors(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-vpp-ds-" + suffix
@@ -294,7 +288,7 @@ func TestAccDataSource_ProVPPInvitation_BySelectors(t *testing.T) {
 		CheckDestroy:             testAccCheckVPPInvitationDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: lifecycleConfig(token, suffix, name, "Make available in Self Service only", true, 1) + `
+				Config: lifecycleConfig(locationID, suffix, name, "Make available in Self Service only", true, 1) + `
 data "jamfplatform_pro_vpp_invitation" "by_id" {
   id = jamfplatform_pro_vpp_invitation.test.id
 }
@@ -313,11 +307,11 @@ data "jamfplatform_pro_vpp_invitation" "by_name" {
 }
 
 func TestAccResource_ProVPPInvitation_DriftRecovery(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-vpp-drift-" + suffix
-	cfg := lifecycleConfig(token, suffix, name, "Make available in Self Service only", true, 1)
+	cfg := lifecycleConfig(locationID, suffix, name, "Make available in Self Service only", true, 1)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
@@ -354,7 +348,7 @@ func TestAccResource_ProVPPInvitation_DriftRecovery(t *testing.T) {
 // group in both limitations and exclusions. Requires both a VPP token (for the
 // account fixture) and a real LDAP group name.
 func TestAccResource_ProVPPInvitation_DSGroupScope(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	ldapEnv := testhelpers.RequireOktaLdapEnv(t)
 	group := testhelpers.RequireLdapGroupName(t)
 	testhelpers.AccPreCheck(t)
@@ -371,10 +365,10 @@ func TestAccResource_ProVPPInvitation_DSGroupScope(t *testing.T) {
 		CheckDestroy:             testAccCheckVPPInvitationDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: vppLocationFixture(token, suffix) + fmt.Sprintf(`
+				Config: vppLocationFixture(locationID, suffix) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_invitation" "test" {
   name                = %[1]q
-  vpp_account_id      = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_account_id      = data.jamfplatform_pro_volume_purchasing_location.vpp.id
   distribution_method = "Make available in Self Service only"
 
   scope = {
@@ -401,10 +395,10 @@ resource "jamfplatform_pro_vpp_invitation" "test" {
 				// the declared-clear gesture (plans as an empty set, emits an explicit
 				// empty element — omission would preserve the group); the post-step
 				// empty-plan check enforces the clear round-tripped.
-				Config: vppLocationFixture(token, suffix) + fmt.Sprintf(`
+				Config: vppLocationFixture(locationID, suffix) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_invitation" "test" {
   name                = %[1]q
-  vpp_account_id      = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_account_id      = data.jamfplatform_pro_volume_purchasing_location.vpp.id
   distribution_method = "Make available in Self Service only"
 
   scope = {
@@ -433,11 +427,11 @@ resource "jamfplatform_pro_vpp_invitation" "test" {
 // TestAccResource_ProVPPInvitation_DSGroupScope). The group fixtures are
 // carried by every step so the server never sees a scoped group disappear
 // underneath the invitation.
-func vppiOmitRetainsConfig(token, suffix, name string) string {
-	return vppiOmitRetainsFixtures(token, suffix, name) + fmt.Sprintf(`
+func vppiOmitRetainsConfig(locationID, suffix, name string) string {
+	return vppiOmitRetainsFixtures(locationID, suffix, name) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_invitation" "test" {
   name                        = %[1]q
-  vpp_account_id              = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_account_id              = data.jamfplatform_pro_volume_purchasing_location.vpp.id
   distribution_method         = "Prompt users to accept/make available in Self Service"
   auto_register_managed_users = true
 
@@ -457,11 +451,11 @@ resource "jamfplatform_pro_vpp_invitation" "test" {
 
 // vppiOmitRetainsChildrenDroppedConfig keeps the scope block but drops its
 // exclusions, which the granular merge re-emits from the server's copy.
-func vppiOmitRetainsChildrenDroppedConfig(token, suffix, name string) string {
-	return vppiOmitRetainsFixtures(token, suffix, name) + fmt.Sprintf(`
+func vppiOmitRetainsChildrenDroppedConfig(locationID, suffix, name string) string {
+	return vppiOmitRetainsFixtures(locationID, suffix, name) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_invitation" "test" {
   name                        = %[1]q
-  vpp_account_id              = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_account_id              = data.jamfplatform_pro_volume_purchasing_location.vpp.id
   distribution_method         = "Prompt users to accept/make available in Self Service"
   auto_register_managed_users = true
 
@@ -478,11 +472,11 @@ resource "jamfplatform_pro_vpp_invitation" "test" {
 
 // vppiOmitRetainsGeneralOnlyConfig drops the scope, so the PUT carries
 // <general> alone.
-func vppiOmitRetainsGeneralOnlyConfig(token, suffix, name string) string {
-	return vppiOmitRetainsFixtures(token, suffix, name) + fmt.Sprintf(`
+func vppiOmitRetainsGeneralOnlyConfig(locationID, suffix, name string) string {
+	return vppiOmitRetainsFixtures(locationID, suffix, name) + fmt.Sprintf(`
 resource "jamfplatform_pro_vpp_invitation" "test" {
   name                        = %[1]q
-  vpp_account_id              = jamfplatform_pro_volume_purchasing_location.vpp.id
+  vpp_account_id              = data.jamfplatform_pro_volume_purchasing_location.vpp.id
   distribution_method         = "Prompt users to accept/make available in Self Service"
   auto_register_managed_users = true
 
@@ -503,8 +497,8 @@ resource "jamfplatform_pro_vpp_invitation" "test" {
 // on this Static User Group" (USERS_VPP_INVITATIONS). The run then fails in
 // CheckDestroy having leaked the group. depends_on is ordering metadata only
 // and reaches no payload, so it cannot weaken what the steps assert.
-func vppiOmitRetainsFixtures(token, suffix, name string) string {
-	return vppLocationFixture(token, suffix) + fmt.Sprintf(`
+func vppiOmitRetainsFixtures(locationID, suffix, name string) string {
+	return vppLocationFixture(locationID, suffix) + fmt.Sprintf(`
 resource "jamfplatform_pro_user_group" "a" {
   name       = "%[1]s-grp-a"
   group_type = "static"
@@ -610,7 +604,7 @@ func vppiRetainedOnServer(t *testing.T, want *vppiOmitRetainsWant) resource.Test
 // ship for this resource. Gated on JAMFPLATFORM_ACC_PRO_VPP_TOKEN like every
 // apply test here.
 func TestAccResource_ProVPPInvitation_OmittedBlocksRetained(t *testing.T) {
-	token := vppToken(t)
+	locationID := requireSharedVPP(t)
 	testhelpers.AccPreCheck(t)
 	suffix := testhelpers.RunSuffix()
 	name := "tf-acc-vpp-omit-" + suffix
@@ -621,7 +615,7 @@ func TestAccResource_ProVPPInvitation_OmittedBlocksRetained(t *testing.T) {
 		CheckDestroy:             testAccCheckVPPInvitationDestroy(t),
 		Steps: []resource.TestStep{
 			{
-				Config: vppiOmitRetainsConfig(token, suffix, name),
+				Config: vppiOmitRetainsConfig(locationID, suffix, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "scope.targets.jss_user_group_ids.#", "1"),
 					resource.TestCheckResourceAttr(resAddr, "scope.exclusions.jss_user_group_ids.#", "1"),
@@ -630,7 +624,7 @@ func TestAccResource_ProVPPInvitation_OmittedBlocksRetained(t *testing.T) {
 				),
 			},
 			{
-				Config: vppiOmitRetainsChildrenDroppedConfig(token, suffix, name),
+				Config: vppiOmitRetainsChildrenDroppedConfig(locationID, suffix, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resAddr, "scope.targets.jss_user_group_ids.#", "1"),
 					resource.TestCheckNoResourceAttr(resAddr, "scope.exclusions.jss_user_group_ids.#"),
@@ -638,7 +632,7 @@ func TestAccResource_ProVPPInvitation_OmittedBlocksRetained(t *testing.T) {
 				),
 			},
 			{
-				Config: vppiOmitRetainsGeneralOnlyConfig(token, suffix, name),
+				Config: vppiOmitRetainsGeneralOnlyConfig(locationID, suffix, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckNoResourceAttr(resAddr, "scope.targets.jss_user_group_ids.#"),
 					vppiRetainedOnServer(t, &want),

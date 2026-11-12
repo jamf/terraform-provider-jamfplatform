@@ -20,7 +20,7 @@ import (
 )
 
 // accCleanupOrphans registers a t.Cleanup that force-deletes any
-// prestages or ADE fixtures whose display name contains the test's
+// prestages whose display name contains the test's
 // unique suffix. Runs unconditionally — Terraform's own
 // `terraform destroy` step is the primary teardown, but mid-step
 // failures (or destroy itself erroring) can leak fixtures on the
@@ -48,43 +48,22 @@ func accCleanupOrphans(t *testing.T, suffix string) {
 			}
 		}
 
-		// ADE fixtures — list, match name by suffix, DELETE.
-		ades, err := c.ListDeviceEnrollmentsV1(ctx, nil)
-		if err != nil {
-			t.Logf("orphan cleanup: list ADE instances failed: %v", err)
-			return
-		}
-		for _, a := range ades {
-			if a.ID == nil || a.Name == "" || !strings.Contains(a.Name, suffix) {
-				continue
-			}
-			if err := c.DeleteDeviceEnrollmentV1(ctx, *a.ID); err != nil && !helpers.IsNotFoundError(err) {
-				t.Logf("orphan cleanup: delete ADE %s (%s) failed: %v", *a.ID, a.Name, err)
-			} else {
-				t.Logf("orphan cleanup: deleted ADE %s (%s)", *a.ID, a.Name)
-			}
-		}
 	})
 }
 
 const (
 	resourceName  = "jamfplatform_pro_computer_prestage_enrollment.test"
-	adeFixtureRef = "jamfplatform_pro_automated_device_enrollment.fixture.id"
+	adeFixtureRef = "local.shared_ade_id"
 )
 
-// requireADETokenBlob skips the test when JAMFPLATFORM_ACC_PRO_DEP_TOKEN is not set.
-// The env var must hold the base64-encoded `.p7m` server token downloaded
-// from Apple Business Manager / Apple School Manager — the same token blob
-// the sibling jamfplatform_pro_automated_device_enrollment acc tests
-// consume. Each test creates an ADE fixture from this blob, builds a
-// prestage that depends on it, and lets TF destroy both at the end.
-func requireADETokenBlob(t *testing.T) string {
+// requireSharedADE returns the id of the one ADE instance every test in this
+// package attaches its PreStage to, creating it on first use. Each test used to
+// upload its own instance and wait about two minutes for Jamf Pro to report the
+// first Apple sync; sharing one removes that wait from every test but the first.
+// Skips when JAMFPLATFORM_ACC_PRO_DEP_TOKEN is unset. TestMain deletes it.
+func requireSharedADE(t *testing.T) string {
 	t.Helper()
-	v := testhelpers.AccEnv("JAMFPLATFORM_ACC_PRO_DEP_TOKEN")
-	if v == "" {
-		t.Skip("JAMFPLATFORM_ACC_PRO_DEP_TOKEN not set — acc tests upload a real ADE server token (.p7m base64) and create an ADE fixture before exercising the prestage.")
-	}
-	return v
+	return testhelpers.RequireSharedADEInstance(t, "computer-prestage")
 }
 
 // requireADESerialFixture skips the test when JAMFPLATFORM_ACC_PRO_DEP_SERIAL is
@@ -112,17 +91,15 @@ func requireADESerial2Fixture(t *testing.T) string {
 	return v
 }
 
-// adeFixtureBlock emits a Terraform resource block that creates an ADE
-// instance from the supplied base64 token. Returned HCL is concatenated
-// with the prestage block in each test config.
-func adeFixtureBlock(suffix, tokenB64 string) string {
+// adeFixtureBlock emits the `local.shared_ade_id` that prestage configs
+// reference (see adeFixtureRef), pointing at the package's shared ADE instance.
+// Returned HCL is concatenated with the prestage block in each test config.
+func adeFixtureBlock(adeID string) string {
 	return fmt.Sprintf(`
-resource "jamfplatform_pro_automated_device_enrollment" "fixture" {
-  name                    = %q
-  server_token            = %q
-  server_token_wo_version = 1
+locals {
+  shared_ade_id = %q
 }
-`, "tf-acc-prestage-ade-"+suffix, tokenB64)
+`, adeID)
 }
 
 // importStateVerifyIgnore mirrors spike §13 — WriteOnly secrets and their
@@ -147,7 +124,7 @@ var importStateVerifyIgnore = []string{
 
 func TestAccResource_ProComputerPrestageEnrollment_Minimal(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-computer-prestage-minimal-" + suffix
@@ -156,7 +133,7 @@ func TestAccResource_ProComputerPrestageEnrollment_Minimal(t *testing.T) {
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageMinimalConfig(name),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageMinimalConfig(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "display_name", name),
 					resource.TestCheckResourceAttrSet(resourceName, "id"),
@@ -176,7 +153,7 @@ func TestAccResource_ProComputerPrestageEnrollment_Minimal(t *testing.T) {
 				ImportStateVerifyIgnore: importStateVerifyIgnore,
 			},
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageMinimalConfig(name+"-renamed"),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageMinimalConfig(name+"-renamed"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "display_name", name+"-renamed"),
 				),
@@ -189,7 +166,7 @@ func TestAccResource_ProComputerPrestageEnrollment_Minimal(t *testing.T) {
 
 func TestAccResource_ProComputerPrestageEnrollment_Full_UpdateRoundTrip(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	// require_authentication = true (V1) is rejected by Jamf Pro with
 	// PREREQUISITE_NOT_MET unless a Directory Service is configured on the
 	// tenant. Stand up the shared Okta LDAP fixture and order the prestage
@@ -205,7 +182,7 @@ func TestAccResource_ProComputerPrestageEnrollment_Full_UpdateRoundTrip(t *testi
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + ldapFixture + testAccComputerPrestageFullConfigV1(name),
+				Config: adeFixtureBlock(adeID) + ldapFixture + testAccComputerPrestageFullConfigV1(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "display_name", name),
 					resource.TestCheckResourceAttr(resourceName, "support_phone_number", "+44-1-555-0100"),
@@ -217,7 +194,7 @@ func TestAccResource_ProComputerPrestageEnrollment_Full_UpdateRoundTrip(t *testi
 				),
 			},
 			{
-				Config: adeFixtureBlock(suffix, token) + ldapFixture + testAccComputerPrestageFullConfigV2(name+"-v2"),
+				Config: adeFixtureBlock(adeID) + ldapFixture + testAccComputerPrestageFullConfigV2(name+"-v2"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "display_name", name+"-v2"),
 					resource.TestCheckResourceAttr(resourceName, "support_phone_number", "+44-1-555-0200"),
@@ -239,7 +216,7 @@ func TestAccResource_ProComputerPrestageEnrollment_Full_UpdateRoundTrip(t *testi
 			// also be empty, proving the removed blocks stay null on refresh
 			// rather than re-appearing as drift.
 			{
-				Config: adeFixtureBlock(suffix, token) + ldapFixture + testAccComputerPrestageBlocksRemovedConfig(name+"-v2"),
+				Config: adeFixtureBlock(adeID) + ldapFixture + testAccComputerPrestageBlocksRemovedConfig(name+"-v2"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "display_name", name+"-v2"),
 					resource.TestCheckNoResourceAttr(resourceName, "skip_setup_items.filevault"),
@@ -256,7 +233,7 @@ func TestAccResource_ProComputerPrestageEnrollment_Full_UpdateRoundTrip(t *testi
 
 func TestAccResource_ProComputerPrestageEnrollment_RecoveryLockManual(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -264,7 +241,7 @@ func TestAccResource_ProComputerPrestageEnrollment_RecoveryLockManual(t *testing
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccComputerPrestageRecoveryLockManualConfig("tf-acc-rl-manual-"+suffix),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "enable_recovery_lock", "true"),
@@ -277,7 +254,7 @@ func TestAccResource_ProComputerPrestageEnrollment_RecoveryLockManual(t *testing
 
 func TestAccResource_ProComputerPrestageEnrollment_RecoveryLockRandom(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -285,7 +262,7 @@ func TestAccResource_ProComputerPrestageEnrollment_RecoveryLockRandom(t *testing
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccComputerPrestageRecoveryLockRandomConfig("tf-acc-rl-random-"+suffix),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "enable_recovery_lock", "true"),
@@ -300,7 +277,7 @@ func TestAccResource_ProComputerPrestageEnrollment_RecoveryLockRandom(t *testing
 
 func TestAccResource_ProComputerPrestageEnrollment_AccountSettingsPrefillCustom(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -308,7 +285,7 @@ func TestAccResource_ProComputerPrestageEnrollment_AccountSettingsPrefillCustom(
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccComputerPrestagePrefillCustomConfig("tf-acc-prefill-custom-"+suffix),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "account_settings.prefill_type", "CUSTOM"),
@@ -322,7 +299,7 @@ func TestAccResource_ProComputerPrestageEnrollment_AccountSettingsPrefillCustom(
 
 func TestAccResource_ProComputerPrestageEnrollment_AccountSettingsPrefillDeviceOwner(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -330,7 +307,7 @@ func TestAccResource_ProComputerPrestageEnrollment_AccountSettingsPrefillDeviceO
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccComputerPrestagePrefillDeviceOwnerConfig("tf-acc-prefill-device-owner-"+suffix),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "account_settings.prefill_type", "DEVICE_OWNER"),
@@ -344,7 +321,7 @@ func TestAccResource_ProComputerPrestageEnrollment_AccountSettingsPrefillDeviceO
 
 func TestAccResource_ProComputerPrestageEnrollment_NoPSSOFields(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -352,7 +329,7 @@ func TestAccResource_ProComputerPrestageEnrollment_NoPSSOFields(t *testing.T) {
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccComputerPrestageMinimalConfig("tf-acc-no-psso-"+suffix),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "psso_enabled", "false"),
@@ -366,7 +343,7 @@ func TestAccResource_ProComputerPrestageEnrollment_NoPSSOFields(t *testing.T) {
 
 func TestAccResource_ProComputerPrestageEnrollment_ScopeAssignments(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	serial := requireADESerialFixture(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
@@ -376,19 +353,19 @@ func TestAccResource_ProComputerPrestageEnrollment_ScopeAssignments(t *testing.T
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageScopeConfig(name, ""),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageScopeConfig(name, ""),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "0"),
 				),
 			},
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageScopeConfig(name, serial),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageScopeConfig(name, serial),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "1"),
 				),
 			},
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageScopeConfig(name, ""),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageScopeConfig(name, ""),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "0"),
 				),
@@ -415,7 +392,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ScopeAssignments(t *testing.T
 // scoped to any other PreStage at the time the test starts.
 func TestAccResource_ProComputerPrestageEnrollment_ScopeMultiSerialDiff(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	s1 := requireADESerialFixture(t)
 	s2 := requireADESerial2Fixture(t)
 	suffix := testhelpers.RunSuffix()
@@ -427,7 +404,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ScopeMultiSerialDiff(t *testi
 		Steps: []resource.TestStep{
 			// Step 1: [] → [s1]
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageMultiScopeConfig(name, []string{s1}),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageMultiScopeConfig(name, []string{s1}),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "1"),
 					resource.TestCheckTypeSetElemAttr(resourceName, "scope_serial_numbers.*", s1),
@@ -435,7 +412,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ScopeMultiSerialDiff(t *testi
 			},
 			// Step 2: [s1] → [s1, s2]
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageMultiScopeConfig(name, []string{s1, s2}),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageMultiScopeConfig(name, []string{s1, s2}),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "2"),
 					resource.TestCheckTypeSetElemAttr(resourceName, "scope_serial_numbers.*", s1),
@@ -444,7 +421,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ScopeMultiSerialDiff(t *testi
 			},
 			// Step 3: [s1, s2] → [s2]  (pure remove)
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageMultiScopeConfig(name, []string{s2}),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageMultiScopeConfig(name, []string{s2}),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "1"),
 					resource.TestCheckTypeSetElemAttr(resourceName, "scope_serial_numbers.*", s2),
@@ -452,7 +429,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ScopeMultiSerialDiff(t *testi
 			},
 			// Step 4: [s2] → [s1]  (combined add + remove)
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageMultiScopeConfig(name, []string{s1}),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageMultiScopeConfig(name, []string{s1}),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "1"),
 					resource.TestCheckTypeSetElemAttr(resourceName, "scope_serial_numbers.*", s1),
@@ -460,7 +437,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ScopeMultiSerialDiff(t *testi
 			},
 			// Step 5: [s1] → []  (pure remove of last serial)
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageMultiScopeConfig(name, []string{}),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageMultiScopeConfig(name, []string{}),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "scope_serial_numbers.#", "0"),
 				),
@@ -506,7 +483,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 // the provider rewraps that diagnostic with guidance.
 func TestAccResource_ProComputerPrestageEnrollment_ScopeAlreadyScopedConflict(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	serial := requireADESerialFixture(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
@@ -516,7 +493,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ScopeAlreadyScopedConflict(t 
 		Steps: []resource.TestStep{
 			// Step 1: create both PreStages, scope serial to A only.
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccTwoComputerPrestagesScopeConflictConfig("tf-acc-conflict-"+suffix, serial, false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("jamfplatform_pro_computer_prestage_enrollment.a", "scope_serial_numbers.#", "1"),
@@ -527,7 +504,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ScopeAlreadyScopedConflict(t 
 			// from A. Jamf returns 400 ALREADY_SCOPED; the provider
 			// surfaces a user-facing "scope conflict" error.
 			{
-				Config: adeFixtureBlock(suffix, token) +
+				Config: adeFixtureBlock(adeID) +
 					testAccTwoComputerPrestagesScopeConflictConfig("tf-acc-conflict-"+suffix, serial, true),
 				ExpectError: regexp.MustCompile(`scope conflict|ALREADY_SCOPED`),
 				// scope conflict matches both the documented `400
@@ -596,7 +573,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "b" {
 
 func TestAccResource_ProComputerPrestageEnrollment_AnchorCertificatesRollback(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-anchor-" + suffix
@@ -605,11 +582,11 @@ func TestAccResource_ProComputerPrestageEnrollment_AnchorCertificatesRollback(t 
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageMinimalConfig(name),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageMinimalConfig(name),
 				Check:  resource.TestCheckResourceAttrSet(resourceName, "id"),
 			},
 			{
-				Config:      adeFixtureBlock(suffix, token) + testAccComputerPrestageAnchorsConfig(name, `["dGVzdA=="]`),
+				Config:      adeFixtureBlock(adeID) + testAccComputerPrestageAnchorsConfig(name, `["dGVzdA=="]`),
 				ExpectError: regexp.MustCompile(`did not commit|anchor_certificates`),
 			},
 		},
@@ -620,7 +597,7 @@ func TestAccResource_ProComputerPrestageEnrollment_AnchorCertificatesRollback(t 
 
 func TestAccResource_ProComputerPrestageEnrollment_ExpectError_RandomConflictsWithPassword(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -628,7 +605,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_RandomConflictsWi
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-random-with-pwd-%s"
   make_mdm_profile_mandatory                             = true
@@ -655,7 +632,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 
 func TestAccResource_ProComputerPrestageEnrollment_ExpectError_PasswordRequiresEnable(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -663,7 +640,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_PasswordRequiresE
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-pwd-disabled-%s"
   make_mdm_profile_mandatory                             = true
@@ -690,7 +667,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 
 func TestAccResource_ProComputerPrestageEnrollment_ExpectError_PrefillCustomRequiresNames(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -698,7 +675,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_PrefillCustomRequ
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-prefill-custom-missing-names-%s"
   make_mdm_profile_mandatory                             = true
@@ -724,7 +701,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 
 func TestAccResource_ProComputerPrestageEnrollment_ExpectError_PssoModesMutuallyExclusive(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -732,7 +709,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_PssoModesMutually
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-psso-conflict-%s"
   make_mdm_profile_mandatory                             = true
@@ -758,7 +735,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 
 func TestAccResource_ProComputerPrestageEnrollment_ExpectError_AttendedPssoConflictsWithEnrollmentCustomization(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -766,7 +743,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_AttendedPssoConfl
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-attended-ec-conflict-%s"
   make_mdm_profile_mandatory                             = true
@@ -792,7 +769,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 
 func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadRecoveryLockType(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -800,7 +777,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadRecoveryLockTy
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-bad-rl-type-%s"
   make_mdm_profile_mandatory                             = true
@@ -824,7 +801,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 
 func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadPrefillType(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -832,7 +809,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadPrefillType(t 
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-bad-prefill-%s"
   make_mdm_profile_mandatory                             = true
@@ -858,7 +835,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 
 func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadUserAccountType(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -866,7 +843,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadUserAccountTyp
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-bad-uat-%s"
   make_mdm_profile_mandatory                             = true
@@ -892,7 +869,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 
 func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadMinOsTarget(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 
@@ -900,7 +877,7 @@ func TestAccResource_ProComputerPrestageEnrollment_ExpectError_BadMinOsTarget(t 
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: adeFixtureBlock(suffix, token) + fmt.Sprintf(`
+				Config: adeFixtureBlock(adeID) + fmt.Sprintf(`
 resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
   display_name                          = "tf-acc-expect-bad-min-os-%s"
   make_mdm_profile_mandatory                             = true
@@ -1278,7 +1255,7 @@ resource "jamfplatform_pro_computer_prestage_enrollment" "test" {
 // 2026-10-14. Needs the ADE token blob the other tests here use.
 func TestAccResource_ProComputerPrestageEnrollment_BlocksOmittedToDeclared(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-	token := requireADETokenBlob(t)
+	adeID := requireSharedADE(t)
 	suffix := testhelpers.RunSuffix()
 	accCleanupOrphans(t, suffix)
 	name := "tf-acc-computer-prestage-blocks-" + suffix
@@ -1286,9 +1263,9 @@ func TestAccResource_ProComputerPrestageEnrollment_BlocksOmittedToDeclared(t *te
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			{Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageBlocksConfig(name, false)},
+			{Config: adeFixtureBlock(adeID) + testAccComputerPrestageBlocksConfig(name, false)},
 			{
-				Config: adeFixtureBlock(suffix, token) + testAccComputerPrestageBlocksConfig(name, true),
+				Config: adeFixtureBlock(adeID) + testAccComputerPrestageBlocksConfig(name, true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "location_information.username", "tf-acc-user"),
 					resource.TestCheckResourceAttrSet(resourceName, "location_information.building_id"),
