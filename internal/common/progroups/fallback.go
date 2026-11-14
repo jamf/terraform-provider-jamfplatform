@@ -24,6 +24,8 @@ import (
 // to the endpoint rather than to a malformed request:
 //
 //	patch reporting criterion, computer smart group  (PI-1286 / PI-1183 / PI-626)
+//	  ACCEPTED from Jamf Pro 11.34.0 (wire-verified 2026-11-14), so the fallback no
+//	  longer engages for it there. Still refused on 11.32.0, and 11.33 is unprobed.
 //	  "Patch Reporting: 1Password"  is  "Latest Version"
 //	  group endpoint  400 INVALID_FIELD "The criterion Patch Reporting: 1Password is not valid"
 //	  older surface   201

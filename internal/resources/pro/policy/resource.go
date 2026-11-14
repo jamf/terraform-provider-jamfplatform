@@ -57,6 +57,9 @@ type PolicyResource struct {
 	// collisions backs the plan-time name collision check. nil when the
 	// provider's name_collision_check mode is off.
 	collisions *collision.Checker
+	// pd gives ModifyPlan the cached tenant version, for the plan-time refusal of
+	// settings a newer Jamf Pro silently discards. nil until Configure.
+	pd *providerdata.Data
 }
 
 var _ resource.Resource = &PolicyResource{}
@@ -495,7 +498,7 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					"update_inventory":        optComputedBool("Update inventory. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"reset_computer_names":    optComputedBool("Reset computer names. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"install_cached_packages": optComputedBool("Install cached packages. Omit to leave the current value untouched; set `true`/`false` to change it."),
-					"fix_disk_permissions":    optComputedBool("Fix disk permissions. Omit to leave the current value untouched; set `true`/`false` to change it."),
+					"fix_disk_permissions":    deprecatedOptComputedBool(maintenanceFixDiskPermissionsDeprecatedDescription, maintenanceFixDiskPermissionsDeprecation),
 					"fix_byhost_files":        optComputedBool("Fix ByHost files. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"flush_system_caches":     optComputedBool("Flush system caches. Omit to leave the current value untouched; set `true`/`false` to change it."),
 					"flush_user_caches":       optComputedBool("Flush user caches. Omit to leave the current value untouched; set `true`/`false` to change it."),
@@ -603,6 +606,7 @@ func (r *PolicyResource) Configure(ctx context.Context, req resource.ConfigureRe
 	// a nil cache means they are switched off.
 	r.impact = providerdata.ConfigureImpact(req.ProviderData)
 	r.collisions = providerdata.ConfigureCollision(req.ProviderData)
+	r.pd, _ = req.ProviderData.(*providerdata.Data)
 }
 
 // ImportState handles import by the Jamf Pro policy ID.
@@ -631,6 +635,7 @@ func (r *PolicyResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 	validateEFIPasswordOnCreate(ctx, req, resp)
 	validateRetryAttemptsOnCreate(ctx, req, resp)
 	validateDeferralDateIsFuture(ctx, req, resp, time.Now())
+	validateFixDiskPermissionsAccepted(ctx, r.pd, req, resp)
 
 	if r.ldapSearcher == nil || req.Plan.Raw.IsNull() {
 		return
@@ -862,6 +867,15 @@ func optComputedBoolKeyed(desc string) schema.BoolAttribute {
 func optComputedBoolKeyedBy(key, desc string) schema.BoolAttribute {
 	a := optComputedBool(desc)
 	a.PlanModifiers = []planmodifier.Bool{planmodifiers.UseKeyedStateForUnknownBool(key)}
+	return a
+}
+
+// deprecatedOptComputedBool is optComputedBool for an attribute under the 90-day
+// deprecation window: the description carries the registry callout, since
+// tfplugindocs does not render DeprecationMessage.
+func deprecatedOptComputedBool(desc, deprecation string) schema.BoolAttribute {
+	a := optComputedBool(desc)
+	a.DeprecationMessage = deprecation
 	return a
 }
 

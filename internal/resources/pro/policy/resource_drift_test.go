@@ -53,7 +53,6 @@ func policyDriftConfig(name, command string) string {
 			}
 			maintenance = {
 				update_inventory     = true
-				fix_disk_permissions = true
 			}
 			restart_options = {
 				message                        = "Declared by Terraform."
@@ -153,7 +152,6 @@ func TestAccResource_ProPolicy_DriftIsReported(t *testing.T) {
 					resource.TestCheckResourceAttr(policyDriftResourceAddr, "general.trigger_other", "tf-acc-387"),
 					resource.TestCheckResourceAttr(policyDriftResourceAddr, "files_and_processes.execute_command", command),
 					resource.TestCheckResourceAttr(policyDriftResourceAddr, "maintenance.update_inventory", "true"),
-					resource.TestCheckResourceAttr(policyDriftResourceAddr, "maintenance.fix_disk_permissions", "true"),
 					resource.TestCheckResourceAttr(policyDriftResourceAddr, "restart_options.message", "Declared by Terraform."),
 					resource.TestCheckResourceAttr(policyDriftResourceAddr, "restart_options.delay_minutes", "5"),
 					resource.TestCheckResourceAttr(policyDriftResourceAddr, "user_interaction.start_message", "Starting."),
