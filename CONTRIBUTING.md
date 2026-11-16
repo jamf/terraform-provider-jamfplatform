@@ -269,17 +269,13 @@ See [STYLE_GUIDE.md §Dependencies](contributing/package-layout.md#dependencies)
 
 ## Release Versioning
 
-The provider does **not** follow strict semver. Until further notice:
-
-- **Patch** (`X.Y.Z+1`): bug fixes only, no schema or behavior changes.
-- **Minor** (`X.Y+1.0`): everything else — new resources, new attributes, deprecations, **and breaking changes** (renames, removals, attribute-type changes, behavior changes).
-- **Major** (`X+1.0.0`): reserved. Bumped only as a deliberate coordinated cleanup release (e.g., wide-scale removals or restructuring). Not required for individual breaking changes.
+The policy users are told is in [Versioning, deprecations and supported versions](templates/guides/versioning-and-support.md), and that guide is the source of truth: patch releases are bug fixes only, minor releases carry everything else including breaking changes, and a major release is reserved for a coordinated clean-up. Change the policy there, then here.
 
 Before you tag a release, bump `github.com/jamf/jamfplatform-go-sdk` to its latest tag. The SDK carries the Apple schema tables that `jamfplatform_blueprint` checks at plan time. The provider rejects any key or declaration type those tables don't know, so a release on a stale SDK fails plans for settings the Jamf Pro editor already offers.
 
-A removal that breaks configuration is announced first: deprecate the attribute, wait 90 days, then remove it. The procedure, the `PRO-DEPRECATED` marker and the weekly sweep that opens the removal issue are in [STYLE_GUIDE.md §Jamf Pro Terraform schema deprecation](contributing/endpoint-lifecycle.md#jamf-pro-terraform-schema-deprecation--90-day-window). An attribute that changes type needs a new name, since the old one cannot hold both types. The one accepted exception is a Set becoming a List of the same element type, in place, as `jamfplatform_device_group` criteria, the `jamfplatform_pro_policy` script, package, printer, dock item and directory binding collections, and `jamfplatform_pro_inventory_preload_record` `extension_attributes` did ([STYLE_GUIDE.md §Jamf Pro Terraform schema deprecation](contributing/endpoint-lifecycle.md#jamf-pro-terraform-schema-deprecation--90-day-window)): configuration is unchanged, but the release notes must call out set functions and `==` comparisons that stop working.
+A removal that breaks configuration is announced first: deprecate the attribute, wait 90 days, then remove it. The procedure, the `PRO-DEPRECATED` marker and the weekly sweep that opens the removal issue are in [STYLE_GUIDE.md §Jamf Pro Terraform schema deprecation](contributing/endpoint-lifecycle.md#jamf-pro-terraform-schema-deprecation--90-day-window), which also covers a change of type and the Set-to-List exception.
 
-Document any breaking change explicitly in the release notes (generated via goreleaser — see [TESTING.md](TESTING.md) and the release workflow). When the policy changes (e.g., on adopting strict semver post-Pro-rollout), update this section.
+Call out every breaking change in the release notes. They are generated from pull request titles (`goreleaser.yml`), so a breaking change needs a title that says so, and the notes need a hand edit after the release is cut where a title is not enough.
 
 ## Commit Messages
 

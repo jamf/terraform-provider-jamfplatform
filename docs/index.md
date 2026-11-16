@@ -13,7 +13,7 @@ description: |-
   | Jamf Security Cloud (Custom DNS, ZTNA, UEM Connect, device groups, activation profiles) | `jamfplatform_security_cloud_*` | continuously deployed |
   | Jamf AI Governance | `jamfplatform_ai_governance_*` | continuously deployed |
   | Jamf Account (single sign-on) | `jamfplatform_account_*` | continuously deployed |
-  Jamf Pro is the only product versioned at the tenant. A tenant below the listed version raises an advisory warning at apply time, and a resource that needs a newer endpoint declares its own floor and fails when it is configured rather than mid-apply. The rest target continuously-deployed platform services, and no version is fetched for a configuration that uses only those.
+  Jamf Pro is the only product versioned at the tenant. A tenant below the listed version raises an advisory warning on every plan and apply, and a resource that needs a newer endpoint declares its own floor and fails when it is configured rather than mid-apply. The rest target continuously-deployed platform services, and no version is fetched for a configuration that uses only those. A minor release of this provider can contain a breaking change: see Versioning, deprecations and supported versions guides/versioning-and-support before you pin or upgrade.
   Which namespaces an API integration reaches depends on the scope it was created with: Blueprints, Compliance Benchmarks and Jamf AI Governance need a platform environment, and jamfplatform_account_* needs organization management and is the only family that scope reaches. Every resource and data source reports the scope it needs when it is configured. See environment_id below.
   This provider builds on the work of Deployment Theory https://github.com/deploymenttheory's terraform-provider-jamfpro https://github.com/deploymenttheory/terraform-provider-jamfpro — first released in early 2024, the most widely adopted community Terraform provider for Jamf.
 ---
@@ -36,7 +36,7 @@ Coming from `jamf-concepts/jamfplatform`: see [Moving to the jamf namespace](gui
 | Jamf AI Governance | `jamfplatform_ai_governance_*` | continuously deployed |
 | Jamf Account (single sign-on) | `jamfplatform_account_*` | continuously deployed |
 
-Jamf Pro is the only product versioned at the tenant. A tenant below the listed version raises an advisory warning at apply time, and a resource that needs a newer endpoint declares its own floor and fails when it is configured rather than mid-apply. The rest target continuously-deployed platform services, and no version is fetched for a configuration that uses only those.
+Jamf Pro is the only product versioned at the tenant. A tenant below the listed version raises an advisory warning on every plan and apply, and a resource that needs a newer endpoint declares its own floor and fails when it is configured rather than mid-apply. The rest target continuously-deployed platform services, and no version is fetched for a configuration that uses only those. A minor release of this provider can contain a breaking change: see [Versioning, deprecations and supported versions](guides/versioning-and-support) before you pin or upgrade.
 
 Which namespaces an API integration reaches depends on the scope it was created with: Blueprints, Compliance Benchmarks and Jamf AI Governance need a platform environment, and `jamfplatform_account_*` needs organization management and is the only family that scope reaches. Every resource and data source reports the scope it needs when it is configured. See `environment_id` below.
 

@@ -110,7 +110,7 @@ Maintainer call, documented in the migration PR description.
 
 ### Slow-track exception
 
-When migration would require a **breaking Terraform schema change**, defer to the next provider major version. Document explicitly in the resource's `crud.go` annotation (see below) and in the major-version release planning.
+When migration would require a **breaking Terraform schema change**, it ships in a minor release like any other breaking change, behind the 90-day schema deprecation below. It does not wait for a major version. Where the 90 days would overrun the hard deadline above, start the deprecation early enough that they do not, and record the plan in the resource's `crud.go` annotation (see below).
 
 ### Tracking — the migration issue
 

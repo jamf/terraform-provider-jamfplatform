@@ -22,7 +22,7 @@ It additionally provides resources and data sources for these products, each und
 * Jamf AI Governance — `jamfplatform_ai_governance_*`: the managed settings delivered to an AI tool, and the product catalogue
 * Jamf Account — `jamfplatform_account_*`: organization-level single sign-on, meaning claimed domains and the identity providers that sign users in for them
 
-Further Jamf products are expected to follow. See the **Supported Jamf products** section below for the per-product tenant version targets, and the [guides](./docs/guides/) for the families that carry behaviour worth reading first.
+Further Jamf products are expected to follow. See **Supported Jamf products and versions** below for the per-product version requirements, and the [guides](./docs/guides/) for the families that carry behaviour worth reading first.
 
 ## Acknowledgements
 
@@ -37,19 +37,21 @@ This provider builds on a path charted by [Deployment Theory](https://github.com
 
 * Terraform >= 1.13.0, or OpenTofu >= 1.6.0
 
-### Supported Jamf products and tenant version targets
+### Supported Jamf products and versions
 
-The provider groups resources by the Jamf product they target. Some products are versioned at the customer-tenant level (the API spec the provider was generated from may be newer than what a given tenant is running); others are continuously-deployed Jamf Platform microservices with no tenant version concept.
+| Product | Resource namespace | Tenant version |
+|---------|--------------------|----------------|
+| Jamf Pro | `jamfplatform_pro_*` | Built against the Jamf Pro API version in [`ProviderMinJamfProVersion`](./internal/providerdata/providerdata.go). An older tenant gets a warning on every plan and apply. |
+| Jamf Platform Services (Blueprints, Device Groups, Devices, Device Actions, Compliance Benchmarks) | no product prefix, such as `jamfplatform_blueprints_blueprint` | Continuously deployed, no requirement. |
+| Jamf Security Cloud (Custom DNS, ZTNA, UEM Connect, device groups, activation profiles) | `jamfplatform_security_cloud_*` | Continuously deployed, no requirement. A separate entitlement from Jamf Pro. |
+| Jamf AI Governance | `jamfplatform_ai_governance_*` | Continuously deployed, no requirement. |
+| Jamf Account (single sign-on) | `jamfplatform_account_*` | Continuously deployed, no requirement. Served from the US gateway alone. |
 
-| Product | Resource namespace | Built against API as of | Notes |
-|---------|--------------------|--------------------------|-------|
-| Jamf Pro | `jamfplatform_pro_*` | **11.31.0** (see [`ProviderMinJamfProVersion`](./internal/providerdata/providerdata.go) for the current source-tree value) | Tenants below this version emit an advisory warning at apply time. Individual resources and actions that depend on newer endpoints declare their own `minJamfProVersion` and hard-fail Configure on unsupported tenants — for example `jamfplatform_pro_service_discovery_enrollment` requires 11.25.0. |
-| Jamf Platform Services (Blueprints, Device Groups, Devices, Device Actions, Compliance Benchmarks) | resources without a product-name prefix (e.g. `jamfplatform_blueprints_blueprint`, `jamfplatform_device_group`) | continuously-deployed | No tenant version requirement. No version fetch is performed against tenants that use only these resources. Blueprints and compliance benchmarks are reachable only by an integration scoped to a platform environment; a tenant-scoped one is refused when the resource is configured. The device and device-group constructs still work under either scope. |
-| Jamf Security Cloud (Custom DNS, ZTNA, UEM Connect, device groups, activation profiles) | `jamfplatform_security_cloud_*` | continuously-deployed | No tenant version requirement. Security Cloud is a separate entitlement: a tenant can hold Jamf Pro without holding it, and these resources then fail with a named diagnostic saying the tenant is not entitled. |
-| Jamf AI Governance | `jamfplatform_ai_governance_*` | continuously-deployed | No tenant version requirement. Reachable only by an integration scoped to a platform environment; a tenant-scoped one is refused when the resource is configured. |
-| Jamf Account (single sign-on) | `jamfplatform_account_*` | continuously-deployed | No tenant version requirement. Reachable only by an integration scoped to organization management, which is also the only scope that reaches it. Served from the US gateway alone. |
+Which of these an API integration reaches depends on the scope it was created with; the [provider documentation](https://registry.terraform.io/providers/jamf/jamfplatform/latest/docs) says which scope each family needs.
 
-Further Jamf products are expected to be added; each will get its own row, namespace, and version constant.
+### Versioning and deprecations
+
+A minor release can contain a breaking change, so pin to a patch series (`~> 1.9.0`). An attribute is deprecated for at least 90 days before it is removed. The full policy, including what happens on an older Jamf Pro tenant, is in [Versioning, deprecations and supported versions](docs/guides/versioning-and-support.md).
 
 **Credentials are the same across all products**: a single OAuth client (`JAMFPLATFORM_CLIENT_ID` / `JAMFPLATFORM_CLIENT_SECRET`) scoped to the relevant API areas on your tenant.
 
