@@ -6,7 +6,7 @@
 //	account.VerifyDomain
 //	account.ListDomains (resolving a domain named by name)
 //
-// Status: current. Last reviewed 2026-09-02.
+// Status: current.
 package ssodomainaction
 
 import (

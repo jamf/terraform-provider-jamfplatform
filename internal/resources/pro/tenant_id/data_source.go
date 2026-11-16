@@ -15,7 +15,7 @@
 //
 //	pro.GetCsaTenantIdV1
 //
-// Status: current. Last reviewed 2026-08-28.
+// Status: current.
 package tenant_id
 
 import (

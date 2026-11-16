@@ -27,7 +27,7 @@
 //   DigiCert's CertificateResponse. Fix-prompt: spike/SDK_PKI_EXPIRATION_DATE_FIX_PROMPT.md.
 //   The single coupled line is isolated in state_builders.go adcsCertExpiration().
 //
-// Status: current. Last reviewed 2026-06-09.
+// Status: current.
 
 package pki_adcs
 

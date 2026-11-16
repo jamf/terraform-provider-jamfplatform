@@ -13,7 +13,7 @@
 //
 // Uniqueness: username and email, each enforced (400 INVALID_REQUEST_PARAMETER_VALUE "Duplicated user account"), case-, trailing-space- and accent-insensitive, a leading space significant. The plan-time collision check lists with pro.ListAccountsV1 (collision.go).
 //
-// Status: current. Last reviewed 2026-09-06.
+// Status: current.
 
 package account
 

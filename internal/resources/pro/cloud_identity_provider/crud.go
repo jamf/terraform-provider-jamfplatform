@@ -20,7 +20,7 @@
 // Uniqueness: display name, enforced (400 DUPLICATE_FIELD), case-, leading- and trailing-space-
 // and accent-insensitive (an accent variant is refused 500 with no body), across both providers.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package cloud_identity_provider
 

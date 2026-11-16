@@ -24,7 +24,7 @@
 // Credentials". So the host carries no minimum-length validator either, and
 // validateSenderSettingsWhenEnabled covers it alongside the sender fields.
 //
-// Status: current. Last reviewed 2026-09-05.
+// Status: current.
 
 package smtp_server
 

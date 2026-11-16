@@ -12,7 +12,7 @@
 //
 // Uniqueness: name, enforced (409), case-, leading-space-, trailing-space- and accent-insensitive.
 //
-// Status: current. Last reviewed 2026-05-21.
+// Status: current.
 
 package site
 

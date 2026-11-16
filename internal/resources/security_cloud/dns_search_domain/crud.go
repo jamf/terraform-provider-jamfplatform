@@ -6,7 +6,7 @@
 //   securitycloud.SetDnsSearchDomainV1
 //   securitycloud.ClearDnsSearchDomainV1
 //
-// Status: current. Last reviewed 2026-08-29.
+// Status: current.
 
 package dns_search_domain
 

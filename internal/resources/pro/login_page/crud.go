@@ -5,7 +5,7 @@
 //   pro.GetLoginCustomizationV1
 //   pro.UpdateLoginCustomizationV1
 //
-// Status: current. Last reviewed 2026-06-09.
+// Status: current.
 
 package login_page
 

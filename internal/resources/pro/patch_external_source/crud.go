@@ -18,7 +18,7 @@
 // include_unenforced. Classic trims the name on save, so the strict comparison also
 // ignores leading and trailing spaces, case and accents.
 //
-// Status: current. Last reviewed 2026-09-06.
+// Status: current.
 
 package patch_external_source
 

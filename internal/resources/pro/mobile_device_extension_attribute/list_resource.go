@@ -3,7 +3,7 @@
 
 // SDK endpoints used:
 //   pro.ListMobileDeviceExtensionAttributesV1
-// Status: current. Last reviewed 2026-06-02.
+// Status: current.
 
 package mobile_device_extension_attribute
 

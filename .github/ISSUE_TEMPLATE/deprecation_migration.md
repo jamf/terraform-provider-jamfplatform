@@ -54,7 +54,7 @@ Conventions are mandatory — see STYLE_GUIDE.md §Deprecation migration timelin
 ## Work required
 
 - [ ] <!-- one item per package, each ending in "drop the suppression" -->
-- [ ] Refresh the `crud.go` SDK-endpoints annotation (`Status:` line + `Last reviewed`).
+- [ ] Refresh the `crud.go` SDK-endpoints annotation (`Status:` line).
 - [ ] `make fix fmt lint test`, then `make generate` if any description changed.
 - [ ] Re-run acceptance for the affected resources.
 

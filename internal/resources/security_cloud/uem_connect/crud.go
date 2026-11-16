@@ -10,7 +10,7 @@
 //	securitycloud.DeleteUemConnectorV1
 //	securitycloud.ListUemConnectorsV1 (data source)
 //
-// Status: current. Last reviewed 2026-08-31.
+// Status: current.
 //
 // CreateUemConnectorV1 takes a vendor-discriminated union as of spec v1882: the
 // body is securitycloud.ConnectorCreateRequestBody and the Jamf Pro variant is

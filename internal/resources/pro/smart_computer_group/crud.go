@@ -45,7 +45,7 @@
 //     on create and on an update that changes it. That route takes the PLATFORM
 //     identifier; a Jamf Pro id answers 404.
 //
-// Status: current. Last reviewed 2026-09-17.
+// Status: current.
 
 package smart_computer_group
 

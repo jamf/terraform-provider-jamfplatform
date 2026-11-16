@@ -15,7 +15,7 @@
 //   pro.ListJamfProtectHistoryV1 / pro.CreateJamfProtectHistoryNoteV1
 //     — object history, convention-wide exclusion.
 //
-// Status: current. Last reviewed 2026-06-10.
+// Status: current.
 //
 // The register POST response is byte-identical to a subsequent GET, so Create
 // needs no GET-after-write. POSTing over an existing registration overwrites

@@ -11,7 +11,7 @@
 //
 // Uniqueness: general.name, enforced (409 Duplicate name), tenant-wide across sites, case-insensitive, surrounding spaces trimmed, accent-sensitive. Create and rename (PUT) both refuse.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 //
 // Scope semantics: within a sent <scope> the server replaces the whole subtree
 // (wire-probed 2026-07-08 — any category element present, even empty, wipes

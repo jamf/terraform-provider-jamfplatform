@@ -5,7 +5,7 @@
 //   pro.ListJamfProtectDeploymentTasksV1    (GET  /v1/jamf-protect/deployments/{id}/tasks — paginated task search)
 //   pro.RetryJamfProtectDeploymentTasksV1   (POST /v1/jamf-protect/deployments/{id}/tasks/retry — task IDs body, 204)
 //
-// Status: current. Last reviewed 2026-07-03.
+// Status: current.
 //
 // Retries failed Jamf Protect install tasks for a deployment. The retry API
 // takes deployment *task* IDs (not computer IDs), so every mode resolves to a

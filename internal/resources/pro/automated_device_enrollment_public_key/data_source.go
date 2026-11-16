@@ -3,7 +3,7 @@
 
 // SDK endpoints used:
 //   pro.GetDeviceEnrollmentPublicKeyV1
-// Status: current. Last reviewed 2026-05-25.
+// Status: current.
 
 // Package automated_device_enrollment_public_key implements the
 // jamfplatform_pro_automated_device_enrollment_public_key data source backed

@@ -15,7 +15,7 @@
 //     all-or-nothing ("must be provided in full, or not at all"), so the provider
 //     re-sends the whole certificate only on a wo_version bump.
 //
-// Status: current. Last reviewed 2026-06-09.
+// Status: current.
 
 package pki_digicert
 

@@ -15,7 +15,7 @@
 // because the endpoint was seen to merge an omitted field. Probe it before
 // relying on merge behaviour here.
 //
-// Status: current. Last reviewed 2026-05-28.
+// Status: current.
 
 package automated_device_enrollment
 

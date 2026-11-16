@@ -10,7 +10,7 @@
 //
 // Uniqueness: name, not enforced: duplicates are stored whatever the case, trailing space or accent (wire-probed 2026-10-25). Not checked by the name collision check, because no read returns a name: the list and the read of one answer only {"code": "..."}, and the list still carries codes of deleted profiles, so there is nothing to compare a planned name against.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package activation_profile
 

@@ -8,7 +8,7 @@
 //   proclassic.DeleteJsonWebTokenConfigurationByID   (DELETE /jsonwebtokenconfigurations/id/{id})
 //   proclassic.ListJsonWebTokenConfigurations        (data source name lookup / list resource)
 //
-// Status: current. Last reviewed 2026-06-09.
+// Status: current.
 //
 // Server invariants (wire-probed — spike/JSON_WEB_TOKEN_SPIKE.md):
 //   - At most ONE JSON Web Token configuration per Jamf Pro instance; a second

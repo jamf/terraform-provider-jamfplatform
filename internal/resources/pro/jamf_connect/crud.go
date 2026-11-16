@@ -16,7 +16,7 @@
 //   pro.ResolveJamfConnectConfigProfileV1ByName /
 //     pro.ResolveJamfConnectConfigProfileV1IDByName — used only by the data source's by-name lookup.
 //
-// Status: current. Last reviewed 2026-06-13.
+// Status: current.
 //
 // Update-only adoption. There is no server-side create or delete for what this
 // resource manages — a configuration profile is "linked to Jamf Connect"

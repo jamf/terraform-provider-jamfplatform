@@ -21,7 +21,7 @@
 // include_unenforced. The strict comparison ignores case, trailing spaces and
 // accents.
 //
-// Status: current. Last reviewed 2026-06-13.
+// Status: current.
 
 package app_request_form_field
 

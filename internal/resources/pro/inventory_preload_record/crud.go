@@ -28,7 +28,7 @@
 //
 // Uniqueness: serial_number, enforced (400 DUPLICATE_FIELD) across both device types, case-, trailing-space- and accent-insensitive; a leading space is distinct.
 //
-// Status: current. Last reviewed 2026-06-10.
+// Status: current.
 
 package inventory_preload_record
 

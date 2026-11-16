@@ -6,7 +6,7 @@
 //	pro.ListCloudIdpV1
 //	pro.GetCloudAzureV1
 //
-// Status: current. Last reviewed 2026-09-05.
+// Status: current.
 package cloud_identity_provider
 
 import (

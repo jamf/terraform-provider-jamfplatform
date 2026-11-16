@@ -3,7 +3,7 @@
 
 // SDK endpoints used:
 //   pro.ListDeviceEnrollmentsV1
-// Status: current. Last reviewed 2026-05-25.
+// Status: current.
 
 package automated_device_enrollment
 

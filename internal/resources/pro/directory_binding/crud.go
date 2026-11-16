@@ -16,7 +16,7 @@
 //
 // Uniqueness: name, enforced (409), case-, leading-space-, trailing-space- and accent-insensitive. The plan-time collision check lists with proclassic.ListDirectoryBindings (collision.go).
 //
-// Status: current. Last reviewed 2026-09-06.
+// Status: current.
 
 package directory_binding
 

@@ -5,7 +5,7 @@
 //   pro.GetGSXConnectionV1
 //   pro.UpdateGSXConnectionV1
 //
-// Status: current. Last reviewed 2026-06-09.
+// Status: current.
 //
 // Notes:
 //   - PatchGSXConnectionV1 is intentionally not used. The GSX PUT mandates token +

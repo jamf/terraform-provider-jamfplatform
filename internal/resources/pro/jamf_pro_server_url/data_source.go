@@ -9,7 +9,7 @@
 //   resource for this object. A data source never writes, so the documented
 //   PUT-gateway behaviour is moot here.
 //
-// Status: current. Last reviewed 2026-06-13.
+// Status: current.
 
 // Package jamf_pro_server_url implements the read-only
 // jamfplatform_pro_jamf_pro_server_url data source, which surfaces the Jamf Pro

@@ -14,7 +14,7 @@
 //   /v2/local-admin-password/pending-rotations
 //   /v2/local-admin-password/{clientManagementId}/account/{username}/set-password
 //
-// Status: current. Last reviewed 2026-06-11.
+// Status: current.
 
 package local_admin_password_settings
 

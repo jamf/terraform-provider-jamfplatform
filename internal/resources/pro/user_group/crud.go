@@ -12,7 +12,7 @@
 //
 // Uniqueness: name, enforced (409 Duplicate name), case-sensitive, surrounding spaces trimmed, accent-sensitive.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package user_group
 

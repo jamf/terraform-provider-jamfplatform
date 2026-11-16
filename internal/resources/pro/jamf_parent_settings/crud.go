@@ -30,7 +30,7 @@
 // processes) is N/A beyond the single-field carry — last-write-wins, as for
 // any singleton without optimistic concurrency.
 //
-// Status: current. Last reviewed 2026-06-10.
+// Status: current.
 
 package jamf_parent_settings
 

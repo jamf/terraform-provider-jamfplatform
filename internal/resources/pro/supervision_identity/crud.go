@@ -20,7 +20,7 @@
 // include_unenforced. The strict comparison ignores case, trailing spaces and
 // accents.
 //
-// Status: current. Last reviewed 2026-06-12.
+// Status: current.
 
 package supervision_identity
 

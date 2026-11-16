@@ -5,7 +5,7 @@
 //   pro.GetEnrollmentAccessManagementV4
 //   pro.UpdateEnrollmentAccessManagementV4
 //
-// Status: current. Last reviewed 2026-06-13.
+// Status: current.
 
 package access_management_settings
 

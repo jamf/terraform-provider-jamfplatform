@@ -76,7 +76,7 @@ A different case from the one above: Jamf deprecates an endpoint and publishes n
 In both, every call to the deprecated symbol suppresses `SA1019` and points at one place that holds the reasoning (`deprecation.go`, or the annotation block), and the suppression names the tracking issue or that file, since there is no successor to name. The annotation reads:
 
 ```go
-// Status: deprecated by Jamf YYYY-MM-DD; no migration is possible and none is planned — <why>. Last reviewed YYYY-MM-DD.
+// Status: deprecated by Jamf YYYY-MM-DD; no migration is possible and none is planned — <why>.
 ```
 
 These suppressions are permanent for the life of the construct, so the timeline's hard floor and the tracking issue's closing condition, which both assume a migration exists, do not describe them.
@@ -156,7 +156,7 @@ The PR body closes the issue (`Closes #NNN`) and records the fast-track or slow-
 
 ### Tracking — in-code annotation (Pro resources only)
 
-Every Jamf Pro resource's `crud.go` opens with an annotation block listing the SDK endpoints in use, their status and the last maintainer review date. Resources in other families do not carry it.
+Every Jamf Pro resource's `crud.go` opens with an annotation block listing the SDK endpoints in use and their status. Resources in other families do not carry it.
 
 ```go
 // SDK endpoints used:
@@ -165,30 +165,25 @@ Every Jamf Pro resource's `crud.go` opens with an annotation block listing the S
 //   pro.UpdateScriptV2 (introduced Jamf Pro 11.8)
 //   pro.DeleteScriptV2 (introduced Jamf Pro 11.8)
 //
-// Status: current. Last reviewed 2026-05-18.
+// Status: current.
 ```
 
 The `Status:` line takes one of four forms:
 
 | State | Line |
 |---|---|
-| Current | `// Status: current. Last reviewed YYYY-MM-DD.` |
-| Deprecated, migration pending | `// Status: deprecated by Jamf YYYY-MM-DD; migrate by YYYY-MM-DD (6mo soft / 3mo hard floor). Last reviewed YYYY-MM-DD.` |
-| Migration in flight | `// Status: migration in progress on V3 in PR #NNN. Last reviewed YYYY-MM-DD.` |
+| Current | `// Status: current.` |
+| Deprecated, migration pending | `// Status: deprecated by Jamf YYYY-MM-DD; migrate by YYYY-MM-DD (6mo soft / 3mo hard floor).` |
+| Migration in flight | `// Status: migration in progress on V3 in PR #NNN.` |
 | Deprecated, no successor | See [§Deprecated with no successor at all](#deprecated-with-no-successor-at-all). |
 
 The annotation is the single source of truth. There is no separate endpoint-versions file to keep in sync.
 
-### Quarterly audit cadence (Pro resources only)
+### How a deprecation is detected
 
-Once per quarter, a maintainer:
+There is no scheduled audit. The SDK is generated from Jamf's OpenAPI specifications, so it is where a new endpoint version or a deprecation first appears, and it carries the signal here:
 
-1. Scans the Jamf Pro release notes and the `jamfplatform-go-sdk` changelog for new Pro endpoint versions and deprecations.
-2. Greps the annotations: `grep -rA5 "SDK endpoints used:" internal/resources/pro/`.
-3. Reconciles each annotation against current Jamf and SDK state.
-4. Updates `Last reviewed YYYY-MM-DD` on every annotation that is still current.
-5. Opens migration tracking issues for newly deprecated endpoints, following [§Tracking — the migration issue](#tracking--the-migration-issue).
-6. Reviews every open `deprecation-migration` issue (`gh issue list --label deprecation-migration`) and checks its `Migrate By` date on Project #2, recomputing it if Jamf has since published a removal date.
-7. Flags any annotation whose `Last reviewed` date is older than 120 days.
+- **A deprecation fails lint.** The SDK marks a deprecated method `// Deprecated:`, and `staticcheck` reports every call to one as `SA1019`. The Dependabot pull request that bumps `jamfplatform-go-sdk` therefore goes red on the first release that deprecates a method this provider calls. Open the [migration issue](#tracking--the-migration-issue) from that pull request; suppress `SA1019` only as [§Deprecated with no generated successor](#deprecated-with-no-generated-successor) allows.
+- **A new endpoint version is in the SDK's release notes.** Nothing fails when one lands. Read the notes on each SDK bump and apply [§Adoption (new endpoints)](#adoption-new-endpoints).
 
-The `Last reviewed` date is the drift detector: an annotation more than 120 days stale means an audit was skipped.
+Open `deprecation-migration` issues carry their own `Migrate By` date on Project #2; recompute it when Jamf publishes a removal date.

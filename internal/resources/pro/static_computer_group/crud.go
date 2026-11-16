@@ -22,7 +22,7 @@
 // membership field at all. GET /JSSResource/computergroups/id/{id} is therefore
 // the only way to learn who is in the group. Every write stays on pro/.
 //
-// Status: current. Last reviewed 2026-09-17.
+// Status: current.
 
 package static_computer_group
 

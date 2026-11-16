@@ -11,7 +11,7 @@
 //
 // Uniqueness: name, enforced (409), case-, leading- and trailing-space-insensitive, accent-sensitive.
 //
-// Status: current. Last reviewed 2026-06-02.
+// Status: current.
 
 package advanced_user_search
 

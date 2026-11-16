@@ -17,7 +17,7 @@
 // erase-device command (EraseDeviceComputerRequest.returnToService) under
 // internal/actions/device/, not this configuration endpoint.
 //
-// Status: current. Last reviewed 2026-06-13.
+// Status: current.
 
 package return_to_service
 

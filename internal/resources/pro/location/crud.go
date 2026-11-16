@@ -9,7 +9,7 @@
 //   pro.ReclaimVolumePurchasingLocationLicensesV1
 //   pro.ListVolumePurchasingLocationsV1                  (list resource)
 //   pro.ResolveVolumePurchasingLocationV1ByName          (data source name lookup)
-// Status: current. Last reviewed 2026-05-25.
+// Status: current.
 
 package location
 

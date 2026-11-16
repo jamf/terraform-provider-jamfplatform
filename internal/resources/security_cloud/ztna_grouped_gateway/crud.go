@@ -12,7 +12,7 @@
 //
 // Uniqueness: name, not enforced: Jamf Security Cloud stores duplicates (wire-probed 2026-10-25), so the name is checked only under include_unenforced, case-, trailing-space- and accent-insensitive.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package ztna_grouped_gateway
 

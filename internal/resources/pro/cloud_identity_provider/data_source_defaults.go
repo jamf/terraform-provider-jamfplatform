@@ -7,7 +7,7 @@
 //	pro.GetCloudLdapDefaultServerConfigurationV2
 //	pro.GetCloudLdapDefaultMappingsV2
 //
-// Status: current. Last reviewed 2026-09-08.
+// Status: current.
 //
 // The Entra ID defaults come from one read because the server-configuration
 // response carries its mappings inline. There is a second endpoint that returns

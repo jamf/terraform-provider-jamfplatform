@@ -23,7 +23,7 @@
 //
 // Uniqueness: name, enforced (400 DUPLICATE_FIELD), case-, surrounding-space- and accent-insensitive.
 //
-// Status: current. Last reviewed 2026-06-11.
+// Status: current.
 
 package file_share_distribution_point
 

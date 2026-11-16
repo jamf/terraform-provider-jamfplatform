@@ -11,7 +11,7 @@
 // Status: deprecated by Jamf 2026-07-14; no migration is possible and none is planned — the read has
 // no successor, so the resource and the data source both carry a whole-schema DeprecationMessage and
 // are removed with the endpoint. See deprecation.go for the reasoning behind the six SA1019
-// suppressions. Last reviewed 2026-09-15.
+// suppressions.
 
 package activation_code
 

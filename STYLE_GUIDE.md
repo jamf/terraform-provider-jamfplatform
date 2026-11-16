@@ -133,4 +133,4 @@ Testing conventions are in [TESTING.md](TESTING.md); the contribution workflow i
   - [Slow-track exception](contributing/endpoint-lifecycle.md#slow-track-exception)
   - [Tracking — the migration issue](contributing/endpoint-lifecycle.md#tracking--the-migration-issue)
   - [Tracking — in-code annotation (Pro resources only)](contributing/endpoint-lifecycle.md#tracking--in-code-annotation-pro-resources-only)
-  - [Quarterly audit cadence (Pro resources only)](contributing/endpoint-lifecycle.md#quarterly-audit-cadence-pro-resources-only)
+  - [How a deprecation is detected](contributing/endpoint-lifecycle.md#how-a-deprecation-is-detected)

@@ -3,7 +3,7 @@
 
 // SDK endpoints used:
 //   pro.ListReturnToServiceConfigurationsV1
-// Status: current. Last reviewed 2026-06-13.
+// Status: current.
 
 package return_to_service
 

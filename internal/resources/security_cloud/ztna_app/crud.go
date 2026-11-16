@@ -10,7 +10,7 @@
 //
 // Uniqueness: hostnames, tenant-wide, enforced (409 HOSTNAME_CONFLICT), case-insensitive and accent-sensitive. The name is not a key for the server: duplicate names are stored (wire-probed 2026-10-25, every case, trailing-space and accent variant), so the name is checked only under include_unenforced.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package ztna_app
 

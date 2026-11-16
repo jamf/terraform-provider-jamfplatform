@@ -13,7 +13,7 @@
 // include_unenforced. The strict comparison ignores case, trailing spaces and
 // accents.
 //
-// Status: current. Last reviewed 2026-09-03.
+// Status: current.
 //
 // Create returns only {href,id}; state is built from a follow-up GET (mirrors
 // blueprint / user_initiated_enrollment_settings). The notificationSettings and

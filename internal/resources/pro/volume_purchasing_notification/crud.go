@@ -9,7 +9,7 @@
 //   pro.ListVolumePurchasingSubscriptionsV1                (list resource)
 //   pro.ResolveVolumePurchasingSubscriptionV1IDByName      (data source name lookup)
 //
-// Status: current. Last reviewed 2026-06-08.
+// Status: current.
 //
 // The endpoint/SDK name the feature "subscriptions"; the UI (and this provider)
 // call it "Notifications". Create returns only {href,id}; state is built from a

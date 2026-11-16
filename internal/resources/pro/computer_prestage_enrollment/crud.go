@@ -25,7 +25,7 @@
 //
 // Uniqueness: displayName, not enforced; duplicates stored; checked only with include_unenforced.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package computer_prestage_enrollment
 

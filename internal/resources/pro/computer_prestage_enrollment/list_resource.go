@@ -4,7 +4,7 @@
 // SDK endpoints used:
 //   pro.ListComputerPrestagesV3
 //
-// Status: current. Last reviewed 2026-05-28.
+// Status: current.
 
 package computer_prestage_enrollment
 

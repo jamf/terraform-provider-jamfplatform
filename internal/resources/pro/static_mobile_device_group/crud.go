@@ -13,7 +13,7 @@
 //
 // Uniqueness: groupName, enforced (422 DUPLICATE_FIELD), case-, trailing-space- and accent-insensitive, one pool shared by smart, static and Platform MOBILE groups.
 //
-// Status: current. Last reviewed 2026-09-17.
+// Status: current.
 //
 // # One body, two opposite write semantics
 //

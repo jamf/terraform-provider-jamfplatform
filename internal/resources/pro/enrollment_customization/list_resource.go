@@ -3,7 +3,7 @@
 
 // SDK endpoints used:
 //   pro.ListEnrollmentCustomizationsV2
-// Status: current. Last reviewed 2026-05-28.
+// Status: current.
 
 package enrollment_customization
 

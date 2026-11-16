@@ -9,7 +9,7 @@
 //
 // The V1 functions are deprecated (api-spec deprecation-date 2025-06-30) and are not used.
 //
-// Status: current. Last reviewed 2026-06-03.
+// Status: current.
 
 package computer_inventory_collection_settings
 

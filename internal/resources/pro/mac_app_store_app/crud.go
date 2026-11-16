@@ -11,7 +11,7 @@
 //
 // Uniqueness: general.name, enforced (409), case-, surrounding-space- and accent-insensitive. The bundle ID and the URL are not keys.
 //
-// Status: current. Last reviewed 2026-05-31.
+// Status: current.
 //
 // Update semantics: the classic /macapplications PUT is a partial-merge at
 // section level, not a full-replace (wire-probed). The provider sends the full

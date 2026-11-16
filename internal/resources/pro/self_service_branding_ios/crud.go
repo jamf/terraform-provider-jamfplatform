@@ -12,7 +12,7 @@
 // pro.ApplyIOSBrandingConfigurationV1 (client-side convenience helpers — the
 // singleton is discovered via List, not resolved by name).
 //
-// Status: current. Last reviewed 2026-06-10.
+// Status: current.
 
 package self_service_branding_ios
 

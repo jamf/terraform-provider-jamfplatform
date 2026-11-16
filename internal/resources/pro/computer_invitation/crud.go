@@ -13,7 +13,7 @@
 // delete only; every user-settable attribute is RequiresReplace. The Update
 // method below is required by the framework but never performs a mutation.
 //
-// Status: current. Last reviewed 2026-06-04.
+// Status: current.
 
 package computer_invitation
 

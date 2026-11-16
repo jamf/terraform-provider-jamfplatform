@@ -24,7 +24,7 @@
 // deleting the last remaining form field while App Requests are enabled is accepted, leaving
 // the tenant enabled with no fields (same probe).
 //
-// Status: current. Last reviewed 2026-09-04.
+// Status: current.
 
 package app_request_settings
 

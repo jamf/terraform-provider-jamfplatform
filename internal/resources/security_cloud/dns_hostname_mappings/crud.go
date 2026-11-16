@@ -6,7 +6,7 @@
 //   securitycloud.ReplaceDnsCustomHostnameMappingsV1
 //   securitycloud.ClearDnsCustomHostnameMappingsV1
 //
-// Status: current. Last reviewed 2026-08-29.
+// Status: current.
 
 package dns_hostname_mappings
 

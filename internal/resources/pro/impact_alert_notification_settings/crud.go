@@ -5,7 +5,7 @@
 //   pro.GetImpactAlertNotificationSettingsV1
 //   pro.UpdateImpactAlertNotificationSettingsV1
 //
-// Status: current. Last reviewed 2026-06-09.
+// Status: current.
 
 package impact_alert_notification_settings
 

@@ -4,7 +4,7 @@
 // SDK endpoints used:
 //   pro.SyncJamfProtectPlansV1   (POST /v1/jamf-protect/plans/sync — fire-and-forget 204)
 //
-// Status: current. Last reviewed 2026-07-03.
+// Status: current.
 //
 // Triggers an on-demand sync of the Jamf Protect plans catalog into Jamf Pro
 // (Settings → Jamf apps → Jamf Protect → Sync Plans). The
