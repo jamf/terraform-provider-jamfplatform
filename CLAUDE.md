@@ -10,7 +10,7 @@ The Jamf Platform API client is the external Go SDK `github.com/jamf/jamfplatfor
 
 ## Companion Docs (authoritative on conflict)
 
-- `STYLE_GUIDE.md` — Go style, file conventions, schema rules, Jamf Pro naming/version/endpoint policies, schema deprecation window (`PRO-DEPRECATED` markers, 90 days), scope helper, profile payload normalisation, ID/import conventions.
+- `STYLE_GUIDE.md` — index for the style guide, which lives in `contributing/*.md`: package layout, schema design, descriptions, read/write/lifecycle semantics, configuration profile payloads, scope, product family rules, endpoint adoption/migration/deprecation (`PRO-DEPRECATED` markers, 90 days).
 - `TESTING.md` — test categories, commands, build tags, CI.
 - `CONTRIBUTING.md` — contribution workflow, Pro-resource workflow (incl. ProClassic SDK payload audit), release-versioning policy.
 - `README.md` — user-facing provider usage.
@@ -77,7 +77,7 @@ examples/{provider,resources,data-sources,list-resources,actions,functions}/
 docs/                  # Auto-generated provider documentation — do not hand-edit
 ```
 
-Each leaf resource folder mirrors the file split in [STYLE_GUIDE.md §Resource Package File Conventions](STYLE_GUIDE.md#resource-package-file-conventions).
+Each leaf resource folder mirrors the file split in [STYLE_GUIDE.md §Resource Package File Conventions](contributing/package-layout.md#resource-package-file-conventions).
 
 ### Reference implementations (copy from these)
 
@@ -104,7 +104,7 @@ Each leaf resource folder mirrors the file split in [STYLE_GUIDE.md §Resource P
 
 ## Impact alerts — one-paragraph orientation
 
-`internal/common/impact/` produces Jamf Pro's **impact alert notifications** during `terraform plan`: an advisory warning on each object whose scope or payload is changing, reporting how many computers or mobile devices the change reaches. Off by default behind the provider's `impact_alerts` attribute; a nil `*impact.Cache` means disabled, so resources need no flag check. Three channels. Two mirror Jamf's own split — **deployable** (policies, profiles, apps, blueprints, benchmarks) and **scopeable** (groups, classes) — because a resource's `ModifyPlan` cannot see a sibling's, so a plan editing both a group and something scoped to it needs an alert from each side. The third, **policy dependencies** (script, package, printer, Dock item, directory binding, disk encryption configuration), has no counterpart in Jamf Pro: these objects have no scope of their own, so their blast radius is the combined audience of the policies referencing them. Resources wire in via `impact.ReportPlan` (deployable), `impact.ReportMembership` (scopeable) or `impact.ReportDependencyPlan` (dependencies), plus a per-family adapter — a reducer to `impact.Scope` for the first two, and for a dependency only a reader for the object's id and name. The shared Jamf Pro scope block goes through `scope.BuildImpactScope`, which is the single place the narrows/broadens/counts classification lives. Dependencies need a whole-tenant policy sweep, since Jamf Pro has no reverse lookup ("which policies use this script"): lazy, at most once per configured provider instance, self-capped at 5 concurrent reads, and built by `impact.NewCacheWithPolicies` (`NewTenantCache` wires both sources). Alerts are advisory — a tenant that cannot be read yields one notice and never fails a plan. Two rules that are easy to get wrong: a numeric Jamf Pro group id is unique only **within an estate** (see [STYLE_GUIDE.md §Scope helper](STYLE_GUIDE.md#scope-helper)), and group membership is expressed in **device management identifiers**, so a Jamf Pro numeric device/building/department id must be resolved through the inventory before it can be compared with a group's members. User guidance, including the `terraform plan -json` caveat, is in `docs/guides/impact-alerts.md`.
+`internal/common/impact/` produces Jamf Pro's **impact alert notifications** during `terraform plan`: an advisory warning on each object whose scope or payload is changing, reporting how many computers or mobile devices the change reaches. Off by default behind the provider's `impact_alerts` attribute; a nil `*impact.Cache` means disabled, so resources need no flag check. Three channels. Two mirror Jamf's own split — **deployable** (policies, profiles, apps, blueprints, benchmarks) and **scopeable** (groups, classes) — because a resource's `ModifyPlan` cannot see a sibling's, so a plan editing both a group and something scoped to it needs an alert from each side. The third, **policy dependencies** (script, package, printer, Dock item, directory binding, disk encryption configuration), has no counterpart in Jamf Pro: these objects have no scope of their own, so their blast radius is the combined audience of the policies referencing them. Resources wire in via `impact.ReportPlan` (deployable), `impact.ReportMembership` (scopeable) or `impact.ReportDependencyPlan` (dependencies), plus a per-family adapter — a reducer to `impact.Scope` for the first two, and for a dependency only a reader for the object's id and name. The shared Jamf Pro scope block goes through `scope.BuildImpactScope`, which is the single place the narrows/broadens/counts classification lives. Dependencies need a whole-tenant policy sweep, since Jamf Pro has no reverse lookup ("which policies use this script"): lazy, at most once per configured provider instance, self-capped at 5 concurrent reads, and built by `impact.NewCacheWithPolicies` (`NewTenantCache` wires both sources). Alerts are advisory — a tenant that cannot be read yields one notice and never fails a plan. Two rules that are easy to get wrong: a numeric Jamf Pro group id is unique only **within an estate** (see [STYLE_GUIDE.md §Scope helper](contributing/scope.md#scope-helper)), and group membership is expressed in **device management identifiers**, so a Jamf Pro numeric device/building/department id must be resolved through the inventory before it can be compared with a group's members. User guidance, including the `terraform plan -json` caveat, is in `docs/guides/impact-alerts.md`.
 
 ## Required permission tables — one-paragraph orientation
 
@@ -301,7 +301,7 @@ gateway 403s on is presumed unrouted rather than unprivileged. Acceptance tests 
 configured scope is a Security Cloud one (`JAMFPLATFORM_ACC_SECURITYCLOUD_{ENVIRONMENT,TENANT}_ID`,
 matching the scope in use) and skips otherwise — a Pro-only acceptance tenant is a
 legitimate environment, not a failure. Full rules:
-[STYLE_GUIDE.md §Jamf Security Cloud Resource Naming](STYLE_GUIDE.md#jamf-security-cloud-resource-naming).
+[STYLE_GUIDE.md §Jamf Security Cloud Resource Naming](contributing/families.md#jamf-security-cloud-resource-naming).
 
 ## Jamf Account — one-paragraph orientation
 
@@ -314,7 +314,7 @@ two data sources and a list resource — is an OIDC identity-provider connection
 for one or more of those domains, scoped to chosen Jamf Pro, School, Protect and Security Cloud
 tenants. Family
 facts and the naming rationale are in
-[STYLE_GUIDE.md §Jamf Account Resource Naming](STYLE_GUIDE.md#jamf-account-resource-naming); five
+[STYLE_GUIDE.md §Jamf Account Resource Naming](contributing/families.md#jamf-account-resource-naming); five
 things drive the design and are easy to get wrong. First, **this is the only family reachable under
 organization scope, and the only scope that reaches it** — wire-probed 2026-09-02 on two
 organization-scoped integrations, while a tenant-scoped one is refused `403 BAD_PERMISSIONS` on the
@@ -389,7 +389,7 @@ referenced deletes per construct. User guidance is in `docs/guides/ai-governance
 
 ## Jamf Pro resources — one-paragraph orientation
 
-Terraform construct name format: `jamfplatform_pro_<resource>` regardless of whether the SDK source is `pro/` or `proclassic/`. One `jamfplatform.Client` built from `JAMFPLATFORM_*` credentials serves both Platform Services and Pro. Every Pro resource declares an unexported `const minJamfProVersion` and funnels Configure through `providerdata.ConfigurePro` (no hand-rolled boilerplate). Each Pro resource's `crud.go` opens with an SDK-endpoints annotation block (`Status: current. Last reviewed YYYY-MM-DD.`) — Pro / ProClassic only; Platform Services resources are exempt. Full rules: [STYLE_GUIDE.md §Jamf Pro Resource Naming](STYLE_GUIDE.md#jamf-pro-resource-naming), §Minimum Jamf Pro version check, §Endpoint adoption & migration policy. Workflow for adding a Pro resource (incl. SDK-comparison + ProClassic payload audit gate): [CONTRIBUTING.md §Adding a Jamf Pro Resource](CONTRIBUTING.md#adding-a-jamf-pro-resource).
+Terraform construct name format: `jamfplatform_pro_<resource>` regardless of whether the SDK source is `pro/` or `proclassic/`. One `jamfplatform.Client` built from `JAMFPLATFORM_*` credentials serves both Platform Services and Pro. Every Pro resource declares an unexported `const minJamfProVersion` and funnels Configure through `providerdata.ConfigurePro` (no hand-rolled boilerplate). Each Pro resource's `crud.go` opens with an SDK-endpoints annotation block (`Status: current. Last reviewed YYYY-MM-DD.`) — Pro / ProClassic only; Platform Services resources are exempt. Full rules: [STYLE_GUIDE.md §Jamf Pro Resource Naming](contributing/families.md#jamf-pro-resource-naming), §Minimum Jamf Pro version check, §Endpoint adoption & migration policy. Workflow for adding a Pro resource (incl. SDK-comparison + ProClassic payload audit gate): [CONTRIBUTING.md §Adding a Jamf Pro Resource](CONTRIBUTING.md#adding-a-jamf-pro-resource).
 
 ## API integration scope — one-paragraph orientation
 

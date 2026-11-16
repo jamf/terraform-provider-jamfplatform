@@ -60,7 +60,7 @@ Conventions are mandatory — see STYLE_GUIDE.md §Deprecation migration timelin
 
 ## Deadlines
 
-Per [STYLE_GUIDE §Deprecation migration timeline](../blob/main/STYLE_GUIDE.md#deprecation-migration-timeline), with the deprecation announced YYYY-MM-DD:
+Per [STYLE_GUIDE §Deprecation migration timeline](../blob/main/contributing/endpoint-lifecycle.md#deprecation-migration-timeline), with the deprecation announced YYYY-MM-DD:
 
 - **6-month soft target: YYYY-MM-DD** — migration should be merged.
 - **Hard floor: 3 months before Jamf's announced removal date.** <!-- State whether a removal

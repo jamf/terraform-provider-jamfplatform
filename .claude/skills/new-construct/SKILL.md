@@ -37,13 +37,13 @@ Then read the family file: `references/pro.md`, `references/security_cloud.md`,
 
 ### Shape
 
-Classify against [STYLE_GUIDE §Endpoint shape classification](../../../STYLE_GUIDE.md#endpoint-shape-classification):
+Classify against [STYLE_GUIDE §Endpoint shape classification](../../../contributing/write-semantics.md#endpoint-shape-classification):
 resource / data source / list resource / singleton / action / read-only catalogue (plural DS
 only, no per-id endpoint). Then pick the closest row from the **Reference implementations**
 table in `CLAUDE.md` and diff against it throughout the build. Do not pick the reference from
 memory — the table is maintained and your recollection of the tree layout is probably stale.
 
-File split: [STYLE_GUIDE §Resource Package File Conventions](../../../STYLE_GUIDE.md#resource-package-file-conventions).
+File split: [STYLE_GUIDE §Resource Package File Conventions](../../../contributing/package-layout.md#resource-package-file-conventions).
 Two conventions that get invented instead of looked up: name-to-value lookup tables go in
 **`mappings.go`** (there is no `enums.go` in the table), and a plural data source lives **in
 the singular's package**, not a sibling `<x>s/` directory.
@@ -91,12 +91,12 @@ A build cannot start from the SDK alone. Gather, and stop and ask for whatever i
    chat. Locked in at this point: SDK function set, construct name, package name, version
    floor, schema sketch.
 8. **Scaffold** per the file conventions, mirroring the §0 reference implementation.
-9. **Shared abstractions** — extract only at the trigger ([STYLE_GUIDE §Shared abstractions](../../../STYLE_GUIDE.md#shared-abstractions--when-to-extract):
+9. **Shared abstractions** — extract only at the trigger ([STYLE_GUIDE §Shared abstractions](../../../contributing/package-layout.md#shared-abstractions--when-to-extract):
    schemas at 3 consumers, non-trivial code helpers at 2). If a trigger fires mid-build, ship
    the extraction as a **separate prior commit**. Extracting tends to expose a bug the
    duplication was hiding — expect that, and check for it.
 10. **Register** in `internal/provider/provider.go`. A construct with a create path also gets its
-    plan-time name collision check (`collision.go`, [STYLE_GUIDE §Plan-time name collision check](../../../STYLE_GUIDE.md#plan-time-name-collision-check))
+    plan-time name collision check (`collision.go`, [STYLE_GUIDE §Plan-time name collision check](../../../contributing/package-layout.md#plan-time-name-collision-check))
     and a row in `templates/guides/name-collisions.md`; a conformance test fails the build without the row.
 11. **Tests** — `references/acceptance.md`. Unit tests always; acceptance coverage per
     [TESTING.md §Writing Acceptance Tests](../../../TESTING.md#writing-acceptance-tests).
@@ -146,19 +146,19 @@ Each of these has been paid for late at least once. The right-hand column is wha
   the SDK carries no constant (checked against `Covered`, so a later SDK release that adds it
   fails); `Ignore` means a different vocabulary shares the spelling (not checked). Getting that
   pair the wrong way round reports a promotion that never happened.
-  ([STYLE_GUIDE §Enum values and error codes come from the SDK](../../../STYLE_GUIDE.md#enum-values-and-error-codes-come-from-the-sdk-not-from-literals))
+  ([STYLE_GUIDE §Enum values and error codes come from the SDK](../../../contributing/schema-design.md#enum-values-and-error-codes-come-from-the-sdk-not-from-literals))
 - **Don't** ship `*[]any` or other under-specified SDK types.
 - **Don't** copy a wire-shape assumption from another construct — even in the same namespace.
   Probe afresh.
 - **Don't** write state upgraders. The provider is unshipped; breaking changes are free
   (`feedback_no_state_upgraders`). Renames are free now and breaking after merge.
 - **Don't** put wire vocabulary in `MarkdownDescription` — no API/endpoint/SDK/HTTP-verb/status-code
-  language ([STYLE_GUIDE §User-facing descriptions are UI-aligned](../../../STYLE_GUIDE.md#user-facing-descriptions-are-ui-aligned-not-wire-aligned)).
+  language ([STYLE_GUIDE §User-facing descriptions are UI-aligned](../../../contributing/descriptions.md#user-facing-descriptions-are-ui-aligned-not-wire-aligned)).
   Wire facts belong in Go comments and the `crud.go` annotation block.
 - **Don't** glue a description together with em dashes, open a paragraph with a bolded run-in
   label (`**Omit = preserve** — …`), or repeat another package's stock clause word for word.
   One em dash per description at most, and only for a real interruption
-  ([STYLE_GUIDE §Description and example prose](../../../STYLE_GUIDE.md#description-and-example-prose-the-terse-reference-voice)).
+  ([STYLE_GUIDE §Description and example prose](../../../contributing/descriptions.md#description-and-example-prose-the-terse-reference-voice)).
   The same voice governs the `#` comments in `examples/`.
 - **Don't** put comments inside function bodies or type definitions (STYLE_GUIDE:11). A schema
   is built inside a function body — so the wire-name mapping table goes in the **package doc

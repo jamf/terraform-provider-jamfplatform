@@ -311,7 +311,7 @@ the step exists to report.
 go test -tags profile_corpus ./internal/resources/pro/macos_configuration_profile/...
 ```
 
-Not part of CI. Regenerate the corpus before running by replaying `/tmp/sample_titles.py` + `/tmp/roundtrip.py` against a tenant. Background on the diff classes the mask covers: [STYLE_GUIDE.md §Configuration profile payload diff suppression](STYLE_GUIDE.md#configuration-profile-payload-diff-suppression-mask-and-compare).
+Not part of CI. Regenerate the corpus before running by replaying `/tmp/sample_titles.py` + `/tmp/roundtrip.py` against a tenant. Background on the diff classes the mask covers: [STYLE_GUIDE.md §Configuration profile payload diff suppression](contributing/configuration-profiles.md#configuration-profile-payload-diff-suppression-mask-and-compare).
 
 ### CI scaling
 
