@@ -10,9 +10,18 @@ The Jamf Platform API client is the external Go SDK `github.com/jamf/jamfplatfor
 
 ## Companion Docs (authoritative on conflict)
 
-- `STYLE_GUIDE.md` — index for the style guide, which lives in `contributing/*.md`: package layout, schema design, descriptions, read/write/lifecycle semantics, configuration profile payloads, scope, product family rules, endpoint adoption/migration/deprecation (`PRO-DEPRECATED` markers, 90 days).
-- `TESTING.md` — test categories, commands, build tags, CI.
-- `CONTRIBUTING.md` — contribution workflow, Pro-resource workflow (incl. ProClassic SDK payload audit), release-versioning policy.
+- `STYLE_GUIDE.md` — index only. Code comments cite rules as `STYLE_GUIDE §<section name>`; the index maps each section to its file under `contributing/`:
+  - `contributing/package-layout.md` — Go conventions, dependencies, the file split inside a resource or function package, naming patterns, shared abstractions, the plan-time name collision check.
+  - `contributing/schema-design.md` — attribute naming, enums from the SDK, Sets vs Lists, secrets, `Optional+Computed`, nested blocks, cross-field validation.
+  - `contributing/descriptions.md` — what schema descriptions and examples say, and how.
+  - `contributing/write-semantics.md` — import hydration, IDs and import, singletons, full-replace / merge-patch / classic update semantics, create and delete, errors and retry helpers.
+  - `contributing/configuration-profiles.md` — payload mask-and-compare and the import fidelity gate.
+  - `contributing/scope.md` — the API integration scope gate and the Jamf Pro scope helper.
+  - `contributing/families.md` — Jamf Account, Jamf Security Cloud and Jamf Pro rules, Configure helpers, the Jamf Pro version gate.
+  - `contributing/endpoint-lifecycle.md` — endpoint adoption and migration, schema deprecation (`PRO-DEPRECATED` / `PLATFORM-DEPRECATED` markers, 90 days), the `crud.go` SDK-endpoints annotation.
+- `templates/guides/versioning-and-support.md` — the user-facing policy (generated into `docs/guides/`): versioning (a minor release can break), the 90-day deprecation window, supported Jamf Pro and Terraform versions. Source of truth for what users are promised.
+- `TESTING.md` — test categories, commands, build tags, required tests by shape, CI lanes.
+- `CONTRIBUTING.md` — contribution workflow, Pro-resource workflow (incl. ProClassic SDK payload audit), fixing a defect in the SDK, release steps.
 - `README.md` — user-facing provider usage.
 - `spike/JAMF_PRO_INVENTORY.md` — gitignored Pro SDK namespace adoption tracker.
 - `spike/PRO_ROLLOUT_PLAN.md` — gitignored Pro rollout planning doc.
@@ -22,13 +31,11 @@ The Jamf Platform API client is the external Go SDK `github.com/jamf/jamfplatfor
 ```
 internal/
 ├── provider/          # Provider config, registration, logging
-├── providerdata/      # Shared Data{} carrying SDK client + cached Pro version
-├── resources/
-│   ├── account/       # Jamf Account — organization-level, flat single tier   (Jamf Account)
-│   │                  #   platform_environment/, sso_domain/, tenants/ (plural DS only)
-│   │                  #   (folder name = Terraform slug minus `jamfplatform_account_`)
-│   ├── ai_governance/ # policy/, tool/                                      (Jamf AI Governance)
-│   │                  #   (folder name = Terraform slug minus `jamfplatform_ai_governance_`)
+├── providerdata/      # Shared Data{} carrying SDK client + cached Pro version; scope gates (scope.go, scopes.go)
+├── resources/         # Every family below is a flat single tier: folder name = Terraform slug minus the family prefix
+│   ├── account/       # Jamf Account, organization-level (`jamfplatform_account_`)
+│   │                  #   platform_environment/, sso_connection/, sso_domain/, tenants/ (plural DS only)
+│   ├── ai_governance/ # Jamf AI Governance (`jamfplatform_ai_governance_`): policy/, tool/
 │   ├── apple/         # app_store_app/ — data source over Apple's public App Store listing (not a Jamf API;
 │   │                  #   SDK standalone `appstore` package, per-run cache in providerdata/appstore.go)
 │   ├── blueprints/    # blueprint/, blueprints/, component/, components/    (Platform Services)
@@ -37,47 +44,61 @@ internal/
 │   ├── device_group/  # Resource, data source, list resource                 (Platform Services)
 │   ├── device_groups/ # Plural data source                                   (Platform Services)
 │   ├── devices/       # Plural data source                                   (Platform Services)
-│   ├── security_cloud/ # Jamf Security Cloud — flat single tier                (Security Cloud)
-│   │                  #   device_group/, dns_zone/, uem_connect/, ztna_gateway/,
-│   │                  #   ztna_grouped_gateway/, ztna_shared_gateways/
-│   │                  #   (folder name = Terraform slug minus `jamfplatform_security_cloud_`)
-│   └── pro/           # Jamf Pro resources — flat single tier: every leaf package sits directly under pro/
-│                      #   (folder name = Terraform slug minus `jamfplatform_pro_`, snake_case). No domain tier.
-│                      #   ~115 packages, fully flat (e.g. the five PKI constructs are pki_adcs/, pki_venafi/, pki_digicert/, … — no pki/ grouping dir).
+│   ├── security_cloud/ # Jamf Security Cloud (`jamfplatform_security_cloud_`)
+│   │                  #   activation_profile/, content_categories/, device_group/, dns_hostname_mappings/,
+│   │                  #   dns_search_domain/, dns_zone/, uem_connect/, ztna_app/, ztna_gateway/,
+│   │                  #   ztna_grouped_gateway/, ztna_predefined_apps/, ztna_shared_gateways/
+│   └── pro/           # Jamf Pro (`jamfplatform_pro_`): one leaf package per construct, directly under pro/.
+│                      #   No domain tier and no grouping dirs (the PKI constructs are pki_adcs/, pki_venafi/, pki_digicert/, …).
 ├── actions/
 │   ├── account/       # platform_environment/ (assign_tenants), sso_domain/ (verify)   (Jamf Account)
 │   ├── device/        # erase, restart, shutdown, unmanage                       (Platform Device Actions API)
-│   └── pro/           # managed_software_updates (plan + abandon), maintenance/ (flush_policy_logs, redeploy_management_framework), mdm/ (send_blank_push, renew_mdm_profile, flush_mdm_commands), patch/ (retry_patch_policy_logs)   (Jamf Pro)
+│   ├── pro/           # app_installers/, jamf_protect/, maintenance/, managed_software_updates/, mdm/ (device MDM commands), patch/   (Jamf Pro)
+│   └── security_cloud/ # uem_connect/ (deploy_activation_profile)                (Jamf Security Cloud)
 ├── functions/         # Provider-defined functions (offline; no SDK client, no provider config)
 │   ├── mobileconfig/       # mobileconfig(profile) — build a full .mobileconfig from HCL payloads; also holds the shared Assemble core
 │   └── mcx_forced_payload/ # mcx_forced_payload(domain, prefs) — MCX "Custom Settings" envelope; thin wrapper over mobileconfig.Assemble
 ├── common/
+│   ├── accountprivileges/ # Privilege-grid model shared by pro account and account_group
 │   ├── accounttenant/ # Tenant-list lookups shared by the platform environment resource and assign_tenants action
+│   ├── actiontimeouts/ # Context deadline + `timeouts` attribute for every action
 │   ├── aischemas/     # Vendor JSON Schema fetch/cache/validate for AI Governance policy settings
 │   ├── availabletitles/ # Shared patch available-titles lookup (patch_external_source, patch_internal_source)
-│   ├── criteria/      # Shared smart-group / advanced-search criteria operator vocabulary (device_group, user_group, future searches)
+│   ├── collision/     # Plan-time name collision check (create or rename onto an existing object)
+│   ├── computertarget/ # Resolves a Jamf Pro computer id from the serial / management-id / udid selector of device-targeting actions
+│   ├── criteria/      # Shared smart-group / advanced-search criteria operator vocabulary
+│   ├── deprecations/  # Single reader of the schema-deprecation removal markers (sweep + conformance test)
+│   ├── egressip/      # The host's public source address, for Jamf-side IP allowlist diagnostics
 │   ├── enumguard/     # Recurrence guard: no enum value or error code restated as a literal the SDK generates
 │   ├── files/         # Shared upload-source plumbing for resources that upload file content
 │   ├── filters/       # RSQL + classic filter schema/expression builder
+│   ├── groupcollision/ # Name uniqueness namespaces for the Jamf Pro group constructs and jamfplatform_device_group
 │   ├── helpers/       # Type conversions, polling, timeout, state reconciliation, dynamic JSON, IDs, Pro version
 │   ├── impact/        # Plan-time impact alerts — device counts for scope changes (see §Impact alerts)
 │   ├── invitationcommon/ # Shared enrollment-invitation helpers (computer_invitation, mobile_device_invitation)
 │   ├── jsonvalue/     # Rendering a decoded JSON value for a diagnostic (aischemas)
 │   ├── ldapgroups/    # Directory-service (LDAP / cloud-IdP) group resolution + scope preflight validation
-│   ├── payloadhelpers/ # mobileconfig mask / compare / identifier injection (macos/mobile_device_configuration_profile)
+│   ├── listskip/      # Reports items a list resource left out because they could not be hydrated
+│   ├── listtimeouts/  # Context deadline + `timeouts` attribute for every list resource
+│   ├── payloadhelpers/ # mobileconfig mask / compare / identifier injection / import gate (see its doc.go)
 │   ├── permissions/   # Required-Jamf-permission tables rendered into schema descriptions (see §Required permission tables)
 │   ├── planmodifiers/ # Shared Terraform Plugin Framework plan modifiers
 │   ├── plisthelpers/  # Generic plist (Apple property list) parsing / normalisation helpers
-│   ├── scope/         # Classic scope sub-block factories + builders + validators (see STYLE_GUIDE §Scope helper)
+│   ├── prestagealias/, prestageskip/ # Attribute-rename rules shared by the two PreStage resources
+│   ├── progroups/     # Machinery shared by the four Jamf Pro device-group constructs
+│   ├── scope/         # Classic scope sub-block factories + builders + validators (see contributing/scope.md)
+│   ├── securitycloudtenant/ # Resolves the Security Cloud tenant ID a ZTNA gateway defaults `tenant_ids` to
 │   └── validators/    # Shared Terraform Plugin Framework validators (unique-string-field across collections)
 └── testhelpers/       # Acceptance fixtures (provider factories, real client, mock server)
 tools/                 # go:generate entrypoint (copywrite, terraform fmt, tfplugindocs)
 local-testing/         # Manual API request workflows for development (gitignored)
 examples/{provider,resources,data-sources,list-resources,actions,functions}/
+templates/guides/      # Source of the registry guides; `make generate` renders them into docs/guides/
 docs/                  # Auto-generated provider documentation — do not hand-edit
+contributing/          # The style guide, split by concern (see Companion Docs)
 ```
 
-Each leaf resource folder mirrors the file split in [STYLE_GUIDE.md §Resource Package File Conventions](contributing/package-layout.md#resource-package-file-conventions).
+Each leaf resource folder follows the file split in [contributing/package-layout.md §Resource Package File Conventions](contributing/package-layout.md#resource-package-file-conventions).
 
 ### Reference implementations (copy from these)
 
@@ -102,37 +123,15 @@ Each leaf resource folder mirrors the file split in [STYLE_GUIDE.md §Resource P
 | Free-form vendor JSON payload (JSON-string attribute + semantic equality + live schema validation) | `internal/resources/ai_governance/policy/` |
 | Data source whose upstream is not Jamf (no scope gate, no permissions table, injected logger, per-instance cache + concurrency cap) | `internal/resources/apple/app_store_app/` |
 
-## Impact alerts — one-paragraph orientation
+## Impact alerts — orientation
 
-`internal/common/impact/` produces Jamf Pro's **impact alert notifications** during `terraform plan`: an advisory warning on each object whose scope or payload is changing, reporting how many computers or mobile devices the change reaches. Off by default behind the provider's `impact_alerts` attribute; a nil `*impact.Cache` means disabled, so resources need no flag check. Three channels. Two mirror Jamf's own split — **deployable** (policies, profiles, apps, blueprints, benchmarks) and **scopeable** (groups, classes) — because a resource's `ModifyPlan` cannot see a sibling's, so a plan editing both a group and something scoped to it needs an alert from each side. The third, **policy dependencies** (script, package, printer, Dock item, directory binding, disk encryption configuration), has no counterpart in Jamf Pro: these objects have no scope of their own, so their blast radius is the combined audience of the policies referencing them. Resources wire in via `impact.ReportPlan` (deployable), `impact.ReportMembership` (scopeable) or `impact.ReportDependencyPlan` (dependencies), plus a per-family adapter — a reducer to `impact.Scope` for the first two, and for a dependency only a reader for the object's id and name. The shared Jamf Pro scope block goes through `scope.BuildImpactScope`, which is the single place the narrows/broadens/counts classification lives. Dependencies need a whole-tenant policy sweep, since Jamf Pro has no reverse lookup ("which policies use this script"): lazy, at most once per configured provider instance, self-capped at 5 concurrent reads, and built by `impact.NewCacheWithPolicies` (`NewTenantCache` wires both sources). Alerts are advisory — a tenant that cannot be read yields one notice and never fails a plan. Two rules that are easy to get wrong: a numeric Jamf Pro group id is unique only **within an estate** (see [STYLE_GUIDE.md §Scope helper](contributing/scope.md#scope-helper)), and group membership is expressed in **device management identifiers**, so a Jamf Pro numeric device/building/department id must be resolved through the inventory before it can be compared with a group's members. User guidance, including the `terraform plan -json` caveat, is in `docs/guides/impact-alerts.md`.
+`internal/common/impact/` produces Jamf Pro's **impact alert notifications** during `terraform plan`: an advisory warning on each object whose scope or payload is changing, reporting how many devices the change reaches. Off by default behind the provider's `impact_alerts` attribute; a nil `*impact.Cache` means disabled, so resources need no flag check, and an unreadable tenant yields one notice and never fails a plan. Three channels, each with one entry point: **deployable** objects (`impact.ReportPlan`), **scopeable** objects such as groups (`impact.ReportMembership`), and **policy dependencies** such as scripts and packages (`impact.ReportDependencyPlan`, which needs a lazy whole-tenant policy sweep capped at 5 concurrent reads). The shared Jamf Pro scope block goes through `scope.BuildImpactScope`, the single place the narrows/broadens/counts classification lives. Two rules that are easy to get wrong: a numeric Jamf Pro group id is unique only **within an estate**, and group membership is expressed in **device management identifiers**, so a numeric device, building or department id must be resolved through the inventory before it is compared with a group's members. The design is in the package's doc comments; user guidance, including the `terraform plan -json` caveat, is in `docs/guides/impact-alerts.md`.
 
-## Required permission tables — one-paragraph orientation
+## Required permission tables — orientation
 
-`internal/common/permissions/` renders the **Required Jamf permissions** table into every
-construct's schema description: for each SDK method a construct calls, the section and permission
-name an operator ticks in Jamf Account, plus the `{capability}:{action}` identifier. The mapping
-from capability slug to picker row exists in exactly one place — Jamf's [Jamf Pro permissions
-map](https://developer.jamf.com/platform-api/reference/jamf-pro-permissions-map) article — because
-the OpenAPI specs publish the slug and nothing else, and the two differ substantially
-(`computer-inventory-collection-settings` is "Device inventory collection settings"). `catalogue.go`
-transcribes that article, all 125 rows, deliberately complete rather than trimmed to what this
-provider calls so it stays diffable against the next revision. **The article is the source of
-truth**, and since it is published as markdown at the same URL with `.md` appended, that is now
-enforced rather than trusted: `permissions-map.md` beside the catalogue is a verbatim snapshot,
-`make permissions-map` refetches it, and `TestCatalogueMatchesThePublishedMap` asserts every row's
-section and name against it — so a renamed or relocated permission fails a build instead of quietly
-sending an operator to a checkbox that no longer exists. Two guards keep that honest: a parse
-yielding under 100 capabilities fails outright, because a parser that silently finds nothing reports
-perfect agreement; and only the article's own capability tables are read, bounded between two named
-headings, since its narrative tables list *old* privilege names in the same column position.
-`TestCatalogueCoversEverySDKCapability` covers the other direction (a capability the SDK requires
-and the file has never heard of), and `catalogue.golden` pins the rendered triples so any edit is a
-reviewable diff. `.github/workflows/permissions-map.yml` refetches monthly and opens a pull request
-— red, with the failures in its body, when the catalogue no longer agrees. What nothing here can
-prove is that the article matches what Jamf Account's picker actually prints; the same pattern lives
-in `jamfplatform-go-sdk` (capability and actions only, as a privilege oracle) and in `jamf-cli`.
+`internal/common/permissions/` renders the **Required Jamf permissions** table into every construct's schema description: for each SDK method a construct calls, the section and permission name an operator ticks in Jamf Account, plus the `{capability}:{action}` identifier. Each package declares its calls in `permissions.go`, and `permissions_test.go` holds it to the SDK privilege registry. The capability-to-picker-row mapping exists only in Jamf's [Jamf Pro permissions map](https://developer.jamf.com/platform-api/reference/jamf-pro-permissions-map) article, so **the article is the source of truth**: `catalogue.go` transcribes it in full, `permissions-map.md` is a verbatim snapshot (`make permissions-map` refetches it), tests fail the build when the catalogue disagrees with the snapshot or the SDK requires a capability the catalogue lacks, and `.github/workflows/permissions-map.yml` refetches on a schedule and opens a pull request. How the guards work is in the doc comments of `catalogue.go` and `permissions_map_test.go`. What nothing here can prove is that the article matches what Jamf Account's picker actually prints. The same pattern lives in `jamfplatform-go-sdk` (capability and actions only, as a privilege oracle) and in `jamf-cli`.
 
-## Apple profile schemas — one-paragraph orientation
+## Apple profile schemas — orientation
 
 The SDK package `appleschemas/profiles` (`github.com/jamf/jamfplatform-go-sdk`, moved there from this
 repository in SDK v1.4.0, SDK issue #97) carries a generated table of Apple's configuration profile
@@ -172,7 +171,7 @@ maintainers tag a release (tags are pushed by hand), Dependabot opens the bump h
 CONTRIBUTING.md §Release Versioning requires bumping the SDK to its latest tag before tagging.
 `raw_component` covers the window. User guidance is in `docs/guides/apple-schema-validation.md`.
 
-## Apple declaration schemas — one-paragraph orientation
+## Apple declaration schemas — orientation
 
 The SDK package `appleschemas/declarations` is the same shape for **declarative device management**:
 a generated table of Apple's declaration types, built from the `declarative` directory of
@@ -216,184 +215,58 @@ branch the table unions — that is inferred from `siri.settings.AllowSiriAI` ap
 picker while absent from release, so re-probe it first if false positives reappear for keys the UI
 offers. User guidance is in `docs/guides/apple-schema-validation.md`.
 
-## Blueprint legacy payload identifiers — one-paragraph orientation
+## Blueprint legacy payload identifiers — orientation
 
-A legacy payload's `payloadIdentifier` is the blueprints service's to assign, not the provider's: it
-is absent from the Blueprints API specification, which requires only `payloadType` in a
-`payloadContent` entry, and wire probing on 2026-09-16 established that a payload arriving without
-one is accepted and stamped with a **fresh UUID on every write**, on POST and on merge-patch alike,
-while one sent with an identifier keeps it verbatim and unvalidated across later writes.
-`payloadContent` is an array and a merge-patch replaces an array wholesale, so a body omitting the
-key re-identifies every payload on each unrelated edit, silently, since the field is masked out of
-state and `deploymentState` reports `OUT_OF_DATE` after any write regardless. The reason to preserve
-it is **parity with the web app**, which mints its own identifiers client-side (lowercase, where the
-service mints uppercase) and sends them back on every save: editing one payload in the web app left
-the identifier, display name, organization and version untouched, wire-verified 2026-09-16. What it
-is **not** is a device concern, and that trap is worth recording because it reads as the obvious
-one — on macOS 26.6, 2026-09-16, a write plus a deploy reinstalled the profile whether the
-identifiers moved or not, and a write rotating all four replaced the payload in place with no orphan
-and no duplicate. A **duplicated** identifier is equally inert: two blueprints delivering one payload
-type under the same identifier installed as two profiles, each keeping its own settings, because the
-device keys a payload on its *profile's* top-level identifier rather than the nested one, and
-managed preferences composite on the **preference domain**: two blueprints setting disjoint keys of
-one payload type land every key in the single `/Library/Managed Preferences/<domain>.plist`, whether
-they share an identifier or not. The derivation every released version used was sha256 of the payload
-type, so identical across every blueprint sharing a type, and it therefore needs no migration and no
-taint. One duplicate **is** fatal, and only one: two payloads in a **single step** sharing an
-identifier make macOS refuse the whole profile and every payload in it (`the PayloadIdentifier is
-used more than once in the profile`, `ConfigProfilePluginDomain:-107`), retrying forever while the
-blueprint reports `DEPLOYED`/`SUCCEEDED`. A step is one component and so one profile, which is why
-the rule scopes there and why the same identifier across two steps, or across two blueprints,
-installs cleanly. The provider does not originate that shape but would propagate one, since stored
-identifiers are read by payload type, so `dropDuplicateIdentifiers` drops any identifier two types in
-a step share and warns, letting the service reissue distinct ones. So a blueprint update is
-**read-merge-write**, the same shape the configuration profile resources get from
-`payloadhelpers.InjectTopLevelIdentifierValues`: `readStoredLegacyPayloadIdentifiers` fetches the
-blueprint first and writes each stored identifier back, located by step and then by `payloadType`
-with steps matched **by name ahead of position** so that inserting or reordering a block cannot shift
-one block's identifiers onto another's payloads; create sends none, an authored value is discarded
-either way, and a failed pre-read fails the apply rather than falling back to minting. One carve-out:
-the injection is wired into `legacy_payloads` alone, so a legacy profile authored as `raw_component`
-goes through `collectBlockComponents`, which re-marshals the author's own JSON untouched, and its
-identifiers rotate on every write. The documentation deliberately says nothing about that, because
-the field is the service's and an operator has nothing to do with it.
+A legacy payload's `payloadIdentifier` is the blueprints service's to assign, not the provider's. A payload sent without one is stamped with a fresh UUID on every write, and a merge-patch replaces `payloadContent` wholesale, so a blueprint update is **read-merge-write**: `readStoredLegacyPayloadIdentifiers` fetches the blueprint first and writes each stored identifier back, matched by step (by name ahead of position) and then by `payloadType`. Create sends none, an authored value is discarded, and a failed pre-read fails the apply. The reason is parity with the web app, **not** a device concern: identifiers rotating or repeating across steps or blueprints is inert on the device. The one fatal shape is two payloads in a **single step** sharing an identifier, which makes macOS refuse the whole profile while the blueprint reports success; `dropDuplicateIdentifiers` drops such an identifier and warns. The wire evidence for all of this is in the doc comments in `internal/resources/blueprints/blueprint/helpers.go`. Two things recorded only here: the injection is wired into `legacy_payloads` alone, so a legacy profile authored as `raw_component` has its identifiers rotated on every write; and the documentation deliberately says nothing about any of it, because the field is the service's and an operator has nothing to do with it.
 
-## Jamf Security Cloud resources — one-paragraph orientation
+## Jamf Security Cloud resources — orientation
 
-Terraform construct name format: `jamfplatform_security_cloud_<resource>`; Go package
-`internal/resources/security_cloud/<resource>/`, flat single tier like `pro/`. All five
-Security Cloud API namespaces (`jsc-categories`, `jsc-dns`, `jsc-ztna`,
-`securitycloud-devices`, `uem-connect`) are generated into one SDK package,
-`jamfplatform/securitycloud`, and every method routes through the unified
-`/securitycloud` prefix — wire-verified in production EU on 2026-08-27 for the DNS
-surface and 2026-08-29 for UEM Connect, both under a tenant-scoped integration. There is
-no `/api` segment: the Platform API GA dropped it everywhere, and a request carrying it
-gets the gateway's own bare `404 page not found` rather than a JSON error. Configure goes through
-`providerdata.ConfigureSecurityCloud`, **not** `ConfigurePro`: Security Cloud is
-continuously deployed with no customer-tenant version, and a tenant can hold it without
-holding Jamf Pro, so a Pro version fetch would be both meaningless and fatal. Two things
-differ from every other namespace and are easy to get wrong. First, **entitlement is not
-authentication** — a valid integration can still be refused with `403 NOT_ENTITLED`, so
-resources translate that code into a named diagnostic instead of surfacing the raw error.
-Second, **cross-namespace references are server-enforced in both directions**: a DNS
-zone's name servers each name a gateway by ID — a shared, dedicated or grouped gateway, all
-three accepted — and a zone cannot be written before its gateway exists
-(`422 GATEWAY_NOT_FOUND`), so that diagnostic points at `authoritative_name_servers` rather than
-the zone; conversely a gateway that anything still references refuses to be deleted with a bare
-`409 CONFLICT` naming nothing, which is a Terraform destroy-ordering trap and gets its own
-diagnostic. That last behaviour is **per construct, not a namespace rule** — a device group
-that a ZTNA app still names deletes cleanly and silently empties the app's assignment instead
-— so probe the referenced delete for each new construct rather than inheriting either answer.
-Three shapes recur across the namespace and are worth knowing before reading any of
-it: a **cipher/algorithm field is an array the server accepts exactly one element in**, so it
-is modelled as a single string and collapsed at the boundary; an **enum violation is
-unattributed, but not identically so across services** — `jsc-dns` and `jsc-ztna` answer
-`400 [INVALID_FIELD] Request body is missing or malformed.` with no field and no value,
-while `uem-connect` answers `422 VALIDATION_FAILED` leaking Jackson's message, which does
-name the accepted values; either way every enum is validated at plan time from the SDK's
-own generated `*Values()` helper rather than a restated list, and the per-service
-difference is one more reason not to write a diagnostic against a code another construct
-observed; and an **unmapped route answers `403 BAD_PERMISSIONS`,
-indistinguishable from a real privilege gap** (a bogus path returns the same body), so that
-code is deliberately never translated into a diagnostic and a spec-advertised endpoint the
-gateway 403s on is presumed unrouted rather than unprivileged. Acceptance tests gate on
-`testhelpers.AccPreCheckSecurityCloud`, which requires the operator to *declare* that the
-configured scope is a Security Cloud one (`JAMFPLATFORM_ACC_SECURITYCLOUD_{ENVIRONMENT,TENANT}_ID`,
-matching the scope in use) and skips otherwise — a Pro-only acceptance tenant is a
-legitimate environment, not a failure. Full rules:
-[STYLE_GUIDE.md §Jamf Security Cloud Resource Naming](contributing/families.md#jamf-security-cloud-resource-naming).
+Terraform construct name format: `jamfplatform_security_cloud_<resource>`; Go package `internal/resources/security_cloud/<resource>/`, flat single tier like `pro/`. All five Security Cloud API namespaces are generated into one SDK package, `jamfplatform/securitycloud`, routed through the unified `/securitycloud` prefix with no `/api` segment. Full rules and the shapes that recur: [contributing/families.md §Jamf Security Cloud Resource Naming](contributing/families.md#jamf-security-cloud-resource-naming); user guidance: `docs/guides/security-cloud.md`. The traps:
 
-## Jamf Account — one-paragraph orientation
+- **Configure goes through `providerdata.ConfigureSecurityCloud`, not `ConfigurePro`.** Security Cloud has no customer-tenant version, and a tenant can hold it without holding Jamf Pro.
+- **Entitlement is not authentication.** A valid integration can be refused `403 NOT_ENTITLED`; resources translate that code into a named diagnostic.
+- **`403 BAD_PERMISSIONS` is never translated into a diagnostic.** An unmapped route answers it too, so it is indistinguishable from a privilege gap, and a spec-advertised endpoint the gateway 403s on is presumed unrouted.
+- **Cross-namespace references are server-enforced, and delete behaviour is per construct.** A DNS zone cannot be written before its gateway exists (`422 GATEWAY_NOT_FOUND`); a referenced gateway refuses delete with a bare `409 CONFLICT`; a referenced device group deletes cleanly and silently empties the referencing app's assignment. Probe the referenced delete for each new construct.
+- **Enums are validated at plan time from the SDK's `*Values()` helpers**, because the server's enum errors are unattributed and differ per service (`400 INVALID_FIELD` from `jsc-dns` and `jsc-ztna`, `422 VALIDATION_FAILED` from `uem-connect`). Do not write a diagnostic against a code another construct observed.
+- **Acceptance tests gate on `testhelpers.AccPreCheckSecurityCloud`**, which requires the scope to be declared as a Security Cloud one and skips otherwise (see TESTING.md).
 
-Terraform construct name format: `jamfplatform_account_<x>`; Go package
-`internal/resources/account/<x>/`, flat single tier like `security_cloud/`. This is the provider's
-**organization-level** family — what a practitioner manages at *account.jamf.com → Organization*,
-above and across individual tenants. Today that means **SSO**: a `sso_domain` is a DNS domain the
-organization has claimed and proved ownership of, and a `sso_connection` — shipped as a resource,
-two data sources and a list resource — is an OIDC identity-provider connection that signs users in
-for one or more of those domains, scoped to chosen Jamf Pro, School, Protect and Security Cloud
-tenants. Family
-facts and the naming rationale are in
-[STYLE_GUIDE.md §Jamf Account Resource Naming](contributing/families.md#jamf-account-resource-naming); five
-things drive the design and are easy to get wrong. First, **this is the only family reachable under
-organization scope, and the only scope that reaches it** — wire-probed 2026-09-02 on two
-organization-scoped integrations, while a tenant-scoped one is refused `403 BAD_PERMISSIONS` on the
-same URL in the same region (provably an authorization refusal rather than an unrouted path, because
-another credential answers 200 there). Environment scope is *untested*, not ruled out: the namespace
-exists only on the **US gateway**, so no US environment-scoped integration was available, and
-widening `ConfigureAccount`'s gate is a fresh probe rather than a one-token edit. No organization ID
-travels anywhere — the gateway resolves it from the access token, so there is no `organization_id`
-attribute and no SDK `WithOrganizationID`. Second, **a domain is create/verify/delete only**: `GET`,
-`PUT` and `PATCH` on `/sso/v1/domains/{id}` all answer `403 BAD_PERMISSIONS`, which by this repo's
-law means unrouted — so every attribute is `RequiresReplace`, Read scans the list endpoint, and
-import is by domain **name**. Third, **verification is an action, not resource state, and it is not
-idempotent**: a *failed* verify returns `200` with `domainStatus` unchanged (so the status code says
-nothing), yet still bumps `lastModifiedDate` and pushes `verificationExpirationDate` out 14 days —
-and because the five-minute rate limit is measured from `lastModifiedDate`, which the claim itself
-sets, the first verify after creating a domain is always refused. Fourth, two things about a connection, and note which
-endpoint each belongs to, because getting that backwards is easy. **Its tenant allow-list is
-write-only**: neither read shape echoes `enabledProducts` or `enabledEnvironments`, and no endpoint
-anywhere lists an organization's tenants, so the ids can be neither discovered nor drift-checked —
-documented rather than solved. And **changing one in place is impossible, though creating one is
-not**: `POST` answers `201` for a valid body, and reading, importing, the data sources, the list
-resource and deleting all work, but `PUT /sso/v1/connections/{id}` answers `500 UPSTREAM_ERROR` for
-*every* request — including the verbatim body a create had just accepted — and wire-verified
-2026-09-03 the refused write applies nothing, a connection read back after a PUT changing three
-fields being byte-identical. So `sso_connection` carries a whole-resource `ModifyPlan` that plans a
-**replacement** on any configured change, in one file rather than fifty `RequiresReplace` modifiers
-so that reverting it is deleting a file; the `Update` method and its acceptance test are already
-written and gated behind `skipUnlessConnectionUpdatesWork`, ready for the day Jamf fixes the
-endpoint. Fifth,
-**the server attributes almost nothing**: `errors[].field` is populated only for top-level required
-fields, an invalid enum returns `MALFORMED_REQUEST_BODY` with `field: null` and never names the
-value, and a `connectionType`-versus-payload mismatch is an unattributed `500` — so every enum is
-taken from the SDK's own `*Values()` helper rather than a restated list, and the connection's
-discriminator/payload pairing will be validated at plan time the same way once it ships.
+## Jamf Account — orientation
 
-## Jamf AI Governance — one-paragraph orientation
+Terraform construct name format: `jamfplatform_account_<x>`; Go package `internal/resources/account/<x>/`, flat single tier. This is the provider's **organization-level** family, what a practitioner manages at *account.jamf.com → Organization*: SSO domains (`sso_domain`) and OIDC connections (`sso_connection`), platform environments (`platform_environment`, plus the `assign_tenants` action), and a read-only list of the organization's tenants (`tenants`, plural data source only). Full rules: [contributing/families.md §Jamf Account Resource Naming](contributing/families.md#jamf-account-resource-naming); user guidance: `docs/guides/account-sso.md`; wire evidence: the package doc comments. The traps:
 
-Terraform construct name format: `jamfplatform_ai_governance_<x>`; Go package
-`internal/resources/ai_governance/<x>/`, flat single tier like `security_cloud/`. An **AI policy** is
-the managed configuration for one AI tool — Claude Code, Claude Desktop or OpenAI Codex today — which
-Jamf Pro then delivers to Macs through a blueprint's `com.jamf.ai-governance` component. Family is
-**Platform Services**: hand-rolled Configure, no version gate, no SDK-endpoints annotation block —
-but the scope gate is `ScopeEnvironment` **alone**, and both alternatives are wire-probed: a request
-carrying no scope header is refused with `400 REQUEST_CONTEXT_NOT_PROVIDED`, and one carrying
-`X-Tenant-Id` is refused with `403 BAD_PERMISSIONS` — while `GET /pro/v1/csa/tenant-id` under that
-same header answers 200, so the header is accepted and the refusal belongs to this namespace. By this
-repo's own law (§Jamf Security Cloud: `403 BAD_PERMISSIONS` is indistinguishable from a privilege
-gap, so a spec-advertised route answering it is presumed unrouted) AI Governance is **not reachable**
-under tenant scope, and widening the gate is a fresh probe rather than a one-token edit. (Note this
-retires the Phase 11 epic's recorded blocker, which had the namespace down as organization-scope and
-therefore unbuildable; and the path is `/ai/governance/policies/v1/...`, not `/api/ai-governance/...`.)
-Four things drive the design and are easy to get wrong. First, **the settings body is the tool vendor's
-own JSON**, declared by a JSON Schema the platform serves per tool per schema version, 142 top-level
-properties for Claude Code and deeply nested for Codex — so it is one `settings_json` string
-attribute with JSON semantic equality, never generated typed attributes (schema versions coexist per
-policy, `anyOf` unions have no framework equivalent, and two Claude Code schema versions shipped in
-three months). `internal/common/aischemas` fetches, caches and validates it at plan time; its
-partiality is measured, not assumed, and its package doc says which keywords are skipped and why.
-Second, **validation strength is a property of the vendor schema, not the service**: an undeclared key
-is silently *stored and never applied* where the schema allows extras (Claude Code) and rejected with
-`422` where it does not (Codex) — which is why an unrecognised key is a warning and everything else an
-error, and why it is the one failure the service itself never reports. Third, **a policy has a draft
-and a published history**: create publishes nothing, a blueprint pins a *version number*, the platform
-diffs settings itself so an apply changing only the name mints no version — and `schemaVersion` is
-part of neither diff, so moving a policy to a newer schema *without* touching the settings publishes
-nothing and leaves blueprints delivering the old schema. Fourth, **archiving is not blocked by a
-blueprint that references the policy**: the delete succeeds and leaves the blueprint pointing at a
-version the platform will no longer serve, with no reverse lookup to warn from
-(`GET /policies/{id}/deployment` returns an empty list even for a deployed referencing blueprint), so
-that trap is documentation only — the opposite of the ZTNA gateway law, and one more reason to probe
-referenced deletes per construct. User guidance is in `docs/guides/ai-governance-policies.md`.
+- **Organization scope only, and only this family is reachable under it.** Gated once in `providerdata.ConfigureAccount`. No organization ID travels anywhere; the gateway resolves it from the access token. The SSO namespace is served from the **US gateway** alone. Environment scope is untested, not ruled out, so widening the gate is a fresh probe.
+- **An SSO domain is create/verify/delete only.** `GET`, `PUT` and `PATCH` by id are unrouted, so every attribute is `RequiresReplace`, Read scans the list endpoint, and import is by domain **name**.
+- **Verification is an action, not resource state, and it is not idempotent.** A failed verify returns `200` with the status unchanged, yet bumps `lastModifiedDate` and pushes the expiry out. The five-minute rate limit is measured from `lastModifiedDate`, which the claim itself sets, so the first verify after creating a domain is always refused.
+- **A connection's tenant allow-list is write-only.** Neither read shape echoes `enabledProducts` or `enabledEnvironments`, so it cannot be drift-checked.
+- **A connection cannot be changed in place.** `PUT /sso/v1/connections/{id}` answers `500 UPSTREAM_ERROR` for every request and applies nothing, so `sso_connection` carries a whole-resource `ModifyPlan` that plans a replacement on any configured change. It is one file so that reverting it is deleting a file; `Update` and its acceptance test are already written behind `skipUnlessConnectionUpdatesWork`.
+- **The server attributes almost nothing.** `errors[].field` is populated only for top-level required fields and an invalid enum never names the value, so every enum comes from the SDK's `*Values()` helper.
 
-## Jamf Pro resources — one-paragraph orientation
+## Jamf AI Governance — orientation
 
-Terraform construct name format: `jamfplatform_pro_<resource>` regardless of whether the SDK source is `pro/` or `proclassic/`. One `jamfplatform.Client` built from `JAMFPLATFORM_*` credentials serves both Platform Services and Pro. Every Pro resource declares an unexported `const minJamfProVersion` and funnels Configure through `providerdata.ConfigurePro` (no hand-rolled boilerplate). Each Pro resource's `crud.go` opens with an SDK-endpoints annotation block (`Status: current. Last reviewed YYYY-MM-DD.`) — Pro / ProClassic only; Platform Services resources are exempt. Full rules: [STYLE_GUIDE.md §Jamf Pro Resource Naming](contributing/families.md#jamf-pro-resource-naming), §Minimum Jamf Pro version check, §Endpoint adoption & migration policy. Workflow for adding a Pro resource (incl. SDK-comparison + ProClassic payload audit gate): [CONTRIBUTING.md §Adding a Jamf Pro Resource](CONTRIBUTING.md#adding-a-jamf-pro-resource).
+Terraform construct name format: `jamfplatform_ai_governance_<x>`; Go package `internal/resources/ai_governance/<x>/`, flat single tier. An **AI policy** is the managed configuration for one AI tool (Claude Code, Claude Desktop or OpenAI Codex today), which Jamf Pro delivers to Macs through a blueprint's `com.jamf.ai-governance` component. Family is **Platform Services**: hand-rolled Configure, no version gate, no SDK-endpoints annotation block. User guidance: `docs/guides/ai-governance-policies.md`; validation design: the `internal/common/aischemas` package doc.
 
-## API integration scope — one-paragraph orientation
+**Scope is `ScopeEnvironment` alone, and both alternatives are wire-probed.** No scope header is refused `400 REQUEST_CONTEXT_NOT_PROVIDED`; `X-Tenant-Id` is refused `403 BAD_PERMISSIONS`, while `GET /pro/v1/csa/tenant-id` under that same header answers 200, so the refusal belongs to this namespace. By this repo's law that reads as unrouted, and widening the gate is a fresh probe. This retires the Phase 11 epic's recorded blocker, which had the namespace down as organization-scope and unbuildable. The path is `/ai/governance/policies/v1/...`, not `/api/ai-governance/...`.
 
-Jamf offers three scopes when an API integration is created, and the provider mirrors all three: **Platform environment** (a group of tenants across product types — the *preferred* scope, `environment_id` → `X-Environment-Id`), **Tenant** (a single Jamf Pro / School / Protect / Security Cloud tenant — Jamf's own words are "legacy method for targeting integrations without a platform environment", `tenant_id` → `X-Tenant-Id`), and **Organization management** (SSO and similar organization-level resources — no scope header at all; the gateway resolves the context from the access token; note AI Governance reads as organization-level and is *not*, it is environment-scoped). Since SDK v0.17.0 the scope travels in a header rather than the URL path, set by `WithEnvironmentID` / `WithTenantID`. So `environment_id` and `tenant_id` are **mutually exclusive and both optional** — an integration targets one, and supplying the other is refused with `403 OWNERSHIP_FORBIDDEN` even when both IDs belong to the same customer. `internal/provider/scope.go` resolves which is in play (config beats environment; both-at-once is an error either way; a shadowed env var warns) and selects the SDK option accordingly; `providerdata.New` then reads the scope back off the built client via `Client.Scope()` (SDK v0.18.0), so the gate can never disagree with the header the client actually sends. Whether a given construct can be reached under that scope is then enforced **per construct**, not once in provider Configure, via `providerdata.RequireScope` in `internal/providerdata/scope.go` — because the answer differs per API family and has already differed twice: Jamf Pro works under either scope (gated once inside `configureSub`, covering every `pro/` package and Pro action), Security Cloud likewise works under either and is gated once inside `ConfigureSecurityCloud`, while Blueprints, Compliance Benchmarks and AI Governance are environment-only. Call sites never write the kinds out; they pass a derived family set from `internal/providerdata/scopes.go`, resolved at initialisation from the SDK privilege registry's `MethodPrivileges.Scopes` (SDK v0.22.0) so that a spec ingest moving a family arrives as one changed value with a pinned expectation to agree with rather than going stale at 27 call sites. Two rules keep that honest. The intersection, not the union, is what a construct needs — `Scopes` is an alternatives set per method and a client carries exactly one scope. And a **spec-declared set is not always what the gateway serves**: the GA deleted `X-Tenant-Id` from six Platform specs while the gateway went on answering it, so `scopes.go` carries a `gatewayWidenings` table of family, scope and dated wire evidence (three entries — Platform devices, device groups, device actions, all 2026-09-04, two independent probes plus a green tenant-scope acceptance run on `device_group` and `devices`), whose entries are deleted rather than edited once either half of the justification goes; `scopes_test.go` fails on one the registry has caught up with, and on a family name that matches nothing and therefore widens nothing. Blueprints and Compliance Benchmarks are deliberately **not** widened, and note *why*: two different tenant credentials are refused `403 BAD_PERMISSIONS`, which classifies nothing on its own — Security Cloud answers identically and is reachable under both scopes — so the narrowing rests instead on Jamf Account's permission picker not offering the `blueprints` or `compliance-benchmarks` capabilities at all when the integration being created is tenant-scoped, observed in the picker 2026-09-04. That is falsified by a change to the picker rather than by a `200` from either route, and it is verified live to produce the named Configure diagnostic in 0.25s where the same run previously spent 134s applying before the 403. Scope is documented as well as enforced — `permissions.Section` opens each "Required Jamf permissions" block with the integration scope, from the same registry, reporting the spec's declaration and deliberately not the widenings. Organization scope is **not** a rejected special case: it is the only scope that reaches the `jamfplatform_account_*` family (Jamf Account SSO), gated once inside `ConfigureAccount`, and it is rejected everywhere else. Enforcement runs both ways for the same reason — an organization-scoped integration aimed at a Pro resource, or an environment-scoped one aimed at a Jamf Account resource, each turn an opaque gateway failure mid-apply into a named diagnostic at Configure.
+Four things drive the design:
+
+- **The settings body is the tool vendor's own JSON**, declared by a JSON Schema the platform serves per tool per schema version (142 top-level properties for Claude Code, deeply nested for Codex). So it is one `settings_json` string with JSON semantic equality, never generated typed attributes: schema versions coexist per policy and `anyOf` unions have no framework equivalent. `aischemas` fetches, caches and validates it at plan time.
+- **Validation strength is a property of the vendor schema, not the service.** An undeclared key is silently stored and never applied where the schema allows extras (Claude Code) and rejected with `422` where it does not (Codex). That is why an unrecognised key is a warning and everything else an error.
+- **A policy has a draft and a published history.** Create publishes nothing, a blueprint pins a version number, and an apply changing only the name mints no version. `schemaVersion` is part of neither diff, so moving a policy to a newer schema without touching the settings publishes nothing and leaves blueprints delivering the old schema.
+- **Archiving is not blocked by a blueprint that references the policy.** The delete succeeds and leaves the blueprint pointing at a version the platform will no longer serve, with no reverse lookup to warn from, so that trap is documentation only. It is the opposite of the ZTNA gateway behaviour: probe referenced deletes per construct.
+
+## Jamf Pro resources — orientation
+
+Terraform construct name format: `jamfplatform_pro_<resource>` regardless of whether the SDK source is `pro/` or `proclassic/`. One `jamfplatform.Client` built from `JAMFPLATFORM_*` credentials serves both Platform Services and Pro. Every Pro construct declares an unexported `const minJamfProVersion` (the per-construct floor; `""` unless an endpoint needs a newer version, and a tenant below it is a Configure error) and funnels Configure through `providerdata.ConfigurePro` or `ConfigureProClassic`, never hand-rolled. Separately, `ProviderMinJamfProVersion` is the provider's build target: it tracks the SDK's `jamfplatform.JamfProAPIVersion`, is not the maximum of the floors, and a tenant below it gets a warning. Each Pro resource's `crud.go` opens with an SDK-endpoints annotation block ending in a `Status:` line (`Status: current.`); Platform Services resources are exempt. Full rules: [contributing/families.md §Jamf Pro Resource Naming](contributing/families.md#jamf-pro-resource-naming) and §Minimum Jamf Pro version check; [contributing/endpoint-lifecycle.md](contributing/endpoint-lifecycle.md) for endpoint adoption, migration and schema deprecation. Workflow for adding a Pro resource (incl. SDK-comparison + ProClassic payload audit gate): [CONTRIBUTING.md §Adding a Jamf Pro Resource](CONTRIBUTING.md#adding-a-jamf-pro-resource).
+
+## API integration scope — orientation
+
+Jamf offers three scopes when an API integration is created, and the provider mirrors all three: **Platform environment** (preferred; `environment_id` → `X-Environment-Id`), **Tenant** (legacy; `tenant_id` → `X-Tenant-Id`), and **Organization management** (no scope header; the gateway resolves the context from the access token). `environment_id` and `tenant_id` are mutually exclusive and both optional; `internal/provider/scope.go` resolves which is in play, and `providerdata.New` reads the scope back off the built client so the gate cannot disagree with the header sent. Full rules: [contributing/scope.md §API integration scope](contributing/scope.md#api-integration-scope-every-construct-declares-which-scopes-reach-it); the evidence is on the tables in `internal/providerdata/scopes.go`. What to remember:
+
+- **Reachability is enforced per construct, at Configure**, via `providerdata.RequireScope`, because the answer differs per family: Jamf Pro and Security Cloud work under environment or tenant scope (gated once in `configureSub` and `ConfigureSecurityCloud`); Blueprints, Compliance Benchmarks and AI Governance are environment-only (AI Governance reads as organization-level and is not); `jamfplatform_account_*` is organization-only, gated in `ConfigureAccount`, and organization scope is rejected everywhere else.
+- **Call sites never write the scope kinds out.** They pass a derived family set from `scopes.go`, resolved from the SDK privilege registry's `MethodPrivileges.Scopes`. A construct needs the intersection across its methods, not the union.
+- **A spec-declared set is not always what the gateway serves.** `gatewayWidenings` in `scopes.go` records each family, scope and dated wire evidence; entries are deleted, not edited, once the registry catches up, and `scopes_test.go` enforces that.
+- **`403 BAD_PERMISSIONS` classifies nothing on its own.** Blueprints and Compliance Benchmarks are not widened because Jamf Account's permission picker does not offer those capabilities to a tenant-scoped integration, not because of the 403. That is falsified by a change to the picker, not by a `200`. It is verified live to produce the named Configure diagnostic in 0.25s where the same run previously spent 134s applying before the 403.
+- **Scope is documented as well as enforced.** `permissions.Section` opens each "Required Jamf permissions" block with the integration scope from the same registry, reporting the spec's declaration and deliberately not the widenings.
 
 ## Tooling
 
@@ -421,45 +294,30 @@ Before committing: `make fix fmt lint test`. Then `make generate` if any schema 
 
 ## Environment Variables
 
+Read by the provider at Configure and documented for users. **Never rename these**; the SDK alignment happens at the secret layer, with `acceptance.yml` mapping the aligned secret onto the provider's own variable.
+
 - `JAMFPLATFORM_BASE_URL` — `https://us.api.jamfcloud.com` / `eu.api.jamfcloud.com` / `apac.api.jamfcloud.com`. The gateway root, host only: it serves `/auth/token` and every namespace at the root, so a `/api` path breaks authentication. The pre-GA beta `{region}.apigw.jamf.com` still resolves and still answers the token exchange, but serves no API namespace, so the provider refuses it at configure time.
 - `JAMFPLATFORM_CLIENT_ID` / `JAMFPLATFORM_CLIENT_SECRET` — API client credentials.
 - `JAMFPLATFORM_ENVIRONMENT_ID` — platform-environment scope, sent as `X-Environment-Id`. **Preferred.**
 - `JAMFPLATFORM_TENANT_ID` — tenant scope, sent as `X-Tenant-Id`. **Legacy.** Mutually exclusive with the above; both are optional — see §API integration scope.
-- `JAMFPLATFORM_ACC_ORGANIZATION_DECLARED_ID` — **acceptance tests only**. Declares that the configured credentials are an organization-scoped integration, which is what the `jamfplatform_account_*` family requires. There is nothing to compare it against — an organization-scoped request carries no scope header, so no `JAMFPLATFORM_*` variable holds the organization — and that is exactly why the declaration is needed: without it a Pro-only credential set with both scope variables unset looks identical to a real organization integration. `testhelpers.AccPreCheckAccount` additionally requires **both** `JAMFPLATFORM_ENVIRONMENT_ID` and `JAMFPLATFORM_TENANT_ID` to be *unset*, and skips on a non-US base URL, since `/sso/v1` is served only from the US gateway.
-- `JAMFPLATFORM_ACC_ORGANIZATION_SSO_VERIFIED_DOMAIN` / `JAMFPLATFORM_ACC_ORGANIZATION_SSO_UNVERIFIABLE_DOMAIN` — **acceptance tests only**, both optional, both naming a *claimed* Jamf Account SSO domain. The first must be a **real, already-verified** domain the operator owns; the second a throwaway `.example` one, which can never verify. They cover the two verification outcomes the suite cannot manufacture: re-checking a verified domain is refused `409 CONFLICT` (which the action reports as success), and checking an unverifiable one returns `200` with the status unchanged. The **first-time** unverified→verified transition is untestable by design — the verification key is reissued on every claim, so a DNS record published for an earlier claim is stale against a new one, and automating it would require the suite to write DNS.
-- `JAMFPLATFORM_ACC_AIGOVERNANCE_ENVIRONMENT_ID` — **acceptance tests only**. Declares that the configured environment holds Jamf AI Governance; must equal `JAMFPLATFORM_ENVIRONMENT_ID`. Unset or mismatched, every AI Governance acceptance test skips locally and **fails** in the `aigovernance` lane, which names this variable in its `require` token — it was referenced by no workflow at all before the lane pipeline, so all 18 tests skipped green on every run. Environment scope only — there is no tenant form, because the surface answers a request carrying no scope header with `REQUEST_CONTEXT_NOT_PROVIDED` and one carrying `X-Tenant-Id` with `403 BAD_PERMISSIONS`, which this repo reads as an unrouted namespace.
-- `JAMFPLATFORM_ACC_PRO_ADCS_API_CLIENT_ID` — **acceptance tests only**. Client ID (UUID) of a pre-existing Jamf Pro API client holding the AD CS certificate-job privileges. `jamfplatform_pro_pki_adcs` in `OUTBOUND` mode needs one and the provider can no longer create it: the API-client and API-role endpoints were withdrawn at the Platform API GA, so clients are created in Jamf Account. Unset and the two OUTBOUND tests skip.
-- `JAMFPLATFORM_ACC_SECURITYCLOUD_ENVIRONMENT_ID` / `JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_ID` — **acceptance tests only**. Declares that the configured scope belongs to a Jamf Security Cloud tenant; must equal the corresponding `JAMFPLATFORM_*` value. Unset or mismatched, every Security Cloud acceptance test skips locally and **fails** in the `securitycloud` lane, which names the environment form in its `require` token. The environment form is wired in CI (wire-verified 2026-09-03); the tenant form is not. The ZTNA gateway tests need no tenant fixture: they leave `tenant_ids` unset and the provider defaults it (see `internal/common/securitycloudtenant`). See [TESTING.md](TESTING.md).
-- `JAMFPLATFORM_ACC_REQUIRE` — **acceptance tests only**. A comma-separated list of lane `require` tokens (`platform`, `environment`, `organization`, `securitycloud`, `aigovernance`, `pro-tenant`). It promotes an unset-credential *skip* into a *failure* for the named sets, and `.github/workflows/acceptance.yml` sets it per lane from `matrix.require`. Unset it locally and everything skips as before, which is what lets a contributor with no estate run `make testacc`. See §Acceptance CI lanes.
-- Every other acceptance-only variable is named `JAMFPLATFORM_ACC_<PRODUCT>_<FIELD>`, matching `jamfplatform-go-sdk` — verbatim where that repo already names the same secret, so one value serves both (hence `JAMFPLATFORM_ACC_PRO_DEP_TOKEN` and `JAMFPLATFORM_ACC_SECURITYCLOUD_UEM_PRO_TENANT_ID`, neither of which is what this repo would have chosen alone). The full rename map, and the dual-read shim that keeps a stale local `.env` working, are in `internal/testhelpers/accrequire/env.go`. The variables listed *above* this line are the exception and must never be renamed: the provider schema reads them at Configure and they are documented for users, so the SDK alignment happens at the **secret** layer, with `acceptance.yml` mapping the aligned secret onto the provider's own variable.
-- Acceptance tests additionally require `TF_ACC=1` (set automatically by `make testacc`), and one of the two scope variables.
 
-## Acceptance CI lanes — one-paragraph orientation
+Acceptance tests only. Requirements, skip rules and the CI wiring for each are in [TESTING.md](TESTING.md); acceptance also needs `TF_ACC=1` (set by `make testacc`).
 
-`.github/workflows/acceptance.yml` runs acceptance as **product lanes**, not one serial suite.
-`.github/acceptance-lanes.json` is the single source of truth, read by `scripts/acclanes` (which
-builds the GitHub matrix) and by `internal/conformance/acc_lanes_test.go` (which proves the
-partition is honest, untagged, in `make test`, with no credentials). A lane is a product space and
-membership is a **package path prefix** — the divergence from the SDK, whose suite is one package
-and so splits on a test-name regex and hands `go test -run` a 34 KB alternation; here the package
-list goes straight to `go test`, 4.9 KB for the pro lane's 110 packages. Six lanes are active —
-`account`, `securitycloud`, `aigovernance`, `platform-env`, `pro-tenant`, and `pro` as the default
-that owns everything unclaimed — plus `protect`, `school` and `android` reserved with
-`planned: true`, which must match zero packages and fail loudly the moment one arrives. Three
-things drive the design. First, **only `pro` holds the estate lock**: the others authenticate with
-a different credential set or a different entitlement declaration and share no fixtures with it, so
-a 38-test Jamf Account run no longer queues behind a ~2.5 h Pro suite the way it did under the old
-single `acceptance-tenant` group. Second, **a running suite is never cancelled** — there is
-deliberately no workflow-level `concurrency`, because cancelling SIGKILLs `go test` and no
-`CheckDestroy` or `t.Cleanup` handler runs, orphaning objects on a shared estate whose duplicate
-names later collide; superseded runs queue, and a `Skip if superseded` step lets a stale one exit in
-seconds. Third, **absence of a credential is fatal in a pipeline and a skip locally**, via
-`JAMFPLATFORM_ACC_REQUIRE` — the failure this whole shape exists to close is the invisible one,
-where a missing secret makes a suite self-skip and the package still prints `ok`. That was not
-hypothetical: `acceptance.yml` referenced 48 secrets of which 13 existed, and the AI Governance
-declaration was read by 18 tests and referenced nowhere. A lane that plans packages and executes
-zero tests now fails with a warning banner, and one `acceptance-gate` job is the required check so
-branch protection never has to name a lane. Full rules: [TESTING.md §CI scaling](TESTING.md#ci-scaling).
+- `JAMFPLATFORM_ACC_ORGANIZATION_DECLARED_ID` — declares that the credentials are an organization-scoped integration, which `jamfplatform_account_*` requires. Nothing else can tell one from a Pro-only credential set with both scope variables unset. `AccPreCheckAccount` also requires both scope variables unset and skips on a non-US base URL.
+- `JAMFPLATFORM_ACC_ORGANIZATION_SSO_VERIFIED_DOMAIN` / `JAMFPLATFORM_ACC_ORGANIZATION_SSO_UNVERIFIABLE_DOMAIN` — optional; a real, already-verified claimed domain and a throwaway `.example` one, covering the two verification outcomes the suite cannot manufacture. The first-time unverified→verified transition is untestable by design: the verification key is reissued on every claim, so automating it would require the suite to write DNS.
+- `JAMFPLATFORM_ACC_AIGOVERNANCE_ENVIRONMENT_ID` — declares that the environment holds Jamf AI Governance; must equal `JAMFPLATFORM_ENVIRONMENT_ID`. Environment scope only.
+- `JAMFPLATFORM_ACC_SECURITYCLOUD_ENVIRONMENT_ID` / `JAMFPLATFORM_ACC_SECURITYCLOUD_TENANT_ID` — declares that the configured scope belongs to a Security Cloud tenant; must equal the corresponding `JAMFPLATFORM_*` value. The environment form is wired in CI; the tenant form is not. The ZTNA gateway tests need no tenant fixture: they leave `tenant_ids` unset and the provider defaults it (`internal/common/securitycloudtenant`).
+- `JAMFPLATFORM_ACC_PRO_ADCS_API_CLIENT_ID` — client ID of a pre-existing Jamf Pro API client holding the AD CS certificate-job privileges, for `jamfplatform_pro_pki_adcs` in `OUTBOUND` mode. The provider cannot create one: the API-client endpoints were withdrawn at the Platform API GA. Unset and the two OUTBOUND tests skip.
+- `JAMFPLATFORM_ACC_REQUIRE` — comma-separated lane `require` tokens (`platform`, `environment`, `organization`, `securitycloud`, `aigovernance`, `pro-tenant`). Promotes an unset-credential skip into a failure for the named sets; `acceptance.yml` sets it per lane. Unset locally, everything skips as before.
+- Every other acceptance-only variable is named `JAMFPLATFORM_ACC_<PRODUCT>_<FIELD>`, matching `jamfplatform-go-sdk` verbatim where that repo already names the same secret, so one value serves both. The rename map and the dual-read shim that keeps a stale local `.env` working are in `internal/testhelpers/accrequire/env.go`.
+
+## Acceptance CI lanes — orientation
+
+`.github/workflows/acceptance.yml` runs acceptance as **product lanes**, not one serial suite. `.github/acceptance-lanes.json` is the single source of truth, read by `scripts/acclanes` (which builds the GitHub matrix) and by `internal/conformance/acc_lanes_test.go` (which proves the partition is honest in `make test`, with no credentials). A lane is a product space and membership is a **package path prefix**; `pro` is the default lane that owns everything unclaimed, and lanes reserved with `planned: true` must match zero packages. Full rules: [TESTING.md §CI scaling](TESTING.md#ci-scaling). Three things drive the design:
+
+- **Only `pro` holds the estate lock.** The other lanes use a different credential set or entitlement declaration and share no fixtures with it, so a short lane no longer queues behind the multi-hour Pro suite.
+- **A running suite is never cancelled.** There is deliberately no workflow-level `concurrency`: cancelling SIGKILLs `go test`, no `CheckDestroy` or `t.Cleanup` runs, and orphans on a shared estate later collide by name. Superseded runs queue, and a `Skip if superseded` step lets a stale one exit in seconds.
+- **Absence of a credential is fatal in a pipeline and a skip locally**, via `JAMFPLATFORM_ACC_REQUIRE`. The failure this closes is the invisible one, where a missing secret makes a suite self-skip and the package still prints `ok`. It was not hypothetical: `acceptance.yml` referenced 48 secrets of which 13 existed, and the AI Governance declaration was read by 18 tests and referenced nowhere. A lane that plans packages and executes zero tests now fails with a warning banner, and one `acceptance-gate` job is the required check so branch protection never has to name a lane.
 
 ## Copyright headers
 
