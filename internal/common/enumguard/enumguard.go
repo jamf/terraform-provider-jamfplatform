@@ -15,13 +15,14 @@
 // SDK covers today, and — through [Check]'s Absent map — on a literal that a
 // future SDK release promotes into an enum.
 //
-// It walks const *and* var declarations, including the elements of slice and
-// map composite literals, because a restated enum is far more often a
+// It walks const *and* var declarations, including the elements and keys of
+// slice and map composite literals, because a restated enum is far more often a
 // `var validFoos = []string{...}` feeding a OneOf validator than a lone const.
 // It also reaches inside function bodies for three shapes. Two are the framework
-// calls that declare an accepted set in all but name — stringvalidator.OneOf and
-// stringdefault.StaticString — since a schema that inlines its vocabulary is
-// restating it just as surely as a package-level var would. The third is a short
+// calls that declare an accepted set in all but name — stringvalidator.OneOf
+// (and OneOfCaseInsensitive) and stringdefault.StaticString — since a schema
+// that inlines its vocabulary is restating it just as surely as a
+// package-level var would. The third is a short
 // variable declaration, `v := "install"`, which is how a builder names the one
 // wire value it is about to send. That third shape was missing until this
 // package's own review found five shipped packages whose only restated enum had
@@ -41,6 +42,12 @@
 // declaration is collected because the name it binds is the value the code goes
 // on to send, whereas the same literal one line later in a `case` is only being
 // recognised.
+//
+// A package adopts the guard with an enum_literals_test.go that calls [Check]
+// and fails on [Findings.Problems]. The plain shape is
+// internal/resources/pro/ebook/enum_literals_test.go; the shape with per-value
+// exemptions is internal/resources/pro/macos_configuration_profile/enum_literals_test.go.
+// [Params] documents the two exemption maps and why they are checked differently.
 package enumguard
 
 import (
