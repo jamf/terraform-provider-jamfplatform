@@ -36,7 +36,7 @@ const minJamfProVersion = ""
 // silently trims surrounding whitespace on write (wire-probed: " jpg " is stored as
 // "jpg"), so accepting such a value would produce an "inconsistent result after apply"
 // once the trimmed echo lands in state. The attribute is Required (non-Computed), so a
-// plan-modifier rewrite is not an option (STYLE_GUIDE §327) — drift is surfaced at plan
+// plan-modifier rewrite is not an option (STYLE_GUIDE §Plan-modifier rewrites are NOT a valid option for `Required` attributes) — drift is surfaced at plan
 // time by this validator instead. Internal characters and case are unconstrained.
 var noSurroundingWhitespace = regexp.MustCompile(`^\S(.*\S)?$`)
 
@@ -94,7 +94,7 @@ func (r *AllowedFileExtensionResource) Schema(ctx context.Context, req resource.
 				},
 			},
 			// Wire field is `extension`; the UI labels this "File extension" — the
-			// attribute keeps the same spelling (STYLE_GUIDE §127). The server stores the
+			// attribute keeps the same spelling (STYLE_GUIDE §Attribute names mirror the Jamf Pro admin UI). The server stores the
 			// value with case and any leading dot preserved (no canonicalisation there),
 			// but trims surrounding whitespace, so the validator rejects surrounding
 			// whitespace to keep plan and state aligned. There is no update path for this

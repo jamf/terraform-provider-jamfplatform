@@ -169,7 +169,7 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 					},
 					"category_name": schema.StringAttribute{
 						// No UseStateForUnknown: derived from the mutable category_id, so it
-						// must go Unknown when category_id changes. See STYLE_GUIDE §886.
+						// must go Unknown when category_id changes. See STYLE_GUIDE §Server-derived computed fields.
 						MarkdownDescription: "Category display name. Returned by Jamf Pro; not user-settable.",
 						Computed:            true,
 					},
@@ -182,7 +182,7 @@ func (r *Resource) Schema(_ context.Context, _ resource.SchemaRequest, resp *res
 					},
 					"site_name": schema.StringAttribute{
 						// No UseStateForUnknown: derived from the mutable site_id, so it
-						// must go Unknown when site_id changes. See STYLE_GUIDE §886.
+						// must go Unknown when site_id changes. See STYLE_GUIDE §Server-derived computed fields.
 						MarkdownDescription: "Site display name. Returned by Jamf Pro; not user-settable.",
 						Computed:            true,
 					},

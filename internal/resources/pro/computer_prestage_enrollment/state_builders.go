@@ -88,7 +88,7 @@ func assignGetToResource(_ context.Context, plan *ComputerPrestageEnrollmentReso
 	}
 	planRecoveryLockPwdWoVersion := plan.RecoveryLockPasswordWoVersion
 
-	// Optional-only typed-pointer nested blocks (STYLE_GUIDE §303: block
+	// Optional-only typed-pointer nested blocks (STYLE_GUIDE §`SingleNestedAttribute` blocks: block
 	// omission == "do not manage this section"). The gate MUST key off the
 	// model being WRITTEN to state — `plan`, the mutated target — never the
 	// prior `state` param. The target pointer is the planned value Terraform

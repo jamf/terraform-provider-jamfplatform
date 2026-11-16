@@ -207,7 +207,7 @@ func benchmarkResourceSchema(ctx context.Context) schema.Schema {
 							Required:            true,
 						},
 						// Every field below is read-only server enrichment. Per
-						// STYLE_GUIDE §282 each carries a sticky UseStateForUnknown plan
+						// STYLE_GUIDE §Server-derived computed fields each carries a sticky UseStateForUnknown plan
 						// modifier so it holds its prior value on a non-refresh plan
 						// instead of going Unknown — otherwise the RequiresReplace on the
 						// rules list sees a difference and triggers a spurious replace.
@@ -373,7 +373,7 @@ func benchmarkResourceSchema(ctx context.Context) schema.Schema {
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			// Read-only server-derived fields (STYLE_GUIDE §282): each carries
+			// Read-only server-derived fields (STYLE_GUIDE §Server-derived computed fields): each carries
 			// UseStateForUnknown so it holds its prior value on a non-refresh plan
 			// rather than going Unknown and provoking a spurious in-place update
 			// (which this replace-only resource cannot service). A refresh still

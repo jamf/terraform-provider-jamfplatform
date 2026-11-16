@@ -161,14 +161,14 @@ func (r *PolicyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					"category_id": optComputedStringValidated("Jamf Pro category ID. Set `-1` to clear the category. Removing the attribute leaves the current category in place.", commonvalidators.ClearableReferenceID("category")),
 					"category_name": schema.StringAttribute{
 						// No UseStateForUnknown: derived from the mutable category_id, so it
-						// must go Unknown when category_id changes. See STYLE_GUIDE §886.
+						// must go Unknown when category_id changes. See STYLE_GUIDE §Server-derived computed fields.
 						MarkdownDescription: "Category display name. Returned by Jamf Pro; not user-settable.",
 						Computed:            true,
 					},
 					"site_id": optComputedStringValidated("Jamf Pro site ID scoping the policy. Set `-1` to clear the site. Removing the attribute leaves the current site in place.", commonvalidators.ClearableReferenceID("site")),
 					"site_name": schema.StringAttribute{
 						// No UseStateForUnknown: derived from the mutable site_id, so it
-						// must go Unknown when site_id changes. See STYLE_GUIDE §886.
+						// must go Unknown when site_id changes. See STYLE_GUIDE §Server-derived computed fields.
 						MarkdownDescription: "Site display name. Returned by Jamf Pro; not user-settable.",
 						Computed:            true,
 					},

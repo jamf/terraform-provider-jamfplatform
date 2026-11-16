@@ -142,7 +142,7 @@ func (r *UserGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	// reconciled the criteria back to state, restore them so a representation-only
 	// swap is an empty plan. Safe: member_count depends only on membership, which is
 	// unchanged when the criteria are equal; site_name is derived from site_id (it
-	// dropped UseStateForUnknown per §886) and a criteria-only swap cannot change
+	// dropped UseStateForUnknown per STYLE_GUIDE §Server-derived computed fields) and a criteria-only swap cannot change
 	// site_id, so the prior name still holds.
 	if criteria.CriteriaModelsEqual(suppressed, toCriterionModels(state.Criteria)) {
 		plan.MemberCount = state.MemberCount

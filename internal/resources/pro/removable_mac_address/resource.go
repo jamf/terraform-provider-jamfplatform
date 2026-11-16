@@ -85,7 +85,7 @@ func (r *RemovableMacAddressResource) Schema(ctx context.Context, req resource.S
 				},
 			},
 			// Wire field is `name`; the UI labels this column "MAC Address" so the
-			// attribute is named mac_address (STYLE_GUIDE §127). Stored verbatim by the
+			// attribute is named mac_address (STYLE_GUIDE §Attribute names mirror the Jamf Pro admin UI). Stored verbatim by the
 			// server — no case-folding or separator canonicalisation — so it never drifts.
 			"mac_address": schema.StringAttribute{
 				MarkdownDescription: "MAC address that Jamf Pro ignores when matching a computer to its inventory record (for example, a shared USB or Thunderbolt Ethernet adapter). Stored exactly as entered. Must be unique and not empty.",

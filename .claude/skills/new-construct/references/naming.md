@@ -30,7 +30,7 @@ the name wherever a sibling resource reference has to work.
 `enums.go` in that table; do not invent one.
 
 The wire mapping goes in the **package doc comment as a table**, not in comments beside each
-attribute: a schema is built inside a function body, and STYLE_GUIDE:11 forbids comments there.
+attribute: a schema is built inside a function body, and STYLE_GUIDE §Go Conventions forbids comments there.
 
 ## Keeping a label table honest
 

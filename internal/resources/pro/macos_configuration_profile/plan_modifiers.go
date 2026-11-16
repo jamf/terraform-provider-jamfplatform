@@ -416,12 +416,12 @@ func (r *Resource) healPayloadPlan(ctx context.Context, req resource.ModifyPlanR
 				// The byte-only payload change made the framework propose an
 				// update on `general`, which marked every Computed-null-config
 				// sibling Unknown. UseStateForUnknown restores most of them, but
-				// category_name / site_name intentionally lack it (§886: they must
+				// category_name / site_name intentionally lack it (STYLE_GUIDE §Server-derived computed fields: they must
 				// go Unknown when their backing id changes). A payload-only NoOp
 				// cannot have changed either id, so restore each derived name from
 				// state when its id is unchanged — otherwise the spurious Unknown
 				// keeps the plan a non-empty update. When an id *is* changing in the
-				// same plan, leave the name Unknown so §886 still holds.
+				// same plan, leave the name Unknown so STYLE_GUIDE §Server-derived computed fields still holds.
 				if plan.General.CategoryID.Equal(state.General.CategoryID) {
 					plan.General.CategoryName = state.General.CategoryName
 				}
@@ -469,13 +469,13 @@ func (r *Resource) healPayloadPlan(ctx context.Context, req resource.ModifyPlanR
 		// Same collateral-Unknown restore as the three-way NoOp branch above.
 		// The byte-only payload change made the framework propose an update on
 		// `general`, marking category_name / site_name Unknown (they lack
-		// UseStateForUnknown per §886). This fallback path runs on the first
+		// UseStateForUnknown per STYLE_GUIDE §Server-derived computed fields). This fallback path runs on the first
 		// plan post-import — when private state has no last_input/last_canonical
 		// baseline — so without this restore the spurious Unknown keeps the plan
 		// a non-empty update and forces a PUT that re-issues the profile to every
 		// scoped device. A payload-only NoOp cannot have changed either id, so
 		// restore each derived name from state when its id is unchanged; when an
-		// id is genuinely changing, leave the name Unknown so §886 still holds.
+		// id is genuinely changing, leave the name Unknown so STYLE_GUIDE §Server-derived computed fields still holds.
 		if plan.General.CategoryID.Equal(state.General.CategoryID) {
 			plan.General.CategoryName = state.General.CategoryName
 		}

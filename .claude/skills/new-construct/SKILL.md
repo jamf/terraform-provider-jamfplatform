@@ -160,7 +160,7 @@ Each of these has been paid for late at least once. The right-hand column is wha
   One em dash per description at most, and only for a real interruption
   ([STYLE_GUIDE §Description and example prose](../../../contributing/descriptions.md#description-and-example-prose-the-terse-reference-voice)).
   The same voice governs the `#` comments in `examples/`.
-- **Don't** put comments inside function bodies or type definitions (STYLE_GUIDE:11). A schema
+- **Don't** put comments inside function bodies or type definitions (STYLE_GUIDE §Go Conventions). A schema
   is built inside a function body — so the wire-name mapping table goes in the **package doc
   comment**, not beside each attribute.
 - **Don't** use `Optional+Computed` with `UseStateForUnknown` inside a `ListNestedAttribute` /

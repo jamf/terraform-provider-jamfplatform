@@ -709,7 +709,7 @@ func (e expectGeneralAttrKnown) CheckPlan(_ context.Context, req plancheck.Check
 		if isUnknown, ok := unknown.(bool); ok && isUnknown {
 			resp.Error = fmt.Errorf(
 				"%s: general.%s is planned unknown (\"known after apply\") on the first post-import plan; "+
-					"it must stay known. Regression of the §886 derived-name restore in ModifyPlan's two-way "+
+					"it must stay known. Regression of the STYLE_GUIDE §Server-derived computed fields derived-name restore in ModifyPlan's two-way "+
 					"fallback (0bfb64b follow-up).",
 				e.resourceAddress, e.attr)
 		}
@@ -723,7 +723,7 @@ func (e expectGeneralAttrKnown) CheckPlan(_ context.Context, req plancheck.Check
 // fresh import. On import the payload is stored in the server-canonical form,
 // which is byte-different from (but semantically equal to) the user's HCL, so
 // the next plan proposes an update on `general`; that marks category_name /
-// site_name Unknown (they are Computed without UseStateForUnknown per §886).
+// site_name Unknown (they are Computed without UseStateForUnknown per STYLE_GUIDE §Server-derived computed fields).
 // Import leaves the three-way payload private-state refs empty, so ModifyPlan
 // takes its two-way fallback — the branch that, before this fix, suppressed the
 // payload diff but forgot to restore the derived names, leaving them Unknown

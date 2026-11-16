@@ -114,7 +114,7 @@ func (r *ScriptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				// No UseStateForUnknown: category_name is derived from the
 				// mutable category_id, so it must go Unknown (not pin the stale
 				// value) when category_id changes, or the post-apply consistency
-				// check trips. See STYLE_GUIDE §886.
+				// check trips. See STYLE_GUIDE §Server-derived computed fields.
 				MarkdownDescription: "Display name of the category referenced by `category_id`. Returned by Jamf Pro; not user-settable.",
 				Computed:            true,
 			},
