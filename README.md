@@ -51,7 +51,7 @@ Which of these an API integration reaches depends on the scope it was created wi
 
 ### Versioning and deprecations
 
-A minor release can contain a breaking change, so pin to a patch series (`~> 1.9.0`). An attribute is deprecated for at least 90 days before it is removed. The full policy, including what happens on an older Jamf Pro tenant, is in [Versioning, deprecations and supported versions](docs/guides/versioning-and-support.md).
+A minor release can contain a breaking change, so pin to a patch series (`~> 1.9.0`). The provider deprecates an attribute at least 90 days before it removes it. [Versioning, deprecations and supported versions](docs/guides/versioning-and-support.md) has the full policy and says what an older Jamf Pro tenant gets.
 
 **Credentials are the same across all products**: a single OAuth client (`JAMFPLATFORM_CLIENT_ID` / `JAMFPLATFORM_CLIENT_SECRET`) scoped to the relevant API areas on your tenant.
 
