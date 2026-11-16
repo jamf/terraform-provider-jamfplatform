@@ -46,7 +46,7 @@ import (
 // and internal/actions/pro/ for those. Only one construct declares a non-empty
 // floor today (service_discovery_enrollment, 11.25.0) and no action does, but
 // keep checking both trees: actions have carried floors before and will again.
-const ProviderMinJamfProVersion = "11.31.0"
+const ProviderMinJamfProVersion = "11.34.0"
 
 // Data is the value passed via ResourceData/DataSourceData/ListResourceData/ActionData.
 // It bundles the authenticated SDK client with lazy Jamf Pro version state shared

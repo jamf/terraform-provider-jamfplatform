@@ -8,7 +8,7 @@ description: |-
   Supported Jamf products and tenant version targets
   | Product | Resource namespace | Built against API as of |
   |---------|--------------------|--------------------------|
-  | Jamf Pro | `jamfplatform_pro_*` | 11.31.0 |
+  | Jamf Pro | `jamfplatform_pro_*` | 11.34.0 |
   | Jamf Platform Services (Blueprints, Device Groups, Devices, Device Actions, Compliance Benchmarks) | no product prefix, such as `jamfplatform_blueprints_blueprint` | continuously deployed |
   | Jamf Security Cloud (Custom DNS, ZTNA, UEM Connect, device groups, activation profiles) | `jamfplatform_security_cloud_*` | continuously deployed |
   | Jamf AI Governance | `jamfplatform_ai_governance_*` | continuously deployed |
@@ -30,7 +30,7 @@ Coming from `jamf-concepts/jamfplatform`: see [Moving to the jamf namespace](gui
 
 | Product | Resource namespace | Built against API as of |
 |---------|--------------------|--------------------------|
-| Jamf Pro | `jamfplatform_pro_*` | 11.31.0 |
+| Jamf Pro | `jamfplatform_pro_*` | 11.34.0 |
 | Jamf Platform Services (Blueprints, Device Groups, Devices, Device Actions, Compliance Benchmarks) | no product prefix, such as `jamfplatform_blueprints_blueprint` | continuously deployed |
 | Jamf Security Cloud (Custom DNS, ZTNA, UEM Connect, device groups, activation profiles) | `jamfplatform_security_cloud_*` | continuously deployed |
 | Jamf AI Governance | `jamfplatform_ai_governance_*` | continuously deployed |
