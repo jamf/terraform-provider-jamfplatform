@@ -22,7 +22,7 @@ That check still has one correct use, and most `Read` methods carry it: deciding
 
 **Adopt an optional collection only when the server returns members.** Adopting an empty one stores `[]` where a create that never declared the attribute stores null. Reference: `flattenSelfService` in `mobile_device_configuration_profile`.
 
-Hydration changes state, so it changes what `ImportStateVerify` compares. See [TESTING.md](../TESTING.md).
+Hydration changes state, so it changes what `ImportStateVerify` compares. See [TESTING.md](../TESTING.md#import-hydration).
 
 ### Blocks holding a `WriteOnly` secret
 
@@ -96,7 +96,7 @@ A Jamf Pro object that exists once per tenant and is Update-only on the API is a
 
 **Fields sharing one write call.** Always send the full set from state. A partial PUT can wipe the others (a partial activation-code PUT risks wiping the licence).
 
-Singleton acceptance and unit-test requirements are in [TESTING.md](../TESTING.md).
+Singleton acceptance and unit-test requirements are in [TESTING.md](../TESTING.md#singletons).
 
 ## Tenant singletons with a real clear
 
@@ -177,7 +177,7 @@ A field matching one of these is **not** `Optional+Computed`:
 
 **Description convention.** End each such *string* field's `MarkdownDescription` with: ``Omit to leave any existing value untouched (it is not cleared on update); set to `""` to clear it.`` Sets clear with `[]`. Bool, int and enum fields have no blank: omit preserves, a concrete value changes; word those accordingly.
 
-**Acceptance coverage.** Each full-replace resource carries one split-ownership test proving omit = preserve and `""`/`[]` = clear on a representative field. See [TESTING.md](../TESTING.md); references are `TestAccResource_ProScript_SplitOwnership` and `TestAccResource_ProBuilding_SplitOwnership`.
+**Acceptance coverage.** Each full-replace resource carries one split-ownership test proving omit = preserve and `""`/`[]` = clear on a representative field. See [TESTING.md](../TESTING.md#full-replace-resources-split-ownership); references are `TestAccResource_ProScript_SplitOwnership` and `TestAccResource_ProBuilding_SplitOwnership`.
 
 #### Discriminator-gated field clearing
 
@@ -254,7 +254,7 @@ A classic XML `PUT` **merges**: an omitted element keeps the stored value, and a
 - **A field the server requires under the current mode refuses the empty element** (`webhook.header` under `HEADER` → `409 INVALID_REQUIRED`; `webhook.username` under `BASIC` → `409 Username is required`). Emit the empty element only under modes that do not require the field, and add a plan-time validator for the modes that do.
 - **Optional nested blocks the server always returns:** refresh a block only when it is already authored (model pointer non-nil), so server defaults do not fabricate a block the user never declared. The block is then not populated on import, so `ImportStateVerifyIgnore` it.
 
-A null in state cannot distinguish "cleared" from "retained and reconciled away", so every clear is asserted on the wire in acceptance; see [TESTING.md](../TESTING.md).
+A null in state cannot distinguish "cleared" from "retained and reconciled away", so every clear is asserted on the wire in acceptance; see [TESTING.md](../TESTING.md#classic-clears).
 
 ### Bearer-auth-only gaps
 
@@ -424,7 +424,7 @@ Classifiers in `internal/common/helpers/helpers.go`:
 
 `IsEdgeBlocked` is `errors.Is(err, jamfplatform.ErrUnexpectedResponse)`, so the classification stays the SDK's. The SDK marks an edge page and exempts Jamf Pro's own HTML "Status page" template, so a classic `404` still means deleted. Never widen this to "an HTML `404` is never gone": every `/proclassic` `Read` depends on the opposite.
 
-Tests for either need `internal/testhelpers/gatewaystub`; see [TESTING.md](../TESTING.md).
+Tests for either need `internal/testhelpers/gatewaystub`; see [TESTING.md](../TESTING.md#gateway-and-edge-errors).
 
 **Render every API error through `helpers.APIErrorDetail(err)` (`api_error_detail.go`), never `err.Error()`.**
 

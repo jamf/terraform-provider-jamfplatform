@@ -85,11 +85,11 @@ Conventions:
 
 ### Testing a provider function
 
-Cover the core, the `Run` seam and an offline acceptance test. The rules are in [TESTING.md](../TESTING.md); `internal/functions/mobileconfig/` is the reference.
+Cover the core, the `Run` seam and an offline acceptance test. The rules are in [TESTING.md](../TESTING.md#provider-functions); `internal/functions/mobileconfig/` is the reference.
 
 ## Test File Conventions
 
-Test file names and test function names are in [TESTING.md](../TESTING.md).
+Test file names and test function names are in [TESTING.md](../TESTING.md#test-file-layout).
 
 ## Naming Patterns
 

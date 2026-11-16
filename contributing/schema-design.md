@@ -26,7 +26,7 @@ When the wire name is cryptic or differs materially from the admin-UI label, nam
 - The `MarkdownDescription` of a renamed attribute leads with the exact UI label in bold quoted form, such as `**"Create Mobile Account"** in the Jamf Pro admin UI.`, so a plan reviewer can match it to the admin screen.
 - The wire name does not appear in user-facing text. Record the whole wire mapping as a table in the package doc comment, where a maintainer chasing a field name seen in an API response will find it. It cannot go in a comment beside the attribute, because a schema is built inside a function and [§Go Conventions](package-layout.md#go-conventions) forbids comments there. Reference: `internal/resources/security_cloud/ztna_gateway/resource.go`.
 - The rule applies to every product family, not only Jamf Pro.
-- Renaming an attribute on a shipped resource is a breaking change. Do not fold it into a feature PR; see [CONTRIBUTING.md](../CONTRIBUTING.md).
+- Renaming an attribute on a shipped resource is a breaking change. Do not fold it into a feature PR; see [CONTRIBUTING.md](../CONTRIBUTING.md#renaming-a-shipped-attribute).
 
 ### Enum values and error codes come from the SDK, not from literals
 
@@ -354,7 +354,7 @@ Config validation (`ValidateConfig`, any `ConfigValidator`, a schema `Validate{S
 - **Skip on Unknown before treating absence as an error.** A required-when check must return when the dependent attribute is Unknown and error only when it is null. Guarding the discriminator is not enough; guard the companion too.
 - **Do not let a Go decode hide Unknown.** `req.Config.Get(ctx, &model)` collapses Unknown to a zero value: a nested block becomes a nil pointer, a list or set has `len() == 0`, a custom "is set" helper returns false. So `if block == nil`, `if len(slice) == 0` and `if !isSet(x)` all raise a false error on Unknown. Read the dependent attribute as its typed value (`types.Object`, `types.List`, `types.String`) with `GetAttribute` and branch on `IsUnknown()` and `IsNull()`.
 - **Forbidden-when checks are safe**, because they fire on presence and Unknown read as absent only defers. Required-when checks are the trap.
-- Acceptance tests use literal HCL and cannot catch this. Each such validator needs a unit test with an Unknown companion; see [TESTING.md](../TESTING.md).
+- Acceptance tests use literal HCL and cannot catch this. Each such validator needs a unit test with an Unknown companion; see [TESTING.md](../TESTING.md#validators-that-read-another-attribute).
 
 Reference body: `internal/resources/pro/ibeacon/validators.go`, which validates only when both values are known.
 

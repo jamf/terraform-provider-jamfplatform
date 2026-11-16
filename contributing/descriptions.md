@@ -92,4 +92,4 @@ product-versus-provider contrast, because "the deprecation is Jamf Pro's, not th
 the distinction a reader needs rather than a distancing tic. Contributor-facing text — Go
 comments, this guide, `CONTRIBUTING.md` — is exempt.
 
-**Pre-PR grep gate.** Before opening a PR, run the description grep in [CONTRIBUTING.md](../CONTRIBUTING.md) over the diff. It matches the habits and vocabulary above. A hit is not automatically a defect, but every hit needs a reason.
+**Pre-PR grep gate.** Before opening a PR, run the description grep in [CONTRIBUTING.md](../CONTRIBUTING.md#description-check) over the diff. It matches the habits and vocabulary above. A hit is not automatically a defect, but every hit needs a reason.

@@ -227,6 +227,24 @@ SDK audit — proclassic.UserGroup (types.go:11477)
   SDK PR: jamfplatform-go-sdk#NN, merged 2026-MM-DD, tag v0.X.Y
 ```
 
+## Fixing a defect in the SDK
+
+A defect in `jamfplatform-go-sdk` is fixed there, never worked around with a hand-written decoder in a resource package ([STYLE_GUIDE.md §SDK type-decode bugs](contributing/write-semantics.md#sdk-type-decode-bugs--fix-by-generator-override-not-provider-hand-decode)).
+
+For a field the generator typed wrongly:
+
+1. Add one entry to the `fieldTypeOverrides` map in the SDK repository's `tools/generate/config.json`, under the relevant package block. The key is `<snake_case_schema_name>.<jsonFieldName>` and the value is the correct Go type. A date with no timezone is `"*string"`: the raw value round-trips and a caller parses it if it needs to. Example: `"cloud_ldap_keystore.expirationDate": "*string"`.
+2. Regenerate. `types.go` is `DO NOT EDIT`; the override is what survives the next regeneration.
+3. Add an SDK test with a realistic body. These defects usually hide because the existing test returns an empty object that never reaches the parser.
+
+A classic payload that is sensitive to field order is fixed the same way, with a per-schema field-order override in the generator.
+
+Write the defect up for a session in the SDK repository: the bug, the SDK functions affected, the wire evidence, the spec quote, the exact override entry and the gap in the tests. Land the SDK pull request, then bump `go.mod` here. If a resource is blocked on the fix, pin the dependency; do not hand-decode to unblock it.
+
+When the server is what is broken and a package routes around it with a local helper, give the helper a doc comment stating the bug, when it was observed, and the upstream fix that would let the helper be deleted. Open an SDK issue as well, so every consumer benefits once the SDK adopts the fallback or the server is fixed.
+
+To probe how a delete behaves, create a throwaway object, send one `DELETE` and capture the status and body (`jamf-cli ... delete <id> --yes -vvv`), then `GET` it by id over time.
+
 ## Adding a New Data Source
 
 Follow the same pattern as resources, but implement `datasource.DataSource` instead of `resource.Resource`. Data source packages that are standalone (not part of a CRUD resource) use `model_types.go` for their model structs.
@@ -298,6 +316,21 @@ Endpoint-deprecation migrations use a fixed form — `refactor(<pkg-or-resource>
 - Update `examples/` for new Terraform constructs.
 - Run `make generate` if schema descriptions changed (to update docs and copyright headers).
 - CI must pass before merge.
+
+### Description check
+
+Before opening a pull request that adds or changes a description or an example comment, check it against [the terse-reference voice](contributing/descriptions.md#description-and-example-prose-the-terse-reference-voice). Run it over the diff, not the tree:
+
+```sh
+git diff -U0 main -- 'internal/*' 'examples/*' | grep -E '^\+' | \
+  grep -nE '—[^—]*—|\*\*[^*]+\*\*[[:space:]]*—|Singleton —|[0-9]-[0-9]|[Nn]ote that|NOTE:|IMPORTANT:| simply | just |is used to|leverage|robust|seamless|comprehensive|ensure|facilitate|Jamf.s |the API|the vendor|upstream'
+```
+
+A hit is not automatically a defect: one em dash carrying real emphasis, a hyphenated identifier, or `ensure` inside a quoted UI label will all match. Every hit does need a reason.
+
+### Renaming a shipped attribute
+
+Renaming an attribute on a shipped resource breaks configurations. Do not fold it into a feature pull request. Give it its own, and take it through the [90-day schema deprecation](contributing/endpoint-lifecycle.md#jamf-pro-terraform-schema-deprecation--90-day-window).
 
 ## Acceptance Tests on Fork PRs (Maintainers)
 

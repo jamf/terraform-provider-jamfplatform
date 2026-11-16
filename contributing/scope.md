@@ -145,7 +145,7 @@ Buildings, departments and ebook classes are never wiped by any flag or combinat
    - `ebook` adds `scope.AllFlagsConflictWith` (fires only when all three flags are `true`), empties `building_ids` / `department_ids` / `class_ids` in the merge when all three end up true, and turns every *unmanaged* flag off when a residual category is declared while all three would be true.
    - Do not widen this to other resources. Their UI offers buildings and departments alongside the flag.
 6. **No plan-time warning about categories managed outside Terraform.** It would fire on every plan of a deliberate co-management setup, Terraform has no per-resource way to mute it, and none of the provider's other omit-means-preserve surfaces warn. The read-merge-write never destroys unmanaged categories. Do not add one without at least gating on plans that modify scope.
-7. **Each scope-bearing resource carries a split-ownership acceptance test**, and import steps over a subset-scope configuration ignore `scope`. See [TESTING.md](../TESTING.md).
+7. **Each scope-bearing resource carries a split-ownership acceptance test**, and import steps over a subset-scope configuration ignore `scope`. See [TESTING.md](../TESTING.md#scope).
 
 #### `classes` needs two writes on Update (ebooks only today)
 
