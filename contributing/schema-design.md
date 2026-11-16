@@ -117,7 +117,7 @@ Related rules:
 - When the trigger changes, force the secret `Unknown` in `ModifyPlan` so Update can re-mint it. Attribute plan modifiers run before resource `ModifyPlan`, so the override wins over `UseStateForUnknown`.
 - **`ModifyPlan` must predict any server-side clearing of the secret.** If a sibling revokes it (an `enabled = false` that also discards the stored credential), null the secret on Read when the server reports it gone, and set it to `types.StringNull()` in `ModifyPlan` whenever that condition is planned. Otherwise the sticky value is planned non-null and applied null, which fails with `Provider produced inconsistent result after apply`.
 - A precondition the generation endpoint enforces (rotation requires the integration to be enabled) gets a cross-field plan-time validator that asserts only when the gating attribute is known.
-- Data sources and list resources **MUST NOT** expose the secret. `ImportStateVerifyIgnore` lists the secret and the rotation trigger.
+- A data source exposes the secret only where reading it is the data source's purpose, as `jamfplatform_pro_sso_failover_url` does, and marks it `Sensitive`. A list resource never exposes it. `ImportStateVerifyIgnore` lists the secret and the rotation trigger.
 
 Reference: `failover_url` and `regeneration_trigger` in `internal/resources/pro/sso_failover_url/`. `jamf_public_key_rotation` in `internal/resources/pro/pki_venafi/` shows the Int64 trigger and the `ModifyPlan` prediction on a value that is not secret.
 
