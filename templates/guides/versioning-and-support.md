@@ -44,8 +44,9 @@ accepts `1.10.0` as well, which this provider does not treat as safe.
 
 Every release lists its changes in the
 [release notes](https://github.com/jamf/terraform-provider-jamfplatform/releases), and a breaking
-change is called out there. Read them before you move to a new minor version. There is no fixed
-release schedule.
+change is called out there. Read them before you move to a new minor version. Releases are roughly
+weekly on a best-effort basis, and a fix for a severe bug can ship sooner. No schedule is
+guaranteed.
 
 ## Deprecations
 
