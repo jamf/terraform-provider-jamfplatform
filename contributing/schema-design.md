@@ -113,13 +113,13 @@ Related rules:
 `WriteOnly` is for secrets the user supplies. A secret that Jamf Pro generates and returns once is an output, so WriteOnly does not apply. An ephemeral resource is the wrong tool as well: it re-runs `Open()` on every apply, and a generate endpoint with no idempotent read-back would mint a fresh secret each time.
 
 - Model the secret as **`Computed + Sensitive`** (never `Optional`) with `UseStateForUnknown`, so it is sticky across plans. The value is written to state. That is the cost of making a server-minted secret usable by downstream resources and outputs, acceptable only because there is no read-back.
-- Drive generation opt-in through an `Optional` Int64 trigger, the same idiom as `_wo_version`. Generate on Create only when the trigger is set; re-mint on Update only when its value changes between state and plan. A null or removed trigger leaves the stored secret alone. Keep the comparison in a small testable helper.
+- Drive generation opt-in through an `Optional` trigger attribute, a free-text string or an Int64 in the `_wo_version` idiom. Generate on Create only when the trigger is set; re-mint on Update only when its value changes between state and plan. A null or removed trigger leaves the stored secret alone. Keep the comparison in a small testable helper.
 - When the trigger changes, force the secret `Unknown` in `ModifyPlan` so Update can re-mint it. Attribute plan modifiers run before resource `ModifyPlan`, so the override wins over `UseStateForUnknown`.
 - **`ModifyPlan` must predict any server-side clearing of the secret.** If a sibling revokes it (an `enabled = false` that also discards the stored credential), null the secret on Read when the server reports it gone, and set it to `types.StringNull()` in `ModifyPlan` whenever that condition is planned. Otherwise the sticky value is planned non-null and applied null, which fails with `Provider produced inconsistent result after apply`.
 - A precondition the generation endpoint enforces (rotation requires the integration to be enabled) gets a cross-field plan-time validator that asserts only when the gating attribute is known.
 - Data sources and list resources **MUST NOT** expose the secret. `ImportStateVerifyIgnore` lists the secret and the rotation trigger.
 
-Reference for the trigger and the `ModifyPlan` prediction: `jamf_public_key_rotation` in `internal/resources/pro/pki_venafi/`. The value it rotates is a public key that Jamf Pro returns on every read, so that resource does not show the `Sensitive` or import-ignore parts.
+Reference: `failover_url` and `regeneration_trigger` in `internal/resources/pro/sso_failover_url/`. `jamf_public_key_rotation` in `internal/resources/pro/pki_venafi/` shows the Int64 trigger and the `ModifyPlan` prediction on a value that is not secret.
 
 ### Server-derived computed fields & `Optional+Computed` attributes
 
