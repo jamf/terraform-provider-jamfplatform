@@ -12,7 +12,10 @@ import (
 // ProfilePlatform selects which storage-category table applies. The category is
 // per-platform, not global: Jamf Pro stores com.apple.ManagedClient.preferences
 // faithfully in a macOS profile but verbatim in a mobile-device profile, and
-// com.apple.applicationaccess the other way round (wire-probed 2026-08-06).
+// com.apple.applicationaccess the other way round. One shared table would get
+// one platform wrong. testdata/reserved_character_corpus.mobileconfig sits in
+// both resources' fixtures with identical content and opposite expected
+// verdicts, and that pair is the regression guard.
 type ProfilePlatform int
 
 const (
@@ -22,9 +25,9 @@ const (
 	PlatformMobileDevice
 )
 
-// Storage categories, wire-probed against a live Jamf Pro 11.30.x tenant on
-// 2026-08-06 (harness: create a profile carrying the type with "&", "<", ">",
-// LF, TAB and a CR reference in a string value; read back; compare values).
+// Storage categories, wire-probed against a live Jamf Pro tenant (harness:
+// create a profile carrying the type with "&", "<", ">", LF, TAB and a CR
+// reference in a string value; read back; compare values).
 //
 // Two categories, per (platform, PayloadType):
 //
@@ -42,17 +45,42 @@ const (
 // Only re-render types are listed. Anything absent — including every payload
 // type not probed and every string slot outside the PayloadContent array (the
 // top-level dict, e.g. a ConsentText sub-dictionary) — is treated as verbatim.
-// Deny-by-default is deliberate: a wrong "verbatim" guess costs one blocked
-// import that the escape hatch reopens, while a wrong "re-render" guess lets a
-// profile through to be silently corrupted by its first update, irreversibly.
+// Deny-by-default is deliberate: a wrong "verbatim" guess costs one refused
+// import, which is loud and fixed by an entry here, while a wrong "re-render"
+// guess lets a profile through to be silently corrupted by its first update,
+// irreversibly. Never guess in the second direction.
 //
-// Probing before assuming is what makes this table worth having: of the payload
-// types on the survey tenant that had no prior classification, roughly a quarter
-// turned out to be re-render (servicemanagement, extensiblesso,
-// webcontent-filter), so deny-by-default alone would have blocked them.
+// There is no override, by design. A profile Jamf Pro cannot store faithfully
+// cannot be managed safely, and a provider-wide switch would reinstate the
+// corruption. A misclassification is corrected here for everyone, and the
+// diagnostic asks the operator to report the PayloadType.
 //
 // Adding an entry requires a wire probe, not inference — see
-// storage_category_probe_test.go (build tag `payload_probe`).
+// storage_category_probe_test.go (build tag `payload_probe`). Roughly a quarter
+// of the types first probed turned out to be re-render (servicemanagement,
+// extensiblesso, webcontent-filter), so leaving a type unprobed refuses imports
+// that would have been safe. A type whose synthetic payloads Jamf Pro rejects
+// on schema grounds, as webcontent-filter did, is probed from a real payload
+// with TestProbeStorageCategoriesFromRealPayload.
+//
+// Probed and found verbatim on the platforms tried, so not worth re-probing:
+// com.apple.loginwindow, com.apple.MCX,
+// com.apple.TCC.configuration-profile-policy, com.apple.vpn.managed,
+// com.apple.wifi.managed, com.apple.dock, com.apple.screensaver,
+// com.apple.SetupAssistant.managed, com.apple.systempreferences,
+// com.apple.finder, com.apple.appstore, com.apple.dashboard,
+// com.apple.system-extension-policy,
+// com.apple.syspolicy.kernel-extension-policy and, on mobile devices,
+// com.apple.webClip.managed. Unprobed on mobile devices:
+// com.apple.systempolicy.control, com.apple.security.firewall,
+// com.apple.SubmitDiagInfo, com.apple.servicemanagement,
+// com.apple.extensiblesso. Unprobed on macOS:
+// com.apple.shareddeviceconfiguration.
+//
+// The table answers the escaping question only. A re-render type can still
+// gain or lose keys on ingest (a web clip gains Icon and data_files and loses
+// keys Jamf Pro does not recognise), which is a separate matter the mask
+// handles.
 var faithfulPayloadTypes = map[ProfilePlatform]map[string]struct{}{
 	PlatformMacOS: {
 		"com.apple.ManagedClient.preferences":   {}, // "Application & Custom Settings"
@@ -78,8 +106,9 @@ var faithfulPayloadTypes = map[ProfilePlatform]map[string]struct{}{
 // Terraform wrote it back, and if so returns diagnostic detail naming each
 // affected value. It performs no API calls and writes nothing: the prediction is
 // derived from the payload text alone by applying the wire law above, then
-// diffing the result through the same comparison the post-write fidelity checks
-// use.
+// diffing the result through diffPayloadTrees, the comparison the post-write
+// fidelity checks use. The prediction must never be judged by a separate
+// predicate.
 //
 // Callers gate on import only. Ordinary refresh must not consult this: a profile
 // corrupted outside Terraform, or already under management, has to keep
