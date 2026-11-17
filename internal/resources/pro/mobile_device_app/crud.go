@@ -13,7 +13,7 @@
 // include_unenforced. Classic trims the name on save, so the strict comparison also
 // ignores leading and trailing spaces, case and accents.
 //
-// Status: current. Last reviewed 2026-05-31.
+// Status: current.
 //
 // Create semantics: the classic POST silently drops os_type (wire-probed — a
 // POST never persists it, even when sent). Create therefore POSTs to allocate

@@ -32,7 +32,7 @@ function's `// Available since` comment, or hand-research, and record it in the 
 ## Endpoint annotation block
 
 `crud.go` opens with the SDK-endpoints annotation block carrying
-`Status: current. Last reviewed YYYY-MM-DD.` — Pro and ProClassic only; Platform Services
+`Status: current.` — Pro and ProClassic only; Platform Services
 constructs are exempt. Endpoint paths and SDK function names live **here and in Go comments**,
 never in user-facing schema text.
 

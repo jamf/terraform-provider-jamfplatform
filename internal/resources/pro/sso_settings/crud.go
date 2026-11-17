@@ -9,7 +9,7 @@
 //   pro.GenerateSsoCertificateV2
 //   pro.DeleteSsoCertificateV2
 //
-// Status: current. Last reviewed 2026-05-26.
+// Status: current.
 
 package sso_settings
 

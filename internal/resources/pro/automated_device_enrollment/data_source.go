@@ -4,7 +4,7 @@
 // SDK endpoints used:
 //   pro.GetDeviceEnrollmentV1
 //   pro.ResolveDeviceEnrollmentV1ByName
-// Status: current. Last reviewed 2026-05-25.
+// Status: current.
 
 package automated_device_enrollment
 

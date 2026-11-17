@@ -10,7 +10,7 @@
 //
 // Uniqueness: name, enforced (400 DUPLICATE_FIELD), case-, trailing-space- and accent-insensitive; a leading space is significant.
 //
-// Status: current. Last reviewed 2026-05-21.
+// Status: current.
 
 package building
 

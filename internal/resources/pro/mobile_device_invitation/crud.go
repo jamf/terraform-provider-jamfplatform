@@ -15,7 +15,7 @@
 // Update method below is required by the framework but never performs a
 // mutation.
 //
-// Status: current. Last reviewed 2026-06-04.
+// Status: current.
 
 package mobile_device_invitation
 

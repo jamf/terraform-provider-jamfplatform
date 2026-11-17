@@ -7,7 +7,7 @@
 //   pro.UpdateCloudDistributionPointV1
 //   pro.DeleteCloudDistributionPointV1
 //
-// Status: current. Last reviewed 2026-05-29.
+// Status: current.
 
 package cloud_distribution_point
 

@@ -3,7 +3,7 @@
 
 // SDK endpoints used:
 //   pro.ListVolumePurchasingLocationsV1
-// Status: current. Last reviewed 2026-05-25.
+// Status: current.
 
 package location
 

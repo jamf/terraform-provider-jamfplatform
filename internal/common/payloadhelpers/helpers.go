@@ -1,10 +1,6 @@
 // Copyright Jamf Software LLC 2026
 // SPDX-License-Identifier: MPL-2.0
 
-// Package payloadhelpers provides shared mobileconfig plist parsing,
-// masking, and diff-suppression helpers used by all configuration profile
-// resources (macOS and mobile device). All functions are pure — they operate
-// on byte slices and maps and carry no resource-specific state.
 package payloadhelpers
 
 import (

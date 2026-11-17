@@ -17,7 +17,7 @@
 //
 // Uniqueness: mac_address (the record name), enforced (409), case-, leading- and trailing-space-insensitive, accent-sensitive.
 //
-// Status: current. Last reviewed 2026-06-11.
+// Status: current.
 
 package removable_mac_address
 

@@ -20,7 +20,7 @@
 // dropped, the stored values echo back) and absent from TeacherSettingsRequest;
 // they are managed outside this endpoint.
 //
-// Status: current. Last reviewed 2026-06-10.
+// Status: current.
 
 package jamf_teacher_settings
 

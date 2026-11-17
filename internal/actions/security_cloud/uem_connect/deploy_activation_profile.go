@@ -5,7 +5,7 @@
 //
 //	securitycloud.DeployActivationProfileToUemV1
 //
-// Status: current. Last reviewed 2026-08-29.
+// Status: current.
 package uemconnectactions
 
 import (

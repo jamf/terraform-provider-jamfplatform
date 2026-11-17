@@ -16,7 +16,7 @@
 // and only then write state. Convergence on the GET is the authoritative signal — the
 // /status endpoint is read-only here, consulted solely to enrich a settle-timeout error.
 //
-// Status: current. Last reviewed 2026-06-13.
+// Status: current.
 
 package managed_software_updates
 

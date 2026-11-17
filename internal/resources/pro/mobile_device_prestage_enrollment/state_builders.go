@@ -82,7 +82,7 @@ func assignGetToResource(_ context.Context, plan *MobileDevicePrestageEnrollment
 	plan.AnchorCertificates = stringSliceToList(got.AnchorCertificates)
 	plan.ProfileUUID = types.StringValue(got.ProfileUUID)
 
-	// Optional-only typed-pointer nested blocks (STYLE_GUIDE §303: block
+	// Optional-only typed-pointer nested blocks (STYLE_GUIDE §`SingleNestedAttribute` blocks: block
 	// omission == "do not manage this section"). The gate MUST key off the
 	// model being WRITTEN to state — `plan`, the mutated target — never the
 	// prior `state` param. On Update the target is the NEW plan: when the

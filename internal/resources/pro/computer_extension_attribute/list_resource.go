@@ -3,7 +3,7 @@
 
 // SDK endpoints used:
 //   pro.ListComputerExtensionAttributesV1
-// Status: current. Last reviewed 2026-06-02.
+// Status: current.
 
 package computer_extension_attribute
 

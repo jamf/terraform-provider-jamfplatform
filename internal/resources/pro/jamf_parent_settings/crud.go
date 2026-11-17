@@ -30,7 +30,7 @@
 // processes) is N/A beyond the single-field carry — last-write-wins, as for
 // any singleton without optimistic concurrency.
 //
-// Status: current. Last reviewed 2026-06-10.
+// Status: current.
 
 package jamf_parent_settings
 
@@ -138,7 +138,7 @@ func (r *JamfParentSettingsResource) Read(ctx context.Context, req resource.Read
 // UseStateForUnknown has already carried every omitted Optional+Computed field
 // into the plan as a known prior value, so the merge base effectively only
 // supplies the unmodeled allowTemplates field, round-tripped verbatim per
-// STYLE_GUIDE §768.3 (see the annotation block at the top of this file).
+// STYLE_GUIDE §Full-replace endpoints, shared backing store (see the annotation block at the top of this file).
 func (r *JamfParentSettingsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
 		resp.Diagnostics.AddError(helpers.ProviderNotConfiguredError())

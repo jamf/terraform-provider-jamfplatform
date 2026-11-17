@@ -22,7 +22,7 @@
 // Uniqueness: name, not enforced; duplicates stored (case, accent and surrounding-space variants all
 // accepted, surrounding spaces trimmed on save); checked only with include_unenforced.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package platform_environment
 

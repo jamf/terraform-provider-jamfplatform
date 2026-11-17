@@ -11,7 +11,7 @@
 //
 // Uniqueness: name, enforced (409), case-, leading-space-, trailing-space- and accent-insensitive. The plan-time collision check lists with proclassic.ListClasses (collision.go).
 //
-// Status: current. Last reviewed 2026-06-05.
+// Status: current.
 
 package class
 

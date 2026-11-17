@@ -12,7 +12,7 @@
 // pro.ExportOnboardingHistoryV1 — onboarding history and export are convention-wide
 // exclusions (audit/reporting concerns, not configuration).
 //
-// Status: current. Last reviewed 2026-06-11.
+// Status: current.
 
 package macos_onboarding
 

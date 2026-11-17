@@ -11,7 +11,7 @@
 //
 // Uniqueness: general.name, enforced (409), case-, leading-space- and trailing-space-insensitive; accents are significant. A delete completes asynchronously.
 //
-// Status: current. Last reviewed 2026-06-03.
+// Status: current.
 //
 // Update semantics: the classic /ebooks PUT is a partial-merge, not a
 // full-replace (wire-probed — omitting <general> fields and the entire <scope>

@@ -3,7 +3,7 @@
 
 // SDK endpoints used:
 //   pro.ListAdvancedMobileDeviceSearchesV1
-// Status: current. Last reviewed 2026-06-02.
+// Status: current.
 
 package advanced_mobile_device_search
 

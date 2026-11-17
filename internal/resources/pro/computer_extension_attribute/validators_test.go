@@ -54,7 +54,7 @@ func validateComputer(t *testing.T, attrs map[string]tftypes.Value) resource.Val
 	return resp
 }
 
-// TestInputTypeValidator_Computer_DefersOnUnknownCompanion is the §436
+// TestInputTypeValidator_Computer_DefersOnUnknownCompanion is the STYLE_GUIDE §Config-time validators MUST defer on unknown values
 // regression guard: when input_type is known but the required companion
 // (script / directory_service_attribute) is unknown — sourced from a variable,
 // for_each, or another resource — the validator MUST defer, not treat unknown

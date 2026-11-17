@@ -6,7 +6,7 @@
 //   pro.GetIconV1
 //   pro.DownloadIconV1
 //
-// Status: current. Last reviewed 2026-05-24.
+// Status: current.
 
 package icon
 

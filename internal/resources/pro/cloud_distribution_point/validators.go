@@ -62,7 +62,7 @@ func (cdnTypeRequiredFieldsConfigValidator) ValidateResource(ctx context.Context
 	// Read each attribute the rule touches as its typed value via GetAttribute,
 	// rather than decoding the whole model — this is the style-guide pattern that
 	// guarantees a Go decode can never collapse an unknown to a zero value
-	// (STYLE_GUIDE §369). All fields here are scalars, but GetAttribute keeps the
+	// (STYLE_GUIDE §Config-time validators MUST defer on unknown values). All fields here are scalars, but GetAttribute keeps the
 	// unknown/null distinction explicit and unambiguous.
 	var data CloudDistributionPointResourceModel
 	for p, target := range map[string]*types.String{

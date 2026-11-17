@@ -11,7 +11,7 @@
 //
 // Uniqueness: name, enforced (409), case-, leading-space-, trailing-space- and accent-insensitive. The plan-time collision check lists with proclassic.ListUserExtensionAttributes (collision.go).
 //
-// Status: current. Last reviewed 2026-06-02.
+// Status: current.
 
 package user_extension_attribute
 

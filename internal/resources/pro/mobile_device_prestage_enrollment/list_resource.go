@@ -4,7 +4,7 @@
 // SDK endpoints used:
 //   pro.ListMobileDevicePrestagesV3
 //
-// Status: current. Last reviewed 2026-05-30.
+// Status: current.
 
 package mobile_device_prestage_enrollment
 

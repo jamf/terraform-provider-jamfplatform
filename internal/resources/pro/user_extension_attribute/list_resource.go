@@ -4,7 +4,7 @@
 // SDK endpoints used:
 //   proclassic.ListUserExtensionAttributes   (id+name only)
 //   proclassic.GetUserExtensionAttributeByID (per-item hydration on include_resource)
-// Status: current. Last reviewed 2026-06-26.
+// Status: current.
 
 package user_extension_attribute
 

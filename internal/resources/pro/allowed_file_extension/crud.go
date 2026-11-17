@@ -20,7 +20,7 @@
 //
 // Uniqueness: extension, enforced (409 "Duplicate extension"), case-, surrounding-space- and accent-insensitive, stored exactly as entered.
 //
-// Status: current. Last reviewed 2026-06-13.
+// Status: current.
 
 package allowed_file_extension
 

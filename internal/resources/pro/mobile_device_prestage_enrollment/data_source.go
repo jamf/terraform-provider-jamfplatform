@@ -6,7 +6,7 @@
 //   pro.ResolveMobileDevicePrestageV3IDByName
 //   pro.ResolveMobileDevicePrestageV3ByName
 //
-// Status: current. Last reviewed 2026-05-30.
+// Status: current.
 
 package mobile_device_prestage_enrollment
 

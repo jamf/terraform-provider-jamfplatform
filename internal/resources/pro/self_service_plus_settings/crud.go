@@ -5,7 +5,7 @@
 //   pro.GetSelfServicePlusSettingsV1
 //   pro.UpdateSelfServicePlusSettingsV1
 //
-// Status: current. Last reviewed 2026-05-19.
+// Status: current.
 
 package self_service_plus_settings
 

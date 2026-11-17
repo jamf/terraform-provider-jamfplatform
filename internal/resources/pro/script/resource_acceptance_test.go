@@ -335,7 +335,7 @@ func TestAccResource_ProScript_SplitOwnership(t *testing.T) {
 }
 
 // TestAccResource_ProScript_CategorySwap is the regression test for the
-// derived-name consistency rule (STYLE_GUIDE §886). `category_name` is a
+// derived-name consistency rule (STYLE_GUIDE §Server-derived computed fields). `category_name` is a
 // Computed-only field derived from the mutable `category_id`. If it carries
 // stringplanmodifier.UseStateForUnknown(), step 2 (swapping category_id to a
 // differently-named category, in place) pins the stale prior name into the

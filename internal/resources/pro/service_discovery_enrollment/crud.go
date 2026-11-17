@@ -5,7 +5,7 @@
 //   pro.GetServiceDiscoveryEnrollmentWellKnownSettingsV1
 //   pro.UpdateServiceDiscoveryEnrollmentWellKnownSettingsV1
 //
-// Status: current. Last reviewed 2026-06-13.
+// Status: current.
 
 package service_discovery_enrollment
 

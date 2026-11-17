@@ -5,7 +5,7 @@
 //   proclassic.GetPolicyByID                  (GET    //policies/id/{id} — preflight existence check)
 //   proclassic.DeleteLogFlushByLogIDInterval  (DELETE //logflush/policy/id/{id}/interval/{interval}, 201)
 //
-// Status: current. Last reviewed 2026-08-03.
+// Status: current.
 //
 // Flushes a policy's logs older than a chosen age. The age is a two-part
 // interval: a quantity drawn from an odd, non-contiguous set (Zero, One, Two,

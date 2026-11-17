@@ -27,7 +27,7 @@
 //     public-key GET come after and need that id. A post-create failure must
 //     persist state-with-id, not orphan the server-side record.
 //
-// Status: current. Last reviewed 2026-06-09.
+// Status: current.
 
 package pki_venafi
 

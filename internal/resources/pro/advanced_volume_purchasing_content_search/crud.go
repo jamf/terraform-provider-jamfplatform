@@ -11,7 +11,7 @@
 //
 // Uniqueness: name, enforced (400 DUPLICATE_FIELD), exact match only; case, leading space, trailing space and accents are distinct.
 //
-// Status: current. Last reviewed 2026-06-02.
+// Status: current.
 
 package advanced_volume_purchasing_content_search
 

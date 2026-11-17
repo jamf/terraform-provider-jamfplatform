@@ -61,7 +61,7 @@
 // {id} and reports the Jamf Pro id in `groupId`, so both identifiers are known
 // after two calls and no bridging request is needed on the happy path.
 //
-// Status: current. Last reviewed 2026-09-17.
+// Status: current.
 
 package smart_mobile_device_group
 

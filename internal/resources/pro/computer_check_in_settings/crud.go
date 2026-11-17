@@ -5,7 +5,7 @@
 //   pro.GetCheckInSettingsV3
 //   pro.UpdateCheckInSettingsV3
 //
-// Status: current. Last reviewed 2026-06-03.
+// Status: current.
 
 package computer_check_in_settings
 

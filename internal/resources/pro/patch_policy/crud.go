@@ -32,7 +32,7 @@
 //
 // Uniqueness: name per software title configuration (the same name on two titles is accepted), enforced (409), case-, surrounding-space- and accent-insensitive.
 //
-// Status: current. Last reviewed 2026-09-04.
+// Status: current.
 //
 // Server invariants (wire-probed):
 //   - Create POSTs the policy <general> to the software-title-config path; the

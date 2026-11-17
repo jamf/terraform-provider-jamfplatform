@@ -17,7 +17,7 @@
 //
 // Uniqueness: display name (packageName) and file name (fileName), each enforced separately (400 DUPLICATE_FIELD), case- and accent-insensitive; a leading space is significant.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package pkg
 

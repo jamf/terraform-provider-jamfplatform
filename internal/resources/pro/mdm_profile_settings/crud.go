@@ -5,7 +5,7 @@
 //   pro.GetDeviceCommunicationSettingsV1
 //   pro.UpdateDeviceCommunicationSettingsV1
 //
-// Status: current. Last reviewed 2026-06-03.
+// Status: current.
 
 package mdm_profile_settings
 

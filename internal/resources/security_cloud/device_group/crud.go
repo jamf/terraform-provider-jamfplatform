@@ -26,7 +26,7 @@
 //   securitycloud.ApplyDeviceGroupV*   generated name-keyed upsert; Terraform owns
 //                                      the create-versus-update decision.
 //
-// Status: current. Last reviewed 2026-09-04.
+// Status: current.
 
 package device_group
 

@@ -10,7 +10,7 @@
 // refresh-only no-op (content changes route through RequiresReplace); Delete
 // removes from Terraform state only.
 //
-// Status: current. Last reviewed 2026-06-10.
+// Status: current.
 
 package self_service_branding_image
 

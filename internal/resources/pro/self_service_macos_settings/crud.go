@@ -8,7 +8,7 @@
 // Not adopted: pro.ListSelfServiceSettingsHistoryV1, pro.CreateSelfServiceSettingsHistoryNoteV1
 // (object history — convention-wide exclusion).
 //
-// Status: current. Last reviewed 2026-06-10.
+// Status: current.
 
 package self_service_macos_settings
 

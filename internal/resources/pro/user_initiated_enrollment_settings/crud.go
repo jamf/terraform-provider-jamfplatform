@@ -15,7 +15,7 @@
 //   pro.DeleteEnrollmentLanguageV3
 //   pro.ListEnrollmentLanguageCodesV3
 //
-// Status: current. Last reviewed 2026-05-29.
+// Status: current.
 
 package user_initiated_enrollment_settings
 

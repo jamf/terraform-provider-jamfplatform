@@ -16,7 +16,7 @@
 // include_unenforced. Classic trims the name on save, so the strict comparison also
 // ignores leading and trailing spaces, case and accents.
 //
-// Status: current. Last reviewed 2026-06-05.
+// Status: current.
 
 package mobile_device_enrollment_profile
 

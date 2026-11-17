@@ -11,7 +11,7 @@
 //
 // Uniqueness: name, enforced (409 Duplicate name), trimmed on save, case- and accent-insensitive; separate pool from mobile device configuration profiles.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 //
 // Scope semantics: within a sent <scope> the server replaces the whole subtree
 // (wire-probed 2026-07-08 — any category element present, even empty, wipes

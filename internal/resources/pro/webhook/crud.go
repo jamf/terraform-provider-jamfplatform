@@ -11,7 +11,7 @@
 //
 // Uniqueness: name, enforced (409), case-, leading-space-, trailing-space- and accent-insensitive.
 //
-// Status: current. Last reviewed 2026-09-06.
+// Status: current.
 //
 // Server invariants (wire-probed — WEBHOOK_SPIKE.md §5):
 //   - Create POSTs to id="0"; the server allocates the integer ID and returns

@@ -4,7 +4,7 @@
 // SDK endpoints used:
 //   pro.GetEnrollmentCustomizationV2
 //   pro.ResolveEnrollmentCustomizationV2ByName
-// Status: current. Last reviewed 2026-05-28.
+// Status: current.
 
 package enrollment_customization
 

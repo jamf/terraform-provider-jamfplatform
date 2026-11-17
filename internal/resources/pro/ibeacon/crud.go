@@ -12,7 +12,7 @@
 //
 // Uniqueness: name, enforced (409), case-, leading-space-, trailing-space- and accent-insensitive. The plan-time collision check lists with proclassic.ListIBeacons (collision.go).
 //
-// Status: current. Last reviewed 2026-05-22.
+// Status: current.
 
 package ibeacon
 

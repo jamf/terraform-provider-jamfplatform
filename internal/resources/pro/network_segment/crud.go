@@ -17,7 +17,7 @@
 //
 // Uniqueness: name, enforced (409), case-, leading-space- and trailing-space-insensitive; accents are significant.
 //
-// Status: current. Last reviewed 2026-09-06.
+// Status: current.
 
 package network_segment
 

@@ -54,13 +54,13 @@ Conventions are mandatory — see STYLE_GUIDE.md §Deprecation migration timelin
 ## Work required
 
 - [ ] <!-- one item per package, each ending in "drop the suppression" -->
-- [ ] Refresh the `crud.go` SDK-endpoints annotation (`Status:` line + `Last reviewed`).
+- [ ] Refresh the `crud.go` SDK-endpoints annotation (`Status:` line).
 - [ ] `make fix fmt lint test`, then `make generate` if any description changed.
 - [ ] Re-run acceptance for the affected resources.
 
 ## Deadlines
 
-Per [STYLE_GUIDE §Deprecation migration timeline](../blob/main/STYLE_GUIDE.md#deprecation-migration-timeline), with the deprecation announced YYYY-MM-DD:
+Per [STYLE_GUIDE §Deprecation migration timeline](../blob/main/contributing/endpoint-lifecycle.md#deprecation-migration-timeline), with the deprecation announced YYYY-MM-DD:
 
 - **6-month soft target: YYYY-MM-DD** — migration should be merged.
 - **Hard floor: 3 months before Jamf's announced removal date.** <!-- State whether a removal

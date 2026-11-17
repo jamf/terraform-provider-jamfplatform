@@ -6,7 +6,7 @@
 //	securitycloud.TriggerUemConnectorSyncV1
 //	securitycloud.ListUemConnectorsV1 (resolving the tenant's only integration)
 //
-// Status: current. Last reviewed 2026-08-28.
+// Status: current.
 package uemconnectactions
 
 import (

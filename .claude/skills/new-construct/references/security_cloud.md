@@ -2,7 +2,7 @@
 
 Authoritative: `STYLE_GUIDE.md` §Jamf Security Cloud Resource Naming — including
 §Security Cloud shapes that recur and §Security Cloud Configure. `CLAUDE.md` carries the
-one-paragraph orientation. Read both; this file is the build-order overlay.
+orientation. Read both; this file is the build-order overlay.
 
 ## The two things most likely to be got wrong
 

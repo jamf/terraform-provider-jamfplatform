@@ -135,3 +135,32 @@ Omit the block and Jamf Pro keeps the stored certificate.
 `developer_certificate` unset because nothing survives to restore them from. Jamf Pro reports
 neither the keystore filename nor the rotation version for a stored signing identity. Omit a block
 and the stored certificate stays put. To remove one, turn off the toggle that governs it.
+
+## Configuration profiles the provider refuses to import
+
+`jamfplatform_pro_macos_configuration_profile` and
+`jamfplatform_pro_mobile_device_configuration_profile` refuse to import a profile if a Terraform
+write would change its payload in Jamf Pro. The error reads "This profile cannot be managed by
+Terraform". It names the profile and up to three of the values at fault, and shows each value as
+Jamf Pro holds it now and as Jamf Pro would hold it after a write. The provider imports nothing
+and changes nothing in Jamf Pro.
+
+The cause is an `&`, a `<`, a line feed or a tab in a text value of the payload. You can build a
+profile with those characters in the Jamf Pro admin UI. For most payload types, a write through
+the API stores `&` as `&amp;` and `<` as `&lt;`, and deletes line feeds and tabs. Had the provider
+imported the profile, your first apply to it, even a rename, would rewrite the payload that way.
+Jamf Pro would then reject the original value through the API, and you could repair the profile
+in the admin UI alone.
+
+No setting overrides the refusal. You have two options:
+
+- Remove the characters the error names in the Jamf Pro admin UI, then import again.
+- Leave the profile out of Terraform and read it with the data source of the same name.
+
+The provider runs this check for `terraform import` and for an `import` block. When you generate
+configuration for many profiles with `terraform query`, the provider leaves out each profile it
+would refuse, generates the rest, and prints one warning that lists up to twenty of the profiles
+it skipped. Import a skipped profile on its own to see which value is at fault.
+
+The check runs at import alone. The provider keeps refreshing a profile Terraform manages, so you
+can still see drift in it and still remove it.

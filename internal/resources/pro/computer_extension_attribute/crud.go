@@ -11,7 +11,7 @@
 //
 // Uniqueness: name, enforced (400 DUPLICATE_FIELD), trimmed on save, case- and accent-insensitive.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package computer_extension_attribute
 

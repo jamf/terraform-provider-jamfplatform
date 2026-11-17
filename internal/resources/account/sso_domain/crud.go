@@ -17,7 +17,7 @@
 //
 // Uniqueness: domain, organization-wide, enforced (409 CONFLICT), case-insensitive. Shared domains count.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package sso_domain
 

@@ -133,7 +133,7 @@ func (r *UserGroupResource) Schema(ctx context.Context, req resource.SchemaReque
 			},
 			"site_name": schema.StringAttribute{
 				// No UseStateForUnknown: derived from the mutable site_id, so it
-				// must go Unknown when site_id changes. See STYLE_GUIDE §886.
+				// must go Unknown when site_id changes. See STYLE_GUIDE §Server-derived computed fields.
 				MarkdownDescription: "Site name reported by Jamf Pro for the assigned `site_id`. Returned by Jamf Pro; not user-settable.",
 				Computed:            true,
 			},

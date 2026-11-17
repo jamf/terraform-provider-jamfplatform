@@ -69,7 +69,6 @@
 // unprivileged. v3 is therefore the top version, not an intermediate step.
 //
 // Status: current on v3 but for the id-minting create, which has no successor.
-// Last reviewed 2026-09-02.
 
 package patch_software_title
 

@@ -5,7 +5,7 @@
 //   pro.GetAppInstallerGlobalSettingsV1
 //   pro.UpdateAppInstallerGlobalSettingsV1
 //
-// Status: current. Last reviewed 2026-09-03.
+// Status: current.
 //
 // The end-user-experience block is a required member of the request body, so it
 // has no omitted form: the "omit block = leave the server untouched" contract is

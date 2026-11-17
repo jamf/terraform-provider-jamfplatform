@@ -5,7 +5,7 @@
 //   pro.GetSsoFailoverV1
 //   pro.GenerateSsoFailoverV1
 //
-// Status: current. Last reviewed 2026-05-26.
+// Status: current.
 
 package sso_failover_url
 

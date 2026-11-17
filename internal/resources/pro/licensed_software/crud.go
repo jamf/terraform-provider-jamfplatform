@@ -11,7 +11,7 @@
 //
 // Uniqueness: name, enforced (409), case-, leading- and trailing-space-insensitive, accent-sensitive.
 //
-// Status: current. Last reviewed 2026-06-05.
+// Status: current.
 //
 // Server invariants (wire-probed against records 65/66/67/68):
 //   - Create POSTs to id="0"; the server allocates the integer ID and returns

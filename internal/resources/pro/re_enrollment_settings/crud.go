@@ -5,7 +5,7 @@
 //   pro.GetReenrollmentSettingsV1
 //   pro.UpdateReenrollmentSettingsV1
 //
-// Status: current. Last reviewed 2026-05-29.
+// Status: current.
 
 package re_enrollment_settings
 

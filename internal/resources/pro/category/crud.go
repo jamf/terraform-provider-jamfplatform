@@ -10,7 +10,7 @@
 //
 // Uniqueness: name, enforced (400 DUPLICATE_FIELD), case-, trailing-space- and accent-insensitive.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package category
 

@@ -35,7 +35,7 @@
 // There is no acceptance test, by maintainer decision: a real assignment cannot
 // be reversed, so the action is covered by unit tests against a stub server.
 //
-// Status: current. Last reviewed 2026-10-22.
+// Status: current.
 package platformenvironmentaction
 
 import (

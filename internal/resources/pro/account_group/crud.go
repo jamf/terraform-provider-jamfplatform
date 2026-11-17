@@ -21,7 +21,7 @@
 // Privilege sets: Jamf Pro accepts only Custom from an API client on POST and PUT (409/403
 // "Only an administrator can assign the ... privilege level"); isPrivilegeSetRefusal names it.
 //
-// Status: current. Last reviewed 2026-09-06.
+// Status: current.
 
 package account_group
 

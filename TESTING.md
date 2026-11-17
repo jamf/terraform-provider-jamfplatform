@@ -97,39 +97,44 @@ cross-package test fixtures) and drops only the registration fan-out.
 
 ## Test File Layout
 
-Test files live alongside the code they test, following Go convention. The Jamf Platform API client lives in the external SDK `jamfplatform-go-sdk` and its tests live in that repo — they are not part of this provider's test suite.
+Test files live beside the code they test. The Jamf Platform API client is the external SDK `jamfplatform-go-sdk`, and its tests live in that repository.
 
-```
-internal/
-├── common/
-│   ├── helpers/                          # helpers_test.go, dynamic_json_test.go, ids_test.go, pro_version_test.go
-│   ├── filters/filters_test.go
-│   └── scope/                            # builders_test.go, schema_test.go, validators_test.go
-├── testhelpers/                          # Acceptance fixtures (mock server, real-client builder, shared fixtures)
-├── actions/device/schema_test.go
-├── functions/                            # Provider-defined functions (offline — no tenant needed)
-│   ├── mobileconfig/                     # assemble_test, function_test (Run seam via real types.Dynamic), function_acceptance_test
-│   └── mcx_forced_payload/               # render_test, function_test, function_acceptance_test
-├── resources/
-│   ├── blueprints/blueprint/             # schema_test, helpers_test, input_builders_test, state_builders_test, state_upgrader_test, resource_acceptance_test
-│   ├── cbengine/benchmark/               # schema_test, input_builders_test, state_builders_test, resource_acceptance_test
-│   ├── device_group/                     # schema_test, helpers_test, input_builders_test, state_builders_test, state_upgrader_test, resource_acceptance_test
-│   ├── devices/                          # schema_test, datasource_acceptance_test (data-source-only)
-│   └── pro/                              # Same file shapes per resource, plus marshal_smoke_test for ProClassic XML resources
-│       ├── inventory/<resource>/         # category, site, building, department, network_segment, ibeacon, dock_item, directory_binding, disk_encryption_configuration, package, icon, printer
-│       ├── policies/{policy,script}/
-│       ├── configuration_profiles/macos_configuration_profile/  # + helpers_corpus_test (build tag profile_corpus)
-│       ├── settings/self_service_plus_settings/
-│       └── users/user_group/
-```
+Unit tests are `*_test.go` with no build tag. Acceptance tests are `*_acceptance_test.go` with `//go:build acceptance`. Acceptance file names are flat, with no per-scenario split. A package carries the files below that apply to it:
 
-Each leaf folder follows the `*_test.go` (unit) + `resource_acceptance_test.go` / `datasource_acceptance_test.go` (acceptance, `//go:build acceptance`) split. Acceptance file names are flat — no per-scenario splits.
+| File | Purpose |
+|------|---------|
+| `schema_test.go` | Schema validation (every package) |
+| `schema_plural_test.go` | Plural data source schema validation |
+| `helpers_test.go` | Helper function tests |
+| `input_builders_test.go` | Input builder tests |
+| `state_builders_test.go` | State builder tests |
+| `validators_test.go` | Validator tests, including the unknown-value cases |
+| `state_upgrader_test.go` | State upgrader tests (where present) |
+| `permissions_test.go` | Asserts `permissions.go` matches the SDK calls the package makes and the SDK privilege registry |
+| `enum_literals_test.go` | Pins the rule that enum values and error codes come from the SDK (`internal/common/enumguard`) |
+| `list_hydration_test.go` | Guards the list resource's config-generation path: every block the wire carries is populated from an empty model |
+| `impact_test.go` | Impact alert adapter tests (where `impact.go` exists) |
+| `resource_acceptance_test.go` | Resource acceptance tests (`//go:build acceptance`) |
+| `datasource_acceptance_test.go` | Data source acceptance tests (`//go:build acceptance`). Eleven packages spell it `data_source_acceptance_test.go`; use `datasource_acceptance_test.go` for new ones |
+| `datasource_plural_acceptance_test.go` | Plural data source acceptance tests (`//go:build acceptance`), where they are not in `datasource_acceptance_test.go` |
+| `list_resource_acceptance_test.go` | List resource acceptance tests (`//go:build acceptance`) |
+| `collision_acceptance_test.go` | Plan-time name collision acceptance test (`//go:build acceptance`), one per package that has `collision.go` |
+| `action_acceptance_test.go` | Action acceptance tests (`//go:build acceptance`), in `internal/actions/` packages |
+| `function_acceptance_test.go` | Provider function acceptance test (`//go:build acceptance`), in `internal/functions/` packages |
+
+Shared test code is in `internal/testhelpers/` (provider factories, the real-client builder, the mock server, shared fixtures). ProClassic XML resources add a `marshal_smoke_test.go`, and `macos_configuration_profile` adds `helpers_corpus_test.go` behind the `profile_corpus` build tag.
 
 ### Naming conventions
 
-- `*_test.go` — unit tests (no build tag).
-- `*_acceptance_test.go` — acceptance tests (with `//go:build acceptance`).
-- `schema_test.go` — schema validation tests present in every resource/data source package.
+Acceptance tests are named `TestAcc<Kind>_<Construct>_<Scenario>`, where `<Kind>` is `Resource`, `DataSource`, `ListResource`, `Action` or `Function`. Unit tests are `Test<Function>_<Case>`.
+
+```go
+func TestAccResource_DeviceGroup_SmartComputer(t *testing.T) { ... }
+func TestAccDataSource_Baselines(t *testing.T) { ... }
+func TestAccListResource_ProCloudIdentityProvider_Basic(t *testing.T) { ... }
+```
+
+Every object an acceptance test creates takes the `tf-acc-` prefix, in every family: `tf-acc-static-computer`, `tf-acc-benchmark-all-rules`.
 
 ## Writing Unit Tests
 
@@ -311,7 +316,7 @@ the step exists to report.
 go test -tags profile_corpus ./internal/resources/pro/macos_configuration_profile/...
 ```
 
-Not part of CI. Regenerate the corpus before running by replaying `/tmp/sample_titles.py` + `/tmp/roundtrip.py` against a tenant. Background on the diff classes the mask covers: [STYLE_GUIDE.md §Configuration profile payload diff suppression](STYLE_GUIDE.md#configuration-profile-payload-diff-suppression-mask-and-compare).
+Not part of CI. Regenerate the corpus before running by replaying `/tmp/sample_titles.py` + `/tmp/roundtrip.py` against a tenant. Background on the diff classes the mask covers: [STYLE_GUIDE.md §Configuration profile payload diff suppression](contributing/configuration-profiles.md#configuration-profile-payload-diff-suppression-mask-and-compare).
 
 ### CI scaling
 
@@ -399,6 +404,74 @@ queued run for a stale commit exit in seconds once it reaches the front.
 ### Benchmark-specific considerations
 
 CBEngine benchmarks deploy asynchronously. The benchmark must reach `SYNCED` state before it can be safely deleted — deleting while in `PENDING` state causes the benchmark to get stuck in `DELETING`. Use `testhelpers.EnsureBenchmarkDeletedByID` or `testhelpers.EnsureBenchmarkDeleted` for cleanup, which handle sync-waiting automatically.
+
+## Required tests by shape
+
+Some shapes fail in ways the ordinary create, update and import steps do not reach. Each rule below names the shape, the test it needs and why. The design rule behind each is in the [style guide](STYLE_GUIDE.md).
+
+### Validators that read another attribute
+
+Acceptance tests use literal HCL, which is always known, so they cannot catch a validator that errors on an unknown value. Add a unit test that feeds `tftypes.UnknownValue` to the dependent attribute and asserts no diagnostic. References: `TestCertInvariant_SilentWhenCertUnknown` in `internal/resources/pro/user_initiated_enrollment_settings/validators_test.go`, and the `validators_test.go` in `disk_encryption_configuration` and `user_group`.
+
+### Optional nested blocks
+
+A flatten that gates a block on prior state, not on the model being written, fails only when an apply removes a block Terraform managed. Unit tests, lint and `make generate` never exercise it. Every resource with an Optional-only nested block needs an acceptance step that declares the block and a later step that removes it.
+
+### Computed nested collections
+
+A Computed nested collection modelled as a Go typed slice fails with "target type cannot handle unknown values", and only under an acceptance apply. Nothing short of plan and apply exercises it.
+
+### Import hydration
+
+Hydration changes state, so it changes what `ImportStateVerify` compares. A test whose configuration never declared a block used to compare null against null, and now differs. After a hydration change, check every `ImportStateVerify: true` step in the package: add `ImportStateVerifyIgnore` entries for blocks the configuration does not declare, and remove entries for blocks that now hydrate.
+
+The acceptance harness defaults `ImportStateId` to the `id` attribute. A construct that imports by another value, such as `jamfplatform_account_sso_domain` by name, must set `ImportStateId` in its import step, since `id` is the value its `ImportState` rejects.
+
+### Singletons
+
+- `CheckDestroy` is inverted: it asserts the record still exists on the tenant after Terraform removes the resource from state. A tenant singleton with a real clear is the exception and asserts the object is gone.
+- Cover both Update paths (toggle a bool true to false), import with `ImportStateId: "singleton"`, and a step asserting that `ImportStateId: "not-the-singleton"` is rejected, with `ExpectError` matching the ImportState error summary.
+- `state_builders_test.go` is mandatory. It pins the nil and non-nil round trip for every assigner, that an assigner leaves a pre-existing `state.ID` alone, and that `helpers.SingletonID` is `"singleton"`.
+
+### Full-replace resources: split ownership
+
+Each full-replace resource carries one split-ownership test on a representative co-managed field. Create without the field in HCL, set it out of band through the acceptance client, change an unrelated managed field such as `name`, and assert the out-of-band value survived. Then set `""` or `[]` and assert it clears. One field per resource is enough; the create, update and import suite covers the rest. References: `TestAccResource_ProScript_SplitOwnership`, `TestAccResource_ProBuilding_SplitOwnership`.
+
+### Scope
+
+- Each scope-bearing resource carries the same split-ownership test on a representative scope category: create with one declared category, add another out of band, apply an unrelated change, and assert the out-of-band members survived on the server and never entered state. Then declare `[]` and assert it clears. Reference: `TestAccResource_ProMacApp_ScopeSplitOwnership`.
+- An import step that verifies against a subset-scope configuration adds `"scope"` to `ImportStateVerifyIgnore`. Import hydrates every category, while apply keeps only the declared ones.
+- The two-write `classes` rule needs a live class, which `jamfplatform_pro_class` mints. The failing shape is "create with a class plus another target, then change the other target"; a create-only test passes either way. Reference: `TestAccResource_ProEbook_ScopeClassesSurviveUpdate`.
+- A unit test catches a cross-estate group ID regression only if its fixture holds a computer group and a mobile device group that share one numeric ID.
+
+### Classic clears
+
+A null in state cannot tell "cleared" from "retained and reconciled away", so assert every classic clear on the wire with `testhelpers.CheckLiveObject`. Write the clear step as omission of the attribute, never `attr = ""`. For an authoritative classic sub-collection, cover both the shrink (N to 1) and the clear (omit).
+
+### Referenced objects
+
+When a test drops a reference from a consumer, keep the referenced fixture defined and unreferenced, so no in-use object is destroyed mid-test.
+
+### Gateway and edge errors
+
+Testing `IsGatewayUnrouted` or `IsEdgeBlocked` handling needs `internal/testhelpers/gatewaystub`, not a hand-built `*APIResponseError`. The SDK attaches the marker inside its unexported transport, so no exported constructor produces a marked error, and a fabricated one asserts only that the provider agrees with itself.
+
+### Configuration profiles
+
+- The import gate's predicate takes unit tests, but its wiring needs acceptance tests, and the provider cannot create the fixture because Create refuses it. The CI tenant keeps two permanent profiles named `Fidelity Test Sentinel [DO NOT DELETE]`: a macOS Login Window with `&` in `LoginwindowText`, and a mobile Web Clip with `&` and `<` in `Label` and `&` in `URL`. Both were uploaded through the admin UI so they hold a true `&` and `<`. Tests resolve them by name, never by ID, and skip with a message describing the fixture when it is absent.
+- Terraform wraps diagnostics at about 80 columns. An `ExpectError` pattern for the payload fidelity error must be a single token, and any other multi-word pattern uses `\s+` between words.
+
+### Name collisions
+
+`collision_acceptance_test.go` creates the colliding object outside Terraform in `PreConfig` and asserts the plan-time error with `ExpectError`.
+
+### Provider functions
+
+Cover both sides of the framework seam:
+
+- **Core unit tests** feed Go values to the core (`Assemble`, `render…`). Golden-output pinning lives here.
+- **`Run` seam tests** build a real `types.Dynamic` and call `Run` through `function.NewArgumentsData([]attr.Value{…})`. Assert the happy path and at least one argument error, such as a non-object argument yielding a `FuncError`. This is the path Terraform invokes, and core tests bypass it.
+- **An acceptance test** invokes the function from a Terraform configuration through an `output` and asserts the rendered string with `statecheck.ExpectKnownOutputValue` and `knownvalue.StringRegexp`. Functions are offline, so the test must not call `testhelpers.AccPreCheck`, which gates on tenant credentials and would skip. Call `testhelpers.AccPreCheckOffline(t)`, use `ProtoV6ProviderFactories` directly, and gate only on Terraform version with `tfversion.SkipBelow(tfversion.Version1_8_0)`. Reference: `internal/functions/mobileconfig/`.
 
 ## CI/CD
 

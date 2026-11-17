@@ -16,7 +16,7 @@
 // profile carries a blob, every PUT returns HTTP 500 (wire-probed). All
 // user-writable attributes are RequiresReplace, so Update never needs to write.
 //
-// Status: current. Last reviewed 2026-10-25.
+// Status: current.
 
 package mobile_device_provisioning_profile
 
