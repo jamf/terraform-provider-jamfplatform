@@ -306,3 +306,22 @@ func TestAssignPolicyResourceModel_RefreshesOnlyTheShapeTheCallerManages(t *test
 		}
 	})
 }
+
+func TestPolicyResource_FixDiskPermissionsIsDeprecated(t *testing.T) {
+	t.Parallel()
+	s := policySchemaForTest(t)
+	maintenance, ok := s.Attributes["maintenance"].(rschema.SingleNestedAttribute)
+	if !ok {
+		t.Fatal("expected maintenance to be SingleNestedAttribute")
+	}
+	attr := maintenance.Attributes["fix_disk_permissions"]
+	if attr == nil {
+		t.Fatal("fix_disk_permissions missing from schema")
+	}
+	if attr.GetDeprecationMessage() != maintenanceFixDiskPermissionsDeprecation {
+		t.Errorf("DeprecationMessage = %q", attr.GetDeprecationMessage())
+	}
+	if !strings.HasPrefix(attr.GetMarkdownDescription(), "~> **Deprecated.**") {
+		t.Errorf("description must open with the deprecation callout, got %q", attr.GetMarkdownDescription())
+	}
+}

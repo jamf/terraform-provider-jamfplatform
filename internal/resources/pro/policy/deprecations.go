@@ -41,3 +41,11 @@ const generalDateTimeLimitationsDeprecatedDescription = "~> **Deprecated.** " + 
 	"Schedule limitations for when the policy may run. Only the user-authored date/time inputs are surfaced. " +
 	"The derived epoch and UTC siblings Jamf Pro also stores are deterministic transforms of `activation_date` / `expiration_date`, " +
 	"reproducible client-side with Terraform stdlib functions such as `formatdate`."
+
+// PRO-DEPRECATED remove-after=2027-02-15 replaced-by=none — Jamf Pro 11.34.0 stores maintenance.permissions as false whatever is sent, and the admin UI no longer offers the option.
+const maintenanceFixDiskPermissionsDeprecation = "Deprecated: Jamf Pro 11.34.0 and later ignore this setting and always report `false`, and the admin UI no longer offers it. " +
+	"The provider will not remove `maintenance.fix_disk_permissions` before 2027-02-15."
+
+const maintenanceFixDiskPermissionsDeprecatedDescription = "~> **Deprecated.** " + maintenanceFixDiskPermissionsDeprecation + "\n\n" +
+	"Fix disk permissions. Jamf Pro 11.34.0 and later accept `true` but store and report `false`, so the provider rejects `true` at plan time on those versions. " +
+	"Earlier versions still honor it. Omit to leave the current value untouched."

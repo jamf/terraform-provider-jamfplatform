@@ -10,11 +10,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
 // deferralUntilUtcPattern matches the classic /policies wire form for
@@ -634,4 +637,63 @@ func validateDeferralDateIsFuture(ctx context.Context, req resource.ModifyPlanRe
 		"user_interaction.deferral_until_utc is in the past",
 		"Jamf Pro refuses a deferral date that has already passed. Set a future date. "+
 			"A policy that already holds a date keeps working after it passes, provided you leave the date unchanged.")
+}
+
+const (
+	// fixDiskPermissionsDeadFrom is the first Jamf Pro version on which
+	// <maintenance><permissions> is stored as false whatever the request carries.
+	// Wire-verified on 11.34.0, 2026-11-14: a POST and a PUT sending true were both
+	// accepted with 201/200 and read back false. The admin UI no longer offers the
+	// option and the release notes do not mention it. The change may have landed
+	// earlier: 11.33 was not probed. If it did, lower this constant.
+	fixDiskPermissionsDeadFrom = "11.34.0"
+
+	// fixDiskPermissionsDeadBefore is an upper bound no real version reaches, so the
+	// strict range helper doubles as a fail-closed "at least" test.
+	fixDiskPermissionsDeadBefore = "1000.0.0"
+)
+
+// fixDiskPermissionsDead reports whether the tenant version is one on which Jamf
+// Pro discards maintenance.fix_disk_permissions. Fail-closed: a version that
+// cannot be read returns false, because this gates a refusal and a refusal must
+// be certain (see helpers.JamfProVersionInRangeStrict).
+func fixDiskPermissionsDead(version string) bool {
+	return helpers.JamfProVersionInRangeStrict(version, fixDiskPermissionsDeadFrom, fixDiskPermissionsDeadBefore)
+}
+
+// fixDiskPermissionsDiagnostic is the plan-time refusal of
+// maintenance.fix_disk_permissions = true on a tenant that would discard it.
+// Without it the apply succeeds on the wire and then fails with "Provider produced
+// inconsistent result after apply", which names neither the cause nor a fix.
+// Setting false is allowed: it is the value the server reports.
+func fixDiskPermissionsDiagnostic(version string) diag.Diagnostic {
+	return diag.NewAttributeErrorDiagnostic(
+		path.Root("maintenance").AtName("fix_disk_permissions"),
+		"Fix disk permissions is not supported by this Jamf Pro version",
+		"Jamf Pro "+version+" accepts maintenance.fix_disk_permissions = true but stores and reports false, "+
+			"so the setting can never take effect and the apply would fail with an inconsistent result. "+
+			"Jamf Pro "+fixDiskPermissionsDeadFrom+" removed the option from the admin UI. Remove the attribute, or set it to false.",
+	)
+}
+
+// validateFixDiskPermissionsAccepted refuses a configured true on a tenant whose
+// Jamf Pro discards it. It reads the configuration rather than the plan, since the
+// attribute is Optional+Computed and an omitted one is unknown in the plan. Not
+// finding a tenant version, or a version below the cut-off, is not an error.
+func validateFixDiskPermissionsAccepted(ctx context.Context, pd *providerdata.Data, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if pd == nil || req.Plan.Raw.IsNull() {
+		return
+	}
+	var configured types.Bool
+	if diags := req.Config.GetAttribute(ctx, path.Root("maintenance").AtName("fix_disk_permissions"), &configured); diags.HasError() {
+		return
+	}
+	if configured.IsNull() || configured.IsUnknown() || !configured.ValueBool() {
+		return
+	}
+	version, err := pd.GetJamfProVersion(ctx)
+	if err != nil || !fixDiskPermissionsDead(version) {
+		return
+	}
+	resp.Diagnostics.Append(fixDiskPermissionsDiagnostic(version))
 }

@@ -56,6 +56,10 @@ type UserInitiatedEnrollmentSettingsResource struct {
 	// Configure; the same *sync.Mutex instance is handed to every enrollment
 	// resource.
 	enrollmentMu *sync.Mutex
+
+	// pd gives ModifyPlan the cached tenant version, for the plan-time refusal of
+	// a setting a newer Jamf Pro silently reverts. nil until Configure.
+	pd *providerdata.Data
 }
 
 var _ resource.Resource = &UserInitiatedEnrollmentSettingsResource{}
@@ -178,7 +182,8 @@ func (r *UserInitiatedEnrollmentSettingsResource) Schema(ctx context.Context, re
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"sign_quickadd_package": schema.BoolAttribute{
-				MarkdownDescription: "Sign the QuickAdd package with a developer certificate. Matches the \"Sign QuickAdd Package\" checkbox. Supply the `developer_certificate` block to upload a signing identity. Omit to leave the current value untouched; set `true`/`false` to change it.",
+				MarkdownDescription: signQuickAddPackageDeprecatedDescription,
+				DeprecationMessage:  signQuickAddPackageDeprecation,
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
@@ -282,7 +287,8 @@ func (r *UserInitiatedEnrollmentSettingsResource) Schema(ctx context.Context, re
 				},
 			},
 			"developer_certificate": schema.SingleNestedAttribute{
-				MarkdownDescription: "Developer signing identity used to sign the QuickAdd package when `sign_quickadd_package = true`. Supply `keystore_file` (raw base64 of a `.p12`) and `keystore_password`; both are `WriteOnly`. This path expects an Apple Developer ID signing certificate.\n\n`keystore_password` is `WriteOnly`: sent to Jamf Pro on writes and never persisted in Terraform state. Bump `keystore_password_wo_version` to force the next apply to re-send the keystore and password.",
+				DeprecationMessage:  developerCertificateDeprecation,
+				MarkdownDescription: developerCertificateDeprecatedDescriptionPrefix + "Developer signing identity used to sign the QuickAdd package when `sign_quickadd_package = true`. Supply `keystore_file` (raw base64 of a `.p12`) and `keystore_password`; both are `WriteOnly`. This path expects an Apple Developer ID signing certificate.\n\n`keystore_password` is `WriteOnly`: sent to Jamf Pro on writes and never persisted in Terraform state. Bump `keystore_password_wo_version` to force the next apply to re-send the keystore and password.",
 				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"keystore_file": schema.StringAttribute{
@@ -482,6 +488,7 @@ func (r *UserInitiatedEnrollmentSettingsResource) ModifyPlan(ctx context.Context
 	if r.client == nil || req.Plan.Raw.IsNull() {
 		return
 	}
+	validateSignQuickAddAccepted(ctx, r.pd, req, resp)
 	var languages types.Map
 	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("messaging_languages"), &languages)...)
 	if resp.Diagnostics.HasError() {
@@ -504,6 +511,7 @@ func (r *UserInitiatedEnrollmentSettingsResource) Configure(ctx context.Context,
 	// Configure call ProviderData is nil, so ok is false and the mutex stays nil
 	// alongside the (also nil) client.
 	if pd, ok := req.ProviderData.(*providerdata.Data); ok {
+		r.pd = pd
 		r.enrollmentMu = pd.EnrollmentWriteLock()
 	}
 }

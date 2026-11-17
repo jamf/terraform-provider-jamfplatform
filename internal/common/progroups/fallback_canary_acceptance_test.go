@@ -16,6 +16,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/proclassic"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/progroups"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/testhelpers"
 )
@@ -25,7 +26,7 @@ import (
 const removalNote = "Jamf Pro ACCEPTED a criterion combination it used to refuse, so this defect looks fixed. " +
 	"That is what this test exists to detect: the fallback write path is invisible to every other test in the suite, " +
 	"because a group that no longer needs it simply takes the normal path and passes either way. " +
-	"Check the remaining canaries, and once none of them fail, delete progroups.ModernWriteRefused and its call sites, " +
+	"Check the remaining canaries, and once none of them fail and the provider floor is past the fixing version, delete progroups.ModernWriteRefused and its call sites, " +
 	"the FallbackWarning, the known-defect paragraphs in the two smart group descriptions, and this test."
 
 // TestAcceptance_ProGroups_ModernWriteRefusalsStillPresent asserts Jamf Pro
@@ -72,7 +73,7 @@ func TestAcceptance_ProGroups_ModernWriteRefusalsStillPresent(t *testing.T) {
 			AndOr:      pro.ComputerSmartGroupCriteriaV2AndOrAnd,
 			Priority:   0,
 		}
-		assertComputerCriterionRefused(t, ctx, proClient, criterion, "PI-1286 / PI-1183 / PI-626")
+		assertPatchReportingCriterion(t, ctx, proClient, criterion)
 	})
 
 	t.Run("has on a computer extension attribute", func(t *testing.T) {
@@ -112,6 +113,49 @@ func TestAcceptance_ProGroups_ModernWriteRefusalsStillPresent(t *testing.T) {
 
 // assertComputerCriterionRefused attempts a computer smart group carrying one
 // criterion and asserts the group endpoint refuses it.
+// patchReportingFixedFrom is the first Jamf Pro version on which the group endpoint
+// accepts a patch reporting criterion. Refused on 11.32.0 (2026-09-17), accepted on
+// 11.34.0 (2026-11-14); 11.33 was not probed, so a tenant on it would fail the
+// refusal half and the constant would move down. PI-1183 is Done, PI-1286 is still
+// Triaged, and neither names a fix version. The fallback is NOT removable on this
+// evidence: the provider's floor is 11.31.0, and the other canary (PI-1032) is
+// still live.
+const patchReportingFixedFrom = "11.34.0"
+
+// assertPatchReportingCriterion pins the patch reporting defect to the versions it
+// is known on. Below patchReportingFixedFrom the write must be refused and the
+// refusal classified, which is what keeps the fallback engaged for tenants that
+// still need it. From that version the write must be accepted, so a regression of
+// the fix is caught as well.
+func assertPatchReportingCriterion(t *testing.T, ctx context.Context, proClient *pro.Client, criterion pro.ComputerSmartGroupCriteriaV2) {
+	t.Helper()
+
+	version, err := proClient.GetJamfProVersionV1(ctx)
+	if err != nil {
+		t.Fatalf("reading the Jamf Pro version: %v", err)
+	}
+	if !helpers.AtLeastJamfProVersion(version.Version, patchReportingFixedFrom) {
+		assertComputerCriterionRefused(t, ctx, proClient, criterion, "PI-1286 / PI-1183 / PI-626")
+		return
+	}
+
+	criteria := []pro.ComputerSmartGroupCriteriaV2{criterion}
+	site := progroups.NoSiteID
+	created, err := proClient.CreateSmartComputerGroupV3(ctx, &pro.SmartComputerGroupV3{
+		Name:     acctest.RandomWithPrefix("tf-acc-canary"),
+		SiteID:   &site,
+		Criteria: &criteria,
+	}, true)
+	removeIfCreated(t, created, func(id string) error {
+		return proClient.DeleteSmartComputerGroupV3(context.Background(), id)
+	})
+	if err != nil {
+		t.Fatalf("the group endpoint refused %q on Jamf Pro %s, which accepted it from %s (PI-1286 / PI-1183 / PI-626): %v",
+			criterion.Name, version.Version, patchReportingFixedFrom, err)
+	}
+	t.Logf("patch reporting criterion accepted on Jamf Pro %s, as expected from %s", version.Version, patchReportingFixedFrom)
+}
+
 func assertComputerCriterionRefused(t *testing.T, ctx context.Context, proClient *pro.Client, criterion pro.ComputerSmartGroupCriteriaV2, ticket string) {
 	t.Helper()
 

@@ -1353,7 +1353,6 @@ resource "jamfplatform_pro_policy" "test" {
     update_inventory        = %t
     reset_computer_names    = true
     install_cached_packages = true
-    fix_disk_permissions    = true
     fix_byhost_files        = true
     flush_system_caches     = true
     flush_user_caches       = true

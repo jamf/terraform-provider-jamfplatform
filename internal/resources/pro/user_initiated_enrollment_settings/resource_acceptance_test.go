@@ -118,7 +118,8 @@ func checkReEnrollmentStillExistsUIE(t *testing.T) resource.TestCheckFunc {
 // deliberately NOT a parameter: the mdmSigningCertificateRequiredValidator fails
 // the plan whenever it is true with no mdm_signing_certificate block, so the
 // scalar-toggle tests keep it false (its true-path is covered by the MDM cert
-// test). No certs and no access_group block are declared here, keeping the
+// test). sign_quickadd_package is likewise not a parameter: Jamf Pro 11.34.0
+// reverts it to false without a developer certificate. No certs and no access_group block are declared here, keeping the
 // config import-safe and deterministic.
 func uieScalarConfig(b bool, managementUsername string) string {
 	return fmt.Sprintf(`
@@ -133,7 +134,6 @@ func uieScalarConfig(b bool, managementUsername string) string {
 			allow_ssh_only_management_account      = %[1]t
 			ensure_ssh_running                     = %[1]t
 			launch_self_service                    = %[1]t
-			sign_quickadd_package                  = %[1]t
 			account_driven_device_enrollment_macos = %[1]t
 
 			profile_driven_enrollment_via_url_institutional = %[1]t
@@ -162,7 +162,6 @@ func uieScalarChecks(b bool, managementUsername string) resource.TestCheckFunc {
 		resource.TestCheckResourceAttr(uieResourceAddr, "allow_ssh_only_management_account", v),
 		resource.TestCheckResourceAttr(uieResourceAddr, "ensure_ssh_running", v),
 		resource.TestCheckResourceAttr(uieResourceAddr, "launch_self_service", v),
-		resource.TestCheckResourceAttr(uieResourceAddr, "sign_quickadd_package", v),
 		resource.TestCheckResourceAttr(uieResourceAddr, "account_driven_device_enrollment_macos", v),
 		resource.TestCheckResourceAttr(uieResourceAddr, "profile_driven_enrollment_via_url_institutional", v),
 		resource.TestCheckResourceAttr(uieResourceAddr, "profile_driven_enrollment_via_url_personal", v),
@@ -307,9 +306,11 @@ func TestAccResource_ProUserInitiatedEnrollmentSettings_MdmSigningCert(t *testin
 	})
 }
 
-// TestAccResource_ProUserInitiatedEnrollmentSettings_DeveloperCert verifies
-// sign_quickadd_package toggles on WITHOUT a developer certificate — it has no
-// cert-required invariant (unlike the MDM signing cert), so the apply succeeds.
+// TestAccResource_ProUserInitiatedEnrollmentSettings_SignQuickAddRefused verifies
+// that sign_quickadd_package = true with no developer_certificate is refused at
+// plan time on Jamf Pro 11.34.0 and later. Those versions accept the write and
+// report false, which would otherwise fail the apply as "Provider produced
+// inconsistent result after apply". Jamf is removing QuickAdd package signing.
 //
 // The developer_certificate UPLOAD path is deliberately NOT acc-tested with the
 // committed dummy keystore. The shared upload code (buildCertificateIdentity /
@@ -317,25 +318,22 @@ func TestAccResource_ProUserInitiatedEnrollmentSettings_MdmSigningCert(t *testin
 // The dev slot specifically expects a real Apple Developer ID Application
 // certificate: a self-signed .p12 is accepted by the PUT but not ingested
 // (developer_certificate.subject / serial_number stay empty), which leaves those
-// Computed attributes resolving unknown and would produce a perpetual diff. A
-// clean dev-cert upload acc test requires a genuine Apple Developer ID .p12
-// supplied out of band.
-func TestAccResource_ProUserInitiatedEnrollmentSettings_DeveloperCert(t *testing.T) {
+// Computed attributes resolving unknown and would produce a perpetual diff.
+func TestAccResource_ProUserInitiatedEnrollmentSettings_SignQuickAddRefused(t *testing.T) {
 	testhelpers.AccPreCheck(t)
-
-	config := `
-		resource "jamfplatform_pro_user_initiated_enrollment_settings" "test" {
-			sign_quickadd_package = true
-		}
-	`
+	testhelpers.RequireMinJamfProVersion(t, "11.34.0")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
 		CheckDestroy:             checkUIEStillExists(t),
 		Steps: []resource.TestStep{
 			{
-				Config: config,
-				Check:  resource.TestCheckResourceAttr(uieResourceAddr, "sign_quickadd_package", "true"),
+				Config: `
+					resource "jamfplatform_pro_user_initiated_enrollment_settings" "test" {
+						sign_quickadd_package = true
+					}
+				`,
+				ExpectError: regexp.MustCompile(`(?s)needs\s+a\s+developer\s+certificate`),
 			},
 		},
 	})

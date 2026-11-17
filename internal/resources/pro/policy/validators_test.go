@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"strings"
 )
 
 // uiObjType is the tftypes shape of the user_interaction block, restricted to
@@ -343,5 +344,40 @@ func TestCreateAccountRequiresHome_NoAccountsIsFine(t *testing.T) {
 
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("no local accounts must not error: %v", resp.Diagnostics)
+	}
+}
+
+func TestFixDiskPermissionsDead(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		version string
+		want    bool
+	}{
+		{"11.31.0", false},
+		{"11.32.0", false},
+		{"11.33.0", false},
+		{"11.33.9", false},
+		{"11.34.0", true},
+		{"11.34.0-t1793383479089", true},
+		{"11.35.1", true},
+		{"12.0.0", true},
+		{"", false},
+		{"not-a-version", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.version, func(t *testing.T) {
+			t.Parallel()
+			if got := fixDiskPermissionsDead(tc.version); got != tc.want {
+				t.Errorf("fixDiskPermissionsDead(%q) = %v, want %v", tc.version, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFixDiskPermissionsDiagnosticNamesAttributeAndVersion(t *testing.T) {
+	t.Parallel()
+	d := fixDiskPermissionsDiagnostic("11.34.0")
+	if !strings.Contains(d.Detail(), "11.34.0") || !strings.Contains(d.Detail(), "fix_disk_permissions") {
+		t.Errorf("diagnostic must name the version and the attribute, got %q", d.Detail())
 	}
 }

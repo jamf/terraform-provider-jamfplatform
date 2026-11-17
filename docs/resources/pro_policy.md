@@ -426,7 +426,9 @@ Optional:
 Optional:
 
 - `fix_byhost_files` (Boolean) Fix ByHost files. Omit to leave the current value untouched; set `true`/`false` to change it.
-- `fix_disk_permissions` (Boolean) Fix disk permissions. Omit to leave the current value untouched; set `true`/`false` to change it.
+- `fix_disk_permissions` (Boolean, Deprecated) ~> **Deprecated.** Deprecated: Jamf Pro 11.34.0 and later ignore this setting and always report `false`, and the admin UI no longer offers it. The provider will not remove `maintenance.fix_disk_permissions` before 2027-02-15.
+
+Fix disk permissions. Jamf Pro 11.34.0 and later accept `true` but store and report `false`, so the provider rejects `true` at plan time on those versions. Earlier versions still honor it. Omit to leave the current value untouched.
 - `flush_system_caches` (Boolean) Flush system caches. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `flush_user_caches` (Boolean) Flush user caches. Omit to leave the current value untouched; set `true`/`false` to change it.
 - `install_cached_packages` (Boolean) Install cached packages. Omit to leave the current value untouched; set `true`/`false` to change it.

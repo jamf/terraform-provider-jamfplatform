@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"strings"
 )
 
 // certObjType is the tftypes shape of the mdm_signing_certificate object used
@@ -152,5 +153,37 @@ func TestCertInvariant_SilentWhenCertUnknown(t *testing.T) {
 	out := runCertValidator(t, cfg)
 	if len(out) != 0 {
 		t.Errorf("validator must defer (not fire) when cert block is unknown, got %v", out)
+	}
+}
+
+func TestSignQuickAddReverts(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		version string
+		want    bool
+	}{
+		{"11.31.0", false},
+		{"11.33.0", false},
+		{"11.34.0", true},
+		{"11.34.0-t1793383479089", true},
+		{"11.35.1", true},
+		{"", false},
+		{"not-a-version", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.version, func(t *testing.T) {
+			t.Parallel()
+			if got := signQuickAddReverts(tc.version); got != tc.want {
+				t.Errorf("signQuickAddReverts(%q) = %v, want %v", tc.version, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSignQuickAddDiagnosticNamesAttributeAndVersion(t *testing.T) {
+	t.Parallel()
+	d := signQuickAddDiagnostic("11.34.0")
+	if !strings.Contains(d.Detail(), "11.34.0") || !strings.Contains(d.Detail(), "sign_quickadd_package") {
+		t.Errorf("diagnostic must name the version and the attribute, got %q", d.Detail())
 	}
 }
