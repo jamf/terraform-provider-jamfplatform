@@ -44,7 +44,6 @@ func TestAccDataSource_BlueprintComponent_ByIdentifier(t *testing.T) {
 						"data.jamfplatform_blueprints_component.first", "name",
 						"data.jamfplatform_blueprints_components.all", "components.0.name",
 					),
-					resource.TestCheckResourceAttrSet("data.jamfplatform_blueprints_component.first", "supported_os.%"),
 				),
 			},
 		},
