@@ -6,9 +6,9 @@ description: |-
   Manages a Jamf Pro package. A package record carries the metadata Jamf Pro pairs with a file on a distribution point: name, category, restart requirement, operating system requirement, info and notes, an optional manifest and optional hashes.
   Operating modes
   The mode is inferred from your configuration.
-  Cloud distribution point upload. Set package_file_source to a local path or an https?:// URL. The provider creates the package record, uploads the file to the Jamf Cloud Distribution Point, and waits until Jamf Pro finishes calculating the file hashes and cloud_transfer_status becomes READY. In this mode Jamf Pro populates the hash attributes (sha3_512, sha256, md5, size, hash_type, hash_value), and setting any of them in configuration is rejected before the change runs.Distribution point with supplied hashes. Omit package_file_source and set the hash attributes directly. Jamf Pro stores the values as given, without validating them. Use this when the file lives on a distribution point you manage and the hashes are calculated elsewhere.Metadata only. Omit package_file_source and every hash attribute. The provider manages the package record alone, and no file is uploaded.
+  Cloud distribution point upload. Set package_file_source to a local path, an http(s):// URL, or an s3:// or azblob:// source. The provider creates the package record, uploads the file to the Jamf Cloud Distribution Point, and waits until Jamf Pro finishes calculating the file hashes and cloud_transfer_status becomes READY. In this mode Jamf Pro populates the hash attributes (sha3_512, sha256, md5, size, hash_type, hash_value), and setting any of them in configuration is rejected before the change runs.Distribution point with supplied hashes. Omit package_file_source and set the hash attributes directly. Jamf Pro stores the values as given, without validating them. Use this when the file lives on a distribution point you manage and the hashes are calculated elsewhere.Metadata only. Omit package_file_source and every hash attribute. The provider manages the package record alone, and no file is uploaded.
   Uploads and updates
-  package_file_source_checksum (optional) is a SHA-3-512 value checked against the file locally before anything is uploaded. A mismatch fails the apply without uploading, which catches on-disk corruption.size is read-only. Jamf Pro calculates it from the uploaded file and ignores any value set in configuration, including on metadata-only records.Changing only metadata (info, notes, priority and so on) updates the record without re-uploading the file. The file is re-uploaded only when its contents change. For a local package_file_source, replacing the file at the same path shows the hash attributes and size as changing in the plan. A change behind an unchanged http(s):// URL is not detected until another change to the package runs an update.manifest_file_source (optional) uploads a .plist manifest for the package. Setting it uploads the manifest, and clearing it removes the manifest from Jamf Pro. The manifest is likewise re-uploaded only when its contents change.Both package_file_source and manifest_file_source accept http(s):// URLs. The provider downloads the URL to a temporary file, up to 8 GiB and following at most 10 redirects, before uploading.
+  package_file_source_checksum (optional) is a SHA-3-512 value checked against the file locally before anything is uploaded. A mismatch fails the apply without uploading, which catches on-disk corruption.size is read-only. Jamf Pro calculates it from the uploaded file and ignores any value set in configuration, including on metadata-only records.Changing only metadata (info, notes, priority and so on) updates the record without re-uploading the file. The file is re-uploaded only when its contents change. For a local package_file_source, replacing the file at the same path shows the hash attributes and size as changing in the plan. So does replacing the object behind an s3:// or azblob:// source, which the provider tells from the object's ETag without downloading it. A change behind an unchanged http(s):// URL is not detected until another change to the package runs an update.manifest_file_source (optional) uploads a .plist manifest for the package. Setting it uploads the manifest, and clearing it removes the manifest from Jamf Pro. The manifest is likewise re-uploaded only when its contents change.Both package_file_source and manifest_file_source accept http(s):// URLs. The provider downloads the URL to a temporary file, up to 8 GiB and following at most 10 redirects, before uploading.Only package_file_source reads s3:// and azblob://, with the credentials the machine already has or those in the provider's file_sources block. See the Package files from cloud storage guide ../guides/package-cloud-storage for setup, permissions and how a change is detected.
   Required Jamf permissions
   Jamf lists this under Platform environment scope (preferred for new integrations) or Tenant scope. You choose an integration's scope when you create it in Jamf Account, and cannot change it afterwards. The provider names the scopes it accepts when you configure it, and for a few families that is wider than Jamf lists here. Grant the API integration the following permissions in Jamf Account — see Getting started with the Platform API https://developer.jamf.com/platform-api/reference/getting-started-with-platform-api. Category and Permission name the section and row of the permission picker; Actions are the boxes to tick within that row.
   | Category | Permission | Actions | API capability |
@@ -26,7 +26,7 @@ Manages a Jamf Pro package. A package record carries the metadata Jamf Pro pairs
 
 The mode is inferred from your configuration.
 
-- Cloud distribution point upload. Set `package_file_source` to a local path or an `https?://` URL. The provider creates the package record, uploads the file to the Jamf Cloud Distribution Point, and waits until Jamf Pro finishes calculating the file hashes and `cloud_transfer_status` becomes `READY`. In this mode Jamf Pro populates the hash attributes (`sha3_512`, `sha256`, `md5`, `size`, `hash_type`, `hash_value`), and setting any of them in configuration is rejected before the change runs.
+- Cloud distribution point upload. Set `package_file_source` to a local path, an `http(s)://` URL, or an `s3://` or `azblob://` source. The provider creates the package record, uploads the file to the Jamf Cloud Distribution Point, and waits until Jamf Pro finishes calculating the file hashes and `cloud_transfer_status` becomes `READY`. In this mode Jamf Pro populates the hash attributes (`sha3_512`, `sha256`, `md5`, `size`, `hash_type`, `hash_value`), and setting any of them in configuration is rejected before the change runs.
 - Distribution point with supplied hashes. Omit `package_file_source` and set the hash attributes directly. Jamf Pro stores the values as given, without validating them. Use this when the file lives on a distribution point you manage and the hashes are calculated elsewhere.
 - Metadata only. Omit `package_file_source` and every hash attribute. The provider manages the package record alone, and no file is uploaded.
 
@@ -34,9 +34,10 @@ The mode is inferred from your configuration.
 
 - `package_file_source_checksum` (optional) is a SHA-3-512 value checked against the file locally before anything is uploaded. A mismatch fails the apply without uploading, which catches on-disk corruption.
 - `size` is read-only. Jamf Pro calculates it from the uploaded file and ignores any value set in configuration, including on metadata-only records.
-- Changing only metadata (`info`, `notes`, `priority` and so on) updates the record without re-uploading the file. The file is re-uploaded only when its contents change. For a local `package_file_source`, replacing the file at the same path shows the hash attributes and `size` as changing in the plan. A change behind an unchanged `http(s)://` URL is not detected until another change to the package runs an update.
+- Changing only metadata (`info`, `notes`, `priority` and so on) updates the record without re-uploading the file. The file is re-uploaded only when its contents change. For a local `package_file_source`, replacing the file at the same path shows the hash attributes and `size` as changing in the plan. So does replacing the object behind an `s3://` or `azblob://` source, which the provider tells from the object's ETag without downloading it. A change behind an unchanged `http(s)://` URL is not detected until another change to the package runs an update.
 - `manifest_file_source` (optional) uploads a `.plist` manifest for the package. Setting it uploads the manifest, and clearing it removes the manifest from Jamf Pro. The manifest is likewise re-uploaded only when its contents change.
 - Both `package_file_source` and `manifest_file_source` accept `http(s)://` URLs. The provider downloads the URL to a temporary file, up to 8 GiB and following at most 10 redirects, before uploading.
+- Only `package_file_source` reads `s3://` and `azblob://`, with the credentials the machine already has or those in the provider's `file_sources` block. See the [Package files from cloud storage guide](../guides/package-cloud-storage) for setup, permissions and how a change is detected.
 
 **Required Jamf permissions**
 
@@ -85,6 +86,32 @@ resource "jamfplatform_pro_package" "cloud_dp_url" {
   display_name        = "MyApp 1.0.0 (URL)"
   file_name           = "MyApp-1.0.0.pkg"
   package_file_source = "https://artifacts.example.com/packages/MyApp-1.0.0.pkg"
+}
+
+# Cloud distribution point upload from Amazon S3. The object is read with the
+# AWS credentials the machine already has, or those in the provider's
+# file_sources block. Replacing the object shows in the next plan, and an
+# update that leaves it unchanged uploads nothing.
+resource "jamfplatform_pro_package" "cloud_dp_s3" {
+  display_name        = "MyApp 1.0.0 (S3)"
+  file_name           = "MyApp-1.0.0.pkg"
+  package_file_source = "s3://my-packages/releases/MyApp-1.0.0.pkg"
+}
+
+# The same from Azure Blob Storage: storage account, container, blob.
+resource "jamfplatform_pro_package" "cloud_dp_azure" {
+  display_name        = "MyApp 1.0.0 (Azure)"
+  file_name           = "MyApp-1.0.0.pkg"
+  package_file_source = "azblob://mystorageaccount/packages/MyApp-1.0.0.pkg"
+}
+
+# A very large package sent from the store to Jamf Pro without a temporary
+# file. Cannot be combined with package_file_source_checksum.
+resource "jamfplatform_pro_package" "cloud_dp_s3_streamed" {
+  display_name        = "Xcode 16.2"
+  file_name           = "Xcode-16.2.pkg"
+  package_file_source = "s3://my-packages/large/Xcode-16.2.pkg"
+  stream_url_directly = true
 }
 
 # Upload with a manifest. `manifest_file_source` accepts either a local path
@@ -149,13 +176,13 @@ resource "jamfplatform_pro_package" "meta_only" {
 - `md5` (String) MD5 hex digest of the package file. Calculated by Jamf Pro after a cloud distribution point upload, or set directly when managing the record without an uploaded file. Cannot be combined with `package_file_source`.
 - `notes` (String) **"Notes"** in the Jamf Pro admin UI. Free-form notes field. Jamf Pro returns an empty string when the field is unset, and the provider reconciles that to keep state stable.
 - `os_requirements` (String) **"Operating system requirement"** in the Jamf Pro admin UI (Limitations tab). Comma-separated string, e.g. `"13.5.2, 13.6.x, 14.3"`.
-- `package_file_source` (String) Optional local path or `http(s)://` URL pointing to the package file. Set it to upload the file to the Jamf Cloud Distribution Point on create or update. A cloud distribution point must be configured on the tenant; without one the change is refused before any bytes are uploaded. A package with no recorded hash is checked for changes by file size only. When omitted, the resource manages only the package record. Cannot be combined with the hash attributes; setting both is rejected before the change runs.
+- `package_file_source` (String) Optional local path, `http(s)://` URL, `s3://bucket/key` or `azblob://account/container/blob` source pointing to the package file. An `s3://` or `azblob://` source is read with the credentials in the provider's `file_sources` block, or the machine's own AWS or Azure credentials when there is none, and a change to the object shows in the plan. Add `?versionId=` to an `s3://` source to read one version of the object. An `https://` URL whose host has an entry in `file_sources.https` is downloaded with that credential. Set it to upload the file to the Jamf Cloud Distribution Point on create or update. A cloud distribution point must be configured on the tenant; without one the change is refused before any bytes are uploaded. A package with no recorded hash is checked for changes by file size only. When omitted, the resource manages only the package record. Cannot be combined with the hash attributes; setting both is rejected before the change runs.
 - `package_file_source_checksum` (String) Optional SHA-3-512 hex digest checked against the file locally before it is uploaded. A mismatch fails the apply without uploading. Cannot be combined with `stream_url_directly`.
 - `priority` (Number) **"Priority"** in the Jamf Pro admin UI. Defaults to `10`. Lower values install first when multiple packages are queued.
 - `reboot_required` (Boolean) **"Requires restart"** in the Jamf Pro admin UI. Defaults to `false`.
 - `sha256` (String) SHA-256 hex digest of the package file. Calculated by Jamf Pro after a cloud distribution point upload, or set directly when managing the record without an uploaded file. Cannot be combined with `package_file_source`.
 - `sha3_512` (String) SHA-3-512 hex digest of the package file. Calculated by Jamf Pro after a Jamf Cloud distribution point upload, or set directly when managing the record without an uploaded file. An Amazon S3 distribution point does not calculate it, so the value stays empty there; the upload is verified against the strongest digest the distribution point reports. Cannot be combined with `package_file_source`.
-- `stream_url_directly` (Boolean) When `true` and `package_file_source` is an `http(s)://` URL, the file is sent straight to the Jamf Cloud Distribution Point as it downloads, instead of being saved to a temporary file first. This avoids using local disk, but disables retry on rate-limiting, pre-upload checksum validation (so it cannot be combined with `package_file_source_checksum`), and recovery if the download is interrupted partway. The upload needs the file size up front, so the download must declare a `Content-Length`; if it does not, the file is saved to a temporary file first, as if this were `false`. Use it on disk-constrained machines with very large files. Ignored for local-path sources.
+- `stream_url_directly` (Boolean) When `true` and `package_file_source` is an `http(s)://` URL, an `s3://` source or an `azblob://` source, the file is sent straight to the Jamf Cloud Distribution Point as it downloads, instead of being saved to a temporary file first. This avoids using local disk, but disables retry on rate-limiting, pre-upload checksum validation (so it cannot be combined with `package_file_source_checksum`), and recovery if the download is interrupted partway. The upload needs the file size up front, so the download must declare a `Content-Length`; if it does not, the file is saved to a temporary file first, as if this were `false`. Use it on disk-constrained machines with very large files. Ignored for local-path sources. An `s3://` or `azblob://` source always declares its size, resumes by itself if the download is cut, and is not sent again by an update that leaves the object unchanged. Giving an existing package such a source for the first time reads the object once to compare it with the file Jamf Pro holds, and uploads it only if they differ.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only
@@ -167,6 +194,7 @@ resource "jamfplatform_pro_package" "meta_only" {
 - `install_language` (String) Locale tag, default `"en_US"`. Returned by Jamf Pro; not user-settable. Not exposed in the Jamf Pro admin UI; surfaced as read-only to avoid drift on refresh.
 - `manifest` (String) The raw plist body Jamf Pro stores for the package manifest. Empty when no manifest is uploaded. Direct-equality compared against the freshly-loaded `manifest_file_source` to decide whether to re-upload.
 - `manifest_file_name` (String) The filename Jamf Pro echoed back for the most recent manifest upload.
+- `package_file_source_version` (String) Change marker of the cloud storage object the package file was last read from: the object's ETag, prefixed `etag:`. Set for an `s3://` or `azblob://` `package_file_source` and empty for any other. The provider compares it with the object on every plan to tell whether the file has changed, and clears it when the file in Jamf Pro is replaced outside Terraform. It is not a checksum of the file. Read-only.
 - `parent_package_id` (String) Parent package ID, default `"-1"` (no parent). Returned by Jamf Pro; not user-settable.
 - `self_heal_notify` (Boolean) Self-healing notification flag. Default `false`. Returned by Jamf Pro; not user-settable.
 - `self_healing_action` (String) Self-healing action, default `"nothing"`. Returned by Jamf Pro; not user-settable.

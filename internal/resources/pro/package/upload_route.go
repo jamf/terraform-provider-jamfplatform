@@ -12,6 +12,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 	"github.com/jamf/jamfplatform-go-sdk/jcdsupload"
 
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filesources"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -147,10 +148,12 @@ func reuploadFromFile(ctx context.Context, client uploadClient, route uploadRout
 }
 
 // reuploadFromURL is Update's streaming-URL re-upload: the same rename, then the
-// streamed upload and poll.
-func reuploadFromURL(ctx context.Context, client uploadClient, route uploadRoute, plan, state *PackageResourceModel, previous fileDigests) diag.Diagnostics {
+// streamed upload and poll. previous and previousSize describe the record
+// before the upload, from the same reading of it: state for a URL, the live
+// record for a cloud storage source.
+func reuploadFromURL(ctx context.Context, client uploadClient, sources *filesources.Resolver, route uploadRoute, plan, state *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
 	if diags := renameRecordBeforeUpload(ctx, client, route, plan, state); diags.HasError() {
 		return diags
 	}
-	return streamURLUploadAndVerify(ctx, client, route, plan, previous, state.Size.ValueString())
+	return streamURLUploadAndVerify(ctx, client, sources, route, plan, previous, previousSize)
 }

@@ -210,10 +210,14 @@ jobs:
     # the pro lane, which files an issue when Jamf Pro's PreStage skip list drifts from the
     # provider's tables. GitHub offers no step-level permission, so every lane carries it;
     # no other step reads the token.
+    # id-token: write is for one step in the pro lane, which exchanges the job's OIDC token
+    # for AWS credentials so the package tests can read from, and write their objects to,
+    # a fixture bucket. No other step asks for the token.
     permissions:
       contents: read
       pull-requests: read
       issues: write
+      id-token: write
     # The lane's ceiling comes from the lane table, and `go test -timeout` below
     # is NOT a substitute for it: that flag is per TEST BINARY, and `go test`
     # builds one per package, so at the pro lane's 110 packages a wedged package
@@ -306,6 +310,28 @@ jobs:
           terraform_wrapper: false
       - run: go mod download
         if: steps.guard.outputs.superseded != 'true'
+
+      # The package tests that read a file from S3 write the objects they read, so the pro
+      # lane needs AWS credentials. They come from the job's OIDC token and a role, never
+      # from a stored key.
+      #
+      # The step runs only when the role variable is set. Without it the tests have no
+      # bucket either and skip, and the lane stays green: a fixture bucket is
+      # infrastructure outside Jamf that this repository may not have. The skip shows in
+      # the lane summary below.
+      #
+      # The role's trust policy names this repository's OIDC issuer and subject, and both
+      # must be copied from a real token. Repositories in the Jamf GitHub enterprise issue
+      # tokens from https://token.actions.githubusercontent.com/jamf, not the public
+      # issuer, and the subject carries the numeric owner and repository IDs. See
+      # TESTING.md.
+      - name: Configure AWS credentials
+        if: steps.guard.outputs.superseded != 'true' && matrix.lane == 'pro' && vars.JAMFPLATFORM_ACC_CLOUDSTORAGE_AWS_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.JAMFPLATFORM_ACC_CLOUDSTORAGE_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.JAMFPLATFORM_ACC_CLOUDSTORAGE_AWS_REGION }}
+          role-session-name: jamfplatform-acceptance
 
       - name: Acceptance tests
         if: steps.guard.outputs.superseded != 'true'
@@ -503,6 +529,19 @@ jobs:
           # endpoints were withdrawn at the Platform API GA, so clients are
           # created in Jamf Account.
           JAMFPLATFORM_ACC_PRO_ADCS_API_CLIENT_ID: ${{ secrets.JAMFPLATFORM_ACC_PRO_ADCS_API_CLIENT_ID }}
+
+          # --- Cloud storage sources for packages --------------------------
+          # Repository VARIABLES, not secrets: a bucket name, a key prefix, a
+          # Region and a role ARN are not credentials, and a secret would mask
+          # them in the log of the lane that most needs them readable. Unset,
+          # the bucket expands to the empty string and the tests that read from
+          # it skip. The AWS credentials themselves are exported by the
+          # "Configure AWS credentials" step above.
+          JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_BUCKET: ${{ vars.JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_BUCKET }}
+          JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_PREFIX: ${{ vars.JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_PREFIX }}
+          JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_REGION: ${{ vars.JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_REGION }}
+          JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_ASSUME_ROLE_ARN: ${{ vars.JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_ASSUME_ROLE_ARN }}
+          JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_ASSUME_ROLE_EXTERNAL_ID: ${{ vars.JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_ASSUME_ROLE_EXTERNAL_ID }}
 
           # --- Jamf Pro: real directory-service fixture --------------------
           # The group-scoped and DS-group suites bootstrap a directory, then

@@ -636,6 +636,50 @@ green there on 2026-09-30 apart from the dedicated-IP entitlement above, so
 `providerdata.ConfigureSecurityCloud` admitting both scopes now rests on a run as well as
 the spec.
 
+### Cloud storage package sources need a bucket, and skip without one
+
+`jamfplatform_pro_package` can read its file from `s3://` and `azblob://`. The tests for that are in `s3_source_acceptance_test.go` and `azure_source_acceptance_test.go` under `internal/resources/pro/package/`, and run in the `pro` lane with the package resource's other tests. They gate on `testhelpers.AccPreCheck`, on `testhelpers.RequireCloudStorageFixture` or `testhelpers.RequireAzureBlobFixture`, which **skip** when no bucket or no account and container are named, and on `testhelpers.RequireDirectUploads`, because every test uploads to the tenant's cloud distribution point.
+
+That skip is never promoted to a failure, locally or in a pipeline, and no `require` token covers it. A bucket is infrastructure outside Jamf that an estate may not have, the same reasoning as the cloud distribution point gate. The consequence is the same too: a green `pro` lane says nothing about cloud storage sources unless the bucket variable was set, so read the lane's skip count before trusting it.
+
+| Variable | Description |
+|---|---|
+| `JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_BUCKET` | The fixture bucket. Setting it says the run has a bucket and AWS credentials that can write to it. Unset → every S3 source test skips |
+| `JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_PREFIX` | Key prefix the tests write under. Defaults to `tf-acc/` |
+| `JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_REGION` | Region the provider's client starts in. Set it to a Region other than the bucket's to cover Region discovery |
+| `JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_ENDPOINT` | An S3-compatible store such as MinIO. Also turns on path-style addressing. Not wired in CI |
+| `JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_ASSUME_ROLE_ARN`, `_ASSUME_ROLE_EXTERNAL_ID` | A role the ambient identity may assume and that can read the bucket. Unset → the `assume_role` test skips |
+| `JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_PROFILE_A`, `_PROFILE_B` | Two named AWS profiles that can each read the bucket. Unset → the two-alias test skips. Local only: a CI runner has no profiles |
+| `JAMFPLATFORM_ACC_CLOUDSTORAGE_AZURE_ACCOUNT`, `_AZURE_CONTAINER` | The fixture storage account and container. Setting both says the run has them and a Microsoft Entra credential that can write there. Either unset → every Azure Blob source test skips |
+| `JAMFPLATFORM_ACC_CLOUDSTORAGE_AZURE_PREFIX` | Blob name prefix the tests write under. Defaults to `tf-acc/` |
+
+What the fixture has to provide:
+
+- **AWS credentials come from the default credential chain**, for the tests' writes and for the provider's reads. Locally that is usually `AWS_PROFILE`. In CI it is the job's OIDC token exchanged for a role by the `Configure AWS credentials` step, which runs only when the `JAMFPLATFORM_ACC_CLOUDSTORAGE_AWS_ROLE_ARN` repository variable is set; the role's Region is in `JAMFPLATFORM_ACC_CLOUDSTORAGE_AWS_REGION`.
+- **Azure credentials are the ambient Microsoft Entra ones**: the `ARM_*` variables, or an Azure CLI login when none is set. The identity needs **Storage Blob Data Contributor** on the container, because the tests write the blobs they read; a provider user needs Storage Blob Data Reader alone. Azure is not wired in CI: there is no step that signs the job in, so those tests skip there. They are real cloud only, with no emulator, since Azurite does not do Microsoft Entra authentication.
+- **A bucket named with credentials that do not work fails**, as refused credentials always do. Only an unnamed bucket skips.
+- **The identity needs `s3:PutObject`, `s3:DeleteObject`, `s3:GetObject` and `s3:ListBucket`** on the prefix, and `s3:GetObjectVersion` on a versioned bucket. That is more than a provider user's identity needs, which is read access alone: the tests create and replace the objects they read. Without `s3:ListBucket` a missing object answers 403, and the missing-object test then fails on the wrong error.
+- **A versioned bucket** runs `TestAccResource_ProPackage_S3Source_PinnedVersion`, which skips otherwise. Give the bucket a lifecycle rule that expires noncurrent versions and delete markers under the prefix, because a delete on a versioned bucket removes nothing.
+- **The role's trust policy must be written from a real token.** Repositories in the Jamf GitHub enterprise issue OIDC tokens from `https://token.actions.githubusercontent.com/jamf`, which to AWS is a different issuer from the public one, and the subject carries numeric IDs (`repo:<owner>@<owner id>/<repo>@<repo id>:…`). A trust policy written from documentation matches neither.
+
+Everything here is a repository variable, not a secret: none of it is a credential, and a secret is masked in the log of the lane that most needs to read it.
+
+To run them locally:
+
+```bash
+export AWS_PROFILE=<a profile that can write to the bucket>
+export JAMFPLATFORM_ACC_CLOUDSTORAGE_S3_BUCKET=<bucket>
+make testacc-run RUN=TestAccResource_ProPackage_S3Source PKG=./internal/resources/pro/package/
+```
+
+And for Azure, signed in with `az login`:
+
+```bash
+export JAMFPLATFORM_ACC_CLOUDSTORAGE_AZURE_ACCOUNT=<storage account>
+export JAMFPLATFORM_ACC_CLOUDSTORAGE_AZURE_CONTAINER=<container>
+make testacc-run RUN=TestAccResource_ProPackage_AzureBlobSource PKG=./internal/resources/pro/package/
+```
+
 ### Jamf Account needs an organization-scoped integration, and therefore its own lane
 
 The `jamfplatform_account_*` family is reachable only under **organization scope**, which

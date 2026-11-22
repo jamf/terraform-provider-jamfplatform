@@ -21,6 +21,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/aischemas"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filesources"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/impact"
 )
@@ -104,6 +105,8 @@ type Data struct {
 	impactCache *impact.Cache
 
 	collisionChecker *collision.Checker
+
+	fileSources *filesources.Resolver
 
 	// deviceGroupWrites serialises device group creates and deletes; see
 	// AcquireDeviceGroupWrite.
@@ -378,6 +381,36 @@ func (d *Data) CollisionChecker() *collision.Checker {
 		return nil
 	}
 	return d.collisionChecker
+}
+
+// SetFileSources installs the resolver that reads s3:// and azblob:// upload
+// sources, built by provider Configure from the file_sources block. It is
+// always installed, block or no block, because those sources work on each
+// cloud's ambient credentials.
+func (d *Data) SetFileSources(resolver *filesources.Resolver) {
+	d.fileSources = resolver
+}
+
+// FileSources returns the shared cloud storage resolver. Nil-receiver-safe: a
+// nil resolver refuses a cloud storage source with a named error, so a
+// resource whose Configure never ran reports that when it is asked to read
+// one, not with a panic.
+func (d *Data) FileSources() *filesources.Resolver {
+	if d == nil {
+		return nil
+	}
+	return d.fileSources
+}
+
+// ConfigureFileSources returns the shared cloud storage resolver from
+// providerData, or nil when providerData is not yet available. It never
+// produces diagnostics, like ConfigureImpact.
+func ConfigureFileSources(providerData any) *filesources.Resolver {
+	pd, ok := providerData.(*Data)
+	if !ok {
+		return nil
+	}
+	return pd.FileSources()
 }
 
 // ConfigureCollision returns the shared name collision checker from providerData,

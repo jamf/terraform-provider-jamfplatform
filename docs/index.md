@@ -79,6 +79,28 @@ provider "jamfplatform" {
   # Send the Platform API credential in this header instead of Authorization,
   # leaving Authorization free for the proxy's own credential above.
   # authorization_header_name = "X-Jamf-Authorization"
+
+  # Only needed when a jamfplatform_pro_package reads its file from Amazon S3,
+  # Azure Blob Storage or an https server that wants a credential, and the
+  # machine's own credentials are not the ones to use. With this block absent,
+  # s3:// uses the AWS default credential chain and azblob:// the ARM_*
+  # variables or the Azure CLI login. See the cloud storage guide.
+  #
+  # file_sources = {
+  #   s3 = {
+  #     assume_role = {
+  #       role_arn = "arn:aws:iam::123456789012:role/package-read"
+  #     }
+  #   }
+  #   azure = {
+  #     tenant_id = "00000000-0000-0000-0000-000000000000"
+  #     client_id = "11111111-1111-1111-1111-111111111111"
+  #     use_oidc  = true
+  #   }
+  #   https = [
+  #     { host = "artifactory.example.com", bearer_token = var.artifactory_token },
+  #   ]
+  # }
 }
 ```
 
@@ -93,10 +115,116 @@ provider "jamfplatform" {
 - `client_secret` (String, Sensitive) Required. OAuth client secret for Jamf Platform API. Must be set either here or via the JAMFPLATFORM_CLIENT_SECRET environment variable. Marked Optional in the schema so it can be sourced from the environment; the provider errors at configure time if it is set in neither place.
 - `custom_headers` (Map of String, Sensitive) Extra HTTP headers to send on every request the provider makes, including the token request it uses to authenticate. Keyed by header name; header names are case-insensitive, so `x-proxy-route` and `X-Proxy-Route` are the same header and only one of the two may appear. For deployments whose traffic reaches Jamf through a reverse proxy that authenticates callers itself, or routes on a tag the provider knows nothing about. Marked sensitive in full, because these headers commonly carry a credential and Terraform cannot redact one entry of a map. Can also be set via the `JAMFPLATFORM_CUSTOM_HEADERS` environment variable, as one `Name: value` pair per line, which a CI runner can inject without a Terraform variable. When this attribute is set the variable is not read at all. Five names are refused, all because a supplied header replaces rather than adds to what the provider sends. `X-Environment-Id` and `X-Tenant-Id` are set by the provider from `environment_id` and `tenant_id`, and the gateway answers an overridden scope with the same error a wrong credential gets. `Cookie` would displace the session cookie Jamf Cloud uses to keep this client on one application node. A proxy that needs a cookie of its own can set one on a response, which the provider stores and sends back on its own. `Content-Type` is chosen per request: JSON, merge-patch JSON, XML on some Jamf Pro requests, or multipart with a generated boundary for a file upload. One value here overrides all four and leaves an upload without its boundary. `Accept` is `application/xml` on those same Jamf Pro requests, and setting it elsewhere is no safer: Jamf Security Cloud's UEM Connect service answers `Accept: application/xml` with an XML body the provider would decode as JSON. Supplying `Authorization` is supported and is the point of the feature. Pair it with `authorization_header_name` so the proxy's credential and the Jamf credential both reach the request. See the [Reverse proxy guide](../guides/reverse-proxy) for the whole arrangement.
 - `environment_id` (String) **Preferred.** ID of the **"Platform environment"** your API integration targets, a group of tenants across product types with interconnected capabilities. Can also be set via the `JAMFPLATFORM_ENVIRONMENT_ID` environment variable. This is the scope new integrations should be created with, and the only one that reaches Blueprints, Compliance Benchmarks and Jamf AI Governance; the provider refuses a tenant-scoped integration for those when you configure it. Mutually exclusive with the legacy `tenant_id`. An API integration targets one or the other, so setting both is an error, and supplying the ID that does not match the integration is refused with `403 OWNERSHIP_FORBIDDEN` even when both IDs belong to the same customer. Pick the one your integration was created for rather than treating them as two spellings of the same thing. Setting neither leaves the provider organization-scoped, matching an **"Organization management"** integration: the scope the `jamfplatform_account_*` resources require, and the only one that reaches them. Each resource and data source reports the scope it needs when it is configured, so a mismatch is named at plan time rather than failing mid-apply.
+- `file_sources` (Attributes) Credentials and endpoints for reading a package file from Amazon S3, Azure Blob Storage or an `https://` server that needs authentication. It applies to `package_file_source` on `jamfplatform_pro_package` and to no other attribute. Every nested block is optional. With none set, an `s3://` source uses the AWS default credential chain, and an `azblob://` source uses the `ARM_*` environment variables and then the Azure CLI. Values set here are not written to state. They are carried in a saved plan file. See the [Package files from cloud storage guide](../guides/package-cloud-storage). (see [below for nested schema](#nestedatt--file_sources))
 - `impact_alerts` (Boolean) Show **impact alerts** during `terraform plan`: an advisory warning on each deployable or scopeable object this plan changes, reporting how many computers or mobile devices the change affects. It is the same signal Jamf Pro shows on Save. Off by default; alerts never block a plan. Can also be set via the JAMFPLATFORM_IMPACT_ALERTS environment variable, which accepts the values of Go's `strconv.ParseBool` (`true`, `false`, `1`, `0`, …). An unparseable value leaves alerts off and raises a configure-time warning. This attribute, when set, always takes precedence over the variable. This does not change any Jamf Pro setting; to configure the alerts Jamf Pro shows in its own web interface, use `jamfplatform_pro_impact_alert_notification_settings`. See the [Impact alerts guide](../guides/impact-alerts) for how to read the figures, how to consume them in CI, and what they cost.
 - `min_request_interval_ms` (Number) Minimum elapsed time, in milliseconds, between the start of consecutive outbound API requests, pacing all traffic through the shared client. Defaults to 0 (no pacing). Because it gates request starts rather than limiting concurrency, it is a throughput ceiling on the whole provider: at 100ms no plan exceeds 10 requests per second however many operations Terraform runs in parallel. Raise it to give a heavily loaded server breathing room, at the cost of slowing every plan and apply. Can also be set via the JAMFPLATFORM_MIN_REQUEST_INTERVAL_MS environment variable.
 - `name_collision_check` (Attributes) Detect during `terraform plan` a new or renamed object whose name already belongs to an object in the tenant. Most object types refuse a duplicate name, so without the check `terraform apply` fails halfway through. The diagnostic names the existing object and its ID and gives the `import` block that adopts it. The check lists each object type once per plan. A listing that fails produces one warning and the plan continues. See the [Name collisions guide](../guides/name-collisions). (see [below for nested schema](#nestedatt--name_collision_check))
 - `tenant_id` (String) **Legacy.** Prefer `environment_id`. UUID of the single **"Tenant"** your API integration targets: one Jamf Pro, Jamf School, Jamf Protect or Jamf Security Cloud tenant. Can also be set via the `JAMFPLATFORM_TENANT_ID` environment variable. Tenant scope is the legacy method for targeting integrations without a platform environment. It stays supported, and a few surfaces are still only reachable this way, but new configurations should use `environment_id`. This scope does not reach Blueprints, Compliance Benchmarks or Jamf AI Governance, so set `environment_id` if your configuration uses any of them. Mutually exclusive with `environment_id`; see that attribute for what happens when the ID and the integration disagree.
+
+<a id="nestedatt--file_sources"></a>
+### Nested Schema for `file_sources`
+
+Optional:
+
+- `azure` (Attributes) Settings for `azblob://account/container/blob` sources. The argument names match Terraform's `azurerm` backend. Authentication is through Microsoft Entra ID alone: a storage account key is not read, and a SAS URL is an `https://` source. Each method is switched on separately. One is used, in this order: a client secret, `use_oidc`, `use_msi`, `use_cli`. A method that is switched on but incomplete, or that fails, is an error and does not fall through to the next. (see [below for nested schema](#nestedatt--file_sources--azure))
+- `https` (Attributes List) Credentials for `https://` sources, one entry per server. A credential is sent to its own host over `https` and nowhere else, and is dropped when a redirect leaves that host. Each entry sets exactly one of `bearer_token`, `username` with `password`, or `header`. (see [below for nested schema](#nestedatt--file_sources--https))
+- `s3` (Attributes) Settings for `s3://bucket/key` sources. The argument names match Terraform's `s3` backend. (see [below for nested schema](#nestedatt--file_sources--s3))
+
+<a id="nestedatt--file_sources--azure"></a>
+### Nested Schema for `file_sources.azure`
+
+Optional:
+
+- `client_id` (String) Client ID of the app registration, or of a user-assigned managed identity with `use_msi`. Can also be set with `ARM_CLIENT_ID`.
+- `client_secret` (String, Sensitive) Client secret of the app registration. Can also be set with `ARM_CLIENT_SECRET`. Needs `tenant_id` and `client_id`. Cannot be combined with `client_secret_file_path`.
+- `client_secret_file_path` (String) Path of a file holding the client secret. Can also be set with `ARM_CLIENT_SECRET_FILE_PATH`. Cannot be combined with `client_secret`.
+- `environment` (String) Azure cloud the storage account belongs to: `public`, `china`, `usgovernment`. Can also be set with `ARM_ENVIRONMENT`. Defaults to `public`.
+- `msi_endpoint` (String) Custom managed identity endpoint, for `use_msi`. Can also be set with `ARM_MSI_ENDPOINT`.
+- `oidc_request_token` (String, Sensitive) Bearer token that authorises the request to `oidc_request_url`. Can also be set with `ARM_OIDC_REQUEST_TOKEN` or `ACTIONS_ID_TOKEN_REQUEST_TOKEN`.
+- `oidc_request_url` (String) URL the OpenID Connect token is requested from, for `use_oidc` on a CI system that issues tokens on request. Can also be set with `ARM_OIDC_REQUEST_URL` or `ACTIONS_ID_TOKEN_REQUEST_URL`.
+- `oidc_token` (String, Sensitive) The OpenID Connect token, for `use_oidc`. Can also be set with `ARM_OIDC_TOKEN`. Cannot be combined with `oidc_token_file_path`.
+- `oidc_token_file_path` (String) Path of a file holding the OpenID Connect token, for `use_oidc`. Can also be set with `ARM_OIDC_TOKEN_FILE_PATH`. Cannot be combined with `oidc_token`.
+- `tenant_id` (String) Microsoft Entra tenant ID. Can also be set with `ARM_TENANT_ID`.
+- `use_cli` (Boolean) Authenticate with the account signed in to the Azure CLI. Can also be set with `ARM_USE_CLI`. Defaults to `true`, so it is the method used when no other is enabled.
+- `use_msi` (Boolean) Authenticate with a managed identity. Can also be set with `ARM_USE_MSI`. It works only on compute hosted in Azure.
+- `use_oidc` (Boolean) Authenticate with an OpenID Connect token through a federated credential on the app registration. Can also be set with `ARM_USE_OIDC`. On GitHub Actions the token is requested from the runner without further configuration.
+
+
+<a id="nestedatt--file_sources--https"></a>
+### Nested Schema for `file_sources.https`
+
+Optional:
+
+- `bearer_token` (String, Sensitive) Token sent as `Authorization: Bearer`.
+- `header` (Attributes) One request header carrying the credential, for a server that reads an API key from a header of its own. (see [below for nested schema](#nestedatt--file_sources--https--header))
+- `host` (String) Required. Hostname the credential belongs to, with an optional port: `files.example.com` or `files.example.com:8443`. No scheme and no path. The port defaults to 443.
+- `password` (String, Sensitive) Password for HTTP basic authentication. Requires `username`.
+- `username` (String) User name for HTTP basic authentication. Requires `password`.
+
+<a id="nestedatt--file_sources--https--header"></a>
+### Nested Schema for `file_sources.https.header`
+
+Required:
+
+- `name` (String) Header name, such as `X-Api-Key`.
+- `value` (String, Sensitive) Header value.
+
+
+
+<a id="nestedatt--file_sources--s3"></a>
+### Nested Schema for `file_sources.s3`
+
+Optional:
+
+- `access_key` (String, Sensitive) AWS access key ID. Requires `secret_key`. A role or a profile keeps the key out of the saved plan file.
+- `assume_role` (Attributes) IAM role to assume before reading. (see [below for nested schema](#nestedatt--file_sources--s3--assume_role))
+- `assume_role_with_web_identity` (Attributes) IAM role to assume with an OpenID Connect token, the usual arrangement on a CI runner. (see [below for nested schema](#nestedatt--file_sources--s3--assume_role_with_web_identity))
+- `endpoints` (Attributes) Custom service endpoints, for S3-compatible storage such as MinIO. (see [below for nested schema](#nestedatt--file_sources--s3--endpoints))
+- `profile` (String) Named profile in the shared configuration files. Can also be set with `AWS_PROFILE`.
+- `region` (String) AWS Region the client starts in. Can also be set with `AWS_REGION` or `AWS_DEFAULT_REGION`. A bucket in another Region is found without further configuration.
+- `secret_key` (String, Sensitive) AWS secret access key. Requires `access_key`.
+- `shared_config_files` (List of String) Paths of the shared configuration files. Defaults to `~/.aws/config`.
+- `shared_credentials_files` (List of String) Paths of the shared credentials files. Defaults to `~/.aws/credentials`.
+- `token` (String, Sensitive) Session token of temporary credentials. Requires `access_key`. Temporary credentials set here are not refreshed, so they must outlive the upload.
+- `use_path_style` (Boolean) Put the bucket in the URL path (`https://host/bucket/key`) instead of the hostname. S3-compatible storage usually needs it. Defaults to `false`.
+
+<a id="nestedatt--file_sources--s3--assume_role"></a>
+### Nested Schema for `file_sources.s3.assume_role`
+
+Required:
+
+- `role_arn` (String) ARN of the role.
+
+Optional:
+
+- `external_id` (String) External ID the role's trust policy asks for.
+- `session_name` (String) Name of the role session, which appears in AWS CloudTrail.
+
+
+<a id="nestedatt--file_sources--s3--assume_role_with_web_identity"></a>
+### Nested Schema for `file_sources.s3.assume_role_with_web_identity`
+
+Required:
+
+- `role_arn` (String) ARN of the role.
+
+Optional:
+
+- `session_name` (String) Name of the role session, which appears in AWS CloudTrail.
+- `web_identity_token` (String, Sensitive) The OpenID Connect token. Cannot be combined with `web_identity_token_file`.
+- `web_identity_token_file` (String) Path of a file holding the OpenID Connect token. Cannot be combined with `web_identity_token`.
+
+
+<a id="nestedatt--file_sources--s3--endpoints"></a>
+### Nested Schema for `file_sources.s3.endpoints`
+
+Optional:
+
+- `s3` (String) URL of the S3 endpoint.
+- `sts` (String) URL of the AWS STS endpoint, used when a role is assumed.
+
+
+
 
 <a id="nestedatt--name_collision_check"></a>
 ### Nested Schema for `name_collision_check`

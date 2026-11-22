@@ -39,6 +39,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/files"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -136,6 +137,7 @@ Point ` + "`image_file_source`" + ` at the file you uploaded. This store hands a
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
+					commonvalidators.NoCloudStorageSource(),
 				},
 			},
 			"source_hash": schema.StringAttribute{

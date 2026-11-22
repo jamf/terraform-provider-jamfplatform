@@ -108,7 +108,7 @@ func TestOpenHashUploadVerifyReachesTheChosenRoute(t *testing.T) {
 					PackageFileSource: types.StringValue(src),
 				}
 
-				diags := openHashUploadVerify(context.Background(), rec, route, plan, fileDigests{}, "")
+				diags := openHashUploadVerify(context.Background(), rec, nil, route, plan, fileDigests{}, "")
 				if diags.HasError() {
 					t.Fatalf("openHashUploadVerify: %v", diags)
 				}
@@ -173,7 +173,7 @@ func TestStreamURLUploadAndVerifyReachesTheChosenRoute(t *testing.T) {
 					PackageFileSource: types.StringValue(srv.URL + "/" + unique + ".pkg"),
 				}
 
-				diags := streamURLUploadAndVerify(context.Background(), rec, route, plan, fileDigests{}, "")
+				diags := streamURLUploadAndVerify(context.Background(), rec, nil, route, plan, fileDigests{}, "")
 				if diags.HasError() {
 					t.Fatalf("streamURLUploadAndVerify: %v", diags)
 				}
@@ -219,7 +219,7 @@ func TestReuploadRenamesTheRecordBeforeADirectUpload(t *testing.T) {
 				var hits atomic.Int32
 				srv := newContentServer(t, true, &hits)
 				plan.PackageFileSource = types.StringValue(srv.URL + "/rename-" + strings.ReplaceAll(t.Name(), "/", "-") + ".pkg")
-				diags = reuploadFromURL(context.Background(), rec, tc.route, plan, state, fileDigests{})
+				diags = reuploadFromURL(context.Background(), rec, nil, tc.route, plan, state, fileDigests{}, state.Size.ValueString())
 			} else {
 				local, size, err := hashStream(strings.NewReader(flowContent))
 				if err != nil {

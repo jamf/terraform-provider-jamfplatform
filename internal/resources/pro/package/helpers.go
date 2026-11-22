@@ -465,7 +465,7 @@ func readSourceBytes(ctx context.Context, src string) ([]byte, error) {
 
 	data, err := io.ReadAll(f)
 	if err != nil {
-		return nil, fmt.Errorf("reading manifest source %q: %w", src, err)
+		return nil, fmt.Errorf("reading manifest source %q: %w", files.RedactSource(src), err)
 	}
 	return data, nil
 }

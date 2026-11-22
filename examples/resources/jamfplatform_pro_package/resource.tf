@@ -34,6 +34,32 @@ resource "jamfplatform_pro_package" "cloud_dp_url" {
   package_file_source = "https://artifacts.example.com/packages/MyApp-1.0.0.pkg"
 }
 
+# Cloud distribution point upload from Amazon S3. The object is read with the
+# AWS credentials the machine already has, or those in the provider's
+# file_sources block. Replacing the object shows in the next plan, and an
+# update that leaves it unchanged uploads nothing.
+resource "jamfplatform_pro_package" "cloud_dp_s3" {
+  display_name        = "MyApp 1.0.0 (S3)"
+  file_name           = "MyApp-1.0.0.pkg"
+  package_file_source = "s3://my-packages/releases/MyApp-1.0.0.pkg"
+}
+
+# The same from Azure Blob Storage: storage account, container, blob.
+resource "jamfplatform_pro_package" "cloud_dp_azure" {
+  display_name        = "MyApp 1.0.0 (Azure)"
+  file_name           = "MyApp-1.0.0.pkg"
+  package_file_source = "azblob://mystorageaccount/packages/MyApp-1.0.0.pkg"
+}
+
+# A very large package sent from the store to Jamf Pro without a temporary
+# file. Cannot be combined with package_file_source_checksum.
+resource "jamfplatform_pro_package" "cloud_dp_s3_streamed" {
+  display_name        = "Xcode 16.2"
+  file_name           = "Xcode-16.2.pkg"
+  package_file_source = "s3://my-packages/large/Xcode-16.2.pkg"
+  stream_url_directly = true
+}
+
 # Upload with a manifest. `manifest_file_source` accepts either a local path
 # or a URL. The manifest is re-uploaded only when its contents change, so
 # changing only the on-disk filename without changing the body does not

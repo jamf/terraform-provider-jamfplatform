@@ -112,6 +112,8 @@ func TestPlanUploadedContentChange_UnreadableOrRemoteSourceIsLeftAlone(t *testin
 	for name, src := range map[string]string{
 		"missing file": filepath.Join(t.TempDir(), "absent.pkg"),
 		"url":          "https://example.invalid/a.pkg",
+		"s3":           "s3://bucket/a.pkg",
+		"azure":        "azblob://account/pkgs/a.pkg",
 	} {
 		t.Run(name, func(t *testing.T) {
 			req, resp := contentPlanFixture(t, "00ff", src)
