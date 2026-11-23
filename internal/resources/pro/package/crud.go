@@ -73,8 +73,8 @@ func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest
 	if isConfiguredString(plan.PackageFileSource) {
 		var diags diag.Diagnostics
 		route, diags = preflightUploadDestination(createCtx, r.client)
+		resp.Diagnostics.Append(diags...)
 		if diags.HasError() {
-			resp.Diagnostics.Append(diags...)
 			return
 		}
 	}
@@ -266,10 +266,12 @@ func (r *PackageResource) Read(ctx context.Context, req resource.ReadRequest, re
 // nothing, where for a URL every update re-sends the whole file. When the
 // object has changed, or state holds no marker for it, the streaming path
 // uploads without comparing digests first, because it has none until the
-// stream has passed through. The exception is adoption, where state holds no
-// marker for the source and the bytes may be the ones Jamf Pro already has:
-// the object is first read through the hashers alone and the upload skipped
-// on a match (sourceAlreadyHeld).
+// stream has passed through. Two exceptions read the object through the
+// hashers alone first and skip the upload on a match (sourceAlreadyHeld):
+// adoption, where state holds no marker for the source and the bytes may be
+// the ones Jamf Pro already has, and a changed marker on an object still the
+// size of Jamf Pro's file (sameSizeAsHeld), which is what an identical
+// rewrite or an Azure metadata edit looks like.
 func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state PackageResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -317,7 +319,7 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 			resp.Diagnostics.Append(diags...)
 			return
 		}
-		if native && held.strongest() >= 0 && adoptingSource(&plan, &state) {
+		if native && held.strongest() >= 0 && (adoptingSource(&plan, &state) || sameSizeAsHeld(updateCtx, r.sources, plan.PackageFileSource.ValueString(), heldSize)) {
 			marker, alreadyHeld, heldErr := sourceAlreadyHeld(updateCtx, r.sources, plan.PackageFileSource.ValueString(), plannedPin(&plan), held)
 			if heldErr != nil {
 				summary, detail := sourceProblem(heldErr)
@@ -332,8 +334,8 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 	if streamingURLEnabled(plan) && !skipSource {
 		route, diags := preflightUploadDestination(updateCtx, r.client)
+		resp.Diagnostics.Append(diags...)
 		if diags.HasError() {
-			resp.Diagnostics.Append(diags...)
 			return
 		}
 		// Upload + verify FIRST so JCDS has recomputed hashes when the
@@ -404,8 +406,8 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 	if isConfiguredString(plan.PackageFileSource) && !skipSource {
 		var diags diag.Diagnostics
 		route, diags = preflightUploadDestination(updateCtx, r.client)
+		resp.Diagnostics.Append(diags...)
 		if diags.HasError() {
-			resp.Diagnostics.Append(diags...)
 			return
 		}
 
@@ -706,7 +708,7 @@ func preflightUploadDestination(ctx context.Context, client cloudDistributionPoi
 	cdp, err := client.GetCloudDistributionPointV1(ctx)
 	if err != nil {
 		tflog.Warn(ctx, "could not read the cloud distribution point before uploading; proceeding by the API route", map[string]any{"err": err.Error()})
-		return uploadViaAPI, nil
+		return uploadViaAPI, diag.Diagnostics{diag.NewWarningDiagnostic(cdpUnreadableSummary, cdpUnreadableDetail(err))}
 	}
 	if cdp == nil || strings.EqualFold(cdp.CdnType, pro.CloudDistributionPointCdnTypeNone) {
 		return uploadViaAPI, errorDiag(
@@ -719,6 +721,38 @@ func preflightUploadDestination(ctx context.Context, client cloudDistributionPoi
 	route := routeForCdnType(cdp.CdnType)
 	tflog.Debug(ctx, "package upload route chosen", map[string]any{"cdn_type": cdp.CdnType, "route": route.String()})
 	return route, nil
+}
+
+// cdpUnreadableSummary heads the warning preflightUploadDestination raises
+// when it cannot read the cloud distribution point and falls back to the API
+// route.
+const cdpUnreadableSummary = "Package uploaded without reading the cloud distribution point"
+
+// cdpUnreadableDetail is the warning's detail. Without it the operator cannot
+// tell from the plan output that the upload took the API route rather than the
+// direct one. A 403 is almost always the integration missing the read
+// permission, so that case names it.
+func cdpUnreadableDetail(err error) string {
+	cause := "The provider could not read the cloud distribution point settings."
+	if helpers.IsForbiddenError(err) {
+		cause = "Jamf Pro refused to show the cloud distribution point settings. Grant the API integration Infrastructure → Cloud Distribution Point → Read."
+	}
+	return cause + "\n\n" +
+		"The provider is uploading the file through Jamf Pro instead of straight to the distribution point. " +
+		"A direct upload also needs Infrastructure → Jamf Cloud Distribution Service files → Create.\n\n" +
+		helpers.APIErrorDetail(err)
+}
+
+// uploadFailureDetail is the detail of a failed binary upload. A 403 on the
+// direct route is Jamf Pro refusing to issue upload credentials, which an
+// integration that can read and write packages still meets when it lacks the
+// one JCDS permission, so that case names it. Every other failure is passed
+// through.
+func uploadFailureDetail(route uploadRoute, err error) string {
+	if route == uploadViaJCDS && helpers.IsForbiddenError(err) {
+		return "Jamf Pro refused to issue credentials for uploading to the Jamf Cloud Distribution Point. Grant the API integration Infrastructure → Jamf Cloud Distribution Service files → Create.\n\n" + helpers.APIErrorDetail(err)
+	}
+	return helpers.APIErrorDetail(err)
 }
 
 // cloudDistributionPointReader is the one SDK call preflightUploadDestination
@@ -761,7 +795,7 @@ func uploadAndPoll(ctx context.Context, client uploadClient, route uploadRoute, 
 		})
 		if err := uploadBinary(ctx, client, route, id, fileName, file); err != nil {
 			tflog.Error(ctx, "package upload failed", map[string]any{"err": err.Error(), "attempt": attempt, "route": route.String()})
-			return errorDiag("Error uploading Jamf Pro package binary", err.Error())
+			return errorDiag("Error uploading Jamf Pro package binary", uploadFailureDetail(route, err))
 		}
 		tflog.Info(ctx, "package upload returned", map[string]any{"id": id, "attempt": attempt, "route": route.String()})
 
@@ -998,7 +1032,7 @@ func streamURLUploadOnce(ctx context.Context, client uploadClient, sources *file
 	if err := uploadBinary(ctx, client, route, plan.ID.ValueString(), fileName, jamfplatform.SizedReader(pr, declaredSize)); err != nil {
 		// Drain any remaining body so the goroutine exits cleanly.
 		_ = pr.CloseWithError(err)
-		return errorDiag("Error streaming Jamf Pro package upload", err.Error()), nil
+		return errorDiag("Error streaming Jamf Pro package upload", uploadFailureDetail(route, err)), nil
 	}
 
 	settleSourceVersion(plan, marker)

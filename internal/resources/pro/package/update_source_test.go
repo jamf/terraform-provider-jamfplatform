@@ -653,19 +653,30 @@ func TestUpdate_StreamingRefusesAChecksumItCannotCheck(t *testing.T) {
 func TestUpdate_StreamedAdoptionHashesTheObjectAndSkipsAnUploadJamfProDoesNotNeed(t *testing.T) {
 	cases := map[string]struct {
 		jamfHolds   string
+		heldSize    string
 		stateMarker types.String
 		wantReads   int
 		wantUploads int
 	}{
-		"same bytes already in Jamf Pro":         {"package bytes", types.StringNull(), 1, 0},
-		"other bytes in Jamf Pro":                {"older bytes", types.StringNull(), 2, 1},
-		"Jamf Pro has no digest to compare with": {"", types.StringNull(), 1, 1},
-		"not an adoption: the marker changed":    {"package bytes", types.StringValue(`etag:"old"`), 1, 1},
+		"same bytes already in Jamf Pro":                         {"package bytes", "", types.StringNull(), 1, 0},
+		"other bytes in Jamf Pro":                                {"older bytes", "", types.StringNull(), 2, 1},
+		"Jamf Pro has no digest to compare with":                 {"", "", types.StringNull(), 1, 1},
+		"marker changed, bytes rewritten unchanged":              {"package bytes", "", types.StringValue(`etag:"old"`), 1, 0},
+		"marker changed, same size, other bytes":                 {"package BYTES", "", types.StringValue(`etag:"old"`), 2, 1},
+		"marker changed, Jamf Pro's file is another size":        {"older bytes", "11", types.StringValue(`etag:"old"`), 1, 1},
+		"marker changed, Jamf Pro reports no size to compare by": {"package bytes", "-", types.StringValue(`etag:"old"`), 1, 1},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			sources, store := objectStoreResolver(t, "package bytes")
 			stub, client := newJamfStub(t, tc.jamfHolds)
+			switch tc.heldSize {
+			case "":
+			case "-":
+				stub.record.Size = nil
+			default:
+				stub.record.Size = new(tc.heldSize)
+			}
 			source := types.StringValue(objectSource)
 			state := recordedModel(stub, source, tc.stateMarker)
 			state.StreamURLDirectly = types.BoolValue(true)

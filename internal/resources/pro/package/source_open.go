@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/files"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filesources"
@@ -147,9 +149,10 @@ func adoptingSource(plan, state *PackageResourceModel) bool {
 // with streaming off, which needs the local disk that streaming exists to
 // avoid. Reading the object once to hash it costs a download and no disk, and
 // on a match the upload is skipped. On a mismatch the object is read a second
-// time to send it, which is why this runs only when adopting: for an object
-// whose marker changed, different bytes are the likely answer and the first
-// read would be wasted.
+// time to send it, which is why it runs only when adopting or when
+// sameSizeAsHeld says the bytes may well be the same ones; for an object whose
+// marker changed to a different size, different bytes are certain and the
+// first read would be wasted.
 //
 // The read is pinned like any other, so the bytes hashed are the ones the
 // plan described, and it is held to the declared size, so a short read cannot
@@ -173,6 +176,33 @@ func sourceAlreadyHeld(ctx context.Context, sources *filesources.Resolver, src, 
 		marker = pin
 	}
 	return marker, held.matches(local), nil
+}
+
+// sameSizeAsHeld reports whether a cloud storage object whose marker changed
+// is the size of the file Jamf Pro holds, by one metadata request. It decides
+// whether the streaming path hashes the object before sending it
+// (sourceAlreadyHeld).
+//
+// A marker is not a checksum. An Azure ETag changes on every write, metadata
+// and access tier included, and an object can be written again with identical
+// bytes; either way the object is still the file Jamf Pro has, and streaming
+// it again would send the whole file for nothing. Those cases keep the size, so
+// a matching size buys the hash pass: a match then costs one read and no
+// upload, and a mismatch one extra read. A different size proves different
+// bytes and goes straight to the stream. A size Jamf Pro does not report, or an
+// object that cannot be examined, answers false: the stream then reports any
+// problem with the object, pinned to the planned marker.
+func sameSizeAsHeld(ctx context.Context, sources *filesources.Resolver, src, heldSize string) bool {
+	held, err := strconv.ParseInt(heldSize, 10, 64)
+	if err != nil {
+		return false
+	}
+	attributes, err := sources.Stat(ctx, src)
+	if err != nil {
+		tflog.Debug(ctx, "could not examine the changed cloud storage object; streaming it without comparing", map[string]any{"err": err.Error()})
+		return false
+	}
+	return attributes.Size == held
 }
 
 // streamingChecksumProblem is the diagnostic for package_file_source_checksum

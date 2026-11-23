@@ -242,7 +242,7 @@ For an `s3://` or `azblob://` source the provider records the object's ETag in `
 - **File replaced in Jamf Pro.** The next refresh clears `package_file_source_version` and warns. The apply reads the object and uploads it if Jamf Pro's file still differs.
 - **Object missing while planning.** The plan warns and carries on, because another resource in the same configuration may create the object. The apply fails, before a package record exists, if it is still missing.
 
-An ETag is not a checksum. An Azure ETag changes on every write, including a metadata edit, and an S3 ETag changes when an object is re-uploaded in parts of a different size. A change the provider did not need costs one download: the object is compared with the file Jamf Pro holds, and uploaded only if it differs.
+An ETag is not a checksum. An Azure ETag changes on every write, including a metadata edit, and an S3 ETag changes when an object is re-uploaded in parts of a different size. A change the provider did not need costs one download: the object is compared with the file Jamf Pro holds, and uploaded only if it differs. With `stream_url_directly`, the provider compares only an object the same size as Jamf Pro's file; see [Streaming](#streaming).
 
 A source with `?versionId=` names one version and is never examined again once it has been read.
 
@@ -253,6 +253,17 @@ Importing a package, or moving one from a local path to cloud storage, does not 
 ### The plan needs read access
 
 The comparison happens while planning, so the identity that runs `terraform plan` needs the same read access as the one that runs `terraform apply`. Where a pipeline plans on pull requests, that identity can learn whether an object exists, its size and its ETag. Scope it as tightly as the apply identity.
+
+## Jamf Pro permissions
+
+To upload a package file, the API integration needs two permissions besides the package ones. Both sit under **Infrastructure**:
+
+| Permission | Without it |
+|---|---|
+| Cloud Distribution Point → Read | The provider cannot tell which distribution point the tenant uses. It warns "Package uploaded without reading the cloud distribution point" and uploads the file through Jamf Pro instead of straight to the distribution point |
+| Jamf Cloud Distribution Service files → Create | On a Jamf Cloud Distribution Point the upload fails, and the error names this permission |
+
+The full list is under **Required Jamf permissions** on the `jamfplatform_pro_package` resource page.
 
 ## Shared runners
 
@@ -265,6 +276,12 @@ Control it around the provider: limit the runner identity's bucket or container 
 By default a cloud storage object is copied to a temporary file, hashed, and uploaded from there. The file is private to the user and removed afterwards.
 
 `stream_url_directly = true` sends the object from the store to Jamf Pro without the temporary file. An unchanged object is still not sent, and a read cut partway resumes where it stopped, pinned to the same ETag. Streaming cannot be combined with `package_file_source_checksum`.
+
+A streamed file has no digest until the provider has sent it. When the ETag changes, the provider decides by size:
+
+- **Same size as Jamf Pro's file.** The provider reads the object once and compares it. It uploads nothing if the bytes match. If they differ, it reads the object again and uploads it, so you pay for two downloads.
+- **Different size.** The provider uploads the object in one pass and compares nothing.
+- **Adopting a package.** The provider reads the object once and compares it, as in [Adopting an existing package](#adopting-an-existing-package).
 
 The size limit is 8 GiB either way.
 
@@ -284,6 +301,7 @@ A signed URL is a credential. It is stored in state, and one generated on every 
 | Package file changed since the plan | The object was replaced after planning. Run the plan again |
 | Server refused the package file download | An `https` host answered 401 or 403 to its credential |
 | Cloud storage source not supported here | The attribute is not `package_file_source` |
+| Package uploaded without reading the cloud distribution point | The integration lacks Cloud Distribution Point → Read. See [Jamf Pro permissions](#jamf-pro-permissions) |
 | Package file not examined during this plan | A `file_sources` value comes from a resource that does not exist yet. The apply decides whether to upload |
 
 With `TF_LOG=DEBUG` the provider logs each object it examines and reads, by name. It logs no credential and no query string.
