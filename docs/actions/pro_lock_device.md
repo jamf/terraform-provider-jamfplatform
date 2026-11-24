@@ -34,6 +34,11 @@ Jamf lists this under **Platform environment** scope. You choose an integration'
 ## Example Usage
 
 ```terraform
+# Locks the listed computers or mobile devices. Take the PIN from a variable so
+# it stays out of the configuration.
+#
+#   terraform apply -invoke='action.jamfplatform_pro_lock_device.lock'
+
 variable "lock_pin" {
   type      = string
   sensitive = true

@@ -1,3 +1,7 @@
+# Starts an AppleCare enhanced log collection session on the listed devices.
+#
+#   terraform apply -invoke='action.jamfplatform_pro_trigger_enhanced_log_collection.collect'
+
 variable "applecare_token" {
   type      = string
   sensitive = true

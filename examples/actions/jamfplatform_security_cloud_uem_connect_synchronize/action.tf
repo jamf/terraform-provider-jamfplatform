@@ -1,3 +1,7 @@
+# Invoke by name, for example:
+#
+#   terraform apply -invoke='action.jamfplatform_security_cloud_uem_connect_synchronize.now'
+
 # Starts a UEM Connect sync immediately instead of waiting for the next scheduled
 # one. Jamf Security Cloud runs it in the background, so this returns as soon as the
 # run has started and reports nothing about what it did.

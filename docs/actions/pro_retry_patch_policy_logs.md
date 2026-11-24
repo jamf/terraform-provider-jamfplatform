@@ -26,6 +26,11 @@ Jamf lists this under **Platform environment** scope (preferred for new integrat
 ## Example Usage
 
 ```terraform
+# Retries failed patch policy installs. Omit device_ids to retry every failed
+# computer.
+#
+#   terraform apply -invoke='action.jamfplatform_pro_retry_patch_policy_logs.retry'
+
 action "jamfplatform_pro_retry_patch_policy_logs" "retry" {
   config {
     patch_policy_id = "123"

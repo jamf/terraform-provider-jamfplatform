@@ -39,6 +39,11 @@ Also grant these when the action targets a computer by `management_id`:
 ## Example Usage
 
 ```terraform
+# Each block below is one way to pick the computers. Invoke the one you want by
+# name, for example:
+#
+#   terraform apply -invoke='action.jamfplatform_pro_jamf_protect_deployment_retry.all_failed'
+
 # Retry failed Jamf Protect install tasks for a deployment.
 #
 # The deployment id is the plan UUID surfaced by the plans data source.
