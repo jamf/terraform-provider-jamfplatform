@@ -104,6 +104,10 @@ func planMarkerVerdict(f markerFacts) markerVerdict {
 // apply then reads the object pinned to that marker, so the bytes uploaded are
 // the ones this plan described, or the apply fails before uploading anything.
 //
+// An ETag that changed under an unchanged source string adds a warning, because
+// the Unknown size and hashes read as a certain re-upload when the apply may
+// find the bytes unchanged.
+//
 // Three cases make no request or cannot use the answer:
 //
 //   - A source carrying ?versionId= names one immutable version. Once state
@@ -198,6 +202,11 @@ func (r *PackageResource) planSourceVersion(ctx context.Context, req resource.Mo
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, marker, types.StringValue(facts.objectMarker))...)
 		if !facts.creating {
 			markUploadDerivedUnknown(ctx, resp)
+		}
+		if !facts.creating && !facts.sourceChanged && facts.stateMarker != "" {
+			resp.Diagnostics.AddAttributeWarning(path.Root("package_file_source"), "Package file ETag changed",
+				"Size and hashes show as known after apply. "+
+					"The apply uploads the file only if its contents differ from what Jamf Pro holds.")
 		}
 	case markerDefer:
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, marker, types.StringUnknown())...)

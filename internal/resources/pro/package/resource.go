@@ -210,7 +210,7 @@ func (r *PackageResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Optional:            true,
 			},
 			"package_file_source_version": schema.StringAttribute{
-				MarkdownDescription: "Change marker of the cloud storage object the package file was last read from: the object's ETag, prefixed `etag:`. Set for an `s3://` or `azblob://` `package_file_source` and empty for any other. The provider compares it with the object on every plan to tell whether the file has changed, and clears it when the file in Jamf Pro is replaced outside Terraform. It is not a checksum of the file. Read-only.",
+				MarkdownDescription: "Change marker of the cloud storage object the package file was last read from: the object's ETag, prefixed `etag:`. Set for an `s3://` or `azblob://` `package_file_source` and empty for any other. The provider compares it with the object on every plan to tell whether the file has changed, and clears it when the file in Jamf Pro is replaced outside Terraform. It is not a checksum of the file. A metadata edit or an identical re-upload also changes it, so the apply compares the object with the file Jamf Pro holds and uploads it only if they differ. Read-only.",
 				Computed:            true,
 			},
 			"manifest_file_source": schema.StringAttribute{
