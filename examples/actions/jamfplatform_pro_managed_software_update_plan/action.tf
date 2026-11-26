@@ -1,11 +1,22 @@
-# Enforce a target OS version on the members of a smart or static group.
-# Submitting an update plan is a fire-once directive, invoked from a resource's
-# lifecycle action_trigger (Terraform >= 1.14).
+# Enforce the latest macOS on a group every time the group is created or
+# changes. caller.jamf_pro_id is the group's numeric Jamf Pro ID. A plan is a
+# fire-once directive, so keep the trigger on events you want to repeat it for.
+resource "jamfplatform_device_group" "pilot" {
+  name        = "Pilot Macs"
+  group_type  = "static"
+  device_type = "computer"
+
+  lifecycle {
+    action_trigger {
+      events  = [after_create]
+      actions = [action.jamfplatform_pro_managed_software_update_plan.enforce_latest]
+    }
+  }
+}
 
 action "jamfplatform_pro_managed_software_update_plan" "enforce_latest" {
   config {
-    # Use the jamf_pro_id exported by jamfplatform_device_group.
-    group_id    = "1"
+    group_id    = caller.jamf_pro_id
     object_type = "COMPUTER_GROUP" # or MOBILE_DEVICE_GROUP
 
     update_action = "DOWNLOAD_INSTALL"

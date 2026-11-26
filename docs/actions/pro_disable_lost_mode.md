@@ -31,11 +31,13 @@ Jamf lists this under **Platform environment** scope. You choose an integration'
 ## Example Usage
 
 ```terraform
+# Turns Lost Mode off on the listed supervised iPhones and iPads.
+#
+#   terraform apply -invoke='action.jamfplatform_pro_disable_lost_mode.found'
+
 action "jamfplatform_pro_disable_lost_mode" "found" {
   config {
-    management_ids = [
-      "00000000-0000-0000-0000-000000000000",
-    ]
+    serial_numbers = ["F2LXXXXXXXXX"]
   }
 }
 ```

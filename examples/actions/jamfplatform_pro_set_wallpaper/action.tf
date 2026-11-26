@@ -1,3 +1,7 @@
+# Sets the wallpaper on the listed supervised iPhones and iPads.
+#
+#   terraform apply -invoke='action.jamfplatform_pro_set_wallpaper.brand'
+
 action "jamfplatform_pro_set_wallpaper" "brand" {
   config {
     serial_numbers = ["F2LXXXXXXXXX"]

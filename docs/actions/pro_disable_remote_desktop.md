@@ -31,6 +31,10 @@ Jamf lists this under **Platform environment** scope. You choose an integration'
 ## Example Usage
 
 ```terraform
+# Turns Remote Desktop off on the listed computers.
+#
+#   terraform apply -invoke='action.jamfplatform_pro_disable_remote_desktop.remote'
+
 action "jamfplatform_pro_disable_remote_desktop" "remote" {
   config {
     serial_numbers = ["C02XXXXXXXXX"]

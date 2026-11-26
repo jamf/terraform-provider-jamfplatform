@@ -31,15 +31,44 @@ Jamf lists this under **Platform environment** scope. You choose an integration'
 ## Example Usage
 
 ```terraform
-action "jamfplatform_pro_send_blank_push" "nudge" {
+# Nudge every member of a static computer group each time its membership
+# changes. caller is the group that fired the trigger, and caller.members is its
+# list of management IDs.
+resource "jamfplatform_device_group" "pilot" {
+  name        = "Pilot Macs"
+  group_type  = "static"
+  device_type = "computer"
+  members     = [for d in data.jamfplatform_devices.macs.devices : d.id]
+
+  lifecycle {
+    action_trigger {
+      events  = [after_create, after_update]
+      actions = [action.jamfplatform_pro_send_blank_push.nudge_group]
+    }
+  }
+}
+
+data "jamfplatform_devices" "macs" {
+  filter = [
+    {
+      selector = "modelIdentifier"
+      argument = "Mac*"
+    }
+  ]
+}
+
+action "jamfplatform_pro_send_blank_push" "nudge_group" {
   config {
-    # Source management IDs from a device group's members, or list serials.
-    management_ids = [
-      "00000000-0000-0000-0000-000000000000",
-    ]
-    serial_numbers = [
-      "C02XXXXXXXXX",
-    ]
+    management_ids = caller.members
+  }
+}
+
+# Nudge named devices on demand:
+#
+#   terraform apply -invoke='action.jamfplatform_pro_send_blank_push.nudge_one'
+action "jamfplatform_pro_send_blank_push" "nudge_one" {
+  config {
+    serial_numbers = ["C02XXXXXXXXX"]
   }
 }
 ```
