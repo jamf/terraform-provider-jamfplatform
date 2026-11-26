@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -49,6 +50,147 @@ var ErrDownloadCapExceeded = errors.New("files: download exceeded byte cap")
 // basename would escape os.TempDir() (path traversal, absolute path, ...).
 var ErrUnsafeTempPath = errors.New("files: refusing unsafe URL-derived temp path")
 
+// sourceSchemePattern matches a leading scheme followed by "://", in either
+// case and after any leading whitespace. RedactSource uses it in place of
+// urlPattern so a string that is URL-shaped but not one this package fetches,
+// such as "HTTPS://" or a URL pasted with a leading space, is still stripped of
+// its query. The scheme is at least two characters, so a Windows drive letter
+// written with forward slashes stays a path.
+var sourceSchemePattern = regexp.MustCompile(`^\s*[A-Za-z][A-Za-z0-9+.-]+://`)
+
+// redactedQuery replaces a query string in anything RedactSource returns.
+const redactedQuery = "?<redacted>"
+
+// redactedRest replaces everything after the scheme when RedactSource cannot
+// tell where a credential ends.
+const redactedRest = "<redacted>"
+
+// numericPattern matches a port.
+var numericPattern = regexp.MustCompile(`^[0-9]*$`)
+
+// RedactSource returns src in a form fit for an error, a diagnostic or a log
+// line. A presigned or SAS URL carries its credential in the query string, and
+// a URL can carry a password in its user information, so both are removed from
+// anything with a scheme. A fragment goes with the query. A local path is
+// returned unchanged.
+//
+// It works on the string, not on a parsed URL, so a source that url.Parse
+// refuses is redacted all the same: that refusal is one of the errors this is
+// called to report.
+//
+// A password pasted without percent-encoding can hold "/", "?" or "#", which
+// ends the authority early and leaves the "@" further along. When the
+// authority has no "@", something after it does, and what follows the
+// authority's colon is not a port, everything after the scheme is withheld,
+// because the string cannot say where the password stops. Two shapes still get
+// through: a password made only of digits up to its first "/", and a bare
+// token with no colon in front of it. Both are indistinguishable from a host
+// with a port, or a host, followed by a path that holds an "@".
+func RedactSource(src string) string {
+	loc := sourceSchemePattern.FindStringIndex(src)
+	if loc == nil {
+		return src
+	}
+	scheme, rest := src[:loc[1]], src[loc[1]:]
+	authority, tail := rest, ""
+	if i := strings.IndexAny(rest, "/?#"); i >= 0 {
+		authority, tail = rest[:i], rest[i:]
+	}
+	if at := strings.LastIndex(authority, "@"); at >= 0 {
+		authority = authority[at+1:]
+	} else if colon := strings.LastIndex(authority, ":"); colon >= 0 && strings.Contains(tail, "@") &&
+		!strings.HasPrefix(authority, "[") && !numericPattern.MatchString(authority[colon+1:]) {
+		return scheme + redactedRest
+	}
+	suffix := ""
+	if i := strings.IndexAny(tail, "?#"); i >= 0 {
+		tail, suffix = tail[:i], redactedQuery
+	}
+	return scheme + authority + tail + suffix
+}
+
+// redactReference redacts a URL quoted by the HTTP client, which is not always
+// absolute: when the redirect cap stops a chain, the client quotes the
+// Location header as the server sent it, which may be a bare path and query.
+// RedactSource leaves a string with no scheme alone, because for a source that
+// is a local path, so the query is cut here.
+func redactReference(ref string) string {
+	out := RedactSource(ref)
+	if out == ref {
+		if i := strings.IndexAny(out, "?#"); i >= 0 {
+			out = out[:i] + redactedQuery
+		}
+	}
+	return out
+}
+
+// embeddedURLPattern finds an absolute URL inside error text, up to the first
+// whitespace or quote.
+var embeddedURLPattern = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]+://[^\s"]*`)
+
+// locationHeaderMarker opens the client's report of a redirect it could not
+// follow. The text after it quotes the Location header and then the parser's
+// complaint, which itself quotes pieces of the URL.
+const locationHeaderMarker = "failed to parse Location header"
+
+// malformedHeaderMarker opens the client's report of a response header line it
+// could not read. The line is quoted whole, and it can be a Location with a
+// signed query in a form no URL pattern recognises, such as a bare path.
+const malformedHeaderMarker = "malformed MIME header line"
+
+// redactedError is an error whose text has had every source redacted. The
+// original is kept as the cause, so errors.Is and errors.As still see it,
+// while Error never returns the original's text.
+type redactedError struct {
+	text  string
+	cause error
+}
+
+func (e *redactedError) Error() string { return e.text }
+
+func (e *redactedError) Unwrap() error { return e.cause }
+
+// RedactError returns err with every source in its text redacted.
+//
+// Three errors quote the source in full. The HTTP client reports a failed
+// request as a *url.Error whose text holds the URL, query included; after a
+// redirect that URL is the redirect target, which is where a presigned query
+// usually appears. url.Parse reports a refused URL the same way, and its
+// complaint quotes the piece it could not read, which can be part of a
+// password. Opening a local path reports an *fs.PathError holding the path,
+// and a URL in a spelling this package does not fetch is opened as one.
+//
+// So the text is rebuilt rather than patched: a parse failure keeps the
+// redacted URL and drops the parser's complaint, a redirect to an unreadable
+// Location keeps neither, and anything else has each URL in it redacted.
+func RedactError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &redactedError{text: redactedText(err), cause: err}
+}
+
+// redactedText renders err for RedactError.
+func redactedText(err error) string {
+	if urlErr, ok := errors.AsType[*url.Error](err); ok && urlErr == err {
+		if urlErr.Op == "parse" {
+			return fmt.Sprintf("parse %q: the URL is not valid", redactReference(urlErr.URL))
+		}
+		return fmt.Sprintf("%s %q: %s", urlErr.Op, redactReference(urlErr.URL), redactedText(urlErr.Err))
+	}
+	if pathErr, ok := errors.AsType[*fs.PathError](err); ok && pathErr == err {
+		return fmt.Sprintf("%s %s: %s", pathErr.Op, RedactSource(pathErr.Path), redactedText(pathErr.Err))
+	}
+	text := err.Error()
+	if strings.Contains(text, locationHeaderMarker) {
+		return "the server redirected to a URL that is not valid"
+	}
+	if strings.Contains(text, malformedHeaderMarker) {
+		return "the server sent a response header that is not valid"
+	}
+	return embeddedURLPattern.ReplaceAllStringFunc(text, RedactSource)
+}
+
 // URLSource reports whether src is an http:// or https:// URL. Anything else
 // is treated as a local filesystem path by OpenUploadSource.
 func URLSource(src string) bool {
@@ -63,7 +205,7 @@ func URLSource(src string) bool {
 func SanitizedTempPath(rawURL string) (string, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return "", fmt.Errorf("files: parsing URL %q: %w", rawURL, err)
+		return "", fmt.Errorf("files: parsing URL %q: %w", RedactSource(rawURL), RedactError(err))
 	}
 
 	base := path.Base(parsed.Path)
@@ -119,17 +261,17 @@ func DownloadCapped(ctx context.Context, src string, dst io.Writer, maxBytes int
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
 	if err != nil {
-		return "", 0, fmt.Errorf("files: building request: %w", err)
+		return "", 0, fmt.Errorf("files: building request: %w", RedactError(err))
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", 0, fmt.Errorf("files: fetching %q: %w", src, err)
+		return "", 0, fmt.Errorf("files: fetching %q: %w", RedactSource(src), RedactError(err))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", 0, fmt.Errorf("files: GET %q returned HTTP %d", src, resp.StatusCode)
+		return "", 0, fmt.Errorf("files: GET %q returned HTTP %d", RedactSource(src), resp.StatusCode)
 	}
 
 	limited := io.LimitReader(resp.Body, maxBytes)
@@ -195,20 +337,20 @@ func OpenURLStream(ctx context.Context, src string, maxBytes int64) (io.ReadClos
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
 	if err != nil {
-		return nil, "", -1, fmt.Errorf("files: building request: %w", err)
+		return nil, "", -1, fmt.Errorf("files: building request: %w", RedactError(err))
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, "", -1, fmt.Errorf("files: fetching %q: %w", src, err)
+		return nil, "", -1, fmt.Errorf("files: fetching %q: %w", RedactSource(src), RedactError(err))
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		_ = resp.Body.Close()
-		return nil, "", -1, fmt.Errorf("files: GET %q returned HTTP %d", src, resp.StatusCode)
+		return nil, "", -1, fmt.Errorf("files: GET %q returned HTTP %d", RedactSource(src), resp.StatusCode)
 	}
 	if resp.ContentLength > maxBytes {
 		_ = resp.Body.Close()
-		return nil, "", -1, fmt.Errorf("files: %q declares %d bytes, over the %d byte cap", src, resp.ContentLength, maxBytes)
+		return nil, "", -1, fmt.Errorf("files: %q declares %d bytes, over the %d byte cap", RedactSource(src), resp.ContentLength, maxBytes)
 	}
 
 	filename := path.Base(resp.Request.URL.Path)
@@ -246,7 +388,7 @@ func OpenUploadSource(ctx context.Context, src string, maxBytes int64) (*os.File
 	if !URLSource(src) {
 		f, err := os.Open(src) //nolint:gosec // user-supplied path is intentional
 		if err != nil {
-			return nil, "", noop, fmt.Errorf("files: opening local source %q: %w", src, err)
+			return nil, "", noop, fmt.Errorf("files: opening local source %q: %w", RedactSource(src), RedactError(err))
 		}
 		filename := filepath.Base(src)
 		cleanup := func() { _ = f.Close() }

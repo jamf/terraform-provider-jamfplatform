@@ -37,6 +37,7 @@ import (
 	"github.com/jamf/jamfplatform-go-sdk/jamfplatform/pro"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/files"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filesources"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 )
 
@@ -72,8 +73,16 @@ func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest
 	if isConfiguredString(plan.PackageFileSource) {
 		var diags diag.Diagnostics
 		route, diags = preflightUploadDestination(createCtx, r.client)
+		resp.Diagnostics.Append(diags...)
 		if diags.HasError() {
-			resp.Diagnostics.Append(diags...)
+			return
+		}
+	}
+
+	if isConfiguredString(plan.PackageFileSource) {
+		if err := preflightSource(createCtx, r.sources, plan.PackageFileSource.ValueString(), plannedPin(&plan)); err != nil {
+			summary, detail := sourceProblem(err)
+			resp.Diagnostics.AddError(summary, detail)
 			return
 		}
 	}
@@ -94,13 +103,13 @@ func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest
 
 	if isConfiguredString(plan.PackageFileSource) {
 		if streamingURLEnabled(plan) {
-			diags := streamURLUploadAndVerify(createCtx, r.client, route, &plan, fileDigests{}, "")
+			diags := streamURLUploadAndVerify(createCtx, r.client, r.sources, route, &plan, fileDigests{}, "")
 			resp.Diagnostics.Append(diags...)
 			if diags.HasError() {
 				return
 			}
 		} else {
-			resp.Diagnostics.Append(openHashUploadVerify(createCtx, r.client, route, &plan, fileDigests{}, "")...)
+			resp.Diagnostics.Append(openHashUploadVerify(createCtx, r.client, r.sources, route, &plan, fileDigests{}, "")...)
 			if resp.Diagnostics.HasError() {
 				return
 			}
@@ -123,6 +132,7 @@ func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	settleSourceVersion(&plan, "")
 
 	resp.Diagnostics.Append(helpers.SetIdentity(ctx, resp.Identity, packageIdentityModel{ID: plan.ID})...)
 	if resp.Diagnostics.HasError() {
@@ -134,6 +144,11 @@ func (r *PackageResource) Create(ctx context.Context, req resource.CreateRequest
 }
 
 // Read refreshes Terraform state with the latest package representation.
+//
+// It also clears package_file_source_version when the file Jamf Pro holds is
+// no longer the one the marker was recorded for (driftedOutsideTerraform). A
+// null marker is a difference to the next plan, so the plan shows the file as
+// changing and the apply puts the source's bytes back.
 func (r *PackageResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	defer r.collisions.NoteManagedState(ctx, resourceTypeName, &resp.State)
 	var state PackageResourceModel
@@ -196,9 +211,17 @@ func (r *PackageResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	recorded, recordedSize := recordedDigestsFromState(&state), state.Size.ValueString()
 	resp.Diagnostics.Append(assignPackageResourceModel(&state, got)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if !state.PackageFileSourceVersion.IsNull() && driftedOutsideTerraform(recorded, recordedDigestsFromState(&state), recordedSize, state.Size.ValueString()) {
+		state.PackageFileSourceVersion = types.StringNull()
+		resp.Diagnostics.AddWarning("Package file changed outside Terraform", fmt.Sprintf(
+			"The file Jamf Pro holds for package %s is not the one Terraform last uploaded from package_file_source. "+
+				"The next apply reads the source again and uploads it if Jamf Pro's file still differs.",
+			state.ID.ValueString()))
 	}
 
 	resp.Diagnostics.Append(helpers.SetIdentity(ctx, resp.Identity, packageIdentityModel{ID: state.ID})...)
@@ -220,6 +243,35 @@ func (r *PackageResource) Read(ctx context.Context, req resource.ReadRequest, re
 // rewind the SAME handle and upload it by the preflight's route. URL sources are
 // downloaded exactly once per Update. An upload by the direct route under a
 // changed file_name renames the record first (renameRecordBeforeUpload).
+//
+// A cloud storage source whose marker the plan kept is not opened at all
+// (sourceUnchanged): the update is the metadata PUT and nothing else. One
+// whose marker changed, or that state holds no marker for, is read pinned to
+// the marker the plan recorded, hashed and compared with the digests Jamf Pro
+// holds. A match skips the upload and records the marker, which is how an
+// imported package adopts its source without re-uploading; a record with no
+// digest is uploaded to (sameAsRecorded).
+//
+// For a cloud storage source both decisions are taken against the record as
+// Jamf Pro holds it now, read at the start, and not against state. State can
+// be stale: a plan made with -refresh=false, or a saved plan applied after the
+// file was replaced in Jamf Pro. Skipping an upload because the object matched
+// a stale digest would record a marker for bytes Jamf Pro does not hold, and
+// the final read would then write Jamf Pro's digests into state beside it, so
+// the drift check could never see the difference again. A local path or a URL
+// keeps comparing with state, as it did before cloud storage sources existed.
+//
+// stream_url_directly applies to a cloud storage source too. The kept-marker
+// skip comes first, so a metadata-only update of a streamed package sends
+// nothing, where for a URL every update re-sends the whole file. When the
+// object has changed, or state holds no marker for it, the streaming path
+// uploads without comparing digests first, because it has none until the
+// stream has passed through. Two exceptions read the object through the
+// hashers alone first and skip the upload on a match (sourceAlreadyHeld):
+// adoption, where state holds no marker for the source and the bytes may be
+// the ones Jamf Pro already has, and a changed marker on an object still the
+// size of Jamf Pro's file (sameSizeAsHeld), which is what an identical
+// rewrite or an Azure metadata edit looks like.
 func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state PackageResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -240,21 +292,63 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 		plan.ID = state.ID
 	}
 
+	var (
+		held     fileDigests
+		heldSize string
+	)
+	native := isConfiguredString(plan.PackageFileSource) && filesources.Native(plan.PackageFileSource.ValueString())
+	skipSource := false
+	if native {
+		current, getErr := r.client.GetPackageV1(updateCtx, plan.ID.ValueString())
+		if getErr != nil {
+			resp.Diagnostics.AddError("Error reading Jamf Pro package before update", helpers.APIErrorDetail(getErr))
+			return
+		}
+		held, heldSize = recordedDigests(current), helpers.DerefString(current.Size)
+		skipSource = sourceUnchanged(&plan, &state) &&
+			!driftedOutsideTerraform(recordedDigestsFromState(&state), held, state.Size.ValueString(), heldSize)
+	}
+
 	// Streaming-URL mode short-circuits the disk-staging path entirely.
 	// The metadata PUT runs first, then the streaming upload, then manifest
 	// reconciliation, then the final GET. No local hash compare gate — the
 	// streaming path always uploads (it has no local hash to compare against
 	// state until after the stream completes).
-	if streamingURLEnabled(plan) {
-		route, diags := preflightUploadDestination(updateCtx, r.client)
-		if diags.HasError() {
+	if streamingURLEnabled(plan) && !skipSource {
+		if diags := streamingChecksumProblem(&plan); diags.HasError() {
 			resp.Diagnostics.Append(diags...)
+			return
+		}
+		if native && held.strongest() >= 0 && (adoptingSource(&plan, &state) || sameSizeAsHeld(updateCtx, r.sources, plan.PackageFileSource.ValueString(), heldSize)) {
+			marker, alreadyHeld, heldErr := sourceAlreadyHeld(updateCtx, r.sources, plan.PackageFileSource.ValueString(), plannedPin(&plan), held)
+			if heldErr != nil {
+				summary, detail := sourceProblem(heldErr)
+				resp.Diagnostics.AddError(summary, detail)
+				return
+			}
+			if alreadyHeld {
+				settleSourceVersion(&plan, marker)
+				skipSource = true
+			}
+		}
+	}
+	if streamingURLEnabled(plan) && !skipSource {
+		route, diags := preflightUploadDestination(updateCtx, r.client)
+		resp.Diagnostics.Append(diags...)
+		if diags.HasError() {
 			return
 		}
 		// Upload + verify FIRST so JCDS has recomputed hashes when the
 		// metadata PUT lands (see disk-staging path for full rationale).
 		previous := recordedDigestsFromState(&state)
-		streamDiags := reuploadFromURL(updateCtx, r.client, route, &plan, &state, previous)
+		if native {
+			previous = held
+		}
+		previousSize := state.Size.ValueString()
+		if native {
+			previousSize = heldSize
+		}
+		streamDiags := reuploadFromURL(updateCtx, r.client, r.sources, route, &plan, &state, previous, previousSize)
 		resp.Diagnostics.Append(streamDiags...)
 		if streamDiags.HasError() {
 			return
@@ -306,21 +400,25 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 		local        fileDigests
 		localSize    int64
 		previous     fileDigests
+
+		recordedMarker string
 	)
-	if isConfiguredString(plan.PackageFileSource) {
+	if isConfiguredString(plan.PackageFileSource) && !skipSource {
 		var diags diag.Diagnostics
 		route, diags = preflightUploadDestination(updateCtx, r.client)
+		resp.Diagnostics.Append(diags...)
 		if diags.HasError() {
-			resp.Diagnostics.Append(diags...)
 			return
 		}
 
-		f, filename, c, openErr := files.OpenUploadSource(updateCtx, plan.PackageFileSource.ValueString(), files.DefaultMaxBytes)
+		f, filename, marker, c, openErr := openPackageSource(updateCtx, r.sources, plan.PackageFileSource.ValueString(), plannedPin(&plan))
 		if openErr != nil {
-			resp.Diagnostics.AddError("Error opening package binary", helpers.APIErrorDetail(openErr))
+			summary, detail := sourceProblem(openErr)
+			resp.Diagnostics.AddError(summary, detail)
 			return
 		}
 		cleanup = c
+		recordedMarker = marker
 
 		digests, sz, hashErr := hashStream(f)
 		if hashErr != nil {
@@ -344,13 +442,17 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 		}
 
 		previous = recordedDigestsFromState(&state)
-		willReupload = !previous.sameContent(local, state.Size.ValueString(), localSize)
+		recordedSize := state.Size.ValueString()
+		if native {
+			previous, recordedSize = held, heldSize
+		}
+		willReupload = !sameAsRecorded(native, previous, local, recordedSize, localSize)
 
 		tflog.Info(ctx, "package update reupload decision", map[string]any{
 			"state_sha3":    previous.sha3,
 			"local_sha3":    local.sha3,
 			"will_reupload": willReupload,
-			"source":        plan.PackageFileSource.ValueString(),
+			"source":        files.RedactSource(plan.PackageFileSource.ValueString()),
 			"file_name":     plan.FileName.ValueString(),
 			"id":            plan.ID.ValueString(),
 		})
@@ -474,6 +576,7 @@ func (r *PackageResource) Update(ctx context.Context, req resource.UpdateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	settleSourceVersion(&plan, recordedMarker)
 
 	resp.Diagnostics.Append(helpers.SetIdentity(ctx, resp.Identity, packageIdentityModel{ID: plan.ID})...)
 	if resp.Diagnostics.HasError() {
@@ -522,13 +625,17 @@ func isConfiguredString(v types.String) bool {
 // Create. Opens the source exactly once, hashes from the open handle,
 // validates the optional user-supplied checksum, rewinds, streams to
 // the preflight's route, and polls until convergence. previous is empty
-// on Create.
-func openHashUploadVerify(ctx context.Context, client uploadClient, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
-	file, filename, cleanup, err := files.OpenUploadSource(ctx, plan.PackageFileSource.ValueString(), files.DefaultMaxBytes)
+// on Create. sources reads an s3:// or azblob:// source and an https URL
+// whose host has a credential; a nil resolver reads a local path or a plain
+// URL as before. A cloud storage read is pinned to the marker the plan recorded, and the marker of
+// the bytes read is written to plan for state.
+func openHashUploadVerify(ctx context.Context, client uploadClient, sources *filesources.Resolver, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
+	file, filename, marker, cleanup, err := openPackageSource(ctx, sources, plan.PackageFileSource.ValueString(), plannedPin(plan))
 	if err != nil {
-		return errorDiag("Error opening package binary", err.Error())
+		return errorDiag(sourceProblem(err))
 	}
 	defer cleanup()
+	settleSourceVersion(plan, marker)
 
 	local, sz, hashErr := hashStream(file)
 	if hashErr != nil {
@@ -601,7 +708,7 @@ func preflightUploadDestination(ctx context.Context, client cloudDistributionPoi
 	cdp, err := client.GetCloudDistributionPointV1(ctx)
 	if err != nil {
 		tflog.Warn(ctx, "could not read the cloud distribution point before uploading; proceeding by the API route", map[string]any{"err": err.Error()})
-		return uploadViaAPI, nil
+		return uploadViaAPI, diag.Diagnostics{diag.NewWarningDiagnostic(cdpUnreadableSummary, cdpUnreadableDetail(err))}
 	}
 	if cdp == nil || strings.EqualFold(cdp.CdnType, pro.CloudDistributionPointCdnTypeNone) {
 		return uploadViaAPI, errorDiag(
@@ -614,6 +721,38 @@ func preflightUploadDestination(ctx context.Context, client cloudDistributionPoi
 	route := routeForCdnType(cdp.CdnType)
 	tflog.Debug(ctx, "package upload route chosen", map[string]any{"cdn_type": cdp.CdnType, "route": route.String()})
 	return route, nil
+}
+
+// cdpUnreadableSummary heads the warning preflightUploadDestination raises
+// when it cannot read the cloud distribution point and falls back to the API
+// route.
+const cdpUnreadableSummary = "Package uploaded without reading the cloud distribution point"
+
+// cdpUnreadableDetail is the warning's detail. Without it the operator cannot
+// tell from the plan output that the upload took the API route rather than the
+// direct one. A 403 is almost always the integration missing the read
+// permission, so that case names it.
+func cdpUnreadableDetail(err error) string {
+	cause := "The provider could not read the cloud distribution point settings."
+	if helpers.IsForbiddenError(err) {
+		cause = "Jamf Pro refused to show the cloud distribution point settings. Grant the API integration Infrastructure → Cloud Distribution Point → Read."
+	}
+	return cause + "\n\n" +
+		"The provider is uploading the file through Jamf Pro instead of straight to the distribution point. " +
+		"A direct upload also needs Infrastructure → Jamf Cloud Distribution Service files → Create.\n\n" +
+		helpers.APIErrorDetail(err)
+}
+
+// uploadFailureDetail is the detail of a failed binary upload. A 403 on the
+// direct route is Jamf Pro refusing to issue upload credentials, which an
+// integration that can read and write packages still meets when it lacks the
+// one JCDS permission, so that case names it. Every other failure is passed
+// through.
+func uploadFailureDetail(route uploadRoute, err error) string {
+	if route == uploadViaJCDS && helpers.IsForbiddenError(err) {
+		return "Jamf Pro refused to issue credentials for uploading to the Jamf Cloud Distribution Point. Grant the API integration Infrastructure → Jamf Cloud Distribution Service files → Create.\n\n" + helpers.APIErrorDetail(err)
+	}
+	return helpers.APIErrorDetail(err)
 }
 
 // cloudDistributionPointReader is the one SDK call preflightUploadDestination
@@ -656,7 +795,7 @@ func uploadAndPoll(ctx context.Context, client uploadClient, route uploadRoute, 
 		})
 		if err := uploadBinary(ctx, client, route, id, fileName, file); err != nil {
 			tflog.Error(ctx, "package upload failed", map[string]any{"err": err.Error(), "attempt": attempt, "route": route.String()})
-			return errorDiag("Error uploading Jamf Pro package binary", err.Error())
+			return errorDiag("Error uploading Jamf Pro package binary", uploadFailureDetail(route, err))
 		}
 		tflog.Info(ctx, "package upload returned", map[string]any{"id": id, "attempt": attempt, "route": route.String()})
 
@@ -766,13 +905,15 @@ func errorDiag(summary, detail string) diag.Diagnostics {
 }
 
 // streamingURLEnabled reports whether the plan opted into the
-// stream-the-URL-body-directly path AND the package source is in fact a
-// URL. For local-path sources the flag is silently ignored.
+// stream-the-body-directly path AND the package source is one that can be
+// streamed: a URL or a cloud storage object. For local-path sources the flag
+// is silently ignored.
 func streamingURLEnabled(plan PackageResourceModel) bool {
-	if !plan.StreamURLDirectly.ValueBool() {
+	if !plan.StreamURLDirectly.ValueBool() || !isConfiguredString(plan.PackageFileSource) {
 		return false
 	}
-	return isConfiguredString(plan.PackageFileSource) && files.URLSource(plan.PackageFileSource.ValueString())
+	src := plan.PackageFileSource.ValueString()
+	return files.URLSource(src) || filesources.Native(src)
 }
 
 // streamURLUploadAndVerify wires up io.Pipe + io.MultiWriter so the URL
@@ -796,9 +937,9 @@ func streamingURLEnabled(plan PackageResourceModel) bool {
 // Trade is intentional: see schema description for the user-facing
 // rationale. Caller has already enforced `package_file_source` is a URL
 // (streamingURLEnabled guards entry).
-func streamURLUploadAndVerify(ctx context.Context, client uploadClient, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
+func streamURLUploadAndVerify(ctx context.Context, client uploadClient, sources *filesources.Resolver, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string) diag.Diagnostics {
 	for attempt := 1; ; attempt++ {
-		diags, pollErr := streamURLUploadOnce(ctx, client, route, plan, previous, previousSize, attempt)
+		diags, pollErr := streamURLUploadOnce(ctx, client, sources, route, plan, previous, previousSize, attempt)
 		if diags.HasError() {
 			return diags
 		}
@@ -806,7 +947,7 @@ func streamURLUploadAndVerify(ctx context.Context, client uploadClient, route up
 			tflog.Warn(ctx, "package URL declared no Content-Length; staging to disk instead of streaming", map[string]any{
 				"id": plan.ID.ValueString(),
 			})
-			return openHashUploadVerify(ctx, client, route, plan, previous, previousSize)
+			return openHashUploadVerify(ctx, client, sources, route, plan, previous, previousSize)
 		}
 		if pollErr == nil {
 			return nil
@@ -844,10 +985,17 @@ var errStreamSizeUnknown = errors.New("package URL declared no Content-Length")
 // diagnostics for anything that fails before the poll (opening the URL,
 // streaming the upload itself); otherwise returns the poll's error (nil on
 // convergence) for the caller's retry decision.
-func streamURLUploadOnce(ctx context.Context, client uploadClient, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string, attempt int) (diag.Diagnostics, error) {
-	body, urlFilename, declaredSize, err := files.OpenURLStream(ctx, plan.PackageFileSource.ValueString(), files.DefaultMaxBytes)
+func streamURLUploadOnce(ctx context.Context, client uploadClient, sources *filesources.Resolver, route uploadRoute, plan *PackageResourceModel, previous fileDigests, previousSize string, attempt int) (diag.Diagnostics, error) {
+	if diags := streamingChecksumProblem(plan); diags.HasError() {
+		return diags, nil
+	}
+	body, urlFilename, declaredSize, marker, err := openPackageURLStream(ctx, sources, plan.PackageFileSource.ValueString(), plannedPin(plan))
 	if err != nil {
-		return errorDiag("Error opening package URL stream", err.Error()), nil
+		summary, detail := sourceProblem(err)
+		if summary == openProblemSummary {
+			summary = "Error opening package URL stream"
+		}
+		return errorDiag(summary, detail), nil
 	}
 	defer func() { _ = body.Close() }()
 	if declaredSize < 0 {
@@ -884,9 +1032,10 @@ func streamURLUploadOnce(ctx context.Context, client uploadClient, route uploadR
 	if err := uploadBinary(ctx, client, route, plan.ID.ValueString(), fileName, jamfplatform.SizedReader(pr, declaredSize)); err != nil {
 		// Drain any remaining body so the goroutine exits cleanly.
 		_ = pr.CloseWithError(err)
-		return errorDiag("Error streaming Jamf Pro package upload", err.Error()), nil
+		return errorDiag("Error streaming Jamf Pro package upload", uploadFailureDetail(route, err)), nil
 	}
 
+	settleSourceVersion(plan, marker)
 	local := digests.sum()
 	localSize := bytesStreamed
 
@@ -927,6 +1076,7 @@ func reconcileManifestAndFinalise(updateCtx, identityCtx context.Context, client
 	if diags := assignPackageResourceModel(plan, got); diags.HasError() {
 		return diags
 	}
+	settleSourceVersion(plan, "")
 	if diags := helpers.SetIdentity(identityCtx, resp.Identity, packageIdentityModel{ID: plan.ID}); diags.HasError() {
 		return diags
 	}

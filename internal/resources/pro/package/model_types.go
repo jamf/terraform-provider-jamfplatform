@@ -42,6 +42,7 @@ type PackageResourceModel struct {
 	PackageFileSource         types.String `tfsdk:"package_file_source"`
 	PackageFileSourceChecksum types.String `tfsdk:"package_file_source_checksum"`
 	StreamURLDirectly         types.Bool   `tfsdk:"stream_url_directly"`
+	PackageFileSourceVersion  types.String `tfsdk:"package_file_source_version"`
 	ManifestFileSource        types.String `tfsdk:"manifest_file_source"`
 
 	// Manifest body Computed: server echoes verbatim plist on read.

@@ -23,6 +23,7 @@ import (
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/files"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
+	commonvalidators "github.com/jamf/terraform-provider-jamfplatform/internal/common/validators"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/providerdata"
 )
 
@@ -116,6 +117,7 @@ Point ` + "`icon_file_source`" + ` at your original upload instead of the CDN-do
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
+					commonvalidators.NoCloudStorageSource(),
 				},
 			},
 			"source_hash": schema.StringAttribute{

@@ -17,6 +17,14 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
+    # github.com/hashicorp/go-azure-sdk/sdk publishes a dated pseudo-version almost every
+    # day, and the provider uses two small packages of it to obtain a Microsoft Entra
+    # token. Grouped, its updates share one open pull request that Dependabot keeps
+    # current, in place of a new pull request a day.
+    groups:
+      go-azure-sdk:
+        patterns:
+          - "github.com/hashicorp/go-azure-sdk/*"
 
   - package-ecosystem: "gomod"
     directory: "/tools"

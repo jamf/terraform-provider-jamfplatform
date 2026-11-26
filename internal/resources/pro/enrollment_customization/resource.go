@@ -122,6 +122,7 @@ func (r *EnrollmentCustomizationResource) Schema(ctx context.Context, req resour
 				Optional:            true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
+					validators.NoCloudStorageSource(),
 					stringvalidator.ConflictsWith(path.MatchRoot("branding_settings").AtName("icon_url")),
 				},
 			},

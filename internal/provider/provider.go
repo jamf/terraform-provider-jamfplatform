@@ -37,6 +37,7 @@ import (
 	patchactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/pro/patch"
 	uemconnectactions "github.com/jamf/terraform-provider-jamfplatform/internal/actions/security_cloud/uem_connect"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/collision"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filesources"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/helpers"
 	mcxforcedpayload "github.com/jamf/terraform-provider-jamfplatform/internal/functions/mcx_forced_payload"
 	"github.com/jamf/terraform-provider-jamfplatform/internal/functions/mobileconfig"
@@ -216,6 +217,7 @@ type JamfPlatformProviderModel struct {
 	MinRequestIntervalMs types.Int64  `tfsdk:"min_request_interval_ms"`
 	ImpactAlerts         types.Bool   `tfsdk:"impact_alerts"`
 	NameCollisionCheck   types.Object `tfsdk:"name_collision_check"`
+	FileSources          types.Object `tfsdk:"file_sources"`
 
 	CustomHeaders           types.Map    `tfsdk:"custom_headers"`
 	AuthorizationHeaderName types.String `tfsdk:"authorization_header_name"`
@@ -376,6 +378,7 @@ func (p *JamfPlatformProvider) Schema(ctx context.Context, req provider.SchemaRe
 					},
 				},
 			},
+			"file_sources": fileSourcesAttribute(),
 		},
 	}
 }
@@ -529,6 +532,13 @@ func (p *JamfPlatformProvider) Configure(ctx context.Context, req provider.Confi
 		resp.Diagnostics.AddWarning("Invalid name collision check setting", w)
 	}
 	pd.EnableNameCollisionCheck(collisionCfg)
+	fileSourcesCfg, fileSourcesUnknown, fileSourcesDiags := resolveFileSources(ctx, data.FileSources)
+	resp.Diagnostics.Append(fileSourcesDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	fileSourcesCfg.UserAgent = "terraform-provider-jamfplatform/" + p.version
+	pd.SetFileSources(filesources.New(fileSourcesCfg, fileSourcesUnknown))
 	resp.DataSourceData = pd
 	resp.ResourceData = pd
 	resp.ListResourceData = pd

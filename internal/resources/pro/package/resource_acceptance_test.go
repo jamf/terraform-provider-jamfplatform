@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -641,6 +642,55 @@ resource "jamfplatform_pro_package" "test" {
 					resource.TestCheckResourceAttrSet(packageResourceAddr, "size"),
 					testCheckPackageHashConverged(t, packageResourceAddr, staticDigest(sha161)),
 				),
+			},
+		},
+	})
+}
+
+// TestAccResource_ProPackage_SourceSchemeValidation is the negative case for
+// the two upload-source validators. Each configuration must be refused while
+// planning, before anything reaches Jamf Pro or a store, so the test needs no
+// distribution point and no bucket.
+func TestAccResource_ProPackage_SourceSchemeValidation(t *testing.T) {
+	testhelpers.AccPreCheck(t)
+
+	config := func(attribute, value string) string {
+		return fmt.Sprintf(`
+resource "jamfplatform_pro_package" "test" {
+  display_name = "tf-acc-source-scheme"
+  file_name    = "tf-acc-source-scheme.pkg"
+  %s = %q
+}
+`, attribute, value)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testhelpers.AccTestProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      config("package_file_source", "gs://bucket/app.pkg"),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Unsupported\s+source\s+scheme`),
+			},
+			{
+				Config:      config("package_file_source", "S3://bucket/app.pkg"),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Source\s+scheme\s+must\s+be\s+lower\s+case`),
+			},
+			{
+				Config:      config("package_file_source", "s3://bucket"),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Invalid\s+cloud\s+storage\s+source`),
+			},
+			{
+				Config:      config("manifest_file_source", "s3://bucket/app.plist"),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Cloud\s+storage\s+source\s+not\s+supported\s+here`),
+			},
+			{
+				Config:      config("manifest_file_source", "azblob://account/container/app.plist"),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Cloud\s+storage\s+source\s+not\s+supported\s+here`),
 			},
 		},
 	})

@@ -6,13 +6,13 @@ package pkg
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/jamf/terraform-provider-jamfplatform/internal/common/files"
+	"github.com/jamf/terraform-provider-jamfplatform/internal/common/filesources"
 )
 
 // planUploadedContentChange leaves every attribute Jamf Pro derives from the
@@ -30,7 +30,8 @@ import (
 // bytes hashed are the bytes uploaded; fetching it here would download the
 // binary on every plan. Content changing behind an unchanged URL is therefore
 // not detected at plan time — Update still re-uploads when it runs for another
-// reason.
+// reason. A cloud storage source is skipped here for the same reason, and
+// because its change is read from the store's marker, not from its bytes.
 //
 // The values are left Unknown rather than set to the local digest: the server's
 // figure after the upload is the truth, and a file edited between plan and apply
@@ -44,7 +45,7 @@ func planUploadedContentChange(ctx context.Context, req resource.ModifyPlanReque
 	if diags := req.Plan.GetAttribute(ctx, path.Root("package_file_source"), &source); diags.HasError() {
 		return
 	}
-	if !isConfiguredString(source) || files.URLSource(source.ValueString()) {
+	if !isConfiguredString(source) || files.URLSource(source.ValueString()) || filesources.Native(source.ValueString()) {
 		return
 	}
 	var stateSha3, stateSha256, stateMD5, stateSize types.String
@@ -71,9 +72,5 @@ func planUploadedContentChange(ctx context.Context, req resource.ModifyPlanReque
 		return
 	}
 
-	var diags diag.Diagnostics
-	for _, name := range []string{"sha3_512", "sha256", "md5", "hash_value", "size"} {
-		diags.Append(resp.Plan.SetAttribute(ctx, path.Root(name), types.StringUnknown())...)
-	}
-	resp.Diagnostics.Append(diags...)
+	markUploadDerivedUnknown(ctx, resp)
 }
